@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 - 2026-07-19
+
+- Replaces direct `innerHTML` writes with Obsidian icons and explicit DOM construction.
+- Preserves custom view placement when the plugin unloads.
+- Uses native Obsidian setting headings.
+- Adds GitHub build provenance attestations for release assets.
+
 ## 1.0.1 - 2026-07-19
 
 - Simplifies the built-in media note body to the title, AnimeList detail block, cover, and creation timestamp.

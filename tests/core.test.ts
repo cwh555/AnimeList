@@ -117,7 +117,35 @@ describe("timeline modal and Traditional Chinese labels", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     assert.match(legacySource, /active: "追番中"/);
     assert.match(legacySource, /planned: "待追"/);
-    assert.ok(legacySource.includes("<span>時間軸</span>"));
+    assert.match(legacySource, /appendIconLabel\(timelineButton, "timeline", "時間軸"\)/);
     assert.doesNotMatch(legacySource, /完成時間軸|願望清單|active: "追番"/);
+  });
+});
+
+
+describe("Obsidian community review compliance", () => {
+  it("does not assign HTML strings directly", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    assert.doesNotMatch(legacySource, /\.innerHTML\s*=/);
+    assert.match(legacySource, /setIcon\(/);
+  });
+
+  it("preserves custom view placement during plugin unload", () => {
+    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    assert.doesNotMatch(mainSource, /detachLeavesOfType/);
+  });
+
+  it("uses native setting headings", () => {
+    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
+    assert.doesNotMatch(settingsSource, /createEl\("h[23]"/);
+    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 3);
+  });
+
+  it("attests release assets", () => {
+    const workflow = readFileSync(path.join(process.cwd(), ".github/workflows/release.yml"), "utf8");
+    assert.match(workflow, /actions\/attest@v4/);
+    assert.match(workflow, /attestations: write/);
+    assert.match(workflow, /artifact-metadata: write/);
+    assert.match(workflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/);
   });
 });

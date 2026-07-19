@@ -49,7 +49,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "AnimeList" });
+    new Setting(containerEl).setName("AnimeList").setHeading();
     containerEl.createEl("p", {
       text: "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.",
     });
@@ -138,7 +138,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("h3", { text: "Metadata providers" });
+    new Setting(containerEl).setName("Metadata providers").setHeading();
     const providerRows: Array<[keyof AnimeListSettings["providers"], string, string]> = [
       ["bangumi", "Bangumi", "Search anime, manga, and light novels. Useful for Chinese and Japanese titles."],
       ["anilist", "AniList", "Search anime, manga, and light novels with structured metadata."],
@@ -156,7 +156,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
         );
     });
 
-    containerEl.createEl("h3", { text: "Library setup" });
+    new Setting(containerEl).setName("Library setup").setHeading();
     new Setting(containerEl)
       .setName("Create configured folders")
       .setDesc("Creates missing note, cover, and template folders. Existing files are never moved or overwritten.")

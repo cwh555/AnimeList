@@ -63,6 +63,7 @@ export class Setting {
   constructor(_container?: any) {}
   setName(): this { return this; }
   setDesc(): this { return this; }
+  setHeading(): this { return this; }
   addDropdown(callback: (control: SettingControl) => void): this { callback(new SettingControl()); return this; }
   addText(callback: (control: SettingControl) => void): this { callback(new SettingControl()); return this; }
   addTextArea(callback: (control: SettingControl) => void): this { callback(new SettingControl()); return this; }
@@ -77,3 +78,5 @@ export function normalizePath(path: string): string {
 export async function requestUrl(): Promise<any> {
   throw new Error("requestUrl is not available in unit tests");
 }
+
+export function setIcon(_parent: HTMLElement, _iconId: string): void {}

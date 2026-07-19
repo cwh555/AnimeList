@@ -1,7 +1,7 @@
 // @ts-nocheck
-import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath } from "obsidian";
+import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
 
-const PLUGIN_VERSION = "1.0.1";
+const PLUGIN_VERSION = "1.0.2";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
@@ -369,23 +369,30 @@ function createEl(tag, className, text) {
   return node;
 }
 
-function iconSvg(name) {
-  const icons = {
-    search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>',
-    grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
-    list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"></path><circle cx="3" cy="6" r="1"></circle><circle cx="3" cy="12" r="1"></circle><circle cx="3" cy="18" r="1"></circle></svg>',
-    poster: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path></svg>',
-    sort: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M6 12h12M10 18h4"></path></svg>',
-    book: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"></path></svg>',
-    plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>',
-    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>',
-    timeline: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"></path><circle cx="7" cy="12" r="2"></circle><circle cx="17" cy="12" r="2"></circle><path d="M7 10V6M17 14v4"></path></svg>',
-    trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v5M14 11v5"></path></svg>',
-    external: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7"></path><path d="m10 14 11-11"></path><path d="M21 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6"></path></svg>',
-    minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>',
-    fit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>',
+function setAnimeListIcon(element, name) {
+  const iconIds = {
+    search: "search",
+    grid: "layout-grid",
+    list: "list",
+    poster: "image",
+    sort: "list-filter",
+    book: "book-open",
+    plus: "plus",
+    edit: "pencil",
+    timeline: "git-branch",
+    trash: "trash-2",
+    external: "external-link",
+    minus: "minus",
+    fit: "maximize-2",
   };
-  return icons[name] || "";
+  setIcon(element, iconIds[name] || name);
+  return element;
+}
+
+function appendIconLabel(element, icon, label) {
+  setAnimeListIcon(element, icon);
+  element.appendChild(createEl("span", "", label));
+  return element;
 }
 
 export const AnimeListUI = (() => {
@@ -426,7 +433,7 @@ export const AnimeListUI = (() => {
   };
 
   function renderLibrary(container, inputItems, adapters = {}) {
-    container.innerHTML = "";
+    container.replaceChildren();
     const items = inputItems.map(normalize);
     const genres = [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
     const initialState = adapters.initialState || {};
@@ -467,14 +474,14 @@ export const AnimeListUI = (() => {
     if (openTimeline) {
       const timelineButton = createEl("button", "al-secondary-button");
       timelineButton.type = "button";
-      timelineButton.innerHTML = `${iconSvg("timeline")}<span>時間軸</span>`;
+      appendIconLabel(timelineButton, "timeline", "時間軸");
       timelineButton.addEventListener("click", () => openTimeline());
       headerActions.appendChild(timelineButton);
     }
     if (addItem) {
       const addButton = createEl("button", "al-add-button");
       addButton.type = "button";
-      addButton.innerHTML = `${iconSvg("plus")}<span>收錄作品</span>`;
+      appendIconLabel(addButton, "plus", "收錄作品");
       addButton.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
       headerActions.appendChild(addButton);
     }
@@ -502,7 +509,7 @@ export const AnimeListUI = (() => {
     const toolbar = createEl("div", "al-toolbar");
     const searchWrap = createEl("label", "al-search");
     const searchIcon = createEl("span", "al-icon");
-    searchIcon.innerHTML = iconSvg("search");
+    setAnimeListIcon(searchIcon, "search");
     const searchInput = createEl("input");
     searchInput.type = "search";
     searchInput.placeholder = "搜尋標題、原名、作者、工作室或分類…";
@@ -524,7 +531,7 @@ export const AnimeListUI = (() => {
 
     const sortWrap = createEl("label", "al-sort");
     const sortIcon = createEl("span", "al-icon");
-    sortIcon.innerHTML = iconSvg("sort");
+    setAnimeListIcon(sortIcon, "sort");
     const sortSelect = createEl("select");
     [
       ["completed-desc", "最近完成"], ["completed-asc", "最早完成"],
@@ -547,7 +554,7 @@ export const AnimeListUI = (() => {
       button.type = "button";
       button.title = label;
       button.setAttribute("aria-label", label);
-      button.innerHTML = iconSvg(icon);
+      setAnimeListIcon(button, icon);
       button.addEventListener("click", () => {
         state.view = key;
         if (adapters.onViewChange) adapters.onViewChange(key);
@@ -602,7 +609,7 @@ export const AnimeListUI = (() => {
       } else {
         const missing = createEl("div", "al-cover-missing");
         const icon = createEl("span", "al-icon-large");
-        icon.innerHTML = iconSvg("book");
+        setAnimeListIcon(icon, "book");
         missing.append(icon, createEl("span", "", "尚未設定封面"));
         media.appendChild(missing);
       }
@@ -631,7 +638,7 @@ export const AnimeListUI = (() => {
         editButton.type = "button";
         editButton.title = "整理這筆紀錄";
         editButton.setAttribute("aria-label", editButton.title);
-        editButton.innerHTML = iconSvg("edit");
+        setAnimeListIcon(editButton, "edit");
         editButton.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); editItem(item.filePath); });
         topActions.appendChild(editButton);
       }
@@ -704,11 +711,11 @@ export const AnimeListUI = (() => {
       const genreSuffix = state.genre === "all" ? "" : ` · ${state.genre}`;
       resultMeta.textContent = `顯示 ${filtered.length} / ${items.length} 部${genreSuffix}`;
       grid.className = `al-grid is-${state.view}`;
-      grid.innerHTML = "";
+      grid.replaceChildren();
       if (!filtered.length) {
         const empty = createEl("div", "al-empty");
         const icon = createEl("span", "al-empty-icon");
-        icon.innerHTML = iconSvg("book");
+        setAnimeListIcon(icon, "book");
         empty.append(icon, createEl("strong", "", "這一頁暫時沒有作品"), createEl("span", "", "換個分類、狀態或搜尋詞，也許就能再次遇見它。"));
         grid.appendChild(empty);
         return;
@@ -759,7 +766,11 @@ export const TimelineUI = (() => {
       .sort((a, b) => a.completedTime - b.completedTime || String(a.title).localeCompare(String(b.title), "zh-Hant"));
     if (!items.length) {
       const empty = createEl("div", "al-timeline-empty");
-      empty.innerHTML = `${iconSvg("timeline")}<strong>時間軸還沒有留下足跡</strong><span>完成作品後，它會依完成日期出現在這裡。</span>`;
+      setAnimeListIcon(empty, "timeline");
+      empty.append(
+        createEl("strong", "", "時間軸還沒有留下足跡"),
+        createEl("span", "", "完成作品後，它會依完成日期出現在這裡。"),
+      );
       container.appendChild(empty);
       return { items: 0 };
     }
@@ -787,12 +798,12 @@ export const TimelineUI = (() => {
     copy.append(createEl("strong", "", "時間軸"), createEl("span", "", `${items.length} 部作品 · ${formatDate(minTime)} 至 ${formatDate(maxTime)}`));
     const controls = createEl("div", "al-timeline-controls");
     const zoomOut = createEl("button", "", "");
-    zoomOut.type = "button"; zoomOut.title = "縮短日期間距"; zoomOut.innerHTML = iconSvg("minus");
+    zoomOut.type = "button"; zoomOut.title = "縮短日期間距"; setAnimeListIcon(zoomOut, "minus");
     const zoomLabel = createEl("span", "al-timeline-zoom", "100%");
     const zoomIn = createEl("button", "", "");
-    zoomIn.type = "button"; zoomIn.title = "拉開日期間距"; zoomIn.innerHTML = iconSvg("plus");
+    zoomIn.type = "button"; zoomIn.title = "拉開日期間距"; setAnimeListIcon(zoomIn, "plus");
     const fit = createEl("button", "", "");
-    fit.type = "button"; fit.title = "完整顯示"; fit.innerHTML = iconSvg("fit");
+    fit.type = "button"; fit.title = "完整顯示"; setAnimeListIcon(fit, "fit");
     controls.append(zoomOut, zoomLabel, zoomIn, fit);
     toolbar.append(copy, controls);
     root.appendChild(toolbar);
@@ -1018,7 +1029,13 @@ class AddMediaModal extends Modal {
     this.contentEl.replaceChildren();
     const heading = document.createElement("div");
     heading.className = "al-modal-heading";
-    heading.innerHTML = `<div><div class="al-kicker">ADD TO YOUR LIBRARY</div><h2>把作品收進書架</h2><p>選擇類型，再輸入名稱；封面、原名與資料連結會一併整理好。</p></div>`;
+    const headingCopy = createEl("div");
+    headingCopy.append(
+      createEl("div", "al-kicker", "ADD TO YOUR LIBRARY"),
+      createEl("h2", "", "把作品收進書架"),
+      createEl("p", "", "選擇類型，再輸入名稱；封面、原名與資料連結會一併整理好。"),
+    );
+    heading.appendChild(headingCopy);
     this.contentEl.appendChild(heading);
 
     const typeTabs = document.createElement("div");
@@ -1151,9 +1168,11 @@ class AddMediaModal extends Modal {
       preview.appendChild(image);
     }
     const copy = document.createElement("div");
-    copy.innerHTML = `<div class="al-kicker">${LABEL.provider[result.provider] || result.provider}</div><h2></h2><p></p>`;
-    copy.querySelector("h2").textContent = result.title;
-    copy.querySelector("p").textContent = result.originalTitle || result.romajiTitle || "";
+    copy.append(
+      createEl("div", "al-kicker", LABEL.provider[result.provider] || result.provider),
+      createEl("h2", "", result.title),
+      createEl("p", "", result.originalTitle || result.romajiTitle || ""),
+    );
     preview.appendChild(copy);
     this.contentEl.appendChild(preview);
 
@@ -1330,7 +1349,7 @@ class EditMediaModal extends Modal {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "al-delete-button";
-    deleteButton.innerHTML = `${iconSvg("trash")}<span>移除作品</span>`;
+    appendIconLabel(deleteButton, "trash", "移除作品");
     deleteButton.addEventListener("click", () => {
       new ConfirmDeleteModal(this.plugin, this.file, () => this.close()).open();
     });
@@ -1491,9 +1510,9 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     actions.append(favorite, edit, library);
     const urls = asArray(fm.source_urls).filter(Boolean);
     if (urls[0]) {
-      const external = createEl("button", "", "查看資料來源");
+      const external = createEl("button");
       external.type = "button";
-      external.innerHTML = `${iconSvg("external")}<span>查看資料來源</span>`;
+      appendIconLabel(external, "external", "查看資料來源");
       external.addEventListener("click", () => window.open(String(urls[0]), "_blank"));
       actions.appendChild(external);
     }

@@ -18,7 +18,7 @@ import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import type { AnimeListSettings, LibrarySection, MediaType } from "./types";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.0.1";
+const PLUGIN_VERSION = "1.0.2";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 
 const {
@@ -134,10 +134,6 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
     this.registerEvent(this.app.vault.on("delete", () => this.refreshViews()));
     this.registerEvent(this.app.vault.on("rename", () => this.refreshViews()));
-  }
-
-  onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE);
   }
 
   private parseLegacyConfig(source: string): Record<string, string> {
