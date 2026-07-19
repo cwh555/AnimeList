@@ -4,7 +4,11 @@ import process from "node:process";
 const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const versions = JSON.parse(fs.readFileSync("versions.json", "utf8"));
-const tag = process.env.GITHUB_REF_NAME || process.argv[2] || "";
+const explicitTag = process.argv[2] || "";
+const githubTag = process.env.GITHUB_REF_TYPE === "tag"
+  ? process.env.GITHUB_REF_NAME || ""
+  : "";
+const tag = explicitTag || githubTag;
 
 const failures = [];
 if (manifest.version !== packageJson.version) failures.push("manifest.json and package.json versions differ");
