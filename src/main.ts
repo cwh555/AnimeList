@@ -18,7 +18,7 @@ import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import type { AnimeListSettings, LibrarySection, MediaType } from "./types";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.0.0";
+const PLUGIN_VERSION = "1.0.1";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 
 const {
@@ -245,10 +245,6 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
 
   private async copyBuiltInTemplates(): Promise<void> {
     const files: Array<[string, string]> = [
-      ["Anime/觀後札記.md", BUILTIN_TEMPLATES["builtin:anime-review"]],
-      ["Anime/逐集隨筆.md", BUILTIN_TEMPLATES["builtin:anime-episode-notes"]],
-      ["Manga/閱讀札記.md", BUILTIN_TEMPLATES["builtin:manga-reading-notes"]],
-      ["Novel/閱讀札記.md", BUILTIN_TEMPLATES["builtin:novel-reading-notes"]],
       ["Common/簡潔筆記.md", BUILTIN_TEMPLATES["builtin:plain"]],
     ];
     for (const [relativePath, content] of files) {

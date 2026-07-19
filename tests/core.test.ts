@@ -71,7 +71,13 @@ describe("media note generation", () => {
     assert.ok(markdown.includes("progress: 12"));
     assert.ok(markdown.includes('completed_at: "2026-01-02"'));
     assert.ok(!markdown.includes("updated_at:"));
-    assert.ok(markdown.includes("## 觀後心得"));
+    const body = markdown.split("---").slice(2).join("---").trim();
+    assert.match(
+      body,
+      /^# Example\n\n```animelist-detail\n```\n\n!\[\[AnimeList\/Covers\/anime\/example\.webp\|260]]\n\n> Added on \d{4}-\d{2}-\d{2} at \d{2}:\d{2}\.$/,
+    );
+    assert.ok(!body.includes("## 作品簡介"));
+    assert.ok(!body.includes("## 資料來源"));
   });
 });
 
@@ -84,7 +90,9 @@ describe("repository defaults", () => {
 
   it("offers built-in and custom-compatible templates", () => {
     const animeTemplates = getBuiltInTemplateOptions("anime");
-    assert.ok(animeTemplates.map((item) => item.path).includes("builtin:anime-review"));
+    assert.deepEqual(animeTemplates, [
+      { path: "builtin:plain", name: "簡潔筆記（內建）" },
+    ]);
   });
 
   it("supports managed and flat media paths", () => {

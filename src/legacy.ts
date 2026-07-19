@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath } from "obsidian";
 
-const PLUGIN_VERSION = "1.0.0";
+const PLUGIN_VERSION = "1.0.1";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
@@ -283,7 +283,7 @@ function applyTemplateVariables(content, context) {
 function ensureDetailBlock(body, title) {
   const detail = "```animelist-detail\n```";
   let text = String(body || "").trim();
-  if (!text) text = `# ${title}\n\n## 心得\n\n- `;
+  if (!text) text = `# ${title}\n\n> Added on ${todayString()} at ${currentTimeString()}.`;
   if (text.includes("```animelist-detail")) return text;
   const lines = text.split(/\r?\n/);
   const headingIndex = lines.findIndex((line) => /^#\s+/.test(line));
@@ -344,8 +344,6 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   let body = ensureDetailBlock(applied, title);
   if (coverPath && !body.includes(coverPath)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![[${coverPath}|260]]`);
   else if (!coverPath && result.coverUrl && !body.includes(result.coverUrl)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![${title} 封面](${result.coverUrl})`);
-  if (result.summary && !body.includes(result.summary) && !/##\s+作品簡介/.test(body)) body += `\n\n## 作品簡介\n\n${result.summary}`;
-  if (result.sourceUrl && !body.includes(result.sourceUrl)) body += `\n\n## 資料來源\n\n[${LABEL.provider[result.provider] || result.provider}](${result.sourceUrl})`;
   lines.push(body.trim(), "");
   return lines.join("\n");
 }

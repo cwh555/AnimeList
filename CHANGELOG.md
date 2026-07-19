@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 - 2026-07-19
+
+- Simplifies the built-in media note body to the title, AnimeList detail block, cover, and creation timestamp.
+- Keeps custom templates supported while exposing only one built-in minimal template.
+- Stops appending the external summary and source link to the note body; both remain available in frontmatter.
+
 ## 1.0.0 - 2026-07-19
 
 - Initial public release of AnimeList as an Obsidian community plugin repository.
