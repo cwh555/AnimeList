@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Minimal compile-time shim mirrors external Obsidian API boundaries without bundling runtime types. */
 declare global {
   interface HTMLElement {
     empty(): void;

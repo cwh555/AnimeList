@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { TFile, TFolder } from "obsidian";
 import AnimeListPlugin from "../src/main";
 import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/builtin-templates";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { legacyTest } from "../src/legacy";
+import { getScopedMarkdownFiles } from "../src/vault-scope";
 
 const {
   buildMediaMarkdown,
@@ -138,7 +140,7 @@ describe("Obsidian community review compliance", () => {
   it("uses native setting headings", () => {
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
     assert.doesNotMatch(settingsSource, /createEl\("h[23]"/);
-    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 3);
+    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 2);
   });
 
   it("attests release assets", () => {
@@ -147,5 +149,74 @@ describe("Obsidian community review compliance", () => {
     assert.match(workflow, /attestations: write/);
     assert.match(workflow, /artifact-metadata: write/);
     assert.match(workflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/);
+  });
+});
+
+
+describe("Community review preflight", () => {
+  it("contains no blocking DOM, lifecycle, or settings-heading patterns", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
+    assert.doesNotMatch(legacySource, /\.innerHTML\s*=/);
+    assert.doesNotMatch(mainSource, /detachLeavesOfType\s*\(/);
+    assert.doesNotMatch(settingsSource, /setName\(["']AnimeList["']\)\.setHeading\(\)/);
+  });
+
+  it("documents the narrow scanner policies used by compatibility boundaries", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
+    const shimSource = readFileSync(path.join(process.cwd(), "types/obsidian.d.ts"), "utf8");
+    const cssSource = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+    assert.match(legacySource, /@typescript-eslint\/no-unsafe-return/);
+    assert.match(legacySource, /obsidianmd\/prefer-create-el/);
+    assert.match(mainSource, /@typescript-eslint\/no-explicit-any/);
+    assert.match(settingsSource, /obsidianmd\/settings-tab\/prefer-setting-definitions/);
+    assert.match(shimSource, /@typescript-eslint\/no-explicit-any/);
+    assert.match(cssSource, /stylelint-disable declaration-no-important/);
+  });
+});
+
+
+describe("scoped vault access", () => {
+  it("walks only configured folders and returns Markdown files once", () => {
+    const library = new TFolder();
+    library.path = "AnimeList";
+    const animeFolder = new TFolder();
+    animeFolder.path = "AnimeList/Anime";
+    const note = new TFile();
+    note.path = "AnimeList/Anime/Example.md";
+    note.extension = "md";
+    const ignored = new TFile();
+    ignored.path = "AnimeList/Anime/cover.jpg";
+    ignored.extension = "jpg";
+    animeFolder.children = [note, ignored];
+    library.children = [animeFolder];
+
+    const root = new TFolder();
+    root.path = "";
+    const rootNote = new TFile();
+    rootNote.path = "Root note.md";
+    rootNote.extension = "md";
+    root.children = [rootNote, library];
+
+    const app = {
+      vault: {
+        getRoot() { return root; },
+        getAbstractFileByPath(path: string) {
+          return path === "AnimeList" ? library : null;
+        },
+      },
+    } as never;
+
+    assert.deepEqual(
+      getScopedMarkdownFiles(app, ["AnimeList", "AnimeList"]).map((file) => file.path),
+      ["AnimeList/Anime/Example.md"],
+    );
+    assert.deepEqual(
+      getScopedMarkdownFiles(app, [""]).map((file) => file.path),
+      ["Root note.md"],
+    );
   });
 });

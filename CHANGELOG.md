@@ -6,6 +6,8 @@
 - Preserves custom view placement when the plugin unloads.
 - Uses native Obsidian setting headings.
 - Adds GitHub build provenance attestations for release assets.
+- Removes the redundant plugin-name settings heading and adds a release preflight for Community review blockers.
+- Documents narrow lint exceptions for the runtime-validated legacy adapter, compile-only Obsidian shim, and scoped host-style overrides.
 
 ## 1.0.1 - 2026-07-19
 

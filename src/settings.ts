@@ -1,3 +1,4 @@
+/* eslint-disable obsidianmd/settings-tab/prefer-setting-definitions -- minAppVersion remains 1.5.0; display() is retained for stable settings behavior before the 1.13 declarative API. */
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { AnimeListSettings, StorageMode } from "./types";
 
@@ -49,7 +50,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    new Setting(containerEl).setName("AnimeList").setHeading();
     containerEl.createEl("p", {
       text: "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.",
     });

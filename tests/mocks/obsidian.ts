@@ -39,7 +39,17 @@ export class ItemView {
 }
 
 export class WorkspaceLeaf {}
-export class TFile {}
+export class TAbstractFile {
+  path = "";
+  name = "";
+}
+export class TFile extends TAbstractFile {
+  basename = "";
+  extension = "md";
+}
+export class TFolder extends TAbstractFile {
+  children: TAbstractFile[] = [];
+}
 export class Notice { constructor(_message?: string) {} }
 export class App {}
 

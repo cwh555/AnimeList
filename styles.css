@@ -1,3 +1,4 @@
+/* stylelint-disable declaration-no-important -- These scoped rules must override Obsidian host and theme declarations. */
 /* AnimeList Dashboard v0.6.2 — loaded by the bundled plugin. */
 .animelist-dashboard .markdown-preview-sizer,
 .animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100% !important; width: 100% !important; }

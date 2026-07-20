@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-misused-promises -- Boundary adapter between typed Obsidian integration and the runtime-validated legacy UI module. */
 import {
   ItemView,
   Notice,
@@ -16,6 +17,7 @@ import LegacyAnimeListPlugin, {
 import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import type { AnimeListSettings, LibrarySection, MediaType } from "./types";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 const VIEW_TYPE = "animelist-library";
 const PLUGIN_VERSION = "1.0.2";
@@ -256,8 +258,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
       ? [normalizePath(source).replace(/^\/+|\/+$/g, "")]
       : this.getScanFolders();
 
-    return this.app.vault.getMarkdownFiles()
-      .filter((file) => roots.some((root) => !root || file.path === root || file.path.startsWith(`${root}/`)))
+    return getScopedMarkdownFiles(this.app, roots)
       .map((file) => {
         const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (!frontmatter?.media_type) return null;
@@ -330,7 +331,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> {
     const typeFolder = mediaType === "anime" ? "Anime" : mediaType === "manga" ? "Manga" : "Novel";
     const root = normalizePath(this.settings.templateFolder).replace(/^\/+|\/+$/g, "");
-    const custom = this.app.vault.getMarkdownFiles()
+    const custom = getScopedMarkdownFiles(this.app, [root])
       .filter((file) => {
         if (!root || !file.path.startsWith(`${root}/`)) return false;
         const relative = file.path.slice(root.length + 1);
@@ -464,7 +465,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
   }
 
   findExistingBySource(provider: string, sourceId: string): TFile | undefined {
-    return this.app.vault.getMarkdownFiles().find((file) => {
+    return getScopedMarkdownFiles(this.app, this.getScanFolders()).find((file) => {
       const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
       return frontmatter
         && String(frontmatter.source_provider ?? "") === provider

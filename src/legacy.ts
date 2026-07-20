@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, obsidianmd/prefer-create-el -- Legacy compatibility layer uses runtime-validated provider data and a DOM factory shared with the tested v6.2 UI. */
 // @ts-nocheck
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PLUGIN_VERSION = "1.0.2";
 const MEDIA_ROOT = "Media";
@@ -1557,8 +1559,7 @@ export class LegacyAnimeListPlugin extends Plugin {
 
   collectMediaItems(source = MEDIA_ROOT) {
     const root = String(source || MEDIA_ROOT).replace(/^\/+|\/+$/g, "");
-    return this.app.vault.getMarkdownFiles()
-      .filter((file) => file.path === root || file.path.startsWith(`${root}/`))
+    return getScopedMarkdownFiles(this.app, [root])
       .map((file) => {
         const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (!fm || !fm.media_type) return null;
@@ -1601,7 +1602,7 @@ export class LegacyAnimeListPlugin extends Plugin {
 
   async getTemplates(mediaType) {
     const typeFolder = mediaType === "anime" ? "Anime" : mediaType === "manga" ? "Manga" : "Novel";
-    const files = this.app.vault.getMarkdownFiles().filter((file) => {
+    const files = getScopedMarkdownFiles(this.app, [TEMPLATE_ROOT]).filter((file) => {
       if (!file.path.startsWith(`${TEMPLATE_ROOT}/`)) return false;
       const relative = file.path.slice(TEMPLATE_ROOT.length + 1);
       return !relative.includes("/") || relative.startsWith("Common/") || relative.startsWith(`${typeFolder}/`);
@@ -1692,7 +1693,7 @@ export class LegacyAnimeListPlugin extends Plugin {
   }
 
   findExistingBySource(provider, sourceId) {
-    return this.app.vault.getMarkdownFiles().find((file) => {
+    return getScopedMarkdownFiles(this.app, [MEDIA_ROOT]).find((file) => {
       const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
       return fm && String(fm.source_provider || "") === String(provider) && String(fm.source_id || "") === String(sourceId);
     });

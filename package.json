@@ -9,10 +9,11 @@
     "build": "tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "test": "node scripts/run-tests.mjs",
-    "check": "npm run typecheck && npm test && npm run build",
+    "check": "npm run typecheck && npm test && npm run community:check && npm run build",
     "test-vault:link": "node scripts/link-test-vault.mjs",
     "release:check": "node scripts/check-release.mjs",
-    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
+    "community:check": "node scripts/check-community-review.mjs"
   },
   "keywords": [
     "obsidian",
