@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-misused-promises -- Boundary adapter between typed Obsidian integration and the runtime-validated legacy UI module. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-misused-promises -- Boundary adapter between typed Obsidian integration and the runtime-validated legacy UI module. */
 import {
   ItemView,
   Notice,
@@ -16,12 +16,21 @@ import LegacyAnimeListPlugin, {
 } from "./legacy";
 import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
-import type { AnimeListSettings, LibrarySection, MediaType } from "./types";
+import type {
+  AnimeListSettings,
+  ExternalMediaResult,
+  LibrarySection,
+  MediaItem,
+  MediaNoteForm,
+  MediaType,
+} from "./types";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 const VIEW_TYPE = "animelist-library";
 const PLUGIN_VERSION = "1.0.2";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
+const DISPLAY_NAME = "AnimeList";
+const OPEN_LIBRARY_LABEL = `開啟 ${DISPLAY_NAME}`;
 
 const {
   buildMediaMarkdown,
@@ -37,6 +46,39 @@ const {
 function asArray<T = unknown>(value: T | T[] | null | undefined): T[] {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : stringValue(value, "Unknown error");
+}
+
+function stringArray(value: unknown): string[] {
+  return asArray(value).map((entry) => stringValue(entry)).filter(Boolean);
+}
+
+function finiteNumber(value: unknown, fallback = 0): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function optionalScore(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function mediaTypeOf(value: unknown): MediaType | null {
+  return value === "anime" || value === "manga" || value === "novel" ? value : null;
 }
 
 function slugify(value: unknown, fallback = "media"): string {
@@ -62,7 +104,7 @@ class AnimeListView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "AnimeList";
+    return DISPLAY_NAME;
   }
 
   getIcon(): string {
@@ -116,7 +158,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     await this.loadSettings();
 
     this.registerView(VIEW_TYPE, (leaf) => new AnimeListView(leaf, this));
-    this.addRibbonIcon("library", "開啟 AnimeList", () => void this.openLibrary());
+    this.addRibbonIcon("library", OPEN_LIBRARY_LABEL, () => void this.openLibrary());
 
     this.registerMarkdownCodeBlockProcessor("animelist", (source, element, context) => {
       const child = new AnimeListRenderChild(element, this, context.sourcePath, this.parseLegacyConfig(source));
@@ -149,13 +191,32 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
   }
 
   async loadSettings(): Promise<void> {
-    const loaded = (await this.loadData()) ?? {};
+    const raw = await this.loadData();
+    const loaded = isRecord(raw) ? raw : {};
+    const providers = isRecord(loaded.providers) ? loaded.providers : {};
+    const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
     this.settings = {
-      ...structuredClone(DEFAULT_SETTINGS),
-      ...loaded,
-      providers: { ...DEFAULT_SETTINGS.providers, ...(loaded.providers ?? {}) },
-      uiState: { ...DEFAULT_SETTINGS.uiState, ...(loaded.uiState ?? {}) },
-      additionalScanFolders: Array.isArray(loaded.additionalScanFolders) ? loaded.additionalScanFolders : [],
+      storageMode: loaded.storageMode === "flat" ? "flat" : "managed",
+      libraryRoot: typeof loaded.libraryRoot === "string" ? loaded.libraryRoot : DEFAULT_SETTINGS.libraryRoot,
+      flatMediaFolder: typeof loaded.flatMediaFolder === "string" ? loaded.flatMediaFolder : DEFAULT_SETTINGS.flatMediaFolder,
+      additionalScanFolders: Array.isArray(loaded.additionalScanFolders)
+        ? loaded.additionalScanFolders.filter((folder): folder is string => typeof folder === "string")
+        : [],
+      coverFolder: typeof loaded.coverFolder === "string" ? loaded.coverFolder : DEFAULT_SETTINGS.coverFolder,
+      templateFolder: typeof loaded.templateFolder === "string" ? loaded.templateFolder : DEFAULT_SETTINGS.templateFolder,
+      providers: {
+        bangumi: typeof providers.bangumi === "boolean" ? providers.bangumi : DEFAULT_SETTINGS.providers.bangumi,
+        anilist: typeof providers.anilist === "boolean" ? providers.anilist : DEFAULT_SETTINGS.providers.anilist,
+        openlibrary: typeof providers.openlibrary === "boolean" ? providers.openlibrary : DEFAULT_SETTINGS.providers.openlibrary,
+      },
+      uiState: {
+        section: uiState.section === "timeline" ? "timeline" : "library",
+        type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel" ? uiState.type : "all",
+        status: typeof uiState.status === "string" ? uiState.status : DEFAULT_SETTINGS.uiState.status,
+        genre: typeof uiState.genre === "string" ? uiState.genre : DEFAULT_SETTINGS.uiState.genre,
+        sort: typeof uiState.sort === "string" ? uiState.sort : DEFAULT_SETTINGS.uiState.sort,
+        view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
+      },
     };
   }
 
@@ -253,7 +314,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     }
   }
 
-  collectMediaItems(source?: string): any[] {
+  collectMediaItems(source?: string): MediaItem[] {
     const roots = source
       ? [normalizePath(source).replace(/^\/+|\/+$/g, "")]
       : this.getScanFolders();
@@ -263,7 +324,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (!frontmatter?.media_type) return null;
 
-        const coverPath = String(frontmatter.cover ?? "")
+        const coverPath = stringValue(frontmatter.cover)
           .replace(/^!\[\[/, "")
           .replace(/^\[\[/, "")
           .replace(/\]\]$/, "")
@@ -277,37 +338,38 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
           if (coverFile instanceof TFile) cover = this.app.vault.getResourcePath(coverFile);
         }
 
-        const people = asArray(frontmatter.studios).length
-          ? asArray(frontmatter.studios)
-          : asArray(frontmatter.authors).length
-            ? asArray(frontmatter.authors)
-            : asArray(frontmatter.creators);
+        const studios = stringArray(frontmatter.studios);
+        const authors = stringArray(frontmatter.authors);
+        const people = studios.length ? studios : authors.length ? authors : stringArray(frontmatter.creators);
+
+        const mediaType = mediaTypeOf(frontmatter.media_type);
+        if (!mediaType) return null;
 
         return {
-          title: String(frontmatter.title ?? file.basename),
-          originalTitle: String(frontmatter.title_original ?? frontmatter.title_romaji ?? ""),
-          mediaType: String(frontmatter.media_type),
-          format: String(frontmatter.format ?? frontmatter.media_type),
-          status: String(frontmatter.status ?? "planned"),
-          progress: frontmatter.progress ?? 0,
-          total: frontmatter.progress_total ?? 0,
-          unit: String(frontmatter.progress_unit ?? ""),
-          score: frontmatter.score,
+          title: stringValue(frontmatter.title, file.basename),
+          originalTitle: stringValue(frontmatter.title_original, stringValue(frontmatter.title_romaji)),
+          mediaType,
+          format: stringValue(frontmatter.format, stringValue(frontmatter.media_type)),
+          status: stringValue(frontmatter.status, "planned"),
+          progress: finiteNumber(frontmatter.progress),
+          total: finiteNumber(frontmatter.progress_total),
+          unit: stringValue(frontmatter.progress_unit),
+          score: optionalScore(frontmatter.score),
           favorite: frontmatter.favorite === true,
-          year: frontmatter.year ?? "",
+          year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string" ? frontmatter.year : "",
           genres: normalizeGenres(frontmatter.genres),
           people,
-          platforms: asArray(frontmatter.platforms),
-          sourceUrls: asArray(frontmatter.source_urls),
+          platforms: stringArray(frontmatter.platforms),
+          sourceUrls: stringArray(frontmatter.source_urls),
           cover,
           filePath: file.path,
           updated: file.stat.mtime,
           updatedLabel: `更新於 ${formatFileModifiedTime(file.stat.mtime)}`,
-          startedAt: frontmatter.started_at ?? "",
-          completedAt: frontmatter.completed_at ?? "",
+          startedAt: stringValue(frontmatter.started_at),
+          completedAt: stringValue(frontmatter.completed_at),
         };
       })
-      .filter(Boolean);
+      .filter((item): item is MediaItem => item !== null);
   }
 
   async setFavorite(path: string, next: boolean): Promise<void> {
@@ -323,8 +385,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
   }
 
   async deleteMediaFile(file: TFile): Promise<void> {
-    if (this.app.fileManager.trashFile) await this.app.fileManager.trashFile(file);
-    else await this.app.vault.trash(file, true);
+    await this.app.fileManager.trashFile(file);
     this.refreshViews();
   }
 
@@ -375,12 +436,12 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const settled = await Promise.all(tasks);
     const warnings = settled
       .filter((entry) => entry.error)
-      .map((entry) => `${entry.provider}: ${entry.error instanceof Error ? entry.error.message : String(entry.error)}`);
+      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
     const results = settled.flatMap((entry) => entry.items ?? []);
     return { results: dedupeSearchResults(results).slice(0, 24), warnings };
   }
 
-  async searchBangumi(mediaType: MediaType, query: string): Promise<any[]> {
+  async searchBangumi(mediaType: MediaType, query: string) {
     const response = await requestUrl({
       url: "https://api.bgm.tv/v0/search/subjects?limit=10&offset=0",
       method: "POST",
@@ -399,7 +460,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     return asArray(payload.data).map((subject) => normalizeBangumiSubject(subject, mediaType));
   }
 
-  async searchAniList(mediaType: MediaType, query: string): Promise<any[]> {
+  async searchAniList(mediaType: MediaType, query: string) {
     const graphQuery = `
       query ($search: String, $type: MediaType, $format: MediaFormat) {
         Page(page: 1, perPage: 10) {
@@ -431,12 +492,12 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const payload = response.json ?? JSON.parse(response.text || "{}");
     let media = asArray(payload?.data?.Page?.media);
     if (mediaType === "manga") {
-      media = media.filter((item: any) => String(item?.format ?? "").toUpperCase() !== "NOVEL");
+      media = media.filter((item: unknown) => !isRecord(item) || stringValue(item.format).toUpperCase() !== "NOVEL");
     }
     return media.map((item) => normalizeAniListMedia(item, mediaType));
   }
 
-  async searchOpenLibrary(query: string): Promise<any[]> {
+  async searchOpenLibrary(query: string) {
     const fields = "key,title,author_name,first_publish_year,cover_i,subject";
     const response = await requestUrl({
       url: `https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&limit=8&lang=zh`,
@@ -468,8 +529,8 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     return getScopedMarkdownFiles(this.app, this.getScanFolders()).find((file) => {
       const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
       return frontmatter
-        && String(frontmatter.source_provider ?? "") === provider
-        && String(frontmatter.source_id ?? "") === String(sourceId);
+        && stringValue(frontmatter.source_provider) === provider
+        && stringValue(frontmatter.source_id) === sourceId;
     });
   }
 
@@ -484,7 +545,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     return candidate;
   }
 
-  async downloadCover(result: any): Promise<string> {
+  async downloadCover(result: ExternalMediaResult): Promise<string> {
     if (!result.coverUrl) return "";
     const response = await requestUrl({
       url: result.coverUrl,
@@ -511,7 +572,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     return path;
   }
 
-  async createMediaNote(result: any, form: any): Promise<TFile> {
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
     const title = String(form?.title ?? "").trim();
     const score = Number(form?.score);
     const completedAt = String(form?.completedAt ?? "").trim();
@@ -521,7 +582,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     }
     if (!completedAt) throw new Error("Completion date is required.");
 
-    const existing = this.findExistingBySource(result.provider, result.sourceId);
+    const existing = this.findExistingBySource(result.provider, String(result.sourceId));
     if (existing) {
       new Notice("這筆外部資料已經在收藏庫中，已替你開啟原筆記。");
       await this.openMediaFile(existing.path);
@@ -550,3 +611,5 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
 }
 
 export default AnimeListPlugin;
+
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-misused-promises -- End typed legacy-adapter lint scope. */

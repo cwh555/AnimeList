@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "obsidian": [
-        "types/obsidian.d.ts"
+        "./types/obsidian.d.ts"
       ]
     },
     "inlineSourceMap": true,
@@ -19,7 +18,6 @@
     "noUnusedLocals": false,
     "moduleResolution": "Bundler",
     "importHelpers": true,
-    "downlevelIteration": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "lib": [

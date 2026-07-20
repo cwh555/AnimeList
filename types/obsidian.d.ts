@@ -1,18 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- Minimal compile-time shim mirrors external Obsidian API boundaries without bundling runtime types. */
 declare global {
   interface HTMLElement {
     empty(): void;
-    createDiv(options?: string | { cls?: string; text?: string; attr?: Record<string, string> }): HTMLDivElement;
-    createSpan(options?: string | { cls?: string; text?: string; attr?: Record<string, string> }): HTMLSpanElement;
-    createEl<K extends keyof HTMLElementTagNameMap>(
-      tag: K,
-      options?: string | { cls?: string; text?: string; attr?: Record<string, string>; type?: string; value?: string },
-    ): HTMLElementTagNameMap[K];
+    createDiv(options?: string | DomElementInfo): HTMLDivElement;
+    createSpan(options?: string | DomElementInfo): HTMLSpanElement;
+    createEl<K extends keyof HTMLElementTagNameMap>(tag: K, options?: string | DomElementInfo): HTMLElementTagNameMap[K];
     addClass(...classes: string[]): void;
     removeClass(...classes: string[]): void;
     toggleClass(className: string, value?: boolean): void;
     setText(text: string): void;
   }
+
+  interface DomElementInfo {
+    cls?: string;
+    text?: string;
+    attr?: Record<string, string>;
+    type?: string;
+    value?: string;
+  }
+
+  function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, options?: string | DomElementInfo): HTMLElementTagNameMap[K];
 }
 
 declare module "obsidian" {
@@ -29,9 +35,11 @@ declare module "obsidian" {
     status: number;
     headers: Record<string, string>;
     arrayBuffer: ArrayBuffer;
-    json: any;
+    json: unknown;
     text: string;
   }
+
+  export type EventRef = object;
 
   export class Component {
     addChild<T extends Component>(component: T): T;
@@ -62,29 +70,93 @@ declare module "obsidian" {
     children: TAbstractFile[];
   }
 
+  export interface WorkspaceLeafState {
+    type: string;
+    active?: boolean;
+    state?: Record<string, unknown>;
+  }
+
   export class WorkspaceLeaf {
-    setViewState(state: any): Promise<void>;
-    getViewState(): any;
+    view: ItemView;
+    setViewState(state: WorkspaceLeafState): Promise<void>;
+    getViewState(): WorkspaceLeafState;
+  }
+
+  export interface CachedMetadata {
+    frontmatter?: Record<string, unknown>;
+  }
+
+  export interface Vault {
+    getRoot(): TFolder;
+    getAbstractFileByPath(path: string): TAbstractFile | null;
+    create(path: string, data: string): Promise<TFile>;
+    createBinary(path: string, data: ArrayBuffer): Promise<TFile>;
+    createFolder(path: string): Promise<TFolder>;
+    cachedRead(file: TFile): Promise<string>;
+    read(file: TFile): Promise<string>;
+    modify(file: TFile, data: string): Promise<void>;
+    delete(file: TAbstractFile, force?: boolean): Promise<void>;
+    trash(file: TAbstractFile, system: boolean): Promise<void>;
+    getResourcePath(file: TFile): string;
+    on(name: string, callback: (...args: unknown[]) => void): EventRef;
+  }
+
+  export interface Workspace {
+    getLeavesOfType(type: string): WorkspaceLeaf[];
+    getLeaf(newLeaf?: string | boolean): WorkspaceLeaf;
+    revealLeaf(leaf: WorkspaceLeaf): void;
+    openLinkText(linktext: string, sourcePath: string, newLeaf?: boolean): Promise<void>;
+  }
+
+  export interface MetadataCache {
+    getFileCache(file: TFile): CachedMetadata | null;
+    getFirstLinkpathDest(linkpath: string, sourcePath: string): TFile | null;
+    on(name: string, callback: (...args: unknown[]) => void): EventRef;
+  }
+
+  export interface FileManager {
+    processFrontMatter(file: TFile, callback: (frontmatter: Record<string, unknown>) => void): Promise<void>;
+    trashFile(file: TFile): Promise<void>;
   }
 
   export class App {
-    vault: any;
-    workspace: any;
-    metadataCache: any;
-    fileManager: any;
+    vault: Vault;
+    workspace: Workspace;
+    metadataCache: MetadataCache;
+    fileManager: FileManager;
+  }
+
+  export interface MarkdownPostProcessorContext {
+    sourcePath: string;
+    addChild(child: MarkdownRenderChild): void;
+  }
+
+  export interface Command {
+    id: string;
+    name: string;
+    callback: () => void | Promise<void>;
+  }
+
+  export interface PluginManifest {
+    id: string;
+    name: string;
+    version: string;
   }
 
   export class Plugin extends Component {
     app: App;
-    manifest: any;
+    manifest: PluginManifest;
     registerView(type: string, creator: (leaf: WorkspaceLeaf) => ItemView): void;
-    registerMarkdownCodeBlockProcessor(language: string, processor: (...args: any[]) => any): void;
-    registerEvent(eventRef: any): void;
-    addRibbonIcon(icon: string, title: string, callback: (event: MouseEvent) => any): HTMLElement;
-    addCommand(command: any): any;
+    registerMarkdownCodeBlockProcessor(
+      language: string,
+      processor: (source: string, element: HTMLElement, context: MarkdownPostProcessorContext) => void,
+    ): void;
+    registerEvent(eventRef: EventRef): void;
+    addRibbonIcon(icon: string, title: string, callback: (event: MouseEvent) => void): HTMLElement;
+    addCommand(command: Command): Command;
     addSettingTab(settingTab: PluginSettingTab): void;
-    loadData(): Promise<any>;
-    saveData(data: any): Promise<void>;
+    loadData(): Promise<unknown>;
+    saveData(data: unknown): Promise<void>;
   }
 
   export class ItemView extends Component {
@@ -119,10 +191,20 @@ declare module "obsidian" {
     setMessage(message: string | DocumentFragment): this;
   }
 
+  export interface SettingDefinition {
+    name: string;
+    desc?: string | DocumentFragment;
+    aliases?: string[];
+    visible?: () => boolean;
+    render?: (setting: Setting) => void;
+  }
+
   export class PluginSettingTab {
     containerEl: HTMLElement;
     constructor(app: App, plugin: Plugin);
+    getSettingDefinitions(): SettingDefinition[];
     display(): void;
+    update(): void;
     hide(): void;
   }
 
@@ -130,14 +212,14 @@ declare module "obsidian" {
     inputEl: HTMLInputElement;
     setPlaceholder(value: string): this;
     setValue(value: string): this;
-    onChange(callback: (value: string) => any): this;
+    onChange(callback: (value: string) => void | Promise<void>): this;
   }
 
   export class TextAreaComponent {
     inputEl: HTMLTextAreaElement;
     setPlaceholder(value: string): this;
     setValue(value: string): this;
-    onChange(callback: (value: string) => any): this;
+    onChange(callback: (value: string) => void | Promise<void>): this;
   }
 
   export class DropdownComponent {
@@ -145,13 +227,13 @@ declare module "obsidian" {
     addOption(value: string, display: string): this;
     addOptions(options: Record<string, string>): this;
     setValue(value: string): this;
-    onChange(callback: (value: string) => any): this;
+    onChange(callback: (value: string) => void | Promise<void>): this;
   }
 
   export class ToggleComponent {
     toggleEl: HTMLElement;
     setValue(value: boolean): this;
-    onChange(callback: (value: boolean) => any): this;
+    onChange(callback: (value: boolean) => void | Promise<void>): this;
   }
 
   export class ButtonComponent {
@@ -161,7 +243,7 @@ declare module "obsidian" {
     setTooltip(tooltip: string): this;
     setCta(): this;
     setWarning(): this;
-    onClick(callback: (event: MouseEvent) => any): this;
+    onClick(callback: (event: MouseEvent) => void | Promise<void>): this;
   }
 
   export class Setting {
@@ -173,11 +255,11 @@ declare module "obsidian" {
     setName(name: string | DocumentFragment): this;
     setDesc(desc: string | DocumentFragment): this;
     setHeading(): this;
-    addText(callback: (component: TextComponent) => any): this;
-    addTextArea(callback: (component: TextAreaComponent) => any): this;
-    addDropdown(callback: (component: DropdownComponent) => any): this;
-    addToggle(callback: (component: ToggleComponent) => any): this;
-    addButton(callback: (component: ButtonComponent) => any): this;
+    addText(callback: (component: TextComponent) => void): this;
+    addTextArea(callback: (component: TextAreaComponent) => void): this;
+    addDropdown(callback: (component: DropdownComponent) => void): this;
+    addToggle(callback: (component: ToggleComponent) => void): this;
+    addButton(callback: (component: ButtonComponent) => void): this;
   }
 
   export function normalizePath(path: string): string;

@@ -1,7 +1,6 @@
-/* stylelint-disable declaration-no-important -- These scoped rules must override Obsidian host and theme declarations. */
 /* AnimeList Dashboard v0.6.2 — loaded by the bundled plugin. */
-.animelist-dashboard .markdown-preview-sizer,
-.animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100% !important; width: 100% !important; }
+.animelist-dashboard.animelist-dashboard .markdown-preview-sizer,
+.animelist-dashboard.animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100%; width: 100%; }
 .animelist-dashboard .markdown-preview-view,
 .markdown-preview-view.animelist-dashboard { padding-inline: clamp(18px, 3.4vw, 54px); }
 .animelist-dashboard h1:first-of-type { display:none; }
@@ -24,7 +23,7 @@
 
 .al-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:28px; padding:26px 0 22px; border-bottom:1px solid var(--al-border); }
 .al-kicker { margin-bottom:8px; color:var(--al-accent); font-size:.68rem; font-weight:800; letter-spacing:.16em; }
-.al-title { display:block !important; margin:0 !important; font-size:clamp(1.8rem,3vw,2.65rem) !important; line-height:1.08; letter-spacing:-.035em; }
+.al-shell .al-title { display:block; margin:0; font-size:clamp(1.8rem,3vw,2.65rem); line-height:1.08; letter-spacing:-.035em; }
 .al-desc { margin:9px 0 0; color:var(--text-muted,#aaa); font-size:.83rem; }
 .al-stats { display:flex; gap:8px; }
 .al-stat { min-width:76px; padding:10px 13px; border:1px solid var(--al-border); border-radius:11px; background:var(--al-panel); text-align:center; }
@@ -41,7 +40,7 @@
 .al-search, .al-sort { display:flex; align-items:center; min-height:40px; border:1px solid var(--al-border); border-radius:10px; background:var(--background-secondary,#25252b); }
 .al-search { padding:0 12px; }
 .al-search .al-icon, .al-sort .al-icon { display:grid; place-items:center; color:var(--text-faint,#777); }
-.al-search input { width:100%; min-width:0; padding:0 8px; border:0 !important; box-shadow:none !important; background:transparent !important; color:var(--text-normal,#ddd); font-size:.78rem; }
+.al-shell .al-search input { width:100%; min-width:0; padding:0 8px; border:0; box-shadow:none; background:transparent; color:var(--text-normal,#ddd); font-size:.78rem; }
 .al-sort { padding-left:10px; }
 .al-sort select { min-width:118px; height:38px; padding:0 28px 0 8px; border:0; box-shadow:none; background:transparent; color:var(--text-normal,#ddd); font-size:.72rem; }
 .al-view-switch { display:flex; overflow:hidden; min-height:40px; border:1px solid var(--al-border); border-radius:10px; background:var(--background-secondary,#25252b); }
@@ -85,7 +84,7 @@
 .al-status.status-dropped { background:rgba(143,67,72,.86); }
 
 .al-card-body { display:flex; flex:1; min-width:0; flex-direction:column; padding:12px 13px 13px; }
-.al-card-title { display:-webkit-box; overflow:hidden; min-height:2.5em; margin:0 !important; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--text-normal,#ddd); font-size:.88rem !important; font-weight:760; line-height:1.25; }
+.al-shell .al-card-title { display:-webkit-box; overflow:hidden; min-height:2.5em; margin:0; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--text-normal,#ddd); font-size:.88rem; font-weight:760; line-height:1.25; }
 .al-original-title { overflow:hidden; margin-top:4px; color:var(--text-faint,#777); font-size:.63rem; white-space:nowrap; text-overflow:ellipsis; }
 .al-facts { display:flex; flex-wrap:wrap; gap:5px 9px; margin-top:9px; color:var(--text-muted,#aaa); font-size:.64rem; }
 .al-facts span+span::before { content:"·"; margin-right:9px; color:var(--text-faint,#777); }
@@ -102,11 +101,11 @@
 .al-grid.is-list .al-card { min-height:176px; }
 .al-grid.is-list .al-cover-wrap { width:116px; aspect-ratio:2/3; }
 .al-grid.is-list .al-card-body { padding:15px 17px; }
-.al-grid.is-list .al-card-title { min-height:0; font-size:1rem !important; }
+.al-shell .al-grid.is-list .al-card-title { min-height:0; font-size:1rem; }
 .al-grid.is-list .al-original-title { font-size:.68rem; }
 .al-grid.is-list .al-progress { max-width:420px; }
 .al-grid.is-poster .al-card-body { position:absolute; z-index:3; inset:auto 0 0; padding:36px 10px 10px; color:#fff; background:linear-gradient(to top,rgba(7,8,12,.94),transparent); }
-.al-grid.is-poster .al-card-title { min-height:0; color:#fff; font-size:.72rem !important; text-shadow:0 1px 3px #000; }
+.al-shell .al-grid.is-poster .al-card-title { min-height:0; color:#fff; font-size:.72rem; text-shadow:0 1px 3px #000; }
 .al-grid.is-poster .al-original-title, .al-grid.is-poster .al-facts, .al-grid.is-poster .al-tags, .al-grid.is-poster .al-progress, .al-grid.is-poster .al-card-footer, .al-grid.is-poster .al-cover-bottom { display:none; }
 .al-grid.is-poster .al-cover-shade { height:62%; }
 .al-grid.is-poster .al-format-badge { font-size:.55rem; }
@@ -144,7 +143,7 @@
   color:#fff; background:rgba(10,11,16,.72); cursor:pointer; backdrop-filter:blur(8px);
 }
 .al-edit-button:hover { color:#fff; background:var(--al-accent); }
-.al-edit-button svg { width:14px !important; height:14px !important; }
+.al-shell .al-edit-button svg { width:14px; height:14px; }
 .al-date-row { display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:8px; color:var(--text-faint,#777); font-size:.6rem; }
 .al-date-row span+span::before { content:"·"; margin-right:10px; }
 
@@ -250,7 +249,7 @@
 .al-detail-buttons button:hover { background:var(--background-modifier-hover); }
 .al-detail-favorite.is-active { color:#e9bb5d; }
 
-.animelist-timeline-modal { width:min(96vw,1500px) !important; max-width:none !important; height:min(92vh,980px); }
+.modal-container .animelist-timeline-modal.animelist-timeline-modal { width:min(96vw,1500px); max-width:none; height:min(92vh,980px); }
 .animelist-timeline-modal .modal-content { height:100%; padding:0; overflow:hidden; }
 .al-timeline-root { display:flex; height:100%; flex-direction:column; background:var(--background-primary); }
 .al-timeline-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--background-modifier-border); background:var(--background-secondary); }
@@ -299,7 +298,7 @@
   .al-view-button { flex:1; }
   .al-detail-actions { align-items:flex-start; flex-direction:column; }
   .al-detail-buttons { width:100%; }
-  .animelist-timeline-modal { width:100vw !important; height:92vh; }
+  .modal-container .animelist-timeline-modal.animelist-timeline-modal { width:100vw; height:92vh; }
 }
 .al-timeline-controls svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 
@@ -366,10 +365,10 @@
   color: var(--text-normal);
   background: none;
 }
-.al-grid.is-poster .al-card-title {
+.al-shell .al-grid.is-poster .al-card-title {
   min-height: 0;
   color: var(--text-normal);
-  font-size: .78rem !important;
+  font-size: .78rem;
   text-shadow: none;
 }
 .al-grid.is-poster .al-original-title,

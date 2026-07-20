@@ -31,14 +31,12 @@ export function getScopedMarkdownFiles(app: App, roots: string[]): TFile[] {
     const root = normalizePath(String(rawRoot ?? "")).replace(/^\/+|\/+$/g, "");
     if (!root) {
       const vaultRoot = app.vault.getRoot();
-      if (vaultRoot instanceof TFolder) {
-        for (const child of vaultRoot.children) appendMarkdownFile(child, output, seen);
-      }
+      for (const child of vaultRoot.children) appendMarkdownFile(child, output, seen);
       continue;
     }
 
     const entry = app.vault.getAbstractFileByPath(root);
-    if (entry) collectMarkdownFiles(entry as TAbstractFile, output, seen);
+    if (entry) collectMarkdownFiles(entry, output, seen);
   }
 
   return output;

@@ -57,3 +57,38 @@ export interface MediaItem {
   startedAt: string;
   completedAt: string;
 }
+
+export interface ExternalMediaResult {
+  provider: string;
+  sourceId: string;
+  title: string;
+  originalTitle: string;
+  romajiTitle: string;
+  mediaType: MediaType;
+  format: string;
+  total: number;
+  unit: string;
+  year: number | string;
+  genres: string[];
+  rawGenres: string[];
+  people: string[];
+  platforms: string[];
+  sourceUrl: string;
+  coverUrl: string;
+  summary: string;
+  externalScore: number | null;
+}
+
+export interface MediaNoteForm {
+  title: string;
+  status: string;
+  progress: number | string;
+  total: number | string;
+  unit: string;
+  score: number | string;
+  favorite: boolean;
+  startedAt: string;
+  completedAt: string;
+  genres: string[];
+  templatePath: string;
+}

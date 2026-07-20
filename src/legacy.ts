@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, obsidianmd/prefer-create-el -- Legacy compatibility layer uses runtime-validated provider data and a DOM factory shared with the tested v6.2 UI. */
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- Legacy compatibility layer consumes runtime-validated provider data while preserving the tested v6.2 behavior. */
 // @ts-nocheck
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
 import { getScopedMarkdownFiles } from "./vault-scope";
@@ -63,6 +63,12 @@ const GENRE_ALIASES = new Map(Object.entries({
 function asArray(value) {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function stringValue(value, fallback = "") {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
 }
 
 function numeric(value, fallback = 0) {
@@ -364,8 +370,8 @@ function itemStatusLabel(item) {
   return LABEL.status[item.status] || item.status;
 }
 
-function createEl(tag, className, text) {
-  const node = document.createElement(tag);
+function makeEl(tag, className, text) {
+  const node = createEl(tag);
   if (className) node.className = className;
   if (text !== undefined && text !== null) node.textContent = String(text);
   return node;
@@ -393,7 +399,7 @@ function setAnimeListIcon(element, name) {
 
 function appendIconLabel(element, icon, label) {
   setAnimeListIcon(element, icon);
-  element.appendChild(createEl("span", "", label));
+  element.appendChild(makeEl("span", "", label));
   return element;
 }
 
@@ -454,34 +460,34 @@ export const AnimeListUI = (() => {
     const toggleFavorite = adapters.toggleFavorite || null;
     const openTimeline = adapters.openTimeline || null;
 
-    const shell = createEl("section", "al-shell");
+    const shell = makeEl("section", "al-shell");
     container.appendChild(shell);
 
-    const header = createEl("header", "al-hero");
-    const titleBlock = createEl("div", "al-hero-copy");
+    const header = makeEl("header", "al-hero");
+    const titleBlock = makeEl("div", "al-hero-copy");
     titleBlock.append(
-      createEl("div", "al-kicker", "PERSONAL MEDIA LIBRARY"),
-      createEl("h1", "al-title", "我的收藏書架"),
-      createEl("p", "al-desc", "以 Markdown 整理動畫、漫畫與小說收藏。"),
+      makeEl("div", "al-kicker", "PERSONAL MEDIA LIBRARY"),
+      makeEl("h1", "al-title", "我的收藏書架"),
+      makeEl("p", "al-desc", "以 Markdown 整理動畫、漫畫與小說收藏。"),
     );
-    const headerRight = createEl("div", "al-hero-right");
-    const stats = createEl("div", "al-stats");
+    const headerRight = makeEl("div", "al-hero-right");
+    const stats = makeEl("div", "al-stats");
     [["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([key, label]) => {
-      const stat = createEl("div", "al-stat");
-      stat.append(createEl("strong", "al-stat-number", items.filter((x) => x.mediaType === key).length), createEl("span", "al-stat-label", label));
+      const stat = makeEl("div", "al-stat");
+      stat.append(makeEl("strong", "al-stat-number", items.filter((x) => x.mediaType === key).length), makeEl("span", "al-stat-label", label));
       stats.appendChild(stat);
     });
     headerRight.appendChild(stats);
-    const headerActions = createEl("div", "al-hero-actions");
+    const headerActions = makeEl("div", "al-hero-actions");
     if (openTimeline) {
-      const timelineButton = createEl("button", "al-secondary-button");
+      const timelineButton = makeEl("button", "al-secondary-button");
       timelineButton.type = "button";
       appendIconLabel(timelineButton, "timeline", "時間軸");
       timelineButton.addEventListener("click", () => openTimeline());
       headerActions.appendChild(timelineButton);
     }
     if (addItem) {
-      const addButton = createEl("button", "al-add-button");
+      const addButton = makeEl("button", "al-add-button");
       addButton.type = "button";
       appendIconLabel(addButton, "plus", "收錄作品");
       addButton.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
@@ -491,13 +497,13 @@ export const AnimeListUI = (() => {
     header.append(titleBlock, headerRight);
     shell.appendChild(header);
 
-    const nav = createEl("nav", "al-type-tabs");
+    const nav = makeEl("nav", "al-type-tabs");
     const typeButtons = new Map();
     [["all", "全部作品"], ["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([key, label]) => {
       const count = key === "all" ? items.length : items.filter((x) => x.mediaType === key).length;
-      const button = createEl("button", `al-type-tab${key === state.type ? " is-active" : ""}`);
+      const button = makeEl("button", `al-type-tab${key === state.type ? " is-active" : ""}`);
       button.type = "button";
-      button.append(createEl("span", "", label), createEl("span", "al-tab-count", count));
+      button.append(makeEl("span", "", label), makeEl("span", "al-tab-count", count));
       button.addEventListener("click", () => {
         state.type = key;
         typeButtons.forEach((candidate, name) => candidate.classList.toggle("is-active", name === key));
@@ -508,21 +514,21 @@ export const AnimeListUI = (() => {
     });
     shell.appendChild(nav);
 
-    const toolbar = createEl("div", "al-toolbar");
-    const searchWrap = createEl("label", "al-search");
-    const searchIcon = createEl("span", "al-icon");
+    const toolbar = makeEl("div", "al-toolbar");
+    const searchWrap = makeEl("label", "al-search");
+    const searchIcon = makeEl("span", "al-icon");
     setAnimeListIcon(searchIcon, "search");
-    const searchInput = createEl("input");
+    const searchInput = makeEl("input");
     searchInput.type = "search";
     searchInput.placeholder = "搜尋標題、原名、作者、工作室或分類…";
     searchInput.value = state.query;
     searchInput.addEventListener("input", () => { state.query = searchInput.value.trim().toLocaleLowerCase(); update(); });
     searchWrap.append(searchIcon, searchInput);
 
-    const genreWrap = createEl("label", "al-sort al-genre-filter");
-    const genreSelect = createEl("select");
+    const genreWrap = makeEl("label", "al-sort al-genre-filter");
+    const genreSelect = makeEl("select");
     [["all", "所有分類"], ...genres.map((genre) => [genre, genre])].forEach(([value, text]) => {
-      const option = createEl("option", "", text);
+      const option = makeEl("option", "", text);
       option.value = value;
       genreSelect.appendChild(option);
     });
@@ -531,17 +537,17 @@ export const AnimeListUI = (() => {
     genreSelect.addEventListener("change", () => { state.genre = genreSelect.value; update(); });
     genreWrap.appendChild(genreSelect);
 
-    const sortWrap = createEl("label", "al-sort");
-    const sortIcon = createEl("span", "al-icon");
+    const sortWrap = makeEl("label", "al-sort");
+    const sortIcon = makeEl("span", "al-icon");
     setAnimeListIcon(sortIcon, "sort");
-    const sortSelect = createEl("select");
+    const sortSelect = makeEl("select");
     [
       ["completed-desc", "最近完成"], ["completed-asc", "最早完成"],
       ["updated-desc", "最近更新"], ["updated-asc", "較早更新"], ["score-desc", "評分由高至低"], ["score-asc", "評分由低至高"],
       ["started-desc", "最近開始"], ["started-asc", "最早開始"],
       ["year-desc", "作品年份由新至舊"], ["year-asc", "作品年份由舊至新"], ["progress-desc", "完成度由高至低"], ["title-asc", "依標題排列"],
     ].forEach(([value, text]) => {
-      const option = createEl("option", "", text);
+      const option = makeEl("option", "", text);
       option.value = value;
       option.selected = value === state.sort;
       sortSelect.appendChild(option);
@@ -549,10 +555,10 @@ export const AnimeListUI = (() => {
     sortSelect.addEventListener("change", () => { state.sort = sortSelect.value; update(); });
     sortWrap.append(sortIcon, sortSelect);
 
-    const views = createEl("div", "al-view-switch");
+    const views = makeEl("div", "al-view-switch");
     const viewButtons = new Map();
     [["grid", "grid", "卡片"], ["list", "list", "清單"], ["poster", "poster", "縮圖"]].forEach(([key, icon, label]) => {
-      const button = createEl("button", `al-view-button${key === state.view ? " is-active" : ""}`);
+      const button = makeEl("button", `al-view-button${key === state.view ? " is-active" : ""}`);
       button.type = "button";
       button.title = label;
       button.setAttribute("aria-label", label);
@@ -569,10 +575,10 @@ export const AnimeListUI = (() => {
     toolbar.append(searchWrap, genreWrap, sortWrap, views);
     shell.appendChild(toolbar);
 
-    const statusBar = createEl("div", "al-status-bar");
+    const statusBar = makeEl("div", "al-status-bar");
     const statusButtons = new Map();
     [["all", "全部"], ["active", "追番中"], ["completed", "已完成"], ["planned", "待追"], ["on_hold", "棄番"]].forEach(([key, label]) => {
-      const button = createEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
+      const button = makeEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
       button.type = "button";
       button.addEventListener("click", () => {
         state.status = key;
@@ -584,16 +590,16 @@ export const AnimeListUI = (() => {
     });
     shell.appendChild(statusBar);
 
-    const resultHead = createEl("div", "al-result-head");
-    const resultTitle = createEl("strong", "al-result-title");
-    const resultMeta = createEl("span", "al-result-meta");
+    const resultHead = makeEl("div", "al-result-head");
+    const resultTitle = makeEl("strong", "al-result-title");
+    const resultMeta = makeEl("span", "al-result-meta");
     resultHead.append(resultTitle, resultMeta);
     shell.appendChild(resultHead);
-    const grid = createEl("div", "al-grid is-grid");
+    const grid = makeEl("div", "al-grid is-grid");
     shell.appendChild(grid);
 
     const makeCard = (item) => {
-      const card = createEl("article", `al-card status-${item.status}`);
+      const card = makeEl("article", `al-card status-${item.status}`);
       card.tabIndex = 0;
       card.setAttribute("role", "link");
       card.addEventListener("click", () => openFile(item.filePath));
@@ -601,29 +607,29 @@ export const AnimeListUI = (() => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openFile(item.filePath); }
       });
 
-      const media = createEl("div", "al-cover-wrap");
+      const media = makeEl("div", "al-cover-wrap");
       if (item.cover) {
-        const image = createEl("img", "al-cover");
+        const image = makeEl("img", "al-cover");
         image.src = item.cover;
         image.alt = `${item.title} 封面`;
         image.loading = "lazy";
         media.appendChild(image);
       } else {
-        const missing = createEl("div", "al-cover-missing");
-        const icon = createEl("span", "al-icon-large");
+        const missing = makeEl("div", "al-cover-missing");
+        const icon = makeEl("span", "al-icon-large");
         setAnimeListIcon(icon, "book");
-        missing.append(icon, createEl("span", "", "尚未設定封面"));
+        missing.append(icon, makeEl("span", "", "尚未設定封面"));
         media.appendChild(missing);
       }
-      media.appendChild(createEl("div", "al-cover-shade"));
-      const top = createEl("div", "al-cover-top");
-      const badges = createEl("div", "al-cover-badges");
-      badges.appendChild(createEl("span", "al-format-badge", `${LABEL.type[item.mediaType] || item.mediaType} · ${item.year || "—"}`));
-      if (item.score != null) badges.appendChild(createEl("span", "al-score-badge", `★ ${item.score.toFixed(1)}`));
+      media.appendChild(makeEl("div", "al-cover-shade"));
+      const top = makeEl("div", "al-cover-top");
+      const badges = makeEl("div", "al-cover-badges");
+      badges.appendChild(makeEl("span", "al-format-badge", `${LABEL.type[item.mediaType] || item.mediaType} · ${item.year || "—"}`));
+      if (item.score != null) badges.appendChild(makeEl("span", "al-score-badge", `★ ${item.score.toFixed(1)}`));
       top.appendChild(badges);
-      const topActions = createEl("div", "al-card-top-actions");
+      const topActions = makeEl("div", "al-card-top-actions");
       if (toggleFavorite) {
-        const favoriteButton = createEl("button", `al-favorite-button${item.favorite ? " is-active" : ""}`, item.favorite ? "★" : "☆");
+        const favoriteButton = makeEl("button", `al-favorite-button${item.favorite ? " is-active" : ""}`, item.favorite ? "★" : "☆");
         favoriteButton.type = "button";
         favoriteButton.title = item.favorite ? "移出最愛" : "加入最愛";
         favoriteButton.setAttribute("aria-label", favoriteButton.title);
@@ -636,7 +642,7 @@ export const AnimeListUI = (() => {
         topActions.appendChild(favoriteButton);
       }
       if (editItem) {
-        const editButton = createEl("button", "al-edit-button");
+        const editButton = makeEl("button", "al-edit-button");
         editButton.type = "button";
         editButton.title = "整理這筆紀錄";
         editButton.setAttribute("aria-label", editButton.title);
@@ -646,39 +652,39 @@ export const AnimeListUI = (() => {
       }
       top.appendChild(topActions);
       media.appendChild(top);
-      const bottom = createEl("div", "al-cover-bottom");
-      bottom.append(createEl("span", `al-status status-${item.status}`, itemStatusLabel(item)), createEl("span", "al-progress-on-cover", progressText(item)));
+      const bottom = makeEl("div", "al-cover-bottom");
+      bottom.append(makeEl("span", `al-status status-${item.status}`, itemStatusLabel(item)), makeEl("span", "al-progress-on-cover", progressText(item)));
       media.appendChild(bottom);
 
-      const body = createEl("div", "al-card-body");
-      body.appendChild(createEl("h2", "al-card-title", item.title));
-      if (item.originalTitle) body.appendChild(createEl("div", "al-original-title", item.originalTitle));
-      const facts = createEl("div", "al-facts");
-      facts.appendChild(createEl("span", "", LABEL.format[item.format] || item.format || "作品"));
-      if (item.people.length) facts.appendChild(createEl("span", "", item.people.slice(0, 2).join("、")));
+      const body = makeEl("div", "al-card-body");
+      body.appendChild(makeEl("h2", "al-card-title", item.title));
+      if (item.originalTitle) body.appendChild(makeEl("div", "al-original-title", item.originalTitle));
+      const facts = makeEl("div", "al-facts");
+      facts.appendChild(makeEl("span", "", LABEL.format[item.format] || item.format || "作品"));
+      if (item.people.length) facts.appendChild(makeEl("span", "", item.people.slice(0, 2).join("、")));
       body.appendChild(facts);
       if (item.startedAt || item.completedAt) {
-        const dates = createEl("div", "al-date-row");
-        if (item.startedAt) dates.appendChild(createEl("span", "", `開始於 ${item.startedAt}`));
-        if (item.completedAt) dates.appendChild(createEl("span", "", `完成於 ${item.completedAt}`));
+        const dates = makeEl("div", "al-date-row");
+        if (item.startedAt) dates.appendChild(makeEl("span", "", `開始於 ${item.startedAt}`));
+        if (item.completedAt) dates.appendChild(makeEl("span", "", `完成於 ${item.completedAt}`));
         body.appendChild(dates);
       }
       if (item.genres.length) {
-        const tags = createEl("div", "al-tags");
-        item.genres.slice(0, 4).forEach((genre) => tags.appendChild(createEl("span", "al-tag", genre)));
+        const tags = makeEl("div", "al-tags");
+        item.genres.slice(0, 4).forEach((genre) => tags.appendChild(makeEl("span", "al-tag", genre)));
         body.appendChild(tags);
       }
-      const progress = createEl("div", "al-progress");
-      const bar = createEl("div", "al-progress-track");
-      const fill = createEl("div", "al-progress-fill");
+      const progress = makeEl("div", "al-progress");
+      const bar = makeEl("div", "al-progress-track");
+      const fill = makeEl("div", "al-progress-fill");
       fill.style.width = `${Math.round(ratio(item) * 100)}%`;
       bar.appendChild(fill);
-      const progressRow = createEl("div", "al-progress-row");
-      progressRow.append(createEl("span", "", progressText(item)), createEl("span", "", `${Math.round(ratio(item) * 100)}%`));
+      const progressRow = makeEl("div", "al-progress-row");
+      progressRow.append(makeEl("span", "", progressText(item)), makeEl("span", "", `${Math.round(ratio(item) * 100)}%`));
       progress.append(bar, progressRow);
       body.appendChild(progress);
-      const footer = createEl("div", "al-card-footer");
-      footer.append(createEl("span", "al-updated", item.updatedLabel || ""), createEl("span", "al-score", item.score == null ? "尚未留下評分" : `★ ${item.score.toFixed(1)}`));
+      const footer = makeEl("div", "al-card-footer");
+      footer.append(makeEl("span", "al-updated", item.updatedLabel || ""), makeEl("span", "al-score", item.score == null ? "尚未留下評分" : `★ ${item.score.toFixed(1)}`));
       body.appendChild(footer);
       card.append(media, body);
       return card;
@@ -715,10 +721,10 @@ export const AnimeListUI = (() => {
       grid.className = `al-grid is-${state.view}`;
       grid.replaceChildren();
       if (!filtered.length) {
-        const empty = createEl("div", "al-empty");
-        const icon = createEl("span", "al-empty-icon");
+        const empty = makeEl("div", "al-empty");
+        const icon = makeEl("span", "al-empty-icon");
         setAnimeListIcon(icon, "book");
-        empty.append(icon, createEl("strong", "", "這一頁暫時沒有作品"), createEl("span", "", "換個分類、狀態或搜尋詞，也許就能再次遇見它。"));
+        empty.append(icon, makeEl("strong", "", "這一頁暫時沒有作品"), makeEl("span", "", "換個分類、狀態或搜尋詞，也許就能再次遇見它。"));
         grid.appendChild(empty);
         return;
       }
@@ -767,11 +773,11 @@ export const TimelineUI = (() => {
       .filter((item) => String(item.status || "completed") === "completed" && item.completedTime)
       .sort((a, b) => a.completedTime - b.completedTime || String(a.title).localeCompare(String(b.title), "zh-Hant"));
     if (!items.length) {
-      const empty = createEl("div", "al-timeline-empty");
+      const empty = makeEl("div", "al-timeline-empty");
       setAnimeListIcon(empty, "timeline");
       empty.append(
-        createEl("strong", "", "時間軸還沒有留下足跡"),
-        createEl("span", "", "完成作品後，它會依完成日期出現在這裡。"),
+        makeEl("strong", "", "時間軸還沒有留下足跡"),
+        makeEl("span", "", "完成作品後，它會依完成日期出現在這裡。"),
       );
       container.appendChild(empty);
       return { items: 0 };
@@ -794,24 +800,24 @@ export const TimelineUI = (() => {
     const baseSpacing = initialDaySpacing(rangeDays);
     const state = { x: 0, y: 0, daySpacing: baseSpacing, sceneWidth: 0 };
 
-    const root = createEl("div", "al-timeline-root");
-    const toolbar = createEl("div", "al-timeline-toolbar");
-    const copy = createEl("div", "al-timeline-copy");
-    copy.append(createEl("strong", "", "時間軸"), createEl("span", "", `${items.length} 部作品 · ${formatDate(minTime)} 至 ${formatDate(maxTime)}`));
-    const controls = createEl("div", "al-timeline-controls");
-    const zoomOut = createEl("button", "", "");
+    const root = makeEl("div", "al-timeline-root");
+    const toolbar = makeEl("div", "al-timeline-toolbar");
+    const copy = makeEl("div", "al-timeline-copy");
+    copy.append(makeEl("strong", "", "時間軸"), makeEl("span", "", `${items.length} 部作品 · ${formatDate(minTime)} 至 ${formatDate(maxTime)}`));
+    const controls = makeEl("div", "al-timeline-controls");
+    const zoomOut = makeEl("button", "", "");
     zoomOut.type = "button"; zoomOut.title = "縮短日期間距"; setAnimeListIcon(zoomOut, "minus");
-    const zoomLabel = createEl("span", "al-timeline-zoom", "100%");
-    const zoomIn = createEl("button", "", "");
+    const zoomLabel = makeEl("span", "al-timeline-zoom", "100%");
+    const zoomIn = makeEl("button", "", "");
     zoomIn.type = "button"; zoomIn.title = "拉開日期間距"; setAnimeListIcon(zoomIn, "plus");
-    const fit = createEl("button", "", "");
+    const fit = makeEl("button", "", "");
     fit.type = "button"; fit.title = "完整顯示"; setAnimeListIcon(fit, "fit");
     controls.append(zoomOut, zoomLabel, zoomIn, fit);
     toolbar.append(copy, controls);
     root.appendChild(toolbar);
 
-    const viewport = createEl("div", "al-timeline-viewport");
-    const scene = createEl("div", "al-timeline-scene");
+    const viewport = makeEl("div", "al-timeline-viewport");
+    const scene = makeEl("div", "al-timeline-scene");
     viewport.appendChild(scene);
     root.appendChild(viewport);
     container.appendChild(root);
@@ -829,7 +835,7 @@ export const TimelineUI = (() => {
       scene.style.width = `${state.sceneWidth}px`;
       scene.style.height = `${sceneHeight}px`;
 
-      const axis = createEl("div", "al-timeline-axis");
+      const axis = makeEl("div", "al-timeline-axis");
       axis.style.left = `${sidePadding}px`;
       axis.style.top = `${axisY}px`;
       axis.style.width = `${Math.max(1, rangeDays * state.daySpacing)}px`;
@@ -837,49 +843,49 @@ export const TimelineUI = (() => {
 
       const tickStep = tickStepForSpacing(state.daySpacing);
       for (let day = 0; day <= rangeDays; day += tickStep) {
-        const tick = createEl("div", "al-timeline-tick");
+        const tick = makeEl("div", "al-timeline-tick");
         tick.style.left = `${sidePadding + day * state.daySpacing}px`;
         tick.style.top = `${axisY - 7}px`;
-        tick.appendChild(createEl("span", "", formatDate(minTime + day * DAY_MS)));
+        tick.appendChild(makeEl("span", "", formatDate(minTime + day * DAY_MS)));
         scene.appendChild(tick);
       }
       if (rangeDays % tickStep !== 0) {
-        const tick = createEl("div", "al-timeline-tick");
+        const tick = makeEl("div", "al-timeline-tick");
         tick.style.left = `${sidePadding + rangeDays * state.daySpacing}px`;
         tick.style.top = `${axisY - 7}px`;
-        tick.appendChild(createEl("span", "", formatDate(maxTime)));
+        tick.appendChild(makeEl("span", "", formatDate(maxTime)));
         scene.appendChild(tick);
       }
 
       dates.forEach((time) => {
         const group = grouped.get(time);
         const x = sidePadding + Math.round((time - minTime) / DAY_MS) * state.daySpacing;
-        const dayMarker = createEl("div", "al-timeline-day-marker");
+        const dayMarker = makeEl("div", "al-timeline-day-marker");
         dayMarker.style.left = `${x - 5}px`;
         dayMarker.style.top = `${axisY - 5}px`;
         scene.appendChild(dayMarker);
         group.forEach((item, index) => {
           const cardY = axisY - 152 - index * 128;
-          const stem = createEl("div", "al-timeline-stem");
+          const stem = makeEl("div", "al-timeline-stem");
           stem.style.left = `${x}px`;
           stem.style.top = `${cardY + 112}px`;
           stem.style.height = `${axisY - (cardY + 112)}px`;
           scene.appendChild(stem);
-          const card = createEl("button", "al-timeline-card");
+          const card = makeEl("button", "al-timeline-card");
           card.type = "button";
           card.style.left = `${x - 54}px`;
           card.style.top = `${cardY}px`;
           card.title = `${item.title} · ${formatDate(time)}`;
           if (item.cover) {
-            const image = createEl("img", "", "");
+            const image = makeEl("img", "", "");
             image.src = item.cover;
             image.alt = `${item.title} 封面`;
             card.appendChild(image);
           }
-          const text = createEl("span", "al-timeline-card-copy");
-          text.append(createEl("strong", "", item.title), createEl("small", "", formatDate(time)));
+          const text = makeEl("span", "al-timeline-card-copy");
+          text.append(makeEl("strong", "", item.title), makeEl("small", "", formatDate(time)));
           card.appendChild(text);
-          if (item.score != null) card.appendChild(createEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
+          if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
           card.addEventListener("click", () => openFile(item.filePath));
           scene.appendChild(card);
         });
@@ -957,28 +963,28 @@ export const TimelineUI = (() => {
 })();
 
 function createLabeledField(parent, labelText, input, hintText = "") {
-  const wrapper = document.createElement("label");
+  const wrapper = createEl("label");
   wrapper.className = "al-form-field";
-  const label = document.createElement("span");
+  const label = createSpan();
   label.className = "al-form-label";
   label.textContent = labelText;
   wrapper.append(label, input);
-  if (hintText) wrapper.appendChild(createEl("small", "al-form-hint", hintText));
+  if (hintText) wrapper.appendChild(makeEl("small", "al-form-hint", hintText));
   parent.appendChild(wrapper);
   return input;
 }
 
 function createTextInput(type = "text", value = "") {
-  const input = document.createElement("input");
+  const input = createEl("input");
   input.type = type;
   input.value = value == null ? "" : String(value);
   return input;
 }
 
 function createSelect(options, selected) {
-  const select = document.createElement("select");
+  const select = createEl("select");
   options.forEach(([value, text]) => {
-    const option = document.createElement("option");
+    const option = createEl("option");
     option.value = value;
     option.textContent = text;
     option.selected = value === selected;
@@ -1029,21 +1035,21 @@ class AddMediaModal extends Modal {
 
   renderSearch() {
     this.contentEl.replaceChildren();
-    const heading = document.createElement("div");
+    const heading = createDiv();
     heading.className = "al-modal-heading";
-    const headingCopy = createEl("div");
+    const headingCopy = makeEl("div");
     headingCopy.append(
-      createEl("div", "al-kicker", "ADD TO YOUR LIBRARY"),
-      createEl("h2", "", "把作品收進書架"),
-      createEl("p", "", "選擇類型，再輸入名稱；封面、原名與資料連結會一併整理好。"),
+      makeEl("div", "al-kicker", "ADD TO YOUR LIBRARY"),
+      makeEl("h2", "", "把作品收進書架"),
+      makeEl("p", "", "選擇類型，再輸入名稱；封面、原名與資料連結會一併整理好。"),
     );
     heading.appendChild(headingCopy);
     this.contentEl.appendChild(heading);
 
-    const typeTabs = document.createElement("div");
+    const typeTabs = createDiv();
     typeTabs.className = "al-modal-type-tabs";
     [["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([value, text]) => {
-      const button = document.createElement("button");
+      const button = createEl("button");
       button.type = "button";
       button.className = `al-modal-type${this.mediaType === value ? " is-active" : ""}`;
       button.textContent = text;
@@ -1057,11 +1063,11 @@ class AddMediaModal extends Modal {
     });
     this.contentEl.appendChild(typeTabs);
 
-    const searchRow = document.createElement("div");
+    const searchRow = createDiv();
     searchRow.className = "al-modal-search-row";
     const input = createTextInput("search", this.query);
     input.placeholder = this.mediaType === "anime" ? "例如：輝夜姬想讓人告白" : this.mediaType === "manga" ? "例如：葬送的芙莉蓮" : "例如：無職轉生／Norwegian Wood";
-    const button = document.createElement("button");
+    const button = createEl("button");
     button.type = "button";
     button.className = "mod-cta";
     button.textContent = "開始搜尋";
@@ -1075,7 +1081,7 @@ class AddMediaModal extends Modal {
     searchRow.append(input, button);
     this.contentEl.appendChild(searchRow);
 
-    const hint = document.createElement("p");
+    const hint = createEl("p");
     hint.className = "al-modal-hint";
     hint.textContent = this.mediaType === "novel"
       ? "輕小說會搜尋 Bangumi／AniList；一般小說也會一併搜尋 Open Library。"
@@ -1083,16 +1089,16 @@ class AddMediaModal extends Modal {
     this.contentEl.appendChild(hint);
 
     if (this.warnings.length) {
-      const warning = document.createElement("div");
+      const warning = createDiv();
       warning.className = "al-modal-warning";
       warning.textContent = `部分資料來源暫時沒有回應：${this.warnings.join("；")}`;
       this.contentEl.appendChild(warning);
     }
 
-    const resultsEl = document.createElement("div");
+    const resultsEl = createDiv();
     resultsEl.className = "al-search-results";
     if (!this.results.length && this.query) {
-      const empty = document.createElement("div");
+      const empty = createDiv();
       empty.className = "al-search-empty";
       empty.textContent = "還沒有找到合適的結果。可以改用原文、日文或英文名稱再試一次。";
       resultsEl.appendChild(empty);
@@ -1120,31 +1126,31 @@ class AddMediaModal extends Modal {
   }
 
   createResultRow(result) {
-    const row = document.createElement("button");
+    const row = createEl("button");
     row.type = "button";
     row.className = "al-search-result";
     if (result.coverUrl) {
-      const image = document.createElement("img");
+      const image = createEl("img");
       image.src = result.coverUrl;
       image.alt = "";
       image.loading = "lazy";
       row.appendChild(image);
     } else {
-      const placeholder = document.createElement("div");
+      const placeholder = createDiv();
       placeholder.className = "al-search-result-placeholder";
-      placeholder.textContent = "NO COVER";
+      placeholder.textContent = "No cover";
       row.appendChild(placeholder);
     }
-    const body = document.createElement("div");
+    const body = createDiv();
     body.className = "al-search-result-body";
-    const title = document.createElement("strong");
+    const title = createEl("strong");
     title.textContent = result.title;
-    const original = document.createElement("span");
+    const original = createSpan();
     original.textContent = result.originalTitle || result.romajiTitle || "";
-    const meta = document.createElement("span");
+    const meta = createSpan();
     meta.textContent = [LABEL.provider[result.provider], result.year || "年份不明", LABEL.format[result.format] || result.format].filter(Boolean).join(" · ");
     body.append(title, original, meta);
-    const use = document.createElement("span");
+    const use = createSpan();
     use.className = "al-search-result-use";
     use.textContent = "選用";
     row.append(body, use);
@@ -1154,32 +1160,32 @@ class AddMediaModal extends Modal {
 
   async renderDetails(result) {
     this.contentEl.replaceChildren();
-    const back = document.createElement("button");
+    const back = createEl("button");
     back.type = "button";
     back.className = "al-modal-back";
     back.textContent = "← 回到搜尋結果";
     back.addEventListener("click", () => this.renderSearch());
     this.contentEl.appendChild(back);
 
-    const preview = document.createElement("div");
+    const preview = createDiv();
     preview.className = "al-selected-preview";
     if (result.coverUrl) {
-      const image = document.createElement("img");
+      const image = createEl("img");
       image.src = result.coverUrl;
       image.alt = `${result.title} 封面`;
       preview.appendChild(image);
     }
-    const copy = document.createElement("div");
+    const copy = createDiv();
     copy.append(
-      createEl("div", "al-kicker", LABEL.provider[result.provider] || result.provider),
-      createEl("h2", "", result.title),
-      createEl("p", "", result.originalTitle || result.romajiTitle || ""),
+      makeEl("div", "al-kicker", LABEL.provider[result.provider] || result.provider),
+      makeEl("h2", "", result.title),
+      makeEl("p", "", result.originalTitle || result.romajiTitle || ""),
     );
     preview.appendChild(copy);
     this.contentEl.appendChild(preview);
 
     const templates = await this.plugin.getTemplates(result.mediaType);
-    const form = document.createElement("div");
+    const form = createDiv();
     form.className = "al-media-form";
     const titleInput = createLabeledField(form, "書架上的名稱", createTextInput("text", result.title), "必填");
     titleInput.required = true;
@@ -1205,25 +1211,25 @@ class AddMediaModal extends Modal {
       ? templates.map((template) => [template.path, template.name])
       : [["", "不套用模板"]];
     const templateSelect = createLabeledField(form, "筆記模板", createSelect(templateOptions, templateOptions[0][0]), "模板直接讀取 Templates 資料夾；可自行新增或修改。" );
-    const completionNote = createEl("div", "al-completion-note");
+    const completionNote = makeEl("div", "al-completion-note");
     form.appendChild(completionNote);
     bindCompletionBehavior(status, total, progress, completedAt, completionNote);
-    const favoriteWrap = document.createElement("label");
+    const favoriteWrap = createEl("label");
     favoriteWrap.className = "al-form-checkbox";
-    const favorite = document.createElement("input");
+    const favorite = createEl("input");
     favorite.type = "checkbox";
-    favoriteWrap.append(favorite, document.createTextNode(" 收進最愛"));
+    favoriteWrap.append(favorite, " 收進最愛");
     form.appendChild(favoriteWrap);
     this.contentEl.appendChild(form);
 
-    const sourceNote = document.createElement("div");
+    const sourceNote = createDiv();
     sourceNote.className = "al-source-note";
-    sourceNote.textContent = "封面會優先保存到 Vault；外部資料連結與原始分類也會保留，方便日後核對。";
+    sourceNote.textContent = "封面會優先保存到 vault；外部資料連結與原始分類也會保留，方便日後核對。";
     this.contentEl.appendChild(sourceNote);
 
-    const actions = document.createElement("div");
+    const actions = createDiv();
     actions.className = "al-modal-actions";
-    const createButton = document.createElement("button");
+    const createButton = createEl("button");
     createButton.type = "button";
     createButton.className = "mod-cta";
     createButton.textContent = "建立作品筆記";
@@ -1268,13 +1274,13 @@ class ConfirmDeleteModal extends Modal {
     this.modalEl.classList.add("animelist-modal", "animelist-confirm-modal");
     const fm = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
-    const title = createEl("h2", "", "移除這筆收藏？");
-    const description = createEl("p", "", `「${fm.title || this.file.basename}」的 Markdown 筆記會移到系統垃圾桶；本地封面不會一併刪除。`);
-    const actions = createEl("div", "al-modal-actions al-confirm-actions");
-    const cancel = createEl("button", "", "先保留");
+    const title = makeEl("h2", "", "移除這筆收藏？");
+    const description = makeEl("p", "", `「${fm.title || this.file.basename}」的 Markdown 筆記會移到系統垃圾桶；本地封面不會一併刪除。`);
+    const actions = makeEl("div", "al-modal-actions al-confirm-actions");
+    const cancel = makeEl("button", "", "先保留");
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
-    const remove = createEl("button", "mod-warning", "移除作品");
+    const remove = makeEl("button", "mod-warning", "移除作品");
     remove.type = "button";
     remove.addEventListener("click", async () => {
       remove.disabled = true;
@@ -1305,17 +1311,17 @@ class EditMediaModal extends Modal {
     this.modalEl.classList.add("animelist-modal", "animelist-edit-modal");
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
-    const heading = document.createElement("div");
+    const heading = createDiv();
     heading.className = "al-modal-heading";
-    const title = document.createElement("h2");
+    const title = createEl("h2");
     title.textContent = `整理：${frontmatter.title || this.file.basename}`;
-    const description = document.createElement("p");
+    const description = createEl("p");
     description.textContent = "調整自己的進度、日期與評分；外部作品資料會保持原樣。";
     heading.append(title, description);
     this.contentEl.appendChild(heading);
 
     const mediaType = String(frontmatter.media_type || "anime");
-    const form = document.createElement("div");
+    const form = createDiv();
     form.className = "al-media-form";
     const statusOptions = mediaType === "anime"
       ? [["planned", "待追"], ["watching", "追番中"], ["completed", "已看完"], ["on_hold", "棄番"]]
@@ -1334,28 +1340,28 @@ class EditMediaModal extends Modal {
     const completedAt = createLabeledField(form, "完成日期", createTextInput("date", frontmatter.completed_at || todayString()), "必填；缺少日期時預設為今天。");
     completedAt.required = true;
     const genreInput = createLabeledField(form, "分類", createTextInput("text", normalizeGenres(frontmatter.genres).join("、")), "可自行補充；常見中英文名稱會自動統一。" );
-    const completionNote = createEl("div", "al-completion-note");
+    const completionNote = makeEl("div", "al-completion-note");
     form.appendChild(completionNote);
     bindCompletionBehavior(status, total, progress, completedAt, completionNote);
-    const favoriteWrap = document.createElement("label");
+    const favoriteWrap = createEl("label");
     favoriteWrap.className = "al-form-checkbox";
-    const favorite = document.createElement("input");
+    const favorite = createEl("input");
     favorite.type = "checkbox";
     favorite.checked = frontmatter.favorite === true;
-    favoriteWrap.append(favorite, document.createTextNode(" 收進最愛"));
+    favoriteWrap.append(favorite, " 收進最愛");
     form.appendChild(favoriteWrap);
     this.contentEl.appendChild(form);
 
-    const actions = document.createElement("div");
+    const actions = createDiv();
     actions.className = "al-modal-actions al-edit-actions";
-    const deleteButton = document.createElement("button");
+    const deleteButton = createEl("button");
     deleteButton.type = "button";
     deleteButton.className = "al-delete-button";
     appendIconLabel(deleteButton, "trash", "移除作品");
     deleteButton.addEventListener("click", () => {
       new ConfirmDeleteModal(this.plugin, this.file, () => this.close()).open();
     });
-    const save = document.createElement("button");
+    const save = createEl("button");
     save.type = "button";
     save.className = "mod-cta";
     save.textContent = "保存這次整理";
@@ -1493,32 +1499,32 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     if (!file) return;
     const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter || {};
     this.containerEl.replaceChildren();
-    const bar = createEl("div", "al-detail-actions");
-    const summary = createEl("div", "al-detail-summary");
-    const status = createEl("span", `al-status status-${fm.status || "planned"}`, itemStatusLabel({ status: fm.status || "planned", mediaType: fm.media_type || "anime" }));
-    const progress = createEl("span", "", fm.progress_total ? `${fm.progress || 0} / ${fm.progress_total} ${LABEL.unit[fm.progress_unit] || fm.progress_unit || ""}` : "尚未記錄進度");
+    const bar = makeEl("div", "al-detail-actions");
+    const summary = makeEl("div", "al-detail-summary");
+    const status = makeEl("span", `al-status status-${fm.status || "planned"}`, itemStatusLabel({ status: fm.status || "planned", mediaType: fm.media_type || "anime" }));
+    const progress = makeEl("span", "", fm.progress_total ? `${fm.progress || 0} / ${fm.progress_total} ${LABEL.unit[fm.progress_unit] || fm.progress_unit || ""}` : "尚未記錄進度");
     summary.append(status, progress);
-    if (fm.score != null && fm.score !== "") summary.appendChild(createEl("span", "al-detail-score", `★ ${Number(fm.score).toFixed(1)}`));
-    const actions = createEl("div", "al-detail-buttons");
-    const favorite = createEl("button", `al-detail-favorite${fm.favorite === true ? " is-active" : ""}`, fm.favorite === true ? "★ 最愛" : "☆ 加入最愛");
+    if (fm.score != null && fm.score !== "") summary.appendChild(makeEl("span", "al-detail-score", `★ ${Number(fm.score).toFixed(1)}`));
+    const actions = makeEl("div", "al-detail-buttons");
+    const favorite = makeEl("button", `al-detail-favorite${fm.favorite === true ? " is-active" : ""}`, fm.favorite === true ? "★ 最愛" : "☆ 加入最愛");
     favorite.type = "button";
     favorite.addEventListener("click", () => this.plugin.setFavorite(file.path, fm.favorite !== true));
-    const edit = createEl("button", "", "整理紀錄");
+    const edit = makeEl("button", "", "整理紀錄");
     edit.type = "button";
     edit.addEventListener("click", () => this.plugin.openEditModal(file.path));
-    const library = createEl("button", "", "回到收藏庫");
+    const library = makeEl("button", "", "回到收藏庫");
     library.type = "button";
     library.addEventListener("click", () => this.plugin.openLibrary());
     actions.append(favorite, edit, library);
     const urls = asArray(fm.source_urls).filter(Boolean);
     if (urls[0]) {
-      const external = createEl("button");
+      const external = makeEl("button");
       external.type = "button";
       appendIconLabel(external, "external", "查看資料來源");
       external.addEventListener("click", () => window.open(String(urls[0]), "_blank"));
       actions.appendChild(external);
     }
-    const remove = createEl("button", "al-detail-delete", "移除作品");
+    const remove = makeEl("button", "al-detail-delete", "移除作品");
     remove.type = "button";
     remove.addEventListener("click", () => new ConfirmDeleteModal(this.plugin, file, () => this.plugin.openLibrary()).open());
     actions.appendChild(remove);
@@ -1563,7 +1569,7 @@ export class LegacyAnimeListPlugin extends Plugin {
       .map((file) => {
         const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (!fm || !fm.media_type) return null;
-        const coverPath = String(fm.cover || "").replace(/^!\[\[/, "").replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0];
+        const coverPath = stringValue(fm.cover).replace(/^!\[\[/, "").replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0];
         let cover = "";
         if (/^https?:\/\//i.test(coverPath)) cover = coverPath;
         else if (coverPath) {
@@ -1572,9 +1578,9 @@ export class LegacyAnimeListPlugin extends Plugin {
         }
         const people = asArray(fm.studios).length ? asArray(fm.studios) : asArray(fm.authors).length ? asArray(fm.authors) : asArray(fm.creators);
         return {
-          title: String(fm.title || file.basename), originalTitle: String(fm.title_original || fm.title_romaji || ""),
-          mediaType: String(fm.media_type), format: String(fm.format || fm.media_type), status: String(fm.status || "planned"),
-          progress: fm.progress || 0, total: fm.progress_total || 0, unit: String(fm.progress_unit || ""), score: fm.score,
+          title: stringValue(fm.title, file.basename), originalTitle: stringValue(fm.title_original, stringValue(fm.title_romaji)),
+          mediaType: stringValue(fm.media_type), format: stringValue(fm.format, stringValue(fm.media_type)), status: stringValue(fm.status, "planned"),
+          progress: fm.progress || 0, total: fm.progress_total || 0, unit: stringValue(fm.progress_unit), score: fm.score,
           favorite: fm.favorite === true, year: fm.year || "", genres: normalizeGenres(fm.genres), people,
           platforms: asArray(fm.platforms), sourceUrls: asArray(fm.source_urls), cover, filePath: file.path,
           updated: Number(file.stat?.mtime || 0), updatedLabel: file.stat?.mtime ? `更新於 ${formatFileModifiedTime(file.stat.mtime)}` : "",
@@ -1595,9 +1601,7 @@ export class LegacyAnimeListPlugin extends Plugin {
   }
 
   async deleteMediaFile(file) {
-    if (this.app.fileManager?.trashFile) return await this.app.fileManager.trashFile(file);
-    if (this.app.vault?.trash) return await this.app.vault.trash(file, true);
-    return await this.app.vault.delete(file);
+    await this.app.fileManager.trashFile(file);
   }
 
   async getTemplates(mediaType) {
@@ -1695,7 +1699,7 @@ export class LegacyAnimeListPlugin extends Plugin {
   findExistingBySource(provider, sourceId) {
     return getScopedMarkdownFiles(this.app, [MEDIA_ROOT]).find((file) => {
       const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      return fm && String(fm.source_provider || "") === String(provider) && String(fm.source_id || "") === String(sourceId);
+      return fm && stringValue(fm.source_provider) === String(provider) && stringValue(fm.source_id) === String(sourceId);
     });
   }
 
@@ -1766,3 +1770,5 @@ export const legacyTest = {
 };
 
 export default LegacyAnimeListPlugin;
+
+/* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- End legacy compatibility-layer lint scope. */

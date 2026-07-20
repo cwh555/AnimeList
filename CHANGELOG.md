@@ -7,7 +7,8 @@
 - Uses native Obsidian setting headings.
 - Adds GitHub build provenance attestations for release assets.
 - Removes the redundant plugin-name settings heading and adds a release preflight for Community review blockers.
-- Documents narrow lint exceptions for the runtime-validated legacy adapter, compile-only Obsidian shim, and scoped host-style overrides.
+- Replaces forbidden lint suppressions with Obsidian DOM helpers, declarative settings, typed API boundaries, scoped vault traversal, and CSS specificity.
+- Runs the official `eslint-plugin-obsidianmd` recommended rules in `npm run check` with zero warnings.
 
 ## 1.0.1 - 2026-07-19
 

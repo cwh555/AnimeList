@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { TFile, TFolder } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import AnimeListPlugin from "../src/main";
 import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/builtin-templates";
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/settings";
 import { legacyTest } from "../src/legacy";
 import { getScopedMarkdownFiles } from "../src/vault-scope";
 
@@ -105,6 +105,43 @@ describe("repository defaults", () => {
     plugin.settings.flatMediaFolder = "Library";
     assert.equal(plugin.getMediaFolder("manga"), "Library");
   });
+
+  it("exposes declarative settings while preserving storage-mode visibility", () => {
+    const host = {
+      settings: structuredClone(DEFAULT_SETTINGS),
+      async saveSettings(): Promise<void> {},
+      async initializeLibrary(): Promise<void> {},
+      refreshViews(): void {},
+    };
+    const tab = new AnimeListSettingTab(new App(), host);
+    const definitions = tab.getSettingDefinitions();
+    assert.equal(definitions.length, 11);
+    assert.deepEqual(
+      definitions.map((definition) => definition.name),
+      [
+        "Storage layout",
+        "Library root",
+        "Flat media folder",
+        "Additional scan folders",
+        "Cover folder",
+        "Template folder",
+        "Bangumi",
+        "AniList",
+        "Open Library",
+        "Create configured folders",
+        "Copy default templates",
+      ],
+    );
+
+    const libraryRoot = definitions.find((definition) => definition.name === "Library root");
+    const flatFolder = definitions.find((definition) => definition.name === "Flat media folder");
+    assert.equal(libraryRoot?.visible?.(), true);
+    assert.equal(flatFolder?.visible?.(), false);
+
+    host.settings.storageMode = "flat";
+    assert.equal(libraryRoot?.visible?.(), false);
+    assert.equal(flatFolder?.visible?.(), true);
+  });
 });
 
 
@@ -163,18 +200,29 @@ describe("Community review preflight", () => {
     assert.doesNotMatch(settingsSource, /setName\(["']AnimeList["']\)\.setHeading\(\)/);
   });
 
-  it("documents the narrow scanner policies used by compatibility boundaries", () => {
+  it("uses paired, allowed compatibility lint scopes without forbidden suppressions", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
     const shimSource = readFileSync(path.join(process.cwd(), "types/obsidian.d.ts"), "utf8");
     const cssSource = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-    assert.match(legacySource, /@typescript-eslint\/no-unsafe-return/);
-    assert.match(legacySource, /obsidianmd\/prefer-create-el/);
-    assert.match(mainSource, /@typescript-eslint\/no-explicit-any/);
-    assert.match(settingsSource, /obsidianmd\/settings-tab\/prefer-setting-definitions/);
-    assert.match(shimSource, /@typescript-eslint\/no-explicit-any/);
-    assert.match(cssSource, /stylelint-disable declaration-no-important/);
+    assert.match(legacySource, /eslint-disable[^\n]*@typescript-eslint\/no-unsafe-return/);
+    assert.match(legacySource, /eslint-enable[^\n]*@typescript-eslint\/no-unsafe-return/);
+    assert.match(mainSource, /eslint-disable[^\n]*@typescript-eslint\/no-unsafe-member-access/);
+    assert.match(mainSource, /eslint-enable[^\n]*@typescript-eslint\/no-unsafe-member-access/);
+    assert.doesNotMatch(legacySource, /eslint-disable[^\n]*obsidianmd\/prefer-create-el/);
+    assert.doesNotMatch(mainSource, /eslint-disable[^\n]*@typescript-eslint\/no-explicit-any/);
+    assert.doesNotMatch(settingsSource, /eslint-disable/);
+    assert.doesNotMatch(shimSource, /eslint-disable|\bany\b/);
+    assert.doesNotMatch(cssSource, /!important|stylelint-disable/);
+  });
+
+  it("uses Obsidian DOM helpers and declarative settings definitions", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
+    assert.doesNotMatch(legacySource, /document\.create(?:Element|DocumentFragment|TextNode)/);
+    assert.match(legacySource, /const node = createEl\(tag\)/);
+    assert.match(settingsSource, /getSettingDefinitions\(\): SettingDefinition\[\]/);
   });
 });
 

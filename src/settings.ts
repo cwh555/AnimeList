@@ -1,6 +1,13 @@
-/* eslint-disable obsidianmd/settings-tab/prefer-setting-definitions -- minAppVersion remains 1.5.0; display() is retained for stable settings behavior before the 1.13 declarative API. */
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
+import type { SettingDefinition } from "obsidian";
 import type { AnimeListSettings, StorageMode } from "./types";
+
+const SETTINGS_INTRO = "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.";
+const DEFAULT_LIBRARY_FOLDER = "AnimeList";
+const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
+const DEFAULT_COVER_FOLDER = "AnimeList/Covers";
+const DEFAULT_TEMPLATE_FOLDER = "AnimeList/Templates";
+const FOLDERS_READY_NOTICE = "AnimeList folders are ready.";
 
 export const DEFAULT_SETTINGS: AnimeListSettings = {
   storageMode: "managed",
@@ -47,134 +54,199 @@ export class AnimeListSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  getSettingDefinitions(): SettingDefinition[] {
+    const definitions: SettingDefinition[] = [
+      {
+        name: "Storage layout",
+        desc: "Managed mode creates Anime, Manga, and Novel subfolders. Flat mode writes every media note directly into one folder.",
+        render: (setting) => this.renderStorageLayout(setting),
+      },
+      {
+        name: "Library root",
+        desc: "AnimeList creates Anime, Manga, Novel, Covers, and Templates below this folder. The default is AnimeList.",
+        visible: () => this.plugin.settings.storageMode === "managed",
+        render: (setting) => this.renderLibraryRoot(setting),
+      },
+      {
+        name: "Flat media folder",
+        desc: "Media notes are created directly in this folder without Anime, Manga, or Novel subfolders. Leave blank to use the vault root.",
+        visible: () => this.plugin.settings.storageMode === "flat",
+        render: (setting) => this.renderFlatMediaFolder(setting),
+      },
+      {
+        name: "Additional scan folders",
+        desc: "Optional existing folders to read without moving files. Enter one vault-relative path per line or separate paths with commas.",
+        render: (setting) => this.renderAdditionalScanFolders(setting),
+      },
+      {
+        name: "Cover folder",
+        desc: "Downloaded cover images are stored below this folder, grouped by media type.",
+        render: (setting) => this.renderCoverFolder(setting),
+      },
+      {
+        name: "Template folder",
+        desc: "Custom templates are read from Anime, Manga, Novel, and Common subfolders below this location.",
+        render: (setting) => this.renderTemplateFolder(setting),
+      },
+      {
+        name: "Bangumi",
+        desc: "Search anime, manga, and light novels. Useful for Chinese and Japanese titles.",
+        render: (setting) => this.renderProvider(setting, "bangumi"),
+      },
+      {
+        name: "AniList",
+        desc: "Search anime, manga, and light novels with structured metadata.",
+        render: (setting) => this.renderProvider(setting, "anilist"),
+      },
+      {
+        name: "Open Library",
+        desc: "Search general novels and books.",
+        render: (setting) => this.renderProvider(setting, "openlibrary"),
+      },
+      {
+        name: "Create configured folders",
+        desc: "Creates missing note, cover, and template folders. Existing files are never moved or overwritten.",
+        render: (setting) => this.renderCreateFolders(setting),
+      },
+      {
+        name: "Copy default templates",
+        desc: "Writes the built-in Traditional Chinese templates into the configured template folder. Existing files are not overwritten.",
+        render: (setting) => this.renderCopyTemplates(setting),
+      },
+    ];
+    return definitions;
+  }
+
   display(): void {
+    this.renderImperativeSettings();
+  }
+
+  private renderImperativeSettings(): void {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("p", {
-      text: "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.",
+      text: SETTINGS_INTRO,
     });
 
-    new Setting(containerEl)
-      .setName("Storage layout")
-      .setDesc("Managed mode creates Anime, Manga, and Novel subfolders. Flat mode writes every media note directly into one folder.")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("managed", "Managed library")
-          .addOption("flat", "Flat folder")
-          .setValue(this.plugin.settings.storageMode)
-          .onChange(async (value) => {
-            this.plugin.settings.storageMode = value as StorageMode;
-            await this.plugin.saveSettings();
-            this.display();
-            this.plugin.refreshViews();
-          }),
-      );
+    const definitions = this.getSettingDefinitions();
+    definitions.forEach((definition, index) => {
+      if (definition.visible && !definition.visible()) return;
+      if (index === 6) new Setting(containerEl).setName("Metadata providers").setHeading();
+      if (index === 9) new Setting(containerEl).setName("Library setup").setHeading();
+      const setting = new Setting(containerEl).setName(definition.name);
+      if (definition.desc) setting.setDesc(definition.desc);
+      definition.render?.(setting);
+    });
+  }
 
-    if (this.plugin.settings.storageMode === "managed") {
-      new Setting(containerEl)
-        .setName("Library root")
-        .setDesc("AnimeList creates Anime, Manga, Novel, Covers, and Templates below this folder. The default is AnimeList.")
-        .addText((text) =>
-          text
-            .setPlaceholder("AnimeList")
-            .setValue(this.plugin.settings.libraryRoot)
-            .onChange(async (value) => {
-              this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
-              await this.plugin.saveSettings();
-            }),
-        );
-    } else {
-      new Setting(containerEl)
-        .setName("Flat media folder")
-        .setDesc("Media notes are created directly in this folder without Anime, Manga, or Novel subfolders. Leave blank to use the vault root.")
-        .addText((text) =>
-          text
-            .setPlaceholder("Media")
-            .setValue(this.plugin.settings.flatMediaFolder)
-            .onChange(async (value) => {
-              this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
-              await this.plugin.saveSettings();
-            }),
-        );
+  private refreshSettingsTab(): void {
+    if (typeof this.update === "function") {
+      this.update();
+      return;
     }
+    this.renderImperativeSettings();
+  }
 
-    new Setting(containerEl)
-      .setName("Additional scan folders")
-      .setDesc("Optional existing folders to read without moving files. Enter one vault-relative path per line or separate paths with commas.")
-      .addTextArea((text) =>
-        text
-          .setPlaceholder("Media\nArchive/Anime")
-          .setValue(this.plugin.settings.additionalScanFolders.join("\n"))
-          .onChange(async (value) => {
-            this.plugin.settings.additionalScanFolders = splitFolders(value);
-            await this.plugin.saveSettings();
-            this.plugin.refreshViews();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Cover folder")
-      .setDesc("Downloaded cover images are stored below this folder, grouped by media type.")
-      .addText((text) =>
-        text
-          .setPlaceholder("AnimeList/Covers")
-          .setValue(this.plugin.settings.coverFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Template folder")
-      .setDesc("Custom templates are read from Anime, Manga, Novel, and Common subfolders below this location.")
-      .addText((text) =>
-        text
-          .setPlaceholder("AnimeList/Templates")
-          .setValue(this.plugin.settings.templateFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl).setName("Metadata providers").setHeading();
-    const providerRows: Array<[keyof AnimeListSettings["providers"], string, string]> = [
-      ["bangumi", "Bangumi", "Search anime, manga, and light novels. Useful for Chinese and Japanese titles."],
-      ["anilist", "AniList", "Search anime, manga, and light novels with structured metadata."],
-      ["openlibrary", "Open Library", "Search general novels and books."],
-    ];
-    providerRows.forEach(([key, name, description]) => {
-      new Setting(containerEl)
-        .setName(name)
-        .setDesc(description)
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
-            this.plugin.settings.providers[key] = value;
-            await this.plugin.saveSettings();
-          }),
-        );
+  private renderStorageLayout(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      dropdown
+        .addOption("managed", "Managed library")
+        .addOption("flat", "Flat folder")
+        .setValue(this.plugin.settings.storageMode)
+        .onChange(async (value) => {
+          this.plugin.settings.storageMode = value as StorageMode;
+          await this.plugin.saveSettings();
+          this.refreshSettingsTab();
+          this.plugin.refreshViews();
+        });
     });
+  }
 
-    new Setting(containerEl).setName("Library setup").setHeading();
-    new Setting(containerEl)
-      .setName("Create configured folders")
-      .setDesc("Creates missing note, cover, and template folders. Existing files are never moved or overwritten.")
-      .addButton((button) =>
-        button.setButtonText("Create folders").onClick(async () => {
-          await this.plugin.initializeLibrary(false);
-          new Notice("AnimeList folders are ready.");
-        }),
-      );
+  private renderLibraryRoot(setting: Setting): void {
+    setting.addText((text) => {
+      text
+        .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
+        .setValue(this.plugin.settings.libraryRoot)
+        .onChange(async (value) => {
+          this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
+          await this.plugin.saveSettings();
+        });
+    });
+  }
 
-    new Setting(containerEl)
-      .setName("Copy default templates")
-      .setDesc("Writes the built-in Traditional Chinese templates into the configured template folder. Existing files are not overwritten.")
-      .addButton((button) =>
-        button.setButtonText("Copy templates").onClick(async () => {
-          await this.plugin.initializeLibrary(true);
-          new Notice("Default templates are ready.");
-        }),
-      );
+  private renderFlatMediaFolder(setting: Setting): void {
+    setting.addText((text) => {
+      text
+        .setPlaceholder("Media")
+        .setValue(this.plugin.settings.flatMediaFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
+          await this.plugin.saveSettings();
+        });
+    });
+  }
+
+  private renderAdditionalScanFolders(setting: Setting): void {
+    setting.addTextArea((text) => {
+      text
+        .setPlaceholder(ADDITIONAL_FOLDER_EXAMPLE)
+        .setValue(this.plugin.settings.additionalScanFolders.join("\n"))
+        .onChange(async (value) => {
+          this.plugin.settings.additionalScanFolders = splitFolders(value);
+          await this.plugin.saveSettings();
+          this.plugin.refreshViews();
+        });
+    });
+  }
+
+  private renderCoverFolder(setting: Setting): void {
+    setting.addText((text) => {
+      text
+        .setPlaceholder(DEFAULT_COVER_FOLDER)
+        .setValue(this.plugin.settings.coverFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
+          await this.plugin.saveSettings();
+        });
+    });
+  }
+
+  private renderTemplateFolder(setting: Setting): void {
+    setting.addText((text) => {
+      text
+        .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
+        .setValue(this.plugin.settings.templateFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
+          await this.plugin.saveSettings();
+        });
+    });
+  }
+
+  private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
+    setting.addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
+        this.plugin.settings.providers[key] = value;
+        await this.plugin.saveSettings();
+      });
+    });
+  }
+
+  private renderCreateFolders(setting: Setting): void {
+    setting.addButton((button) => {
+      button.setButtonText("Create folders").onClick(async () => {
+        await this.plugin.initializeLibrary(false);
+        new Notice(FOLDERS_READY_NOTICE);
+      });
+    });
+  }
+
+  private renderCopyTemplates(setting: Setting): void {
+    setting.addButton((button) => {
+      button.setButtonText("Copy templates").onClick(async () => {
+        await this.plugin.initializeLibrary(true);
+        new Notice("Default templates are ready.");
+      });
+    });
   }
 }

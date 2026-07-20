@@ -26,6 +26,13 @@ function rejectMatch(value, pattern, message) {
   if (pattern.test(value)) failures.push(message);
 }
 
+function requirePairedLintScope(value, rules, label) {
+  const escaped = rules.map((rule) => rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const sequence = escaped.join(",\\s*");
+  requireMatch(value, new RegExp(`/\\* eslint-disable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-disable scope is missing or changed`);
+  requireMatch(value, new RegExp(`/\\* eslint-enable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-enable scope is missing or changed`);
+}
+
 if (manifest.version !== "1.0.2" || packageJson.version !== "1.0.2") {
   failures.push("Community release version must remain 1.0.2");
 }
@@ -34,16 +41,41 @@ if (versions["1.0.2"] !== manifest.minAppVersion) {
 }
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");
+rejectMatch(sourceFiles, /document\.create(?:Element|DocumentFragment|TextNode)\s*\(/, "native DOM creation remains; use Obsidian createEl helpers");
 rejectMatch(main, /detachLeavesOfType\s*\(/, "custom views must not be detached during unload");
 rejectMatch(settings, /setName\(["']AnimeList["']\)\.setHeading\(\)/, "plugin name must not be a settings heading");
 rejectMatch(sourceFiles, /\.getMarkdownFiles\s*\(|\.getFiles\s*\(/, "whole-vault file enumeration remains");
+rejectMatch(scopedVault, /\bas\s+(?:TAbstractFile|TFile|TFolder)\b/, "vault traversal must use instanceof narrowing instead of file casts");
 
-requireMatch(legacy, /eslint-disable[^\n]*@typescript-eslint\/no-unsafe-return/, "legacy compatibility lint boundary is missing");
-requireMatch(legacy, /eslint-disable[^\n]*obsidianmd\/prefer-create-el/, "legacy DOM helper lint boundary is missing");
-requireMatch(main, /eslint-disable[^\n]*@typescript-eslint\/no-explicit-any/, "typed adapter lint boundary is missing");
-requireMatch(settings, /obsidianmd\/settings-tab\/prefer-setting-definitions/, "pre-1.13 settings compatibility policy is missing");
-requireMatch(shim, /eslint-disable[^\n]*@typescript-eslint\/no-explicit-any/, "compile-time shim lint policy is missing");
-requireMatch(styles, /stylelint-disable declaration-no-important/, "scoped host-style override policy is missing");
+const forbiddenDisabledRules = [
+  "@typescript-eslint/no-explicit-any",
+  "obsidianmd/prefer-create-el",
+  "obsidianmd/settings-tab/prefer-setting-definitions",
+];
+for (const rule of forbiddenDisabledRules) {
+  const escaped = rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  rejectMatch([legacy, main, settings, shim].join("\n"), new RegExp(`eslint-disable[^\\n]*${escaped}`), `forbidden lint suppression remains: ${rule}`);
+}
+rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
+rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
+requireMatch(settings, /getSettingDefinitions\(\):\s*SettingDefinition\[\]/, "declarative settings definitions are missing");
+rejectMatch(styles, /!important\b/, "CSS !important remains");
+
+requirePairedLintScope(legacy, [
+  "@typescript-eslint/no-unsafe-return",
+  "@typescript-eslint/no-unsafe-member-access",
+  "@typescript-eslint/no-unsafe-call",
+  "@typescript-eslint/no-unsafe-argument",
+  "@typescript-eslint/no-unsafe-assignment",
+  "@typescript-eslint/no-floating-promises",
+  "@typescript-eslint/no-misused-promises",
+], "legacy compatibility");
+requirePairedLintScope(main, [
+  "@typescript-eslint/no-unsafe-member-access",
+  "@typescript-eslint/no-unsafe-assignment",
+  "@typescript-eslint/no-misused-promises",
+], "typed legacy adapter");
+
 requireMatch(releaseWorkflow, /actions\/attest@v4/, "release artifact attestation is missing");
 requireMatch(releaseWorkflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/, "all release assets must be attested");
 
