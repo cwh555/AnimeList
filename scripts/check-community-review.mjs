@@ -33,11 +33,11 @@ function requirePairedLintScope(value, rules, label) {
   requireMatch(value, new RegExp(`/\\* eslint-enable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-enable scope is missing or changed`);
 }
 
-if (manifest.version !== "1.0.2" || packageJson.version !== "1.0.2") {
-  failures.push("Community release version must remain 1.0.2");
+if (manifest.version !== "1.0.3" || packageJson.version !== "1.0.3") {
+  failures.push("Community release version must remain 1.0.3");
 }
-if (versions["1.0.2"] !== manifest.minAppVersion) {
-  failures.push("versions.json must map 1.0.2 to manifest minAppVersion");
+if (versions["1.0.3"] !== manifest.minAppVersion) {
+  failures.push("versions.json must map 1.0.3 to manifest minAppVersion");
 }
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");

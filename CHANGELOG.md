@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 - 2026-07-20
+
+- Publish the Community-review-compliant build as a new release.
+
 ## 1.0.2 - 2026-07-19
 
 - Replaces direct `innerHTML` writes with Obsidian icons and explicit DOM construction.

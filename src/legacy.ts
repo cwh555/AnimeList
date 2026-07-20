@@ -3,7 +3,7 @@
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
-const PLUGIN_VERSION = "1.0.2";
+const PLUGIN_VERSION = "1.0.3";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";

@@ -27,7 +27,7 @@ import type {
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.0.2";
+const PLUGIN_VERSION = "1.0.3";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 const DISPLAY_NAME = "AnimeList";
 const OPEN_LIBRARY_LABEL = `開啟 ${DISPLAY_NAME}`;
