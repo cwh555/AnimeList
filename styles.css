@@ -161,7 +161,7 @@
 .al-modal-search-row button { min-width:88px; }
 .al-modal-hint { margin:8px 1px 14px; color:var(--text-faint); font-size:.67rem; line-height:1.5; }
 .al-modal-warning { margin:0 0 12px; padding:9px 11px; border:1px solid color-mix(in srgb,#d49a48 40%,var(--background-modifier-border)); border-radius:9px; color:var(--text-muted); background:color-mix(in srgb,#d49a48 10%,transparent); font-size:.68rem; }
-.al-search-results { display:flex; max-height:min(560px,58vh); flex-direction:column; gap:7px; overflow:auto; padding-right:3px; }
+.al-search-results { display:flex; max-height:none; flex-direction:column; gap:7px; overflow:visible; padding-right:3px; }
 .al-search-result {
   display:grid; grid-template-columns:58px minmax(0,1fr) auto; gap:12px; align-items:center;
   width:100%; min-height:86px; padding:8px 10px 8px 8px; border:1px solid var(--background-modifier-border);

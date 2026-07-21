@@ -95,6 +95,7 @@ export interface ExternalMediaResult {
   summary: string;
   externalScore: number | null;
   releaseStatus: ReleaseStatus;
+  searchTitles?: string[];
 }
 
 export interface MediaNoteForm {

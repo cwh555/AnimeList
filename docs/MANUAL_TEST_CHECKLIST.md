@@ -28,6 +28,7 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Search, media type, status, and genre filters can be combined.
 - [ ] Default sorting is newest completion date first.
 - [ ] Recently updated sorting uses the file modification time.
+- [ ] Long search results scroll with the outer modal only; the wheel continues through the full dialog without becoming trapped in a nested result pane.
 
 ## Create and edit
 
@@ -35,6 +36,7 @@ Run this checklist before every public release and before the initial Community 
 
 - [ ] Search works with Bangumi enabled alone.
 - [ ] Search works with AniList enabled alone.
+- [ ] Searching `輝夜姬想讓人告白第二季` returns the second season, and searching `輝夜姬想讓人告白 永不結束的初吻` returns the matching special through broader-title fallback.
 - [ ] General novel search works with Open Library enabled.
 - [ ] A title is always required.
 - [ ] Planned, watching/reading, and on-hold records can be saved with an empty score and empty completion date.
@@ -80,6 +82,7 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Every saved novel-volume row appears on the timeline because missing completion dates default to today.
 - [ ] Every novel-volume card uses the series cover and visibly shows both the work title and `第 N 卷`.
 - [ ] Records on the same or nearby dates move into alternating vertical lanes and do not overlap at fit, zoomed-in, or zoomed-out scales.
+- [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and novel volumes appear in `1`, `2`, `3` order.
 - [ ] Dragging pans the timeline.
 - [ ] Zoom changes day spacing, not poster dimensions.
 - [ ] Fit shows all completion dates.

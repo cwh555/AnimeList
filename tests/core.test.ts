@@ -17,6 +17,7 @@ import {
   serializeVolumeLog,
 } from "../src/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
+import { rankSearchResults, searchQueryVariants } from "../src/search";
 
 const PathExists = existsSync;
 
@@ -24,6 +25,8 @@ const {
   assignTimelineLanes,
   buildMediaMarkdown,
   completedProgress,
+  compareTimelineEntries,
+  dedupeSearchResults,
   filterTimelineEntries,
   normalizeGenres,
   sanitizePathPart,
@@ -61,6 +64,111 @@ const baseResult = {
   unit: "episode",
   summary: "Summary",
 };
+
+describe("external search fallbacks", () => {
+  it("broadens season and translated-subtitle queries without replacing the original query", () => {
+    assert.deepEqual(
+      searchQueryVariants("輝夜姬想讓人告白第二季"),
+      ["輝夜姬想讓人告白第二季", "輝夜姬想讓人告白"],
+    );
+    assert.deepEqual(
+      searchQueryVariants("輝夜姬想讓人告白 永不結束的初吻"),
+      ["輝夜姬想讓人告白 永不結束的初吻", "輝夜姬想讓人告白", "永不結束的初吻"],
+    );
+  });
+
+  it("ranks the requested season from provider synonyms ahead of other seasons", () => {
+    const common = {
+      provider: "anilist", sourceUrl: "", mediaType: "anime", format: "tv", year: 2020, coverUrl: "",
+      genres: [], rawGenres: [], people: [], platforms: [], total: 12, unit: "episode", summary: "",
+      externalScore: null, releaseStatus: "finished", originalTitle: "", romajiTitle: "",
+    } as const;
+    const ranked = rankSearchResults([
+      { ...common, sourceId: "101921", title: "Kaguya-sama: Love is War", searchTitles: ["辉夜大小姐想让我告白"] },
+      { ...common, sourceId: "112641", title: "Kaguya-sama: Love is War?", searchTitles: ["Kaguya-sama: Love is War Season 2", "辉夜大小姐想让我告白 第二季"] },
+      { ...common, sourceId: "125367", title: "Kaguya-sama: Love is War -Ultra Romantic-", searchTitles: ["Kaguya-sama: Love is War Season 3", "辉夜大小姐想让我告白 第三季"] },
+    ], "輝夜姬想讓人告白第二季");
+
+    assert.equal(ranked[0].sourceId, "112641");
+  });
+
+  it("does not collapse distinct seasons whose English titles differ only by punctuation", () => {
+    const common = {
+      provider: "anilist", sourceUrl: "", mediaType: "anime", format: "tv", year: 2020, coverUrl: "",
+      genres: [], rawGenres: [], people: [], platforms: [], total: 12, unit: "episode", summary: "",
+      externalScore: null, releaseStatus: "finished", originalTitle: "", romajiTitle: "",
+    } as const;
+    const results = dedupeSearchResults([
+      { ...common, sourceId: "101921", title: "Kaguya-sama: Love is War" },
+      { ...common, sourceId: "112641", title: "Kaguya-sama: Love is War?" },
+    ]);
+
+    assert.deepEqual(results.map((result) => result.sourceId), ["101921", "112641"]);
+  });
+
+  it("queries broader provider result sets and merges every generated query", () => {
+    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    assert.match(mainSource, /const queries = searchQueryVariants\(query\)/);
+    assert.match(mainSource, /queries\.map\(\(candidate\) => this\.searchBangumi/);
+    assert.match(mainSource, /queries\.map\(\(candidate\) => this\.searchAniList/);
+    assert.match(mainSource, /search\/subjects\?limit=20&offset=0/);
+    assert.match(mainSource, /Page\(page: 1, perPage: 20\)/);
+    assert.match(mainSource, /rankSearchResults\(deduped, query\)/);
+  });
+
+  it("merges fallback provider responses and returns the requested second season", async () => {
+    const common = {
+      provider: "anilist", sourceUrl: "", mediaType: "anime", format: "tv", year: 2020, coverUrl: "",
+      genres: [], rawGenres: [], people: [], platforms: [], total: 12, unit: "episode", summary: "",
+      externalScore: null, releaseStatus: "finished", originalTitle: "", romajiTitle: "",
+    } as const;
+    const calls: string[] = [];
+    const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
+      searchBangumi: (mediaType: string, query: string) => Promise<typeof common[]>;
+      searchAniList: (mediaType: string, query: string) => Promise<Array<typeof common & { sourceId: string; title: string; searchTitles: string[] }>>;
+    };
+    plugin.settings = structuredClone(DEFAULT_SETTINGS);
+    plugin.settings.providers.openlibrary = false;
+    plugin.searchBangumi = async (_mediaType, query) => { calls.push(`bangumi:${query}`); return []; };
+    plugin.searchAniList = async (_mediaType, query) => {
+      calls.push(`anilist:${query}`);
+      if (query !== "輝夜姬想讓人告白") return [];
+      return [
+        { ...common, year: 2019, sourceId: "101921", title: "Kaguya-sama: Love is War", searchTitles: ["辉夜大小姐想让我告白"] },
+        { ...common, year: 2020, sourceId: "112641", title: "Kaguya-sama: Love is War?", searchTitles: ["Kaguya-sama: Love is War Season 2", "辉夜大小姐想让我告白 第二季"] },
+      ];
+    };
+
+    const response = await plugin.searchExternal("anime", "輝夜姬想讓人告白第二季");
+    assert.equal(response.results[0].sourceId, "112641");
+    assert.ok(calls.includes("bangumi:輝夜姬想讓人告白第二季"));
+    assert.ok(calls.includes("bangumi:輝夜姬想讓人告白"));
+    assert.ok(calls.includes("anilist:輝夜姬想讓人告白第二季"));
+    assert.ok(calls.includes("anilist:輝夜姬想讓人告白"));
+  });
+
+  it("keeps a translated subtitle result returned by a broader query", async () => {
+    const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
+      searchBangumi: (mediaType: string, query: string) => Promise<any[]>;
+      searchAniList: (mediaType: string, query: string) => Promise<any[]>;
+    };
+    plugin.settings = structuredClone(DEFAULT_SETTINGS);
+    plugin.settings.providers.anilist = false;
+    plugin.settings.providers.openlibrary = false;
+    plugin.searchAniList = async () => [];
+    plugin.searchBangumi = async (_mediaType, query) => query === "輝夜姬想讓人告白"
+      ? [{
+        ...baseResult, provider: "bangumi", sourceId: "425211", sourceUrl: "", mediaType: "anime",
+        title: "辉夜大小姐想让我告白-初吻不会结束-", originalTitle: "かぐや様は告らせたい-ファーストキッスは終わらない-",
+        romajiTitle: "", format: "special", year: 2022, coverUrl: "", rawGenres: [], people: [], platforms: [],
+        externalScore: null, releaseStatus: "finished", searchTitles: ["輝夜姬想讓人告白－永不結束的初吻－"],
+      }]
+      : [];
+
+    const response = await plugin.searchExternal("anime", "輝夜姬想讓人告白 永不結束的初吻");
+    assert.equal(response.results.some((result) => result.sourceId === "425211"), true);
+  });
+});
 
 describe("media note generation", () => {
   it("forces completed progress to the total", () => {
@@ -300,6 +408,24 @@ describe("serial progress and novel volume records", () => {
     assert.deepEqual(layout.map((entry) => entry.lane), [0, 1, 0, 2]);
   });
 
+  it("sorts same-day related titles and volume labels in natural order", () => {
+    const entries = [
+      { title: "Series 10" },
+      { title: "Other work" },
+      { title: "Series 2" },
+      { title: "Series 1" },
+    ].sort(compareTimelineEntries);
+    assert.deepEqual(entries.map((entry) => entry.title), ["Other work", "Series 1", "Series 2", "Series 10"]);
+
+    const volumes = [
+      { title: "Novel — 第 10 卷", seriesTitle: "Novel", volumeLabel: "10" },
+      { title: "Novel — 第 2 卷", seriesTitle: "Novel", volumeLabel: "2" },
+      { title: "Novel — 第 1 卷", seriesTitle: "Novel", volumeLabel: "1" },
+      { title: "Novel — 第 EX 卷", seriesTitle: "Novel", volumeLabel: "EX" },
+    ].sort(compareTimelineEntries);
+    assert.deepEqual(volumes.map((entry) => entry.volumeLabel), ["1", "2", "10", "EX"]);
+  });
+
   it("omits an unknown serial total instead of writing a fake zero", () => {
     const markdown = buildMediaMarkdown({
       ...baseResult,
@@ -346,6 +472,14 @@ describe("novel volume editor UI", () => {
   it("does not ship a per-volume cover provider module or credentials", () => {
     assert.equal(PathExists(path.join(process.cwd(), "src/volume-covers.ts")), false);
     assert.equal("novelCovers" in DEFAULT_SETTINGS, false);
+  });
+});
+
+describe("modal scrolling", () => {
+  it("uses the outer Obsidian modal as the only vertical scroll container", () => {
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+    assert.match(stylesheet, /\.al-search-results \{[^}]*max-height:none[^}]*overflow:visible/);
+    assert.doesNotMatch(stylesheet, /\.al-search-results \{[^}]*overflow:auto/);
   });
 });
 
@@ -586,7 +720,8 @@ describe("version documentation", () => {
 
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
-    assert.match(changelog, /## 1\.1\.1 - Unreleased/);
+    assert.match(changelog, /## 1\.1\.2 - Unreleased/);
+    assert.match(changelog, /## 1\.1\.1 - 2026-07-21/);
     assert.match(changelog, /## 1\.1\.0 - 2026-07-21/);
     assert.match(readme, /> \[!NOTE\]/);
     assert.match(readme, /> \*\*What's new in 1\.1\.0\*\*/);
@@ -604,13 +739,13 @@ describe("version documentation", () => {
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
 
-    assert.equal(manifest.version, "1.1.1");
+    assert.equal(manifest.version, "1.1.2");
     assert.equal(packageJson.version, manifest.version);
     assert.equal(packageLock.version, manifest.version);
     assert.equal(packageLock.packages[""]?.version, manifest.version);
     assert.equal(versions[manifest.version], "1.5.0");
-    assert.match(mainSource, /const PLUGIN_VERSION = "1\.1\.1";/);
-    assert.match(legacySource, /const PLUGIN_VERSION = "1\.1\.1";/);
+    assert.match(mainSource, /const PLUGIN_VERSION = "1\.1\.2";/);
+    assert.match(legacySource, /const PLUGIN_VERSION = "1\.1\.2";/);
   });
 });
 

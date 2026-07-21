@@ -18,7 +18,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 ## Features
 
 - One library for anime, manga, and novels.
-- Metadata search through Bangumi, AniList, and Open Library.
+- Metadata search through Bangumi, AniList, and Open Library, with broader-title fallback for localized season and subtitle names.
 - Local cover downloads with remote-image fallback.
 - Card, list, and compact library views.
 - Search, media-type, status, genre, favorite, and sorting controls.

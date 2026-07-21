@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.1.1 - Unreleased
+## 1.1.2 - Unreleased
+
+- Retries localized season and subtitle searches with broader series queries, then ranks explicit season matches from provider aliases.
+- Uses the outer Obsidian modal as the only vertical scroll container so wheel scrolling does not become trapped in search results.
+- Naturally orders same-day timeline entries by related title and volume number.
+
+## 1.1.1 - 2026-07-21
 
 - Reorganizes the README around installation, everyday use, the Markdown data model, and concise development links.
 - Presents the released 1.1.0 feature summary in a GitHub callout instead of marking it unreleased.

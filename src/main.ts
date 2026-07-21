@@ -17,6 +17,7 @@ import LegacyAnimeListPlugin, {
 import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { completedRequirementMessage, uiText } from "./ui-text";
+import { rankSearchResults, searchQueryVariants } from "./search";
 import type {
   AnimeListSettings,
   ExternalMediaResult,
@@ -33,7 +34,7 @@ import {
 } from "./novel-progress";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.1.1";
+const PLUGIN_VERSION = "1.1.2";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 const DISPLAY_NAME = "AnimeList";
 
@@ -420,21 +421,22 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     return this.app.vault.cachedRead(file);
   }
 
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: unknown[]; warnings: string[] }> {
+  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
     const tasks: Array<Promise<{ provider: string; items?: unknown[]; error?: unknown }>> = [];
+    const queries = searchQueryVariants(query);
     if (this.settings.providers.bangumi) {
-      tasks.push(this.searchBangumi(mediaType, query)
-        .then((items) => ({ provider: "Bangumi", items }))
+      tasks.push(Promise.all(queries.map((candidate) => this.searchBangumi(mediaType, candidate)))
+        .then((groups) => ({ provider: "Bangumi", items: dedupeSearchResults(groups.flat()) }))
         .catch((error) => ({ provider: "Bangumi", error })));
     }
     if (this.settings.providers.anilist) {
-      tasks.push(this.searchAniList(mediaType, query)
-        .then((items) => ({ provider: "AniList", items }))
+      tasks.push(Promise.all(queries.map((candidate) => this.searchAniList(mediaType, candidate)))
+        .then((groups) => ({ provider: "AniList", items: dedupeSearchResults(groups.flat()) }))
         .catch((error) => ({ provider: "AniList", error })));
     }
     if (mediaType === "novel" && this.settings.providers.openlibrary) {
-      tasks.push(this.searchOpenLibrary(query)
-        .then((items) => ({ provider: "Open Library", items }))
+      tasks.push(Promise.all(queries.map((candidate) => this.searchOpenLibrary(candidate)))
+        .then((groups) => ({ provider: "Open Library", items: dedupeSearchResults(groups.flat()) }))
         .catch((error) => ({ provider: "Open Library", error })));
     }
     if (!tasks.length) return { results: [], warnings: ["No metadata provider is enabled."] };
@@ -444,12 +446,13 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
       .filter((entry) => entry.error)
       .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
     const results = settled.flatMap((entry) => entry.items ?? []);
-    return { results: dedupeSearchResults(results).slice(0, 24), warnings };
+    const deduped: ExternalMediaResult[] = dedupeSearchResults(results);
+    return { results: rankSearchResults(deduped, query).slice(0, 24), warnings };
   }
 
   async searchBangumi(mediaType: MediaType, query: string) {
     const response = await requestUrl({
-      url: "https://api.bgm.tv/v0/search/subjects?limit=10&offset=0",
+      url: "https://api.bgm.tv/v0/search/subjects?limit=20&offset=0",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -469,7 +472,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
   async searchAniList(mediaType: MediaType, query: string) {
     const graphQuery = `
       query ($search: String, $type: MediaType, $format: MediaFormat) {
-        Page(page: 1, perPage: 10) {
+        Page(page: 1, perPage: 20) {
           media(search: $search, type: $type, format: $format, sort: SEARCH_MATCH) {
             id siteUrl type format status episodes chapters volumes averageScore description(asHtml: false) genres synonyms
             startDate { year month day }

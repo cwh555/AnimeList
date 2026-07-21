@@ -24,7 +24,7 @@ import {
   serializeVolumeLog,
 } from "./novel-progress";
 
-const PLUGIN_VERSION = "1.1.1";
+const PLUGIN_VERSION = "1.1.2";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
@@ -161,6 +161,23 @@ function normalizeComparable(value) {
   return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
 }
 
+const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
+
+function compareTimelineEntries(left, right) {
+  const leftSeries = String(left?.seriesTitle || left?.title || "");
+  const rightSeries = String(right?.seriesTitle || right?.title || "");
+  const seriesOrder = timelineTitleCollator.compare(leftSeries, rightSeries);
+  if (seriesOrder) return seriesOrder;
+  const leftVolume = normalizeVolumeLabel(left?.volumeLabel);
+  const rightVolume = normalizeVolumeLabel(right?.volumeLabel);
+  if (leftVolume && rightVolume) {
+    const volumeOrder = compareVolumeLabels(leftVolume, rightVolume);
+    if (volumeOrder) return volumeOrder;
+  } else if (leftVolume) return 1;
+  else if (rightVolume) return -1;
+  return timelineTitleCollator.compare(String(left?.title || ""), String(right?.title || ""));
+}
+
 function normalizeGenre(value) {
   const clean = String(value || "").normalize("NFKC").trim().replace(/^#/, "");
   if (!clean) return "";
@@ -252,6 +269,11 @@ function normalizeBangumiSubject(subject, mediaType) {
     genres: normalizeGenres(rawGenres), rawGenres, people, platforms: platform ? [platform] : [], total,
     unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
     summary: String(subject?.summary || "").trim(), externalScore: numeric(subject?.rating?.score, null), releaseStatus: "unknown",
+    searchTitles: [...new Set([
+      localTitle,
+      originalTitle,
+      ...bangumiInfoboxValues(subject?.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
+    ].map((title) => String(title || "").trim()).filter(Boolean))],
   };
 }
 
@@ -275,6 +297,14 @@ function normalizeAniListMedia(media, selectedType) {
     genres: normalizeGenres(rawGenres), rawGenres, people: mediaType === "anime" ? studios : staff, platforms: [], total,
     unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
     summary: stripHtml(media?.description), externalScore: media?.averageScore == null ? null : numeric(media.averageScore) / 10, releaseStatus,
+    searchTitles: [...new Set([
+      localTitle,
+      originalTitle,
+      title.romaji,
+      title.english,
+      title.native,
+      ...asArray(media?.synonyms),
+    ].map((entry) => String(entry || "").trim()).filter(Boolean))],
   };
 }
 
@@ -291,15 +321,20 @@ function normalizeOpenLibraryBook(book) {
 
 function dedupeSearchResults(results) {
   const seenSource = new Set();
-  const seenTitle = new Set();
+  const titleOwners = new Map();
   const output = [];
   for (const result of results) {
     const sourceKey = `${result.provider}:${result.sourceId}`;
     if (seenSource.has(sourceKey)) continue;
     seenSource.add(sourceKey);
-    const titleKey = `${result.mediaType}:${normalizeComparable(result.title || result.originalTitle)}`;
-    if (titleKey && seenTitle.has(titleKey)) continue;
-    if (titleKey) seenTitle.add(titleKey);
+
+    const comparableTitle = normalizeComparable(result.title || result.originalTitle);
+    const titleKey = comparableTitle
+      ? `${result.mediaType}:${comparableTitle}:${result.year || ""}:${result.format || ""}`
+      : "";
+    const titleOwner = titleKey ? titleOwners.get(titleKey) : undefined;
+    if (titleOwner && titleOwner !== result.provider) continue;
+    if (titleKey && !titleOwner) titleOwners.set(titleKey, result.provider);
     output.push(result);
   }
   return output;
@@ -862,7 +897,7 @@ export const TimelineUI = (() => {
     const allItems = expandTimelineEntries(inputItems)
       .map((item) => ({ ...item, completedTime: dayStart(item.completedAt || item.completed_at) }))
       .filter((item) => item.completedTime)
-      .sort((a, b) => a.completedTime - b.completedTime || String(a.title).localeCompare(String(b.title), "zh-Hant"));
+      .sort((a, b) => a.completedTime - b.completedTime || compareTimelineEntries(a, b));
     if (!allItems.length) {
       const empty = makeEl("div", "al-timeline-empty");
       setAnimeListIcon(empty, "timeline");
@@ -2142,6 +2177,7 @@ export const legacyTest = {
   normalizeBangumiSubject, normalizeAniListMedia, normalizeOpenLibraryBook, dedupeSearchResults,
   buildMediaMarkdown, sanitizePathPart, normalizeGenres, completedProgress, applyTemplateVariables, formatFileModifiedTime,
   ensureDetailBlock, AnimeListUI, TimelineUI, assignTimelineLanes, filterTimelineEntries,
+  compareTimelineEntries,
 };
 
 export default LegacyAnimeListPlugin;
