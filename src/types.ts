@@ -2,6 +2,8 @@ export type MediaType = "anime" | "manga" | "novel";
 export type StorageMode = "managed" | "flat";
 export type LibrarySection = "library" | "timeline";
 export type LibraryViewMode = "grid" | "list" | "poster";
+export type ReleaseStatus = "releasing" | "finished" | "hiatus" | "cancelled" | "unknown";
+export type ProgressValue = number | string;
 
 export interface ProviderSettings {
   bangumi: boolean;
@@ -17,6 +19,7 @@ export interface LibraryUiState {
   sort: string;
   view: LibraryViewMode;
 }
+
 
 export interface AnimeListSettings {
   storageMode: StorageMode;
@@ -34,14 +37,22 @@ export interface TemplateOption {
   name: string;
 }
 
+export interface NovelVolumeEntry {
+  label: string;
+  startedAt: string;
+  completedAt: string;
+}
+
+
 export interface MediaItem {
   title: string;
   originalTitle: string;
   mediaType: MediaType;
   format: string;
   status: string;
-  progress: number;
-  total: number;
+  releaseStatus: ReleaseStatus;
+  progress: ProgressValue;
+  total: ProgressValue;
   unit: string;
   score: number | null;
   favorite: boolean;
@@ -56,6 +67,12 @@ export interface MediaItem {
   updatedLabel: string;
   startedAt: string;
   completedAt: string;
+  volumeLog: NovelVolumeEntry[];
+}
+
+export interface TimelineMediaEntry extends MediaItem {
+  seriesTitle?: string;
+  volumeLabel?: string;
 }
 
 export interface ExternalMediaResult {
@@ -77,18 +94,21 @@ export interface ExternalMediaResult {
   coverUrl: string;
   summary: string;
   externalScore: number | null;
+  releaseStatus: ReleaseStatus;
 }
 
 export interface MediaNoteForm {
   title: string;
   status: string;
-  progress: number | string;
-  total: number | string;
+  releaseStatus: ReleaseStatus;
+  progress: ProgressValue;
+  total: ProgressValue;
   unit: string;
-  score: number | string;
+  score: number | string | null;
   favorite: boolean;
   startedAt: string;
   completedAt: string;
   genres: string[];
   templatePath: string;
+  volumeLog: NovelVolumeEntry[];
 }

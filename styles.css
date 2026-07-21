@@ -263,16 +263,17 @@
 .al-timeline-viewport { position:relative; flex:1; min-height:0; overflow:hidden; cursor:grab; background-color:var(--background-primary); background-image:radial-gradient(circle,color-mix(in srgb,var(--text-faint) 18%,transparent) 1px,transparent 1px); background-size:22px 22px; touch-action:none; }
 .al-timeline-viewport.is-dragging { cursor:grabbing; }
 .al-timeline-scene { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
-.al-timeline-axis { position:absolute; height:3px; border-radius:99px; background:linear-gradient(90deg,color-mix(in srgb,var(--interactive-accent) 35%,var(--background-modifier-border)),var(--interactive-accent)); box-shadow:0 0 18px color-mix(in srgb,var(--interactive-accent) 22%,transparent); }
+.al-timeline-axis { position:absolute; z-index:1; height:3px; border-radius:99px; background:linear-gradient(90deg,color-mix(in srgb,var(--interactive-accent) 35%,var(--background-modifier-border)),var(--interactive-accent)); box-shadow:0 0 18px color-mix(in srgb,var(--interactive-accent) 22%,transparent); }
 .al-timeline-tick { position:absolute; width:1px; height:16px; background:var(--background-modifier-border); }
 .al-timeline-tick span { position:absolute; top:19px; left:0; transform:translateX(-50%); color:var(--text-faint); font-size:10px; white-space:nowrap; }
-.al-timeline-day-marker { position:absolute; z-index:3; width:11px; height:11px; border:2px solid var(--background-primary); border-radius:50%; background:var(--interactive-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--interactive-accent) 35%,transparent); }
-.al-timeline-stem { position:absolute; z-index:1; width:1px; background:color-mix(in srgb,var(--interactive-accent) 55%,var(--background-modifier-border)); }
-.al-timeline-card { position:absolute; z-index:2; display:flex; width:108px; height:116px; flex-direction:column; overflow:hidden; padding:0; border:1px solid var(--background-modifier-border); border-radius:10px; color:var(--text-normal); background:var(--background-secondary); cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); text-align:left; transition:transform .15s ease,border-color .15s ease; }
+.al-timeline-day-marker { position:absolute; z-index:4; width:11px; height:11px; border:2px solid var(--background-primary); border-radius:50%; background:var(--interactive-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--interactive-accent) 35%,transparent); }
+.al-timeline-stem { position:absolute; z-index:0; width:2px; transform:translateX(-50%); pointer-events:none; background:color-mix(in srgb,var(--interactive-accent) 55%,var(--background-modifier-border)); }
+.al-timeline-card { position:absolute; z-index:3; display:flex; width:120px; height:146px; flex-direction:column; overflow:hidden; padding:0; border:1px solid var(--background-modifier-border); border-radius:10px; color:var(--text-normal); background:var(--background-secondary); cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.2); text-align:left; transition:transform .15s ease,border-color .15s ease; }
 .al-timeline-card:hover { z-index:10; transform:translateY(-4px) scale(1.03); border-color:var(--interactive-accent); }
-.al-timeline-card img { width:100%; height:76px; object-fit:cover; }
-.al-timeline-card-copy { display:flex; min-width:0; flex:1; flex-direction:column; justify-content:center; gap:2px; padding:5px 7px; }
-.al-timeline-card-copy strong { overflow:hidden; font-size:10px; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; }
+.al-timeline-card img { width:100%; height:84px; flex:none; object-fit:cover; }
+.al-timeline-card-copy { display:flex; min-width:0; flex:1; flex-direction:column; justify-content:center; gap:2px; padding:5px 7px 6px; }
+.al-timeline-card-copy strong { display:-webkit-box; overflow:hidden; font-size:10px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.al-timeline-volume-label { color:var(--text-accent); font-size:9px; font-weight:650; line-height:1.2; }
 .al-timeline-card-copy small { color:var(--text-muted); font-size:8px; }
 .al-timeline-score { position:absolute; top:5px; right:5px; padding:2px 5px; border-radius:6px; color:#fff1b7; background:rgba(20,16,5,.8); font-size:9px; }
 .al-timeline-empty { display:flex; height:100%; min-height:420px; flex-direction:column; align-items:center; justify-content:center; gap:9px; color:var(--text-muted); }
@@ -438,4 +439,92 @@
 
 .is-mobile .animelist-native-view {
   padding: 0 10px 24px;
+}
+
+/* Manga and novel serial-progress controls. */
+.animelist-modal .al-volume-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.animelist-modal .al-volume-editor-header,
+.animelist-modal .al-volume-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.animelist-modal .al-volume-editor-header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.animelist-modal .al-volume-editor-header small,
+.animelist-modal .al-volume-editor-empty {
+  color: var(--text-muted);
+}
+
+.animelist-modal .al-volume-editor-rows {
+  display: grid;
+  gap: 12px;
+}
+
+.animelist-modal .al-volume-row {
+  padding: 12px;
+  scroll-margin-block: 18px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.animelist-modal .al-volume-row.al-volume-row-new {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.animelist-modal .al-volume-row-fields {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.65fr) repeat(2, minmax(140px, 1fr));
+  gap: 10px;
+  flex: 1;
+}
+
+.animelist-modal .al-volume-row-actions {
+  display: flex;
+  align-items: flex-start;
+  flex: 0 0 auto;
+}
+
+.animelist-dashboard .al-status-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.animelist-dashboard .al-release-label,
+.animelist-native-view .al-release-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 900px) {
+  .animelist-modal .al-volume-row {
+    flex-direction: column;
+  }
+
+  .animelist-modal .al-volume-row-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .animelist-modal .al-volume-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }

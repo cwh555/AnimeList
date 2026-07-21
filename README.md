@@ -17,11 +17,15 @@ The Markdown files remain the source of truth. Removing the plugin does not remo
 - Card, list, and compact views.
 - Filter by media type, status, and normalized genre.
 - Sort by completion date, file modification time, score, start date, year, progress, or title.
-- Required title, personal score, and completion date for newly created or edited records.
-- Automatic completed-progress synchronization.
+- A title is always required. Personal score and completion date are required only after a record is marked completed.
+- Separate reading and Japanese-publication status for manga and novels.
+- Manga progress records only the current chapter; completion is always chosen explicitly.
+- Novel progress in volumes, including integer, half-volume (`.5`), and `EX` labels.
+- Per-volume novel history with an optional start date and a completion date that defaults to today. Timeline cards reuse the series cover and show the volume number explicitly.
+- Anime completed-progress synchronization from its episode total; manga and novels never infer completion from counts.
 - One-click favorite toggle from the library.
 - Built-in and user-defined Markdown templates.
-- A pannable completion timeline where zoom changes the spacing between days rather than the poster size.
+- A pannable completion timeline where zoom changes day spacing and collision-aware vertical lanes prevent nearby events from overlapping.
 - Desktop and mobile support.
 - No Dataview dependency and no private media database.
 
@@ -58,7 +62,7 @@ After this repository is public and has a release, it can also be installed thro
 1. Enable AnimeList.
 2. Select the library icon in the left ribbon, or run **AnimeList: Open library** from the command palette.
 3. Select **收錄作品** to search for an anime, manga, or novel.
-4. Choose a search result, enter your score and dates, select a template, and create the note.
+4. Choose a search result, set progress and status, select a template, and create the note. Score and completion date are required only for completed works.
 
 The interface uses Traditional Chinese. Text returned directly by metadata providers may remain in the provider's original language.
 
@@ -79,6 +83,7 @@ AnimeList/
 │   ├── anime/
 │   ├── manga/
 │   └── novel/
+│       └── volumes/
 └── Templates/
     ├── Anime/
     ├── Manga/
@@ -123,14 +128,13 @@ under **Additional scan folders**.
 
 ### Required properties
 
-AnimeList requires these properties when it creates or edits a record:
+AnimeList always requires a title and `media_type`. Personal score and completion date are required only when `status` is `completed`; planned, active, or on-hold records may omit both:
 
 ```yaml
 ---
 title: 輝夜姬想讓人告白 第一季
 media_type: anime
-score: 9
-completed_at: 2026-01-18
+status: watching
 ---
 ```
 
@@ -148,7 +152,7 @@ novel
 
 ```yaml
 ---
-schema_version: 4
+schema_version: 5
 title: 輝夜姬想讓人告白 第一季
 title_original: かぐや様は告らせたい～天才たちの恋愛頭脳戦～
 media_type: anime
@@ -181,18 +185,63 @@ AnimeList uses the file's real modification time for the **recently updated** so
 
 The current interface uses these status labels:
 
-- `watching` or `reading`: 追番中
-- `completed`: 已完成
-- `planned`: 待追
-- `on_hold`: 棄番
+- `watching`: 追番中
+- `reading`: 閱讀中
+- `completed`: 動畫顯示「已完食」，漫畫／小說顯示「已讀完」
+- `planned`: 動畫顯示「待追」，漫畫／小說顯示「待讀」
+- `on_hold`: 動畫、漫畫與小說皆顯示「擱置」
 
-Legacy `dropped` values are displayed as 棄番.
+Legacy `dropped` values use「棄番」for anime and「棄讀」for manga or novels.
+
+Reading status and publication status are independent for manga and novels. Manga and novel notes deliberately do not store or request a latest chapter/volume total because public metadata is not reliable enough for ongoing Japanese releases. Their `progress` field records only the user's current reading position, and `completed` is always selected explicitly.
 
 When a record is marked completed:
 
-- `progress` is automatically set to `progress_total`.
-- Changing the total keeps the completed progress synchronized.
+- Anime progress is synchronized to its known episode total.
+- Manga and novel progress is left unchanged; the status itself determines whether the work is considered read.
 - The completion date defaults to the current date when it is missing.
+
+### Manga example
+
+```yaml
+---
+schema_version: 5
+title: 葬送的芙莉蓮
+media_type: manga
+status: reading
+release_status: releasing
+progress: 130
+progress_unit: chapter
+score: 9
+---
+```
+
+### Novel volume history
+
+Novel progress supports whole-volume labels, half volumes such as `7.5`, and `EX`. A completely different title can be recorded as a separate novel instead of a volume entry. Adding a volume records it as completed by default and pre-fills `completed_at` with today; the date remains editable.
+
+```yaml
+---
+schema_version: 5
+title: Example light novel
+media_type: novel
+status: reading
+release_status: releasing
+progress: 2.5
+progress_unit: volume
+score: 8.5
+volume_log:
+  - label: "1"
+    completed_at: "2026-01-08"
+  - label: "2.5"
+    started_at: "2026-02-01"
+    completed_at: "2026-02-08"
+  - label: "EX"
+    completed_at: "2026-03-14"
+---
+```
+
+Volume start dates are optional. New volume rows assume the volume has been completed and use today as the completion date when none is entered. Rows and saved `volume_log` entries are ordered by normalized volume label (`1`, `1.5`, `2`, …, `EX`), not by creation or reading date. Changing a volume label repositions that row when editing finishes. The editor scrolls a newly created row into view and focuses its volume label. Each entry stores `label`, optional `started_at`, and `completed_at`. Timeline cards visibly separate the work title from `第 N 卷`, reuse the series cover, and move nearby events into vertical lanes to prevent overlap.
 
 ## Templates
 
@@ -233,9 +282,9 @@ AnimeList can query:
 - AniList for anime, manga, and light novels.
 - Open Library for general novels and books.
 
-Providers can be disabled individually in settings.
+Providers for normal work search can be disabled individually in settings. Novel volume history does not contact any additional service; it stores only local volume labels and dates.
 
-Search terms are sent only to the enabled metadata providers. Personal scores, progress, dates, favorites, and note bodies are not uploaded by AnimeList.
+Personal scores, progress, dates, favorites, and note bodies are not uploaded by AnimeList.
 
 ## Development
 
@@ -261,6 +310,10 @@ The repository intentionally does not force a registry URL; npm uses the registr
 
 The runtime `obsidian` module is still provided by Obsidian itself. For compilation, this repository uses a small local declaration file at `types/obsidian.d.ts` instead of downloading the full Obsidian, CodeMirror, and Moment development dependency chain. This keeps a clean install to four packages on the current platform.
 
+### Version sessions
+
+Feature-level decisions for each major development version are recorded in [`docs/VERSION_SESSIONS.md`](docs/VERSION_SESSIONS.md). The session log intentionally omits individual bug-fix history.
+
 ### Run automated checks
 
 ```bash
@@ -277,7 +330,7 @@ npm run check
 
 ### Test in the included vault
 
-The repository includes `test-vault` with three example anime records and local cover images. Normal plugin installation does not add these examples.
+The repository includes `test-vault` with example anime, manga, and novel records plus local cover images. Normal plugin installation does not add these examples.
 
 Run:
 

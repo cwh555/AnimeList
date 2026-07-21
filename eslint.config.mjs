@@ -7,6 +7,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig([
+  { ignores: ["**/._*"] },
   ...obsidianmd.configs.recommended,
   {
     files: ["src/**/*.ts", "types/**/*.ts"],

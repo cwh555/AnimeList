@@ -85,7 +85,15 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\.\//, "");
 }
 
-export async function requestUrl(): Promise<any> {
+type RequestUrlHandler = (options: any) => any | Promise<any>;
+let requestUrlHandler: RequestUrlHandler | null = null;
+
+export function setRequestUrlMock(handler: RequestUrlHandler | null): void {
+  requestUrlHandler = handler;
+}
+
+export async function requestUrl(options: any): Promise<any> {
+  if (requestUrlHandler) return requestUrlHandler(options);
   throw new Error("requestUrl is not available in unit tests");
 }
 

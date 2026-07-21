@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 - Unreleased
+
+- Separates personal reading status from Japanese publication status for manga and novels without relying on unreliable latest chapter or volume totals.
+- Supports novel volume labels such as `7.5` and `EX`; newly added volumes default to completed today while the dates remain editable.
+- Expands novel volumes into timeline entries with a visible volume label, the normal series cover, and collision-aware vertical lanes.
+- Sorts volume rows and saved history by normalized volume number, and automatically scrolls and focuses newly added or repositioned rows.
+- Requires a personal score and completion date only for completed works.
+- Writes the 1.1.0 serial-reading model as schema 5 while keeping published 1.0.3 notes readable.
+
 ## 1.0.3 - 2026-07-20
 
 - Publish the Community-review-compliant build as a new release.

@@ -1,13 +1,12 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
 import type { AnimeListSettings, StorageMode } from "./types";
+import { uiText } from "./ui-text";
 
-const SETTINGS_INTRO = "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.";
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
 const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
 const DEFAULT_COVER_FOLDER = "AnimeList/Covers";
 const DEFAULT_TEMPLATE_FOLDER = "AnimeList/Templates";
-const FOLDERS_READY_NOTICE = "AnimeList folders are ready.";
 
 export const DEFAULT_SETTINGS: AnimeListSettings = {
   storageMode: "managed",
@@ -57,60 +56,60 @@ export class AnimeListSettingTab extends PluginSettingTab {
   getSettingDefinitions(): SettingDefinition[] {
     const definitions: SettingDefinition[] = [
       {
-        name: "Storage layout",
-        desc: "Managed mode creates Anime, Manga, and Novel subfolders. Flat mode writes every media note directly into one folder.",
+        name: uiText("settings.storageLayout.name"),
+        desc: uiText("settings.storageLayout.desc"),
         render: (setting) => this.renderStorageLayout(setting),
       },
       {
-        name: "Library root",
-        desc: "AnimeList creates Anime, Manga, Novel, Covers, and Templates below this folder. The default is AnimeList.",
+        name: uiText("settings.libraryRoot.name"),
+        desc: uiText("settings.libraryRoot.desc"),
         visible: () => this.plugin.settings.storageMode === "managed",
         render: (setting) => this.renderLibraryRoot(setting),
       },
       {
-        name: "Flat media folder",
-        desc: "Media notes are created directly in this folder without Anime, Manga, or Novel subfolders. Leave blank to use the vault root.",
+        name: uiText("settings.flatFolder.name"),
+        desc: uiText("settings.flatFolder.desc"),
         visible: () => this.plugin.settings.storageMode === "flat",
         render: (setting) => this.renderFlatMediaFolder(setting),
       },
       {
-        name: "Additional scan folders",
-        desc: "Optional existing folders to read without moving files. Enter one vault-relative path per line or separate paths with commas.",
+        name: uiText("settings.additionalFolders.name"),
+        desc: uiText("settings.additionalFolders.desc"),
         render: (setting) => this.renderAdditionalScanFolders(setting),
       },
       {
-        name: "Cover folder",
-        desc: "Downloaded cover images are stored below this folder, grouped by media type.",
+        name: uiText("settings.coverFolder.name"),
+        desc: uiText("settings.coverFolder.desc"),
         render: (setting) => this.renderCoverFolder(setting),
       },
       {
-        name: "Template folder",
-        desc: "Custom templates are read from Anime, Manga, Novel, and Common subfolders below this location.",
+        name: uiText("settings.templateFolder.name"),
+        desc: uiText("settings.templateFolder.desc"),
         render: (setting) => this.renderTemplateFolder(setting),
       },
       {
-        name: "Bangumi",
-        desc: "Search anime, manga, and light novels. Useful for Chinese and Japanese titles.",
+        name: uiText("media.provider.bangumi"),
+        desc: uiText("settings.provider.bangumi.desc"),
         render: (setting) => this.renderProvider(setting, "bangumi"),
       },
       {
-        name: "AniList",
-        desc: "Search anime, manga, and light novels with structured metadata.",
+        name: uiText("media.provider.anilist"),
+        desc: uiText("settings.provider.anilist.desc"),
         render: (setting) => this.renderProvider(setting, "anilist"),
       },
       {
-        name: "Open Library",
-        desc: "Search general novels and books.",
+        name: uiText("media.provider.openlibrary"),
+        desc: uiText("settings.provider.openlibrary.desc"),
         render: (setting) => this.renderProvider(setting, "openlibrary"),
       },
       {
-        name: "Create configured folders",
-        desc: "Creates missing note, cover, and template folders. Existing files are never moved or overwritten.",
+        name: uiText("settings.createFolders.name"),
+        desc: uiText("settings.createFolders.desc"),
         render: (setting) => this.renderCreateFolders(setting),
       },
       {
-        name: "Copy default templates",
-        desc: "Writes the built-in Traditional Chinese templates into the configured template folder. Existing files are not overwritten.",
+        name: uiText("settings.copyTemplates.name"),
+        desc: uiText("settings.copyTemplates.desc"),
         render: (setting) => this.renderCopyTemplates(setting),
       },
     ];
@@ -125,14 +124,18 @@ export class AnimeListSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("p", {
-      text: SETTINGS_INTRO,
+      text: uiText("settings.intro"),
     });
 
     const definitions = this.getSettingDefinitions();
     definitions.forEach((definition, index) => {
       if (definition.visible && !definition.visible()) return;
-      if (index === 6) new Setting(containerEl).setName("Metadata providers").setHeading();
-      if (index === 9) new Setting(containerEl).setName("Library setup").setHeading();
+      if (definition.name === uiText("media.provider.bangumi")) {
+        new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
+      }
+      if (definition.name === uiText("settings.createFolders.name")) {
+        new Setting(containerEl).setName(uiText("settings.setup.heading")).setHeading();
+      }
       const setting = new Setting(containerEl).setName(definition.name);
       if (definition.desc) setting.setDesc(definition.desc);
       definition.render?.(setting);
@@ -150,8 +153,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
   private renderStorageLayout(setting: Setting): void {
     setting.addDropdown((dropdown) => {
       dropdown
-        .addOption("managed", "Managed library")
-        .addOption("flat", "Flat folder")
+        .addOption("managed", uiText("settings.storageLayout.managed"))
+        .addOption("flat", uiText("settings.storageLayout.flat"))
         .setValue(this.plugin.settings.storageMode)
         .onChange(async (value) => {
           this.plugin.settings.storageMode = value as StorageMode;
@@ -223,6 +226,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
   }
 
+
+
   private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
     setting.addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
@@ -234,18 +239,18 @@ export class AnimeListSettingTab extends PluginSettingTab {
 
   private renderCreateFolders(setting: Setting): void {
     setting.addButton((button) => {
-      button.setButtonText("Create folders").onClick(async () => {
+      button.setButtonText(uiText("settings.createFolders.button")).onClick(async () => {
         await this.plugin.initializeLibrary(false);
-        new Notice(FOLDERS_READY_NOTICE);
+        new Notice(uiText("settings.createFolders.notice"));
       });
     });
   }
 
   private renderCopyTemplates(setting: Setting): void {
     setting.addButton((button) => {
-      button.setButtonText("Copy templates").onClick(async () => {
+      button.setButtonText(uiText("settings.copyTemplates.button")).onClick(async () => {
         await this.plugin.initializeLibrary(true);
-        new Notice("Default templates are ready.");
+        new Notice(uiText("settings.copyTemplates.notice"));
       });
     });
   }

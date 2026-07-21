@@ -15,6 +15,7 @@ dist/
 .env
 .env.*
 !.env.example
+/data.json
 
 # Logs
 *.log
@@ -24,6 +25,7 @@ pnpm-debug.log*
 
 # Operating system
 .DS_Store
+._*
 Thumbs.db
 
 # Editors

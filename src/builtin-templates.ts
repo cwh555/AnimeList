@@ -1,4 +1,5 @@
 import type { MediaType, TemplateOption } from "./types";
+import { uiText } from "./ui-text";
 
 export const BUILTIN_TEMPLATE_PREFIX = "builtin:";
 
@@ -14,5 +15,5 @@ export const BUILTIN_TEMPLATES: Record<string, string> = {
 };
 
 export function getBuiltInTemplateOptions(_mediaType: MediaType): TemplateOption[] {
-  return [{ path: "builtin:plain", name: "簡潔筆記（內建）" }];
+  return [{ path: "builtin:plain", name: uiText("template.builtinPlain") }];
 }

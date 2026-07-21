@@ -13,10 +13,12 @@ const legacy = read("src/legacy.ts");
 const main = read("src/main.ts");
 const settings = read("src/settings.ts");
 const scopedVault = read("src/vault-scope.ts");
+const novelProgress = read("src/novel-progress.ts");
+const uiText = read("src/ui-text.ts");
 const shim = read("types/obsidian.d.ts");
 const styles = read("styles.css");
 const releaseWorkflow = read(".github/workflows/release.yml");
-const sourceFiles = [legacy, main, settings, scopedVault].join("\n");
+const sourceFiles = [legacy, main, settings, scopedVault, novelProgress, uiText].join("\n");
 
 function requireMatch(value, pattern, message) {
   if (!pattern.test(value)) failures.push(message);
@@ -33,11 +35,11 @@ function requirePairedLintScope(value, rules, label) {
   requireMatch(value, new RegExp(`/\\* eslint-enable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-enable scope is missing or changed`);
 }
 
-if (manifest.version !== "1.0.3" || packageJson.version !== "1.0.3") {
-  failures.push("Community release version must remain 1.0.3");
+if (manifest.version !== packageJson.version) {
+  failures.push("manifest.json and package.json versions must match");
 }
-if (versions["1.0.3"] !== manifest.minAppVersion) {
-  failures.push("versions.json must map 1.0.3 to manifest minAppVersion");
+if (versions[manifest.version] !== manifest.minAppVersion) {
+  failures.push(`versions.json must map ${manifest.version} to manifest minAppVersion`);
 }
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");

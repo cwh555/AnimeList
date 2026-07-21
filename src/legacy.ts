@@ -2,32 +2,55 @@
 // @ts-nocheck
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
 import { getScopedMarkdownFiles } from "./vault-scope";
+import {
+  completedRequirementMessage,
+  completedStatusLabel,
+  mediaFormatLabel,
+  mediaProviderLabel,
+  mediaStatusLabel,
+  statusFilterOptions,
+  uiText,
+} from "./ui-text";
+import {
+  compareVolumeLabels,
+  expandTimelineEntries,
+  highestCompletedVolume,
+  normalizeProgressValue,
+  normalizeReleaseStatus,
+  normalizeVolumeLabel,
+  normalizeVolumeLog,
+  progressDisplayValue,
+  progressRatio,
+  serializeVolumeLog,
+} from "./novel-progress";
 
-const PLUGIN_VERSION = "1.0.3";
+const PLUGIN_VERSION = "1.1.0";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 
 const LABEL = {
-  type: { all: "全部", anime: "動畫", manga: "漫畫", novel: "小說" },
-  status: {
-    all: "所有狀態",
-    active: "追番中",
-    watching: "追番中",
-    reading: "追番中",
-    completed: "已完成",
-    planned: "待追",
-    on_hold: "棄番",
-    dropped: "棄番", // legacy frontmatter is normalized to on_hold
+  type: {
+    get all() { return uiText("media.type.all"); },
+    get anime() { return uiText("media.type.anime"); },
+    get manga() { return uiText("media.type.manga"); },
+    get novel() { return uiText("media.type.novel"); },
   },
-  unit: { episode: "集", chapter: "話", volume: "卷", page: "頁", percent: "%" },
-  format: {
-    tv: "TV 動畫", movie: "動畫電影", ova: "OVA", ona: "ONA", special: "特別篇", music: "音樂動畫",
-    manga: "漫畫", one_shot: "短篇漫畫", manhwa: "韓漫", manhua: "華語漫畫",
-    light_novel: "輕小說", novel: "小說",
+  unit: {
+    get episode() { return uiText("media.unit.episode"); },
+    get chapter() { return uiText("media.unit.chapter"); },
+    get volume() { return uiText("media.unit.volume"); },
+    get page() { return uiText("media.unit.page"); },
+    get percent() { return uiText("media.unit.percent"); },
   },
-  provider: { bangumi: "Bangumi", anilist: "AniList", openlibrary: "Open Library", manual: "手動建立" },
+  releaseStatus: {
+    get releasing() { return uiText("media.release.releasing"); },
+    get finished() { return uiText("media.release.finished"); },
+    get hiatus() { return uiText("media.release.hiatus"); },
+    get cancelled() { return uiText("media.release.cancelled"); },
+    get unknown() { return uiText("media.release.unknown"); },
+  },
 };
 
 const GENRE_ALIASES = new Map(Object.entries({
@@ -171,6 +194,19 @@ function yamlArray(lines, key, values) {
   clean.forEach((value) => lines.push(`  - ${yamlScalar(value)}`));
 }
 
+function yamlVolumeLog(lines, entries) {
+  const serialized = serializeVolumeLog(entries);
+  if (!serialized.length) return;
+  lines.push("volume_log:");
+  for (const entry of serialized) {
+    lines.push(`  - label: ${yamlScalar(entry.label)}`);
+    Object.entries(entry).forEach(([key, value]) => {
+      if (key === "label" || value === "") return;
+      lines.push(`    ${key}: ${yamlScalar(value)}`);
+    });
+  }
+}
+
 function mapFormat(value, mediaType) {
   const format = String(value || "").toUpperCase();
   const map = { TV: "tv", TV_SHORT: "tv", MOVIE: "movie", OVA: "ova", ONA: "ona", SPECIAL: "special", MUSIC: "music", MANGA: "manga", ONE_SHOT: "one_shot", NOVEL: "light_novel" };
@@ -196,7 +232,7 @@ function bangumiInfoboxValues(infobox, keys) {
 
 function normalizeBangumiSubject(subject, mediaType) {
   const originalTitle = String(subject?.name || "").trim();
-  const localTitle = String(subject?.name_cn || originalTitle || "未命名作品").trim();
+  const localTitle = String(subject?.name_cn || originalTitle || uiText("media.untitled")).trim();
   const images = subject?.images || {};
   const people = mediaType === "anime"
     ? bangumiInfoboxValues(subject?.infobox, ["动画制作", "動畫製作", "制作", "製作"])
@@ -207,7 +243,7 @@ function normalizeBangumiSubject(subject, mediaType) {
   else if (/ova/i.test(platform)) format = "ova";
   else if (/web|ona/i.test(platform)) format = "ona";
   const date = String(subject?.date || "");
-  const total = mediaType === "anime" ? numeric(subject?.eps || subject?.total_episodes) : numeric(subject?.volumes || subject?.eps);
+  const total = mediaType === "anime" ? numeric(subject?.eps || subject?.total_episodes) : 0;
   const rawGenres = asArray(subject?.tags).slice(0, 16).map((tag) => typeof tag === "string" ? tag : tag?.name).filter(Boolean);
   return {
     provider: "bangumi", sourceId: String(subject?.id ?? ""), sourceUrl: subject?.id ? `https://bgm.tv/subject/${subject.id}` : "",
@@ -215,20 +251,21 @@ function normalizeBangumiSubject(subject, mediaType) {
     coverUrl: images.large || images.common || images.medium || images.small || images.grid || "",
     genres: normalizeGenres(rawGenres), rawGenres, people, platforms: platform ? [platform] : [], total,
     unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
-    summary: String(subject?.summary || "").trim(), externalScore: numeric(subject?.rating?.score, null),
+    summary: String(subject?.summary || "").trim(), externalScore: numeric(subject?.rating?.score, null), releaseStatus: "unknown",
   };
 }
 
 function normalizeAniListMedia(media, selectedType) {
   const title = media?.title || {};
-  const localTitle = String(title.english || title.romaji || title.native || "未命名作品").trim();
+  const localTitle = String(title.english || title.romaji || title.native || uiText("media.untitled")).trim();
   const originalTitle = String(title.native || title.romaji || "").trim();
   const staff = asArray(media?.staff?.edges)
     .filter((edge) => /creator|story|art|author|original/i.test(String(edge?.role || "")))
     .map((edge) => edge?.node?.name?.native || edge?.node?.name?.full).filter(Boolean);
   const studios = asArray(media?.studios?.nodes).map((node) => node?.name).filter(Boolean);
   const mediaType = selectedType;
-  const total = mediaType === "anime" ? numeric(media?.episodes) : mediaType === "manga" ? numeric(media?.chapters || media?.volumes) : numeric(media?.volumes);
+  const releaseStatus = ({ RELEASING: "releasing", FINISHED: "finished", HIATUS: "hiatus", CANCELLED: "cancelled" })[String(media?.status || "").toUpperCase()] || "unknown";
+  const total = mediaType === "anime" ? numeric(media?.episodes) : 0;
   const rawGenres = asArray(media?.genres).slice(0, 12);
   return {
     provider: "anilist", sourceId: String(media?.id ?? ""),
@@ -237,7 +274,7 @@ function normalizeAniListMedia(media, selectedType) {
     year: numeric(media?.startDate?.year, ""), coverUrl: media?.coverImage?.extraLarge || media?.coverImage?.large || media?.coverImage?.medium || "",
     genres: normalizeGenres(rawGenres), rawGenres, people: mediaType === "anime" ? studios : staff, platforms: [], total,
     unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
-    summary: stripHtml(media?.description), externalScore: media?.averageScore == null ? null : numeric(media.averageScore) / 10,
+    summary: stripHtml(media?.description), externalScore: media?.averageScore == null ? null : numeric(media.averageScore) / 10, releaseStatus,
   };
 }
 
@@ -246,9 +283,9 @@ function normalizeOpenLibraryBook(book) {
   const rawGenres = asArray(book?.subject).slice(0, 16);
   return {
     provider: "openlibrary", sourceId: key, sourceUrl: key ? `https://openlibrary.org/works/${key}` : "", mediaType: "novel",
-    title: String(book?.title || "未命名作品"), originalTitle: String(book?.title || ""), romajiTitle: "", format: "novel",
+    title: String(book?.title || uiText("media.untitled")), originalTitle: String(book?.title || ""), romajiTitle: "", format: "novel",
     year: numeric(book?.first_publish_year, ""), coverUrl: book?.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "",
-    genres: normalizeGenres(rawGenres), rawGenres, people: asArray(book?.author_name).slice(0, 6), platforms: [], total: 0, unit: "page", summary: "", externalScore: null,
+    genres: normalizeGenres(rawGenres), rawGenres, people: asArray(book?.author_name).slice(0, 6), platforms: [], total: 0, unit: "volume", summary: "", externalScore: null, releaseStatus: "unknown",
   };
 }
 
@@ -300,38 +337,50 @@ function ensureDetailBlock(body, title) {
   return lines.join("\n");
 }
 
-function completedProgress(status, total, current) {
+function completedProgress(status, total, current, mediaType = "anime") {
+  const safeCurrent = mediaType === "novel" ? normalizeProgressValue(current) : Math.max(0, numeric(current));
+  if (mediaType !== "anime") return safeCurrent;
   const safeTotal = Math.max(0, numeric(total));
-  return status === "completed" ? safeTotal : Math.max(0, numeric(current));
+  return status === "completed" && safeTotal > 0 ? safeTotal : safeCurrent;
 }
 
 function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   const title = String(form.title || "").trim();
-  const score = Number(form.score);
-  const completedAt = String(form.completedAt || todayString()).trim();
-  if (!title) throw new Error("作品名稱為必填欄位");
-  if (form.score === "" || form.score == null || !Number.isFinite(score) || score < 0 || score > 10) {
-    throw new Error("個人評分必須是 0 到 10 之間的數字");
+  const hasScore = form.score !== "" && form.score != null;
+  const score = hasScore ? Number(form.score) : null;
+  const completedAt = String(form.completedAt || "").trim();
+  if (!title) throw new Error(uiText("validation.titleRequired"));
+  if (form.status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+  if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
+    throw new Error(uiText("validation.scoreRange"));
   }
-  if (!completedAt) throw new Error("完成日期為必填欄位");
-  const total = Math.max(0, numeric(form.total ?? result.total));
-  const progress = completedProgress(form.status, total, form.progress);
+  if (form.status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
+  const total = result.mediaType === "anime"
+    ? Math.max(0, numeric(form.total ?? result.total))
+    : 0;
+  const progress = completedProgress(form.status, total, form.progress, result.mediaType);
   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
-  const lines = ["---", "schema_version: 4"];
+  const releaseStatus = result.mediaType === "anime"
+    ? "unknown"
+    : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
+  const volumeLog = result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [];
+  const lines = ["---", "schema_version: 5"];
   lines.push(`title: ${yamlScalar(title)}`);
   if (result.originalTitle) lines.push(`title_original: ${yamlScalar(result.originalTitle)}`);
   if (result.romajiTitle && result.romajiTitle !== result.originalTitle) lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
   lines.push(`status: ${yamlScalar(form.status || "planned")}`);
-  lines.push(`progress: ${progress}`);
-  lines.push(`progress_total: ${total}`);
+  if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
+  lines.push(`progress: ${yamlScalar(progress)}`);
+  if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
   lines.push(`progress_unit: ${yamlScalar(form.unit || result.unit)}`);
-  lines.push(`score: ${score}`);
+  if (score != null) lines.push(`score: ${score}`);
   lines.push(`favorite: ${form.favorite === true ? "true" : "false"}`);
   if (result.year) lines.push(`year: ${numeric(result.year)}`);
   if (form.startedAt) lines.push(`started_at: ${yamlScalar(form.startedAt)}`);
-  lines.push(`completed_at: ${yamlScalar(completedAt)}`);
+  if (completedAt) lines.push(`completed_at: ${yamlScalar(completedAt)}`);
+  yamlVolumeLog(lines, volumeLog);
   if (coverPath || result.coverUrl) lines.push(`cover: ${yamlScalar(coverPath || result.coverUrl)}`);
   if (result.coverUrl) lines.push(`cover_remote: ${yamlScalar(result.coverUrl)}`);
   yamlArray(lines, "genres", genres);
@@ -351,7 +400,7 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   });
   let body = ensureDetailBlock(applied, title);
   if (coverPath && !body.includes(coverPath)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![[${coverPath}|260]]`);
-  else if (!coverPath && result.coverUrl && !body.includes(result.coverUrl)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![${title} 封面](${result.coverUrl})`);
+  else if (!coverPath && result.coverUrl && !body.includes(result.coverUrl)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![${uiText("library.coverAlt", { title })}](${result.coverUrl})`);
   lines.push(body.trim(), "");
   return lines.join("\n");
 }
@@ -366,8 +415,7 @@ function parseConfig(source) {
 }
 
 function itemStatusLabel(item) {
-  if (item.status === "completed") return item.mediaType === "anime" ? "已看完" : "已讀完";
-  return LABEL.status[item.status] || item.status;
+  return mediaStatusLabel(item.status, item.mediaType);
 }
 
 function makeEl(tag, className, text) {
@@ -404,16 +452,16 @@ function appendIconLabel(element, icon, label) {
 }
 
 export const AnimeListUI = (() => {
-  const normalize = (item) => ({
+  const normalize = (item) => {
+    const mediaType = String(item.mediaType || item.media_type || "").toLowerCase();
+    return {
     ...item,
-    mediaType: String(item.mediaType || item.media_type || "").toLowerCase(),
-    status: (() => {
-      const value = String(item.status || "planned").toLowerCase();
-      return value === "dropped" ? "on_hold" : value;
-    })(),
+    mediaType,
+    status: String(item.status || "planned").toLowerCase(),
     format: String(item.format || item.mediaType || item.media_type || "").toLowerCase(),
-    progress: numeric(item.progress),
-    total: numeric(item.total ?? item.progress_total),
+    releaseStatus: normalizeReleaseStatus(item.releaseStatus || item.release_status),
+    progress: normalizeProgressValue(item.progress),
+    total: mediaType === "anime" ? normalizeProgressValue(item.total ?? item.progress_total) : 0,
     score: item.score === "" || item.score == null ? null : numeric(item.score, null),
     genres: normalizeGenres(item.genres),
     people: asArray(item.people).filter(Boolean),
@@ -423,15 +471,23 @@ export const AnimeListUI = (() => {
     updated: numeric(item.updated),
     startedAt: String(item.startedAt || item.started_at || ""),
     completedAt: String(item.completedAt || item.completed_at || ""),
-  });
+    volumeLog: normalizeVolumeLog(item.volumeLog || item.volume_log),
+    };
+  };
 
-  const ratio = (item) => item.total > 0 ? Math.min(1, Math.max(0, item.progress / item.total)) : item.unit === "percent" ? Math.min(1, Math.max(0, item.progress / 100)) : 0;
+  const ratio = (item) => item.mediaType === "anime" ? progressRatio(item.progress, item.total, item.unit) : null;
+  const hasProgress = (value) => value !== "" && value != null && !(typeof value === "number" && value <= 0) && String(value) !== "0";
 
   const progressText = (item) => {
     const unit = LABEL.unit[item.unit] || item.unit || "";
-    if (item.total > 0) return `${item.progress} / ${item.total} ${unit}`;
-    if (item.progress > 0) return `${item.progress} ${unit}`.trim();
-    return "尚未開始";
+    const current = progressDisplayValue(item.progress);
+    const total = progressDisplayValue(item.total);
+    if (item.mediaType === "anime" && hasProgress(item.total)) return `${current} / ${total} ${unit}`.trim();
+    if (hasProgress(item.progress)) return uiText(
+      item.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress",
+      { progress: current, unit },
+    ).trim();
+    return uiText("library.notStarted");
   };
 
   const statusMatch = (item, filter) => {
@@ -466,13 +522,13 @@ export const AnimeListUI = (() => {
     const header = makeEl("header", "al-hero");
     const titleBlock = makeEl("div", "al-hero-copy");
     titleBlock.append(
-      makeEl("div", "al-kicker", "PERSONAL MEDIA LIBRARY"),
-      makeEl("h1", "al-title", "我的收藏書架"),
-      makeEl("p", "al-desc", "以 Markdown 整理動畫、漫畫與小說收藏。"),
+      makeEl("div", "al-kicker", uiText("library.kicker")),
+      makeEl("h1", "al-title", uiText("library.title")),
+      makeEl("p", "al-desc", uiText("library.description")),
     );
     const headerRight = makeEl("div", "al-hero-right");
     const stats = makeEl("div", "al-stats");
-    [["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([key, label]) => {
+    [["anime", LABEL.type.anime], ["manga", LABEL.type.manga], ["novel", LABEL.type.novel]].forEach(([key, label]) => {
       const stat = makeEl("div", "al-stat");
       stat.append(makeEl("strong", "al-stat-number", items.filter((x) => x.mediaType === key).length), makeEl("span", "al-stat-label", label));
       stats.appendChild(stat);
@@ -482,14 +538,14 @@ export const AnimeListUI = (() => {
     if (openTimeline) {
       const timelineButton = makeEl("button", "al-secondary-button");
       timelineButton.type = "button";
-      appendIconLabel(timelineButton, "timeline", "時間軸");
+      appendIconLabel(timelineButton, "timeline", uiText("library.timeline"));
       timelineButton.addEventListener("click", () => openTimeline());
       headerActions.appendChild(timelineButton);
     }
     if (addItem) {
       const addButton = makeEl("button", "al-add-button");
       addButton.type = "button";
-      appendIconLabel(addButton, "plus", "收錄作品");
+      appendIconLabel(addButton, "plus", uiText("action.collect"));
       addButton.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
       headerActions.appendChild(addButton);
     }
@@ -499,7 +555,7 @@ export const AnimeListUI = (() => {
 
     const nav = makeEl("nav", "al-type-tabs");
     const typeButtons = new Map();
-    [["all", "全部作品"], ["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([key, label]) => {
+    [["all", uiText("library.tabAll")], ["anime", LABEL.type.anime], ["manga", LABEL.type.manga], ["novel", LABEL.type.novel]].forEach(([key, label]) => {
       const count = key === "all" ? items.length : items.filter((x) => x.mediaType === key).length;
       const button = makeEl("button", `al-type-tab${key === state.type ? " is-active" : ""}`);
       button.type = "button";
@@ -507,6 +563,7 @@ export const AnimeListUI = (() => {
       button.addEventListener("click", () => {
         state.type = key;
         typeButtons.forEach((candidate, name) => candidate.classList.toggle("is-active", name === key));
+        renderStatusButtons();
         update();
       });
       typeButtons.set(key, button);
@@ -520,14 +577,14 @@ export const AnimeListUI = (() => {
     setAnimeListIcon(searchIcon, "search");
     const searchInput = makeEl("input");
     searchInput.type = "search";
-    searchInput.placeholder = "搜尋標題、原名、作者、工作室或分類…";
+    searchInput.placeholder = uiText("library.searchPlaceholder");
     searchInput.value = state.query;
     searchInput.addEventListener("input", () => { state.query = searchInput.value.trim().toLocaleLowerCase(); update(); });
     searchWrap.append(searchIcon, searchInput);
 
     const genreWrap = makeEl("label", "al-sort al-genre-filter");
     const genreSelect = makeEl("select");
-    [["all", "所有分類"], ...genres.map((genre) => [genre, genre])].forEach(([value, text]) => {
+    [["all", uiText("library.genreAll")], ...genres.map((genre) => [genre, genre])].forEach(([value, text]) => {
       const option = makeEl("option", "", text);
       option.value = value;
       genreSelect.appendChild(option);
@@ -542,10 +599,10 @@ export const AnimeListUI = (() => {
     setAnimeListIcon(sortIcon, "sort");
     const sortSelect = makeEl("select");
     [
-      ["completed-desc", "最近完成"], ["completed-asc", "最早完成"],
-      ["updated-desc", "最近更新"], ["updated-asc", "較早更新"], ["score-desc", "評分由高至低"], ["score-asc", "評分由低至高"],
-      ["started-desc", "最近開始"], ["started-asc", "最早開始"],
-      ["year-desc", "作品年份由新至舊"], ["year-asc", "作品年份由舊至新"], ["progress-desc", "完成度由高至低"], ["title-asc", "依標題排列"],
+      ["completed-desc", uiText("library.sort.completedDesc")], ["completed-asc", uiText("library.sort.completedAsc")],
+      ["updated-desc", uiText("library.sort.updatedDesc")], ["updated-asc", uiText("library.sort.updatedAsc")], ["score-desc", uiText("library.sort.scoreDesc")], ["score-asc", uiText("library.sort.scoreAsc")],
+      ["started-desc", uiText("library.sort.startedDesc")], ["started-asc", uiText("library.sort.startedAsc")],
+      ["year-desc", uiText("library.sort.yearDesc")], ["year-asc", uiText("library.sort.yearAsc")], ["progress-desc", uiText("library.sort.progressDesc")], ["title-asc", uiText("library.sort.titleAsc")],
     ].forEach(([value, text]) => {
       const option = makeEl("option", "", text);
       option.value = value;
@@ -557,7 +614,7 @@ export const AnimeListUI = (() => {
 
     const views = makeEl("div", "al-view-switch");
     const viewButtons = new Map();
-    [["grid", "grid", "卡片"], ["list", "list", "清單"], ["poster", "poster", "縮圖"]].forEach(([key, icon, label]) => {
+    [["grid", "grid", uiText("library.view.grid")], ["list", "list", uiText("library.view.list")], ["poster", "poster", uiText("library.view.poster")]].forEach(([key, icon, label]) => {
       const button = makeEl("button", `al-view-button${key === state.view ? " is-active" : ""}`);
       button.type = "button";
       button.title = label;
@@ -577,17 +634,22 @@ export const AnimeListUI = (() => {
 
     const statusBar = makeEl("div", "al-status-bar");
     const statusButtons = new Map();
-    [["all", "全部"], ["active", "追番中"], ["completed", "已完成"], ["planned", "待追"], ["on_hold", "棄番"]].forEach(([key, label]) => {
-      const button = makeEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
-      button.type = "button";
-      button.addEventListener("click", () => {
-        state.status = key;
-        statusButtons.forEach((candidate, name) => candidate.classList.toggle("is-active", name === key));
-        update();
+    const renderStatusButtons = () => {
+      statusButtons.clear();
+      statusBar.replaceChildren();
+      statusFilterOptions(state.type).forEach(([key, label]) => {
+        const button = makeEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
+        button.type = "button";
+        button.addEventListener("click", () => {
+          state.status = key;
+          statusButtons.forEach((candidate, name) => candidate.classList.toggle("is-active", name === key));
+          update();
+        });
+        statusButtons.set(key, button);
+        statusBar.appendChild(button);
       });
-      statusButtons.set(key, button);
-      statusBar.appendChild(button);
-    });
+    };
+    renderStatusButtons();
     shell.appendChild(statusBar);
 
     const resultHead = makeEl("div", "al-result-head");
@@ -611,14 +673,14 @@ export const AnimeListUI = (() => {
       if (item.cover) {
         const image = makeEl("img", "al-cover");
         image.src = item.cover;
-        image.alt = `${item.title} 封面`;
+        image.alt = uiText("library.coverAlt", { title: item.title });
         image.loading = "lazy";
         media.appendChild(image);
       } else {
         const missing = makeEl("div", "al-cover-missing");
         const icon = makeEl("span", "al-icon-large");
         setAnimeListIcon(icon, "book");
-        missing.append(icon, makeEl("span", "", "尚未設定封面"));
+        missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
         media.appendChild(missing);
       }
       media.appendChild(makeEl("div", "al-cover-shade"));
@@ -631,7 +693,7 @@ export const AnimeListUI = (() => {
       if (toggleFavorite) {
         const favoriteButton = makeEl("button", `al-favorite-button${item.favorite ? " is-active" : ""}`, item.favorite ? "★" : "☆");
         favoriteButton.type = "button";
-        favoriteButton.title = item.favorite ? "移出最愛" : "加入最愛";
+        favoriteButton.title = item.favorite ? uiText("library.favoriteRemove") : uiText("library.favoriteAdd");
         favoriteButton.setAttribute("aria-label", favoriteButton.title);
         favoriteButton.setAttribute("aria-pressed", item.favorite ? "true" : "false");
         favoriteButton.addEventListener("click", async (event) => {
@@ -644,7 +706,7 @@ export const AnimeListUI = (() => {
       if (editItem) {
         const editButton = makeEl("button", "al-edit-button");
         editButton.type = "button";
-        editButton.title = "整理這筆紀錄";
+        editButton.title = uiText("action.edit");
         editButton.setAttribute("aria-label", editButton.title);
         setAnimeListIcon(editButton, "edit");
         editButton.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); editItem(item.filePath); });
@@ -653,20 +715,22 @@ export const AnimeListUI = (() => {
       top.appendChild(topActions);
       media.appendChild(top);
       const bottom = makeEl("div", "al-cover-bottom");
-      bottom.append(makeEl("span", `al-status status-${item.status}`, itemStatusLabel(item)), makeEl("span", "al-progress-on-cover", progressText(item)));
+      const statusBadges = makeEl("span", "al-status-group");
+      statusBadges.appendChild(makeEl("span", `al-status status-${item.status}`, itemStatusLabel(item)));
+      bottom.append(statusBadges, makeEl("span", "al-progress-on-cover", progressText(item)));
       media.appendChild(bottom);
 
       const body = makeEl("div", "al-card-body");
       body.appendChild(makeEl("h2", "al-card-title", item.title));
       if (item.originalTitle) body.appendChild(makeEl("div", "al-original-title", item.originalTitle));
       const facts = makeEl("div", "al-facts");
-      facts.appendChild(makeEl("span", "", LABEL.format[item.format] || item.format || "作品"));
+      facts.appendChild(makeEl("span", "", mediaFormatLabel(item.format) || uiText("library.unknownFormat")));
       if (item.people.length) facts.appendChild(makeEl("span", "", item.people.slice(0, 2).join("、")));
       body.appendChild(facts);
       if (item.startedAt || item.completedAt) {
         const dates = makeEl("div", "al-date-row");
-        if (item.startedAt) dates.appendChild(makeEl("span", "", `開始於 ${item.startedAt}`));
-        if (item.completedAt) dates.appendChild(makeEl("span", "", `完成於 ${item.completedAt}`));
+        if (item.startedAt) dates.appendChild(makeEl("span", "", uiText("library.startedAt", { date: item.startedAt })));
+        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: item.completedAt })));
         body.appendChild(dates);
       }
       if (item.genres.length) {
@@ -675,16 +739,22 @@ export const AnimeListUI = (() => {
         body.appendChild(tags);
       }
       const progress = makeEl("div", "al-progress");
-      const bar = makeEl("div", "al-progress-track");
-      const fill = makeEl("div", "al-progress-fill");
-      fill.style.width = `${Math.round(ratio(item) * 100)}%`;
-      bar.appendChild(fill);
+      const itemRatio = ratio(item);
+      if (itemRatio !== null) {
+        const bar = makeEl("div", "al-progress-track");
+        const fill = makeEl("div", "al-progress-fill");
+        fill.style.width = `${Math.round(itemRatio * 100)}%`;
+        bar.appendChild(fill);
+        progress.appendChild(bar);
+      }
       const progressRow = makeEl("div", "al-progress-row");
-      progressRow.append(makeEl("span", "", progressText(item)), makeEl("span", "", `${Math.round(ratio(item) * 100)}%`));
-      progress.append(bar, progressRow);
+      progressRow.appendChild(makeEl("span", "", progressText(item)));
+      if (itemRatio !== null) progressRow.appendChild(makeEl("span", "", `${Math.round(itemRatio * 100)}%`));
+      else if (item.mediaType !== "anime") progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));
+      progress.appendChild(progressRow);
       body.appendChild(progress);
       const footer = makeEl("div", "al-card-footer");
-      footer.append(makeEl("span", "al-updated", item.updatedLabel || ""), makeEl("span", "al-score", item.score == null ? "尚未留下評分" : `★ ${item.score.toFixed(1)}`));
+      footer.append(makeEl("span", "al-updated", item.updatedLabel || ""), makeEl("span", "al-score", item.score == null ? uiText("library.unrated") : `★ ${item.score.toFixed(1)}`));
       body.appendChild(footer);
       card.append(media, body);
       return card;
@@ -712,19 +782,19 @@ export const AnimeListUI = (() => {
         "year-desc": (a, b) => numeric(b.year) - numeric(a.year),
         "year-asc": (a, b) => numeric(a.year) - numeric(b.year),
         "title-asc": (a, b) => a.title.localeCompare(b.title, "zh-Hant"),
-        "progress-desc": (a, b) => ratio(b) - ratio(a),
+        "progress-desc": (a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1),
       };
       filtered.sort(sorters[state.sort] || sorters["completed-desc"]);
-      resultTitle.textContent = state.type === "all" ? "全部作品" : LABEL.type[state.type];
+      resultTitle.textContent = state.type === "all" ? uiText("library.resultAll") : LABEL.type[state.type];
       const genreSuffix = state.genre === "all" ? "" : ` · ${state.genre}`;
-      resultMeta.textContent = `顯示 ${filtered.length} / ${items.length} 部${genreSuffix}`;
+      resultMeta.textContent = uiText("library.resultMeta", { shown: filtered.length, total: items.length, genre: genreSuffix });
       grid.className = `al-grid is-${state.view}`;
       grid.replaceChildren();
       if (!filtered.length) {
         const empty = makeEl("div", "al-empty");
         const icon = makeEl("span", "al-empty-icon");
         setAnimeListIcon(icon, "book");
-        empty.append(icon, makeEl("strong", "", "這一頁暫時沒有作品"), makeEl("span", "", "換個分類、狀態或搜尋詞，也許就能再次遇見它。"));
+        empty.append(icon, makeEl("strong", "", uiText("library.emptyTitle")), makeEl("span", "", uiText("library.emptyDescription")));
         grid.appendChild(empty);
         return;
       }
@@ -738,10 +808,26 @@ export const AnimeListUI = (() => {
   return { renderLibrary };
 })();
 
+function assignTimelineLanes(positionedItems, minimumDistance) {
+  const laneEnds = [];
+  return positionedItems.map((positioned) => {
+    let lane = laneEnds.findIndex((lastX) => positioned.x - lastX >= minimumDistance);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = positioned.x;
+    return { ...positioned, lane };
+  });
+}
+
 export const TimelineUI = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const MIN_DAY_SPACING = 0.18;
   const MAX_DAY_SPACING = 96;
+  const CARD_WIDTH = 120;
+  const CARD_HEIGHT = 146;
+  const CARD_GAP_X = 16;
+  const CARD_GAP_Y = 18;
+  const STEM_GAP = 44;
+  const SCENE_PADDING_Y = 56;
   const dayStart = (value) => {
     const time = parseDateValue(value);
     if (!time) return 0;
@@ -768,16 +854,16 @@ export const TimelineUI = (() => {
 
   function render(container, inputItems, adapters = {}) {
     container.replaceChildren();
-    const items = inputItems
+    const items = expandTimelineEntries(inputItems)
       .map((item) => ({ ...item, completedTime: dayStart(item.completedAt || item.completed_at) }))
-      .filter((item) => String(item.status || "completed") === "completed" && item.completedTime)
+      .filter((item) => item.completedTime)
       .sort((a, b) => a.completedTime - b.completedTime || String(a.title).localeCompare(String(b.title), "zh-Hant"));
     if (!items.length) {
       const empty = makeEl("div", "al-timeline-empty");
       setAnimeListIcon(empty, "timeline");
       empty.append(
-        makeEl("strong", "", "時間軸還沒有留下足跡"),
-        makeEl("span", "", "完成作品後，它會依完成日期出現在這裡。"),
+        makeEl("strong", "", uiText("timeline.emptyTitle")),
+        makeEl("span", "", uiText("timeline.emptyDescription")),
       );
       container.appendChild(empty);
       return { items: 0 };
@@ -794,24 +880,21 @@ export const TimelineUI = (() => {
     const maxTime = dates[dates.length - 1];
     const rangeDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS));
     const sidePadding = 170;
-    const maxStack = Math.max(...[...grouped.values()].map((group) => group.length));
-    const axisY = Math.max(360, 175 + maxStack * 128);
-    const sceneHeight = axisY + 260;
     const baseSpacing = initialDaySpacing(rangeDays);
-    const state = { x: 0, y: 0, daySpacing: baseSpacing, sceneWidth: 0 };
+    const state = { x: 0, y: 0, daySpacing: baseSpacing, sceneWidth: 0, sceneHeight: 0 };
 
     const root = makeEl("div", "al-timeline-root");
     const toolbar = makeEl("div", "al-timeline-toolbar");
     const copy = makeEl("div", "al-timeline-copy");
-    copy.append(makeEl("strong", "", "時間軸"), makeEl("span", "", `${items.length} 部作品 · ${formatDate(minTime)} 至 ${formatDate(maxTime)}`));
+    copy.append(makeEl("strong", "", uiText("timeline.title")), makeEl("span", "", uiText("timeline.summary", { count: items.length, start: formatDate(minTime), end: formatDate(maxTime) })));
     const controls = makeEl("div", "al-timeline-controls");
     const zoomOut = makeEl("button", "", "");
-    zoomOut.type = "button"; zoomOut.title = "縮短日期間距"; setAnimeListIcon(zoomOut, "minus");
+    zoomOut.type = "button"; zoomOut.title = uiText("timeline.zoomOut"); setAnimeListIcon(zoomOut, "minus");
     const zoomLabel = makeEl("span", "al-timeline-zoom", "100%");
     const zoomIn = makeEl("button", "", "");
-    zoomIn.type = "button"; zoomIn.title = "拉開日期間距"; setAnimeListIcon(zoomIn, "plus");
+    zoomIn.type = "button"; zoomIn.title = uiText("timeline.zoomIn"); setAnimeListIcon(zoomIn, "plus");
     const fit = makeEl("button", "", "");
-    fit.type = "button"; fit.title = "完整顯示"; setAnimeListIcon(fit, "fit");
+    fit.type = "button"; fit.title = uiText("timeline.fit"); setAnimeListIcon(fit, "fit");
     controls.append(zoomOut, zoomLabel, zoomIn, fit);
     toolbar.append(copy, controls);
     root.appendChild(toolbar);
@@ -825,15 +908,32 @@ export const TimelineUI = (() => {
 
     const applyPan = () => {
       scene.style.transform = `translate(${state.x}px, ${state.y}px)`;
-      zoomLabel.textContent = `${Math.round((state.daySpacing / baseSpacing) * 100)}% · ${state.daySpacing.toFixed(state.daySpacing < 10 ? 1 : 0)} px/日`;
+      zoomLabel.textContent = uiText("timeline.zoomLabel", { percent: Math.round((state.daySpacing / baseSpacing) * 100), spacing: state.daySpacing.toFixed(state.daySpacing < 10 ? 1 : 0) });
     };
 
     const renderGeometry = () => {
       scene.replaceChildren();
       const viewportWidth = Math.max(720, viewport.clientWidth || 1200);
       state.sceneWidth = Math.max(viewportWidth, sidePadding * 2 + rangeDays * state.daySpacing);
+
+      const positionedItems = items.map((item) => ({
+        item,
+        time: item.completedTime,
+        x: sidePadding + Math.round((item.completedTime - minTime) / DAY_MS) * state.daySpacing,
+      }));
+      const laidOutItems = assignTimelineLanes(positionedItems, CARD_WIDTH + CARD_GAP_X);
+      const laneCount = Math.max(1, ...laidOutItems.map((positioned) => positioned.lane + 1));
+      const aboveLaneCount = Math.ceil(laneCount / 2);
+      const belowLaneCount = Math.floor(laneCount / 2);
+      const axisY = SCENE_PADDING_Y + STEM_GAP
+        + aboveLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y;
+      state.sceneHeight = axisY + SCENE_PADDING_Y
+        + (belowLaneCount > 0
+          ? STEM_GAP + belowLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y
+          : 0);
+
       scene.style.width = `${state.sceneWidth}px`;
-      scene.style.height = `${sceneHeight}px`;
+      scene.style.height = `${state.sceneHeight}px`;
 
       const axis = makeEl("div", "al-timeline-axis");
       axis.style.left = `${sidePadding}px`;
@@ -858,37 +958,50 @@ export const TimelineUI = (() => {
       }
 
       dates.forEach((time) => {
-        const group = grouped.get(time);
         const x = sidePadding + Math.round((time - minTime) / DAY_MS) * state.daySpacing;
         const dayMarker = makeEl("div", "al-timeline-day-marker");
         dayMarker.style.left = `${x - 5}px`;
         dayMarker.style.top = `${axisY - 5}px`;
         scene.appendChild(dayMarker);
-        group.forEach((item, index) => {
-          const cardY = axisY - 152 - index * 128;
-          const stem = makeEl("div", "al-timeline-stem");
-          stem.style.left = `${x}px`;
-          stem.style.top = `${cardY + 112}px`;
-          stem.style.height = `${axisY - (cardY + 112)}px`;
-          scene.appendChild(stem);
-          const card = makeEl("button", "al-timeline-card");
-          card.type = "button";
-          card.style.left = `${x - 54}px`;
-          card.style.top = `${cardY}px`;
-          card.title = `${item.title} · ${formatDate(time)}`;
-          if (item.cover) {
-            const image = makeEl("img", "", "");
-            image.src = item.cover;
-            image.alt = `${item.title} 封面`;
-            card.appendChild(image);
-          }
-          const text = makeEl("span", "al-timeline-card-copy");
-          text.append(makeEl("strong", "", item.title), makeEl("small", "", formatDate(time)));
-          card.appendChild(text);
-          if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
-          card.addEventListener("click", () => openFile(item.filePath));
-          scene.appendChild(card);
-        });
+      });
+
+      laidOutItems.forEach(({ item, time, x, lane }) => {
+        const level = Math.floor(lane / 2);
+        const aboveAxis = lane % 2 === 0;
+        const cardY = aboveAxis
+          ? axisY - STEM_GAP - CARD_HEIGHT - level * (CARD_HEIGHT + CARD_GAP_Y)
+          : axisY + STEM_GAP + level * (CARD_HEIGHT + CARD_GAP_Y);
+        const stemStart = aboveAxis ? cardY + CARD_HEIGHT : axisY;
+        const stemEnd = aboveAxis ? axisY : cardY;
+        const stem = makeEl("div", "al-timeline-stem");
+        stem.style.left = `${x}px`;
+        stem.style.top = `${stemStart}px`;
+        stem.style.height = `${Math.max(1, stemEnd - stemStart)}px`;
+        scene.appendChild(stem);
+
+        const card = makeEl("button", "al-timeline-card");
+        card.type = "button";
+        card.dataset.timelineLane = String(lane);
+        card.style.left = `${x - CARD_WIDTH / 2}px`;
+        card.style.top = `${cardY}px`;
+        card.title = uiText("timeline.cardTitle", { title: item.title, date: formatDate(time) });
+        if (item.cover) {
+          const image = makeEl("img", "", "");
+          image.src = item.cover;
+          image.alt = uiText("timeline.coverAlt", { title: item.title });
+          card.appendChild(image);
+        }
+        const text = makeEl("span", "al-timeline-card-copy");
+        const displayTitle = item.seriesTitle || item.title;
+        text.appendChild(makeEl("strong", "", displayTitle));
+        if (item.volumeLabel) {
+          text.appendChild(makeEl("span", "al-timeline-volume-label", uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
+        }
+        text.appendChild(makeEl("small", "", formatDate(time)));
+        card.appendChild(text);
+        if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
+        card.addEventListener("click", () => openFile(item.filePath));
+        scene.appendChild(card);
       });
       applyPan();
     };
@@ -911,7 +1024,7 @@ export const TimelineUI = (() => {
       state.daySpacing = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, availableWidth / rangeDays));
       renderGeometry();
       state.x = (viewport.clientWidth - state.sceneWidth) / 2;
-      state.y = (viewport.clientHeight - sceneHeight) / 2;
+      state.y = (viewport.clientHeight - state.sceneHeight) / 2;
       applyPan();
     };
 
@@ -993,29 +1106,186 @@ function createSelect(options, selected) {
   return select;
 }
 
-function bindCompletionBehavior(status, total, progress, completedAt, noteEl = null) {
+function bindCompletionBehavior(status, total, progress, completedAt, noteEl = null, mediaType = "anime") {
   const sync = () => {
     const completed = status.value === "completed";
-    progress.readOnly = completed;
-    progress.classList.toggle("is-auto", completed);
-    if (completed) {
-      progress.value = String(Math.max(0, numeric(total.value)));
+    const autoProgress = mediaType === "anime" && completed;
+    progress.readOnly = autoProgress;
+    progress.classList.toggle("is-auto", autoProgress);
+    if (autoProgress) {
+      const normalizedTotal = Math.max(0, numeric(total?.value));
+      if (normalizedTotal > 0) progress.value = progressDisplayValue(normalizedTotal);
       if (completedAt && !completedAt.value) completedAt.value = todayString();
+    } else if (completed && completedAt && !completedAt.value) {
+      completedAt.value = todayString();
     }
+    if (completedAt) completedAt.required = completed;
     if (noteEl) {
-      noteEl.textContent = completed
-        ? "選為已完成時，進度會與總數同步，避免留下互相矛盾的紀錄。"
-        : "進度可依目前觀看或閱讀的位置調整。";
+      if (mediaType === "anime") {
+        noteEl.textContent = completed
+          ? uiText("completion.animeCompleted", { status: completedStatusLabel("anime") })
+          : uiText("completion.animeActive");
+      } else {
+        noteEl.textContent = completed
+          ? uiText("completion.readingCompleted")
+          : uiText("completion.readingActive");
+      }
     }
   };
   status.addEventListener("change", sync);
-  total.addEventListener("input", sync);
+  total?.addEventListener("input", sync);
+  sync();
+  return sync;
+}
+
+function bindScoreRequirement(status, score, mediaType = "anime") {
+  const sync = () => {
+    const required = status.value === "completed";
+    score.required = required;
+    score.setAttribute("aria-required", required ? "true" : "false");
+    score.placeholder = required
+      ? uiText("completion.requiredPlaceholder", { status: completedStatusLabel(mediaType === "anime" ? "anime" : mediaType === "manga" ? "manga" : "novel") })
+      : uiText("common.optional");
+  };
+  status.addEventListener("change", sync);
   sync();
   return sync;
 }
 
 function genreInputValues(input) {
   return normalizeGenres(String(input?.value || "").split(/[、,，;；\n]+/));
+}
+
+function releaseStatusOptions(selected = "unknown") {
+  return createSelect([
+    ["releasing", uiText("media.release.releasing")],
+    ["finished", uiText("media.release.finished")],
+    ["hiatus", uiText("media.release.hiatus")],
+    ["cancelled", uiText("media.release.cancelled")],
+    ["unknown", uiText("media.release.unknown")],
+  ], normalizeReleaseStatus(selected));
+}
+
+function validateNovelProgress(value, label, optional = false) {
+  const text = String(value ?? "").normalize("NFKC").trim();
+  if (!text && optional) return 0;
+  if (!text || text === "0") return 0;
+  const normalized = normalizeVolumeLabel(text);
+  if (normalized === null) throw new Error(uiText("validation.volumeFormat", { label }));
+  return normalized === "EX" ? "EX" : Number(normalized);
+}
+
+function createNovelVolumeEditor(parent, initialEntries = []) {
+  const section = makeEl("section", "al-volume-editor");
+  const header = makeEl("div", "al-volume-editor-header");
+  const copy = makeEl("div", "");
+  copy.append(
+    makeEl("strong", "", uiText("volume.title")),
+    makeEl("small", "", uiText("volume.description")),
+  );
+  const add = makeEl("button", "al-secondary-button", uiText("volume.add"));
+  add.type = "button";
+  header.append(copy, add);
+  const rows = makeEl("div", "al-volume-editor-rows");
+  section.append(header, rows);
+  parent.appendChild(section);
+
+  const entries = normalizeVolumeLog(initialEntries).map((entry) => ({ ...entry }));
+
+  const nextLabel = () => {
+    const numericLabels = entries
+      .map((entry) => normalizeVolumeLabel(entry.label))
+      .filter((label) => label && label !== "EX")
+      .map(Number)
+      .filter(Number.isFinite);
+    return numericLabels.length ? String(Math.floor(Math.max(...numericLabels)) + 1) : "1";
+  };
+
+  const revealVolumeRow = (row, labelInput, { highlight = false, select = false } = {}) => {
+    if (highlight) row.classList.add("al-volume-row-new");
+    const reveal = () => {
+      row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      labelInput.focus({ preventScroll: true });
+      if (select) labelInput.select();
+      if (highlight) {
+        row.ownerDocument.defaultView?.setTimeout(() => row.classList.remove("al-volume-row-new"), 1400);
+      }
+    };
+    const view = row.ownerDocument.defaultView;
+    if (view?.requestAnimationFrame) view.requestAnimationFrame(() => view.requestAnimationFrame(reveal));
+    else view?.setTimeout(reveal, 0);
+  };
+
+  const render = ({ revealEntry = null, highlightEntry = false, selectLabel = false } = {}) => {
+    rows.replaceChildren();
+    entries.sort((left, right) => compareVolumeLabels(left.label, right.label));
+    if (!entries.length) {
+      rows.appendChild(makeEl("p", "al-volume-editor-empty", uiText("volume.empty")));
+    }
+
+    entries.forEach((entry, index) => {
+      const row = makeEl("div", "al-volume-row");
+      const fields = makeEl("div", "al-volume-row-fields");
+      const labelInput = createLabeledField(fields, uiText("volume.label"), createTextInput("text", entry.label), uiText("volume.labelPlaceholder"));
+      const startedInput = createLabeledField(fields, uiText("volume.startedAt"), createTextInput("date", entry.startedAt || ""));
+      const completedInput = createLabeledField(fields, uiText("volume.completedAt"), createTextInput("date", entry.completedAt || todayString()), uiText("volume.completedHint"));
+      if (!entry.completedAt) entry.completedAt = completedInput.value;
+      const actions = makeEl("div", "al-volume-row-actions");
+      const remove = makeEl("button", "al-delete-button", uiText("action.remove"));
+      remove.type = "button";
+      actions.appendChild(remove);
+      row.append(fields, actions);
+      rows.appendChild(row);
+
+      labelInput.addEventListener("input", () => { entry.label = labelInput.value; });
+      labelInput.addEventListener("change", () => {
+        const normalizedLabel = normalizeVolumeLabel(labelInput.value);
+        if (!normalizedLabel) return;
+        entry.label = normalizedLabel;
+        render({ revealEntry: entry });
+      });
+      startedInput.addEventListener("input", () => { entry.startedAt = startedInput.value; });
+      completedInput.addEventListener("input", () => { entry.completedAt = completedInput.value; });
+      completedInput.addEventListener("change", () => {
+        if (!completedInput.value) completedInput.value = todayString();
+        entry.completedAt = completedInput.value;
+      });
+      remove.addEventListener("click", () => {
+        entries.splice(index, 1);
+        render();
+      });
+
+      if (entry === revealEntry) {
+        revealVolumeRow(row, labelInput, { highlight: highlightEntry, select: selectLabel });
+      }
+    });
+  };
+
+  add.addEventListener("click", () => {
+    const entry = { label: nextLabel(), startedAt: "", completedAt: todayString() };
+    entries.push(entry);
+    render({ revealEntry: entry, highlightEntry: true, selectLabel: true });
+  });
+  render();
+
+  return {
+    getEntries() {
+      const output = [];
+      const seen = new Set();
+      for (const entry of entries) {
+        const label = normalizeVolumeLabel(entry.label);
+        if (!label) throw new Error(uiText("validation.volumeInvalid", { value: entry.label || uiText("common.emptyValue") }));
+        if (seen.has(label)) throw new Error(uiText("validation.volumeDuplicate", { volume: label }));
+        seen.add(label);
+        output.push({
+          label,
+          startedAt: entry.startedAt || "",
+          completedAt: entry.completedAt || todayString(),
+        });
+      }
+      return output.sort((left, right) => compareVolumeLabels(left.label, right.label));
+    },
+  };
 }
 
 class AddMediaModal extends Modal {
@@ -1039,16 +1309,16 @@ class AddMediaModal extends Modal {
     heading.className = "al-modal-heading";
     const headingCopy = makeEl("div");
     headingCopy.append(
-      makeEl("div", "al-kicker", "ADD TO YOUR LIBRARY"),
-      makeEl("h2", "", "把作品收進書架"),
-      makeEl("p", "", "選擇類型，再輸入名稱；封面、原名與資料連結會一併整理好。"),
+      makeEl("div", "al-kicker", uiText("add.kicker")),
+      makeEl("h2", "", uiText("add.title")),
+      makeEl("p", "", uiText("add.description")),
     );
     heading.appendChild(headingCopy);
     this.contentEl.appendChild(heading);
 
     const typeTabs = createDiv();
     typeTabs.className = "al-modal-type-tabs";
-    [["anime", "動畫"], ["manga", "漫畫"], ["novel", "小說"]].forEach(([value, text]) => {
+    [["anime", LABEL.type.anime], ["manga", LABEL.type.manga], ["novel", LABEL.type.novel]].forEach(([value, text]) => {
       const button = createEl("button");
       button.type = "button";
       button.className = `al-modal-type${this.mediaType === value ? " is-active" : ""}`;
@@ -1066,14 +1336,14 @@ class AddMediaModal extends Modal {
     const searchRow = createDiv();
     searchRow.className = "al-modal-search-row";
     const input = createTextInput("search", this.query);
-    input.placeholder = this.mediaType === "anime" ? "例如：輝夜姬想讓人告白" : this.mediaType === "manga" ? "例如：葬送的芙莉蓮" : "例如：無職轉生／Norwegian Wood";
+    input.placeholder = this.mediaType === "anime" ? uiText("add.placeholderAnime") : this.mediaType === "manga" ? uiText("add.placeholderManga") : uiText("add.placeholderNovel");
     const button = createEl("button");
     button.type = "button";
     button.className = "mod-cta";
-    button.textContent = "開始搜尋";
+    button.textContent = uiText("action.search");
     const runSearch = () => {
       this.query = input.value.trim();
-      if (!this.query) { new Notice("先寫下作品名稱，再開始搜尋。"); return; }
+      if (!this.query) { new Notice(uiText("notice.searchQueryRequired")); return; }
       this.search(button);
     };
     button.addEventListener("click", runSearch);
@@ -1084,14 +1354,14 @@ class AddMediaModal extends Modal {
     const hint = createEl("p");
     hint.className = "al-modal-hint";
     hint.textContent = this.mediaType === "novel"
-      ? "輕小說會搜尋 Bangumi／AniList；一般小說也會一併搜尋 Open Library。"
-      : "搜尋結果會合併 Bangumi 與 AniList；中文名稱通常較容易由 Bangumi 找到。";
+      ? uiText("add.hintNovel")
+      : uiText("add.hintMedia");
     this.contentEl.appendChild(hint);
 
     if (this.warnings.length) {
       const warning = createDiv();
       warning.className = "al-modal-warning";
-      warning.textContent = `部分資料來源暫時沒有回應：${this.warnings.join("；")}`;
+      warning.textContent = uiText("add.warning", { warnings: this.warnings.join("；") });
       this.contentEl.appendChild(warning);
     }
 
@@ -1100,7 +1370,7 @@ class AddMediaModal extends Modal {
     if (!this.results.length && this.query) {
       const empty = createDiv();
       empty.className = "al-search-empty";
-      empty.textContent = "還沒有找到合適的結果。可以改用原文、日文或英文名稱再試一次。";
+      empty.textContent = uiText("add.emptyResult");
       resultsEl.appendChild(empty);
     }
     this.results.forEach((result) => resultsEl.appendChild(this.createResultRow(result)));
@@ -1110,17 +1380,17 @@ class AddMediaModal extends Modal {
 
   async search(button) {
     button.disabled = true;
-    button.textContent = "尋找中…";
+    button.textContent = uiText("add.searching");
     try {
       const response = await this.plugin.searchExternal(this.mediaType, this.query);
       this.results = response.results;
       this.warnings = response.warnings;
-      if (!this.results.length) new Notice("沒有找到相符作品，換個名稱再試一次。" );
+      if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
       console.error("AnimeList external search failed", error);
       this.results = [];
       this.warnings = [error?.message || String(error)];
-      new Notice("目前無法連上外部資料庫，請稍後再試。" );
+      new Notice(uiText("notice.searchUnavailable"));
     }
     this.renderSearch();
   }
@@ -1138,7 +1408,7 @@ class AddMediaModal extends Modal {
     } else {
       const placeholder = createDiv();
       placeholder.className = "al-search-result-placeholder";
-      placeholder.textContent = "No cover";
+      placeholder.textContent = uiText("add.noCover");
       row.appendChild(placeholder);
     }
     const body = createDiv();
@@ -1148,11 +1418,11 @@ class AddMediaModal extends Modal {
     const original = createSpan();
     original.textContent = result.originalTitle || result.romajiTitle || "";
     const meta = createSpan();
-    meta.textContent = [LABEL.provider[result.provider], result.year || "年份不明", LABEL.format[result.format] || result.format].filter(Boolean).join(" · ");
+    meta.textContent = [mediaProviderLabel(result.provider), result.year || uiText("add.unknownYear"), mediaFormatLabel(result.format)].filter(Boolean).join(" · ");
     body.append(title, original, meta);
     const use = createSpan();
     use.className = "al-search-result-use";
-    use.textContent = "選用";
+    use.textContent = uiText("action.select");
     row.append(body, use);
     row.addEventListener("click", () => this.renderDetails(result));
     return row;
@@ -1163,7 +1433,7 @@ class AddMediaModal extends Modal {
     const back = createEl("button");
     back.type = "button";
     back.className = "al-modal-back";
-    back.textContent = "← 回到搜尋結果";
+    back.textContent = uiText("action.back");
     back.addEventListener("click", () => this.renderSearch());
     this.contentEl.appendChild(back);
 
@@ -1172,12 +1442,12 @@ class AddMediaModal extends Modal {
     if (result.coverUrl) {
       const image = createEl("img");
       image.src = result.coverUrl;
-      image.alt = `${result.title} 封面`;
+      image.alt = uiText("library.coverAlt", { title: result.title });
       preview.appendChild(image);
     }
     const copy = createDiv();
     copy.append(
-      makeEl("div", "al-kicker", LABEL.provider[result.provider] || result.provider),
+      makeEl("div", "al-kicker", mediaProviderLabel(result.provider)),
       makeEl("h2", "", result.title),
       makeEl("p", "", result.originalTitle || result.romajiTitle || ""),
     );
@@ -1187,44 +1457,58 @@ class AddMediaModal extends Modal {
     const templates = await this.plugin.getTemplates(result.mediaType);
     const form = createDiv();
     form.className = "al-media-form";
-    const titleInput = createLabeledField(form, "書架上的名稱", createTextInput("text", result.title), "必填");
+    const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", result.title), uiText("add.required"));
     titleInput.required = true;
     const statusOptions = result.mediaType === "anime"
-      ? [["planned", "待追"], ["watching", "追番中"], ["completed", "已看完"], ["on_hold", "棄番"]]
-      : [["planned", "待追"], ["reading", "追番中"], ["completed", "已讀完"], ["on_hold", "棄番"]];
-    const status = createLabeledField(form, "目前狀態", createSelect(statusOptions, "planned"));
-    const score = createLabeledField(form, "我的評分（0–10）", createTextInput("number", ""), "必填；可輸入一位小數。");
-    score.min = "0"; score.max = "10"; score.step = "0.1"; score.required = true;
-    const startedAt = createLabeledField(form, "開始日期", createTextInput("date", ""));
-    const completedAt = createLabeledField(form, "完成日期", createTextInput("date", todayString()), "必填；預設為今天，可自行調整。");
-    completedAt.required = true;
-    const progress = createLabeledField(form, "目前進度", createTextInput("number", "0"));
-    progress.min = "0"; progress.step = "1";
-    const total = createLabeledField(form, "作品總數", createTextInput("number", result.total || "0"));
-    total.min = "0"; total.step = "1";
+      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
+      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, "planned"));
+    const releaseStatus = result.mediaType === "anime"
+      ? null
+      : createLabeledField(form, uiText("add.releaseStatusLabel"), releaseStatusOptions(result.releaseStatus));
+    const score = createLabeledField(form, uiText("add.scoreLabel"), createTextInput("number", ""), uiText("add.scoreHint", { status: completedStatusLabel(result.mediaType) }));
+    score.min = "0"; score.max = "10"; score.step = "0.1";
+    bindScoreRequirement(status, score, result.mediaType);
+    const startedAt = createLabeledField(form, uiText("add.startedAt"), createTextInput("date", ""), uiText("add.startedHint"));
+    const completedAt = createLabeledField(form, uiText("add.completedAt"), createTextInput("date", ""), uiText("add.completedHint", { status: completedStatusLabel(result.mediaType) }));
+    const progressType = result.mediaType === "novel" ? "text" : "number";
+    const progressLabel = result.mediaType === "manga" ? uiText("add.progressManga") : result.mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
+    const progress = createLabeledField(form, progressLabel, createTextInput(progressType, "0"), result.mediaType === "novel" ? uiText("add.progressNovelHint") : "");
+    if (result.mediaType !== "novel") { progress.min = "0"; progress.step = "1"; }
+    const total = result.mediaType === "anime"
+      ? createLabeledField(form, uiText("add.total"), createTextInput("number", result.total || ""))
+      : null;
+    if (total) { total.min = "0"; total.step = "1"; }
     const unitOptions = result.mediaType === "anime"
-      ? [["episode", "集"]]
-      : result.mediaType === "manga" ? [["chapter", "話"], ["volume", "卷"]] : [["volume", "卷"], ["page", "頁"], ["percent", "%"]];
-    const unit = createLabeledField(form, "進度單位", createSelect(unitOptions, result.unit));
-    const genreInput = createLabeledField(form, "分類", createTextInput("text", normalizeGenres(result.genres).join("、")), "可用逗號或頓號分隔；常見中英文分類會自動統一。" );
+      ? [["episode", uiText("media.unit.episode")]]
+      : result.mediaType === "manga"
+        ? [["chapter", uiText("media.unit.chapter")]]
+        : [["volume", uiText("media.unit.volume")]];
+    const unit = createLabeledField(form, uiText("add.unit"), createSelect(unitOptions, unitOptions[0][0]));
+    const genreInput = createLabeledField(form, uiText("add.genres"), createTextInput("text", normalizeGenres(result.genres).join("、")), uiText("add.genresHint"));
     const templateOptions = templates.length
       ? templates.map((template) => [template.path, template.name])
-      : [["", "不套用模板"]];
-    const templateSelect = createLabeledField(form, "筆記模板", createSelect(templateOptions, templateOptions[0][0]), "模板直接讀取 Templates 資料夾；可自行新增或修改。" );
+      : [["", uiText("add.noTemplate")]];
+    const templateSelect = createLabeledField(form, uiText("add.template"), createSelect(templateOptions, templateOptions[0][0]), uiText("add.templateHint"));
     const completionNote = makeEl("div", "al-completion-note");
     form.appendChild(completionNote);
-    bindCompletionBehavior(status, total, progress, completedAt, completionNote);
+    bindCompletionBehavior(status, total, progress, completedAt, completionNote, result.mediaType);
+    const volumeEditor = result.mediaType === "novel"
+      ? createNovelVolumeEditor(form, [])
+      : null;
     const favoriteWrap = createEl("label");
     favoriteWrap.className = "al-form-checkbox";
     const favorite = createEl("input");
     favorite.type = "checkbox";
-    favoriteWrap.append(favorite, " 收進最愛");
+    favoriteWrap.append(favorite, ` ${uiText("add.favorite")}`);
     form.appendChild(favoriteWrap);
     this.contentEl.appendChild(form);
 
     const sourceNote = createDiv();
     sourceNote.className = "al-source-note";
-    sourceNote.textContent = "封面會優先保存到 vault；外部資料連結與原始分類也會保留，方便日後核對。";
+    sourceNote.textContent = result.mediaType === "novel"
+      ? uiText("add.sourceNovel")
+      : uiText("add.sourceMedia");
     this.contentEl.appendChild(sourceNote);
 
     const actions = createDiv();
@@ -1232,29 +1516,36 @@ class AddMediaModal extends Modal {
     const createButton = createEl("button");
     createButton.type = "button";
     createButton.className = "mod-cta";
-    createButton.textContent = "建立作品筆記";
+    createButton.textContent = uiText("action.add");
     createButton.addEventListener("click", async () => {
-      if (!titleInput.value.trim()) { new Notice("請替這筆收藏留下一個名稱。" ); return; }
-      const scoreValue = Number(score.value);
-      if (score.value === "" || !Number.isFinite(scoreValue) || scoreValue < 0 || scoreValue > 10) { new Notice("請填入 0 到 10 之間的個人評分。" ); return; }
-      if (!completedAt.value) { new Notice("請填入完成日期。" ); return; }
+      if (!titleInput.value.trim()) { new Notice(uiText("validation.titleRequired")); return; }
+      const hasScore = score.value.trim() !== "";
+      const scoreValue = hasScore ? Number(score.value) : null;
+      if (status.value === "completed" && !hasScore) { new Notice(`${completedRequirementMessage(result.mediaType, uiText("field.score"))}。`); return; }
+      if (hasScore && (scoreValue == null || !Number.isFinite(scoreValue) || scoreValue < 0 || scoreValue > 10)) { new Notice(`${uiText("validation.scoreRange")}。`); return; }
+      if (status.value === "completed" && !completedAt.value) { new Notice(`${completedRequirementMessage(result.mediaType, uiText("field.completedAt"))}。`); return; }
       createButton.disabled = true;
-      createButton.textContent = "整理中…";
+      createButton.textContent = uiText("add.processing");
       try {
+        const volumeLog = volumeEditor ? volumeEditor.getEntries() : [];
+        let nextProgress = result.mediaType === "novel" ? validateNovelProgress(progress.value, uiText("add.progressNovel")) : Math.max(0, numeric(progress.value));
+        const nextTotal = result.mediaType === "anime" ? Math.max(0, numeric(total?.value)) : 0;
+        const completedVolume = highestCompletedVolume(volumeLog);
+        if (result.mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
         const file = await this.plugin.createMediaNote(result, {
-          title: titleInput.value.trim(), status: status.value, score: score.value,
+          title: titleInput.value.trim(), status: status.value, releaseStatus: releaseStatus?.value || "unknown", score: score.value,
           startedAt: startedAt.value, completedAt: completedAt.value,
-          progress: progress.value, total: total.value, unit: unit.value,
-          favorite: favorite.checked, genres: genreInputValues(genreInput), templatePath: templateSelect.value,
+          progress: nextProgress, total: nextTotal, unit: unit.value,
+          favorite: favorite.checked, genres: genreInputValues(genreInput), templatePath: templateSelect.value, volumeLog,
         });
         this.close();
-        new Notice(`已收錄：${titleInput.value.trim()}`);
+        new Notice(uiText("notice.collected", { title: titleInput.value.trim() }));
         await this.plugin.app.workspace.openLinkText(file.path, "", false);
       } catch (error) {
         console.error("AnimeList create note failed", error);
-        new Notice(`建立失敗：${error?.message || error}`);
+        new Notice(uiText("notice.createFailed", { error: error?.message || error }));
         createButton.disabled = false;
-        createButton.textContent = "建立作品筆記";
+        createButton.textContent = uiText("action.add");
       }
     });
     actions.appendChild(createButton);
@@ -1274,13 +1565,13 @@ class ConfirmDeleteModal extends Modal {
     this.modalEl.classList.add("animelist-modal", "animelist-confirm-modal");
     const fm = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
-    const title = makeEl("h2", "", "移除這筆收藏？");
-    const description = makeEl("p", "", `「${fm.title || this.file.basename}」的 Markdown 筆記會移到系統垃圾桶；本地封面不會一併刪除。`);
+    const title = makeEl("h2", "", uiText("delete.title"));
+    const description = makeEl("p", "", uiText("delete.description", { title: fm.title || this.file.basename }));
     const actions = makeEl("div", "al-modal-actions al-confirm-actions");
-    const cancel = makeEl("button", "", "先保留");
+    const cancel = makeEl("button", "", uiText("action.cancel"));
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
-    const remove = makeEl("button", "mod-warning", "移除作品");
+    const remove = makeEl("button", "mod-warning", uiText("action.delete"));
     remove.type = "button";
     remove.addEventListener("click", async () => {
       remove.disabled = true;
@@ -1288,10 +1579,10 @@ class ConfirmDeleteModal extends Modal {
         await this.plugin.deleteMediaFile(this.file);
         this.close();
         if (this.onDeleted) this.onDeleted();
-        new Notice("作品已從收藏庫移除。" );
+        new Notice(uiText("notice.deleted"));
       } catch (error) {
         console.error("AnimeList delete failed", error);
-        new Notice(`移除失敗：${error?.message || error}`);
+        new Notice(uiText("notice.deleteFailed", { error: error?.message || error }));
         remove.disabled = false;
       }
     });
@@ -1314,9 +1605,9 @@ class EditMediaModal extends Modal {
     const heading = createDiv();
     heading.className = "al-modal-heading";
     const title = createEl("h2");
-    title.textContent = `整理：${frontmatter.title || this.file.basename}`;
+    title.textContent = uiText("edit.title", { title: frontmatter.title || this.file.basename });
     const description = createEl("p");
-    description.textContent = "調整自己的進度、日期與評分；外部作品資料會保持原樣。";
+    description.textContent = uiText("edit.description");
     heading.append(title, description);
     this.contentEl.appendChild(heading);
 
@@ -1324,31 +1615,41 @@ class EditMediaModal extends Modal {
     const form = createDiv();
     form.className = "al-media-form";
     const statusOptions = mediaType === "anime"
-      ? [["planned", "待追"], ["watching", "追番中"], ["completed", "已看完"], ["on_hold", "棄番"]]
-      : [["planned", "待追"], ["reading", "追番中"], ["completed", "已讀完"], ["on_hold", "棄番"]];
-    const titleInput = createLabeledField(form, "書架上的名稱", createTextInput("text", frontmatter.title || this.file.basename), "必填");
+      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
+      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", frontmatter.title || this.file.basename), uiText("add.required"));
     titleInput.required = true;
-    const currentStatus = String(frontmatter.status || "planned") === "dropped" ? "on_hold" : String(frontmatter.status || "planned");
-    const status = createLabeledField(form, "目前狀態", createSelect(statusOptions, currentStatus));
-    const score = createLabeledField(form, "我的評分（0–10）", createTextInput("number", frontmatter.score ?? ""), "必填；可輸入一位小數。");
-    score.min = "0"; score.max = "10"; score.step = "0.1"; score.required = true;
-    const progress = createLabeledField(form, "目前進度", createTextInput("number", frontmatter.progress ?? 0));
-    progress.min = "0";
-    const total = createLabeledField(form, "作品總數", createTextInput("number", frontmatter.progress_total ?? 0));
-    total.min = "0";
-    const startedAt = createLabeledField(form, "開始日期", createTextInput("date", frontmatter.started_at || ""));
-    const completedAt = createLabeledField(form, "完成日期", createTextInput("date", frontmatter.completed_at || todayString()), "必填；缺少日期時預設為今天。");
-    completedAt.required = true;
-    const genreInput = createLabeledField(form, "分類", createTextInput("text", normalizeGenres(frontmatter.genres).join("、")), "可自行補充；常見中英文名稱會自動統一。" );
+    const currentStatus = String(frontmatter.status || "planned");
+    const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, currentStatus));
+    const releaseStatus = mediaType === "anime"
+      ? null
+      : createLabeledField(form, uiText("add.releaseStatusLabel"), releaseStatusOptions(frontmatter.release_status));
+    const score = createLabeledField(form, uiText("add.scoreLabel"), createTextInput("number", frontmatter.score ?? ""), uiText("add.scoreHint", { status: completedStatusLabel(mediaType) }));
+    score.min = "0"; score.max = "10"; score.step = "0.1";
+    bindScoreRequirement(status, score, mediaType);
+    const progressType = mediaType === "novel" ? "text" : "number";
+    const progressLabel = mediaType === "manga" ? uiText("add.progressManga") : mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
+    const progress = createLabeledField(form, progressLabel, createTextInput(progressType, frontmatter.progress ?? 0), mediaType === "novel" ? uiText("add.progressNovelHint") : "");
+    if (mediaType !== "novel") progress.min = "0";
+    const total = mediaType === "anime"
+      ? createLabeledField(form, uiText("add.total"), createTextInput("number", frontmatter.progress_total ?? ""))
+      : null;
+    if (total) total.min = "0";
+    const startedAt = createLabeledField(form, uiText("add.startedAt"), createTextInput("date", frontmatter.started_at || ""), uiText("add.startedHint"));
+    const completedAt = createLabeledField(form, uiText("add.completedAt"), createTextInput("date", frontmatter.completed_at || ""), uiText("add.completedHint", { status: completedStatusLabel(mediaType) }));
+    const genreInput = createLabeledField(form, uiText("add.genres"), createTextInput("text", normalizeGenres(frontmatter.genres).join("、")), uiText("add.genresHint"));
     const completionNote = makeEl("div", "al-completion-note");
     form.appendChild(completionNote);
-    bindCompletionBehavior(status, total, progress, completedAt, completionNote);
+    bindCompletionBehavior(status, total, progress, completedAt, completionNote, mediaType);
+    const volumeEditor = mediaType === "novel"
+      ? createNovelVolumeEditor(form, frontmatter.volume_log)
+      : null;
     const favoriteWrap = createEl("label");
     favoriteWrap.className = "al-form-checkbox";
     const favorite = createEl("input");
     favorite.type = "checkbox";
     favorite.checked = frontmatter.favorite === true;
-    favoriteWrap.append(favorite, " 收進最愛");
+    favoriteWrap.append(favorite, ` ${uiText("add.favorite")}`);
     form.appendChild(favoriteWrap);
     this.contentEl.appendChild(form);
 
@@ -1357,41 +1658,53 @@ class EditMediaModal extends Modal {
     const deleteButton = createEl("button");
     deleteButton.type = "button";
     deleteButton.className = "al-delete-button";
-    appendIconLabel(deleteButton, "trash", "移除作品");
+    appendIconLabel(deleteButton, "trash", uiText("action.delete"));
     deleteButton.addEventListener("click", () => {
       new ConfirmDeleteModal(this.plugin, this.file, () => this.close()).open();
     });
     const save = createEl("button");
     save.type = "button";
     save.className = "mod-cta";
-    save.textContent = "保存這次整理";
+    save.textContent = uiText("action.save");
     save.addEventListener("click", async () => {
       const nextTitle = titleInput.value.trim();
-      const nextScore = Number(score.value);
-      if (!nextTitle) { new Notice("作品名稱不能留空。" ); return; }
-      if (score.value === "" || !Number.isFinite(nextScore) || nextScore < 0 || nextScore > 10) { new Notice("請填入 0 到 10 之間的個人評分。" ); return; }
-      if (!completedAt.value) { new Notice("完成日期不能留空。" ); return; }
+      const hasScore = score.value.trim() !== "";
+      const nextScore = hasScore ? Number(score.value) : null;
+      if (!nextTitle) { new Notice(uiText("validation.titleRequired")); return; }
+      if (status.value === "completed" && !hasScore) { new Notice(`${completedRequirementMessage(mediaType, uiText("field.score"))}。`); return; }
+      if (hasScore && (nextScore == null || !Number.isFinite(nextScore) || nextScore < 0 || nextScore > 10)) { new Notice(`${uiText("validation.scoreRange")}。`); return; }
+      if (status.value === "completed" && !completedAt.value) { new Notice(`${completedRequirementMessage(mediaType, uiText("field.completedAt"))}。`); return; }
       save.disabled = true;
       try {
+        const volumeLog = volumeEditor ? volumeEditor.getEntries() : [];
+        const nextTotal = mediaType === "anime" ? Math.max(0, numeric(total?.value)) : 0;
+        let nextProgress = mediaType === "novel"
+          ? validateNovelProgress(progress.value, uiText("add.progressNovel"))
+          : Math.max(0, numeric(progress.value));
+        const completedVolume = highestCompletedVolume(volumeLog);
+        if (mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
         await this.plugin.app.fileManager.processFrontMatter(this.file, (fm) => {
-          const nextTotal = Math.max(0, numeric(total.value));
+          fm.schema_version = 5;
           fm.title = nextTitle;
           fm.status = status.value;
-          fm.progress_total = nextTotal;
-          fm.progress = completedProgress(status.value, nextTotal, progress.value);
+          if (mediaType !== "anime") fm.release_status = releaseStatus?.value || "unknown";
+          if (mediaType === "anime") fm.progress_total = nextTotal;
+          else delete fm.progress_total;
+          fm.progress = completedProgress(status.value, nextTotal, nextProgress, mediaType);
           fm.favorite = favorite.checked;
           fm.genres = genreInputValues(genreInput);
-          fm.score = nextScore;
+          if (nextScore != null) fm.score = nextScore; else delete fm.score;
           if (startedAt.value) fm.started_at = startedAt.value; else delete fm.started_at;
-          fm.completed_at = completedAt.value;
+          if (completedAt.value) fm.completed_at = completedAt.value; else delete fm.completed_at;
+          if (mediaType === "novel" && volumeLog.length) fm.volume_log = serializeVolumeLog(volumeLog); else delete fm.volume_log;
           delete fm.updated_at;
           delete fm.metadata_updated_at;
         });
         this.close();
-        new Notice("這筆收藏已整理完成。" );
+        new Notice(uiText("notice.saved"));
       } catch (error) {
         console.error("AnimeList edit failed", error);
-        new Notice(`保存失敗：${error?.message || error}`);
+        new Notice(uiText("notice.saveFailed", { error: error?.message || error }));
         save.disabled = false;
       }
     });
@@ -1501,18 +1814,26 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     this.containerEl.replaceChildren();
     const bar = makeEl("div", "al-detail-actions");
     const summary = makeEl("div", "al-detail-summary");
-    const status = makeEl("span", `al-status status-${fm.status || "planned"}`, itemStatusLabel({ status: fm.status || "planned", mediaType: fm.media_type || "anime" }));
-    const progress = makeEl("span", "", fm.progress_total ? `${fm.progress || 0} / ${fm.progress_total} ${LABEL.unit[fm.progress_unit] || fm.progress_unit || ""}` : "尚未記錄進度");
+    const detailItem = {
+      status: fm.status || "planned", mediaType: fm.media_type || "anime", releaseStatus: normalizeReleaseStatus(fm.release_status),
+      progress: normalizeProgressValue(fm.progress), total: String(fm.media_type || "anime") === "anime" ? normalizeProgressValue(fm.progress_total) : 0, unit: fm.progress_unit || "",
+    };
+    const status = makeEl("span", `al-status status-${detailItem.status}`, itemStatusLabel(detailItem));
+    const unitLabel = LABEL.unit[detailItem.unit] || detailItem.unit || "";
+    const hasTotal = detailItem.total !== 0 && detailItem.total !== "";
+    const progress = makeEl("span", "", hasTotal
+      ? `${progressDisplayValue(detailItem.progress)} / ${progressDisplayValue(detailItem.total)} ${unitLabel}`
+      : detailItem.progress !== 0 ? uiText(detailItem.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", { progress: progressDisplayValue(detailItem.progress), unit: unitLabel }) : uiText("detail.noProgress"));
     summary.append(status, progress);
     if (fm.score != null && fm.score !== "") summary.appendChild(makeEl("span", "al-detail-score", `★ ${Number(fm.score).toFixed(1)}`));
     const actions = makeEl("div", "al-detail-buttons");
-    const favorite = makeEl("button", `al-detail-favorite${fm.favorite === true ? " is-active" : ""}`, fm.favorite === true ? "★ 最愛" : "☆ 加入最愛");
+    const favorite = makeEl("button", `al-detail-favorite${fm.favorite === true ? " is-active" : ""}`, fm.favorite === true ? uiText("detail.favorite") : uiText("detail.favoriteAdd"));
     favorite.type = "button";
     favorite.addEventListener("click", () => this.plugin.setFavorite(file.path, fm.favorite !== true));
-    const edit = makeEl("button", "", "整理紀錄");
+    const edit = makeEl("button", "", uiText("action.edit"));
     edit.type = "button";
     edit.addEventListener("click", () => this.plugin.openEditModal(file.path));
-    const library = makeEl("button", "", "回到收藏庫");
+    const library = makeEl("button", "", uiText("detail.library"));
     library.type = "button";
     library.addEventListener("click", () => this.plugin.openLibrary());
     actions.append(favorite, edit, library);
@@ -1520,11 +1841,11 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     if (urls[0]) {
       const external = makeEl("button");
       external.type = "button";
-      appendIconLabel(external, "external", "查看資料來源");
+      appendIconLabel(external, "external", uiText("detail.source"));
       external.addEventListener("click", () => window.open(String(urls[0]), "_blank"));
       actions.appendChild(external);
     }
-    const remove = makeEl("button", "al-detail-delete", "移除作品");
+    const remove = makeEl("button", "al-detail-delete", uiText("action.delete"));
     remove.type = "button";
     remove.addEventListener("click", () => new ConfirmDeleteModal(this.plugin, file, () => this.plugin.openLibrary()).open());
     actions.appendChild(remove);
@@ -1544,9 +1865,9 @@ export class LegacyAnimeListPlugin extends Plugin {
       const child = new DetailActionsRenderChild(element, this, context.sourcePath);
       context.addChild(child);
     });
-    this.addCommand({ id: "open-library", name: "開啟收藏書架", callback: () => this.app.workspace.openLinkText("Dashboard/Library", "", false) });
-    this.addCommand({ id: "add-media", name: "搜尋並收錄作品", callback: () => this.openAddModal("anime") });
-    this.addCommand({ id: "open-timeline", name: "開啟時間軸", callback: () => this.openTimeline() });
+    this.addCommand({ id: "open-library", name: uiText("app.openLibrary"), callback: () => this.app.workspace.openLinkText("Dashboard/Library", "", false) });
+    this.addCommand({ id: "add-media", name: uiText("action.collect"), callback: () => this.openAddModal("anime") });
+    this.addCommand({ id: "open-timeline", name: uiText("app.openTimeline"), callback: () => this.openTimeline() });
   }
 
   openAddModal(initialType = "anime") {
@@ -1555,7 +1876,7 @@ export class LegacyAnimeListPlugin extends Plugin {
 
   openEditModal(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) { new Notice("找不到這筆作品筆記。" ); return; }
+    if (!file) { new Notice(uiText("notice.mediaNoteMissing")); return; }
     new EditMediaModal(this, file).open();
   }
 
@@ -1580,24 +1901,25 @@ export class LegacyAnimeListPlugin extends Plugin {
         return {
           title: stringValue(fm.title, file.basename), originalTitle: stringValue(fm.title_original, stringValue(fm.title_romaji)),
           mediaType: stringValue(fm.media_type), format: stringValue(fm.format, stringValue(fm.media_type)), status: stringValue(fm.status, "planned"),
-          progress: fm.progress || 0, total: fm.progress_total || 0, unit: stringValue(fm.progress_unit), score: fm.score,
+          releaseStatus: normalizeReleaseStatus(fm.release_status), progress: normalizeProgressValue(fm.progress), total: stringValue(fm.media_type) === "anime" ? normalizeProgressValue(fm.progress_total) : 0, unit: stringValue(fm.progress_unit), score: fm.score,
           favorite: fm.favorite === true, year: fm.year || "", genres: normalizeGenres(fm.genres), people,
           platforms: asArray(fm.platforms), sourceUrls: asArray(fm.source_urls), cover, filePath: file.path,
-          updated: Number(file.stat?.mtime || 0), updatedLabel: file.stat?.mtime ? `更新於 ${formatFileModifiedTime(file.stat.mtime)}` : "",
+          updated: Number(file.stat?.mtime || 0), updatedLabel: file.stat?.mtime ? uiText("library.updatedAt", { date: formatFileModifiedTime(file.stat.mtime) }) : "",
           startedAt: fm.started_at || "", completedAt: fm.completed_at || "",
+          volumeLog: normalizeVolumeLog(fm.volume_log),
         };
       }).filter(Boolean);
   }
 
   async setFavorite(path, next) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) throw new Error("找不到作品筆記");
+    if (!file) throw new Error(uiText("validation.mediaNoteMissing"));
     await this.app.fileManager.processFrontMatter(file, (fm) => {
       fm.favorite = next === true;
       delete fm.updated_at;
       delete fm.metadata_updated_at;
     });
-    new Notice(next ? "已收進最愛。" : "已從最愛中移除。" );
+    new Notice(uiText(next ? "notice.favoriteAdded" : "notice.favoriteRemoved"));
   }
 
   async deleteMediaFile(file) {
@@ -1613,7 +1935,7 @@ export class LegacyAnimeListPlugin extends Plugin {
     });
     return files.sort((a, b) => a.path.localeCompare(b.path, "zh-Hant")).map((file) => ({
       path: file.path,
-      name: file.path.startsWith(`${TEMPLATE_ROOT}/Common/`) ? `${file.basename}（共用）` : file.basename,
+      name: file.path.startsWith(`${TEMPLATE_ROOT}/Common/`) ? uiText("common.sharedName", { name: file.basename }) : file.basename,
     }));
   }
 
@@ -1652,7 +1974,7 @@ export class LegacyAnimeListPlugin extends Plugin {
       query ($search: String, $type: MediaType, $format: MediaFormat) {
         Page(page: 1, perPage: 10) {
           media(search: $search, type: $type, format: $format, sort: SEARCH_MATCH) {
-            id siteUrl type format episodes chapters volumes averageScore description(asHtml: false) genres synonyms
+            id siteUrl type format status episodes chapters volumes averageScore description(asHtml: false) genres synonyms
             startDate { year month day }
             title { romaji english native }
             coverImage { extraLarge large medium }
@@ -1734,14 +2056,16 @@ export class LegacyAnimeListPlugin extends Plugin {
 
   async createMediaNote(result, form) {
     const title = String(form?.title || "").trim();
-    const score = Number(form?.score);
+    const hasScore = form?.score !== "" && form?.score != null;
+    const score = hasScore ? Number(form.score) : null;
     const completedAt = String(form?.completedAt || "").trim();
-    if (!title) throw new Error("作品名稱為必填欄位");
-    if (form?.score === "" || form?.score == null || !Number.isFinite(score) || score < 0 || score > 10) throw new Error("個人評分必須是 0 到 10 之間的數字");
-    if (!completedAt) throw new Error("完成日期為必填欄位");
+    if (!title) throw new Error(uiText("validation.titleRequired"));
+    if (form?.status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+    if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) throw new Error(uiText("validation.scoreRange"));
+    if (form?.status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
     const existing = this.findExistingBySource(result.provider, result.sourceId);
     if (existing) {
-      new Notice("這筆外部資料已經在收藏庫中，已替你開啟原筆記。" );
+      new Notice(uiText("notice.existingMedia"));
       await this.app.workspace.openLinkText(existing.path, "", false);
       return existing;
     }
@@ -1750,7 +2074,7 @@ export class LegacyAnimeListPlugin extends Plugin {
       try { coverPath = await this.downloadCover(result); }
       catch (error) {
         console.warn("AnimeList cover download failed; using remote URL", error);
-        new Notice("封面暫時無法存到本機，會先使用遠端圖片。" );
+        new Notice(uiText("notice.coverRemote"));
       }
     }
     const folderName = result.mediaType === "anime" ? "Anime" : result.mediaType === "manga" ? "Manga" : "Novel";
@@ -1766,7 +2090,7 @@ export class LegacyAnimeListPlugin extends Plugin {
 export const legacyTest = {
   normalizeBangumiSubject, normalizeAniListMedia, normalizeOpenLibraryBook, dedupeSearchResults,
   buildMediaMarkdown, sanitizePathPart, normalizeGenres, completedProgress, applyTemplateVariables, formatFileModifiedTime,
-  ensureDetailBlock, AnimeListUI, TimelineUI,
+  ensureDetailBlock, AnimeListUI, TimelineUI, assignTimelineLanes,
 };
 
 export default LegacyAnimeListPlugin;
