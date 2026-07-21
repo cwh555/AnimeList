@@ -130,6 +130,8 @@ export const UI_TEXT = {
 
   "timeline.title": "時間軸",
   "timeline.summary": "{count} 筆完成紀錄 · {start} 至 {end}",
+  "timeline.summaryEmpty": "0 筆完成紀錄",
+  "timeline.filterAll": "所有",
   "timeline.emptyTitle": "尚無完成紀錄",
   "timeline.emptyDescription": "完成作品後會顯示於此。",
   "timeline.zoomOut": "縮短日期間距",

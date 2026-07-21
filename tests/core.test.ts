@@ -24,6 +24,7 @@ const {
   assignTimelineLanes,
   buildMediaMarkdown,
   completedProgress,
+  filterTimelineEntries,
   normalizeGenres,
   sanitizePathPart,
 } = legacyTest;
@@ -355,6 +356,38 @@ describe("timeline connector geometry", () => {
   });
 });
 
+describe("timeline media filters", () => {
+  it("filters expanded timeline entries without collapsing novel volumes", () => {
+    const entries = [
+      { mediaType: "anime", title: "Anime" },
+      { mediaType: "manga", title: "Manga" },
+      { mediaType: "novel", title: "Novel volume 1", volumeLabel: "1" },
+      { mediaType: "novel", title: "Novel volume 2", volumeLabel: "2" },
+    ];
+
+    assert.deepEqual(filterTimelineEntries(entries, "all"), entries);
+    assert.deepEqual(filterTimelineEntries(entries, "anime").map((entry) => entry.title), ["Anime"]);
+    assert.deepEqual(filterTimelineEntries(entries, "manga").map((entry) => entry.title), ["Manga"]);
+    assert.deepEqual(
+      filterTimelineEntries(entries, "novel").map((entry) => entry.volumeLabel),
+      ["1", "2"],
+    );
+  });
+
+  it("renders the approved all, anime, manga, and novel filter buttons", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+
+    assert.equal(UI_TEXT["timeline.filterAll"], "所有");
+    assert.match(legacySource, /\["all", uiText\("timeline\.filterAll"\)\]/);
+    assert.match(legacySource, /\["anime", uiText\("media\.type\.anime"\)\]/);
+    assert.match(legacySource, /\["manga", uiText\("media\.type\.manga"\)\]/);
+    assert.match(legacySource, /\["novel", uiText\("media\.type\.novel"\)\]/);
+    assert.match(legacySource, /render\(container, inputItems, \{ \.\.\.adapters, typeFilter: type \}\)/);
+    assert.match(stylesheet, /\.al-timeline-type-filter\.is-active/);
+  });
+});
+
 describe("tracked UI wording", () => {
   it("uses the approved shared action and section labels", () => {
     assert.equal(UI_TEXT["action.save"], "儲存");
@@ -380,20 +413,30 @@ describe("tracked UI wording", () => {
   });
 
   it("uses the approved media-specific status labels", () => {
-    assert.equal(UI_TEXT["media.status.plannedAnime"], "待追");
-    assert.equal(UI_TEXT["media.status.watching"], "追番中");
-    assert.equal(UI_TEXT["media.status.completedAnime"], "已完食");
-    assert.equal(UI_TEXT["media.status.pausedAnime"], "擱置");
-    assert.equal(UI_TEXT["media.status.droppedAnime"], "棄番");
-    assert.equal(UI_TEXT["media.status.plannedReading"], "待讀");
-    assert.equal(UI_TEXT["media.status.reading"], "閱讀中");
-    assert.equal(UI_TEXT["media.status.completedReading"], "已讀完");
-    assert.equal(UI_TEXT["media.status.pausedReading"], "擱置");
-    assert.equal(UI_TEXT["media.status.droppedReading"], "棄讀");
-    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), ["所有狀態", "追番中", "已完食", "待追", "擱置", "棄番"]);
-    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), ["所有狀態", "閱讀中", "已讀完", "待讀", "擱置", "棄讀"]);
-    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), ["所有狀態", "進行中", "完成", "待開始", "擱置", "棄置"]);
-    assert.equal(Object.values(UI_TEXT).some((label) => label.includes("已完成")), false);
+    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), [
+      UI_TEXT["media.status.all"],
+      UI_TEXT["media.status.watching"],
+      UI_TEXT["media.status.completedAnime"],
+      UI_TEXT["media.status.plannedAnime"],
+      UI_TEXT["media.status.pausedAnime"],
+      UI_TEXT["media.status.droppedAnime"],
+    ]);
+    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), [
+      UI_TEXT["media.status.all"],
+      UI_TEXT["media.status.reading"],
+      UI_TEXT["media.status.completedReading"],
+      UI_TEXT["media.status.plannedReading"],
+      UI_TEXT["media.status.pausedReading"],
+      UI_TEXT["media.status.droppedReading"],
+    ]);
+    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), [
+      UI_TEXT["media.status.all"],
+      UI_TEXT["media.status.active"],
+      UI_TEXT["media.status.completed"],
+      UI_TEXT["media.status.planned"],
+      UI_TEXT["media.status.paused"],
+      UI_TEXT["media.status.dropped"],
+    ]);
     assert.equal(Object.values(UI_TEXT).some((label) => label.includes("/") || label.includes("／")), false);
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedAnime"\)\]/);

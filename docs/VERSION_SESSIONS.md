@@ -31,6 +31,7 @@ This document preserves the product-level decisions introduced by each major dev
 - Made personal score and completion date required only for completed works.
 - Added novel volume labels for integers, half volumes, and `EX`; new rows default to completed today, with editable start and completion dates.
 - Expanded each volume into a timeline entry with a visible volume label, the normal series cover, and vertical collision lanes.
+- Added timeline filters for all records, anime, manga, and novels without changing the stored media data.
 - Ordered volume rows and serialized history by normalized volume label, while automatically moving the editor viewport and keyboard focus to a newly added or repositioned row.
 - Centralized approved user-facing action labels in tracked source so the same operation uses the same wording across views.
 

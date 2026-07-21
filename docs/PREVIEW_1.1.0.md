@@ -75,6 +75,8 @@ The release preflight is only a local consistency check. Do not create or push a
 
 ### Timeline
 
+- Switch among **所有**, **動畫**, **漫畫**, and **小說**. Each view must contain only matching entries, and the summary count and date range must update.
+- Select a type with no completion records and confirm the filter buttons remain available.
 - Confirm every saved volume appears because completion dates default to today.
 - Confirm each novel timeline card visibly shows the work title and `第 N 卷`, using the novel’s normal series cover.
 - Create several events on the same and adjacent dates; confirm they use vertical lanes instead of overlapping at multiple zoom levels.

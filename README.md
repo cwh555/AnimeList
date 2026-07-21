@@ -8,6 +8,13 @@ The Markdown files remain the source of truth. Removing the plugin does not remo
 
 ![AnimeList completion timeline](docs/images/timeline.png)
 
+## 1.1.0 highlights — Unreleased
+
+- Manga and novels use explicit reading status without unreliable latest chapter or volume totals; score and completion date are required only after completion.
+- Novel history records whole, half, and `EX` volumes, sorts them by volume number, and defaults newly added volumes to completed today.
+- Novel volumes appear as separate timeline events with the series cover and a visible volume label.
+- The timeline separates nearby cards into vertical lanes and can filter completion records by **所有**, **動畫**, **漫畫**, or **小說**.
+
 ## Features
 
 - Native Obsidian custom view opened from the ribbon or command palette.
@@ -17,15 +24,11 @@ The Markdown files remain the source of truth. Removing the plugin does not remo
 - Card, list, and compact views.
 - Filter by media type, status, and normalized genre.
 - Sort by completion date, file modification time, score, start date, year, progress, or title.
-- A title is always required. Personal score and completion date are required only after a record is marked completed.
-- Separate reading and Japanese-publication status for manga and novels.
-- Manga progress records only the current chapter; completion is always chosen explicitly.
-- Novel progress in volumes, including integer, half-volume (`.5`), and `EX` labels.
-- Per-volume novel history with an optional start date and a completion date that defaults to today. Timeline cards reuse the series cover and show the volume number explicitly.
-- Anime completed-progress synchronization from its episode total; manga and novels never infer completion from counts.
+- Explicit status, progress, score, and completion-date rules for each media type.
+- Novel volume history with integer, half-volume (`.5`), and `EX` labels.
 - One-click favorite toggle from the library.
 - Built-in and user-defined Markdown templates.
-- A pannable completion timeline where zoom changes day spacing and collision-aware vertical lanes prevent nearby events from overlapping.
+- A pannable, zoomable, media-filtered completion timeline with collision-aware vertical lanes.
 - Desktop and mobile support.
 - No Dataview dependency and no private media database.
 

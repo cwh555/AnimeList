@@ -818,6 +818,11 @@ function assignTimelineLanes(positionedItems, minimumDistance) {
   });
 }
 
+function filterTimelineEntries(items, mediaType) {
+  if (mediaType !== "anime" && mediaType !== "manga" && mediaType !== "novel") return items;
+  return items.filter((item) => item.mediaType === mediaType);
+}
+
 export const TimelineUI = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const MIN_DAY_SPACING = 0.18;
@@ -854,11 +859,11 @@ export const TimelineUI = (() => {
 
   function render(container, inputItems, adapters = {}) {
     container.replaceChildren();
-    const items = expandTimelineEntries(inputItems)
+    const allItems = expandTimelineEntries(inputItems)
       .map((item) => ({ ...item, completedTime: dayStart(item.completedAt || item.completed_at) }))
       .filter((item) => item.completedTime)
       .sort((a, b) => a.completedTime - b.completedTime || String(a.title).localeCompare(String(b.title), "zh-Hant"));
-    if (!items.length) {
+    if (!allItems.length) {
       const empty = makeEl("div", "al-timeline-empty");
       setAnimeListIcon(empty, "timeline");
       empty.append(
@@ -869,6 +874,14 @@ export const TimelineUI = (() => {
       return { items: 0 };
     }
 
+    const selectedType = adapters.typeFilter === "anime"
+      || adapters.typeFilter === "manga"
+      || adapters.typeFilter === "novel"
+      ? adapters.typeFilter
+      : "all";
+    const items = filterTimelineEntries(allItems, selectedType);
+
+    const sidePadding = 170;
     const grouped = new Map();
     for (const item of items) {
       const key = item.completedTime;
@@ -876,17 +889,40 @@ export const TimelineUI = (() => {
       grouped.get(key).push(item);
     }
     const dates = [...grouped.keys()].sort((a, b) => a - b);
-    const minTime = dates[0];
-    const maxTime = dates[dates.length - 1];
+    const minTime = dates[0] || 0;
+    const maxTime = dates[dates.length - 1] || minTime;
     const rangeDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS));
-    const sidePadding = 170;
     const baseSpacing = initialDaySpacing(rangeDays);
     const state = { x: 0, y: 0, daySpacing: baseSpacing, sceneWidth: 0, sceneHeight: 0 };
 
     const root = makeEl("div", "al-timeline-root");
     const toolbar = makeEl("div", "al-timeline-toolbar");
     const copy = makeEl("div", "al-timeline-copy");
-    copy.append(makeEl("strong", "", uiText("timeline.title")), makeEl("span", "", uiText("timeline.summary", { count: items.length, start: formatDate(minTime), end: formatDate(maxTime) })));
+    copy.append(
+      makeEl("strong", "", uiText("timeline.title")),
+      makeEl("span", "", items.length
+        ? uiText("timeline.summary", { count: items.length, start: formatDate(minTime), end: formatDate(maxTime) })
+        : uiText("timeline.summaryEmpty")),
+    );
+    const typeFilters = makeEl("div", "al-timeline-type-filters");
+    typeFilters.setAttribute("role", "group");
+    typeFilters.setAttribute("aria-label", uiText("timeline.title"));
+    const typeOptions = [
+      ["all", uiText("timeline.filterAll")],
+      ["anime", uiText("media.type.anime")],
+      ["manga", uiText("media.type.manga")],
+      ["novel", uiText("media.type.novel")],
+    ];
+    for (const [type, label] of typeOptions) {
+      const button = makeEl("button", `al-timeline-type-filter${selectedType === type ? " is-active" : ""}`, label);
+      button.type = "button";
+      button.setAttribute("aria-pressed", selectedType === type ? "true" : "false");
+      button.addEventListener("click", () => {
+        if (selectedType === type) return;
+        render(container, inputItems, { ...adapters, typeFilter: type });
+      });
+      typeFilters.appendChild(button);
+    }
     const controls = makeEl("div", "al-timeline-controls");
     const zoomOut = makeEl("button", "", "");
     zoomOut.type = "button"; zoomOut.title = uiText("timeline.zoomOut"); setAnimeListIcon(zoomOut, "minus");
@@ -896,8 +932,21 @@ export const TimelineUI = (() => {
     const fit = makeEl("button", "", "");
     fit.type = "button"; fit.title = uiText("timeline.fit"); setAnimeListIcon(fit, "fit");
     controls.append(zoomOut, zoomLabel, zoomIn, fit);
-    toolbar.append(copy, controls);
+    controls.hidden = !items.length;
+    toolbar.append(copy, typeFilters, controls);
     root.appendChild(toolbar);
+
+    if (!items.length) {
+      const empty = makeEl("div", "al-timeline-empty");
+      setAnimeListIcon(empty, "timeline");
+      empty.append(
+        makeEl("strong", "", uiText("timeline.emptyTitle")),
+        makeEl("span", "", uiText("timeline.emptyDescription")),
+      );
+      root.appendChild(empty);
+      container.appendChild(root);
+      return { items: 0, totalItems: allItems.length, type: selectedType };
+    }
 
     const viewport = makeEl("div", "al-timeline-viewport");
     const scene = makeEl("div", "al-timeline-scene");
@@ -1066,6 +1115,8 @@ export const TimelineUI = (() => {
     window.setTimeout(fitScene, 0);
     return {
       items: items.length,
+      totalItems: allItems.length,
+      type: selectedType,
       fitScene,
       getDaySpacing: () => state.daySpacing,
       getSceneWidth: () => state.sceneWidth,
@@ -2090,7 +2141,7 @@ export class LegacyAnimeListPlugin extends Plugin {
 export const legacyTest = {
   normalizeBangumiSubject, normalizeAniListMedia, normalizeOpenLibraryBook, dedupeSearchResults,
   buildMediaMarkdown, sanitizePathPart, normalizeGenres, completedProgress, applyTemplateVariables, formatFileModifiedTime,
-  ensureDetailBlock, AnimeListUI, TimelineUI, assignTimelineLanes,
+  ensureDetailBlock, AnimeListUI, TimelineUI, assignTimelineLanes, filterTimelineEntries,
 };
 
 export default LegacyAnimeListPlugin;

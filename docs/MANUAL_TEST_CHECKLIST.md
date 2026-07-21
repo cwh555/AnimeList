@@ -74,6 +74,8 @@ Run this checklist before every public release and before the initial Community 
 
 - [ ] The timeline opens in a floating modal instead of replacing the library view.
 - [ ] The modal closes from the title-bar close button, the Escape key, and the backdrop.
+- [ ] The **所有**, **動畫**, **漫畫**, and **小說** buttons show only their matching completion records and update the summary count and date range.
+- [ ] A type with no matching records keeps the filter buttons visible so another type can be selected.
 - [ ] Completed anime/manga and legacy completed novels appear when they have a completion date.
 - [ ] Every saved novel-volume row appears on the timeline because missing completion dates default to today.
 - [ ] Every novel-volume card uses the series cover and visibly shows both the work title and `第 N 卷`.
