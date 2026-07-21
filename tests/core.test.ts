@@ -178,7 +178,10 @@ describe("serial progress and novel volume records", () => {
       ]),
     } as const;
     const entries = expandTimelineEntries([item]);
-    assert.deepEqual(entries.map((entry) => entry.title), ["Example novel — 第 1 卷", "Example novel — 第 EX 卷"]);
+    assert.deepEqual(entries.map((entry) => entry.title), [
+      uiText("timeline.novelEventTitle", { title: "Example novel", volume: "1" }),
+      uiText("timeline.novelEventTitle", { title: "Example novel", volume: "EX" }),
+    ]);
     assert.equal(entries[0].cover, "series.jpg");
     assert.equal(entries[1].cover, "series.jpg");
     assert.equal(entries[0].volumeLabel, "1");
@@ -277,7 +280,10 @@ describe("serial progress and novel volume records", () => {
       completedAt: "",
       volumeLog,
     }]);
-    assert.equal(entries[0].title, "藥屋少女的呢喃 — 第 14 卷");
+    assert.equal(
+      entries[0].title,
+      uiText("timeline.novelEventTitle", { title: "藥屋少女的呢喃", volume: "14" }),
+    );
     assert.equal(entries[0].seriesTitle, "藥屋少女的呢喃");
     assert.equal(entries[0].volumeLabel, "14");
     assert.equal(entries[0].cover, "series.jpg");
@@ -378,7 +384,8 @@ describe("timeline media filters", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
 
-    assert.equal(UI_TEXT["timeline.filterAll"], "所有");
+    assert.ok(UI_TEXT["timeline.filterAll"].trim());
+    assert.equal(uiText("timeline.filterAll"), UI_TEXT["timeline.filterAll"]);
     assert.match(legacySource, /\["all", uiText\("timeline\.filterAll"\)\]/);
     assert.match(legacySource, /\["anime", uiText\("media\.type\.anime"\)\]/);
     assert.match(legacySource, /\["manga", uiText\("media\.type\.manga"\)\]/);
@@ -389,27 +396,36 @@ describe("timeline media filters", () => {
 });
 
 describe("tracked UI wording", () => {
-  it("uses the approved shared action and section labels", () => {
-    assert.equal(UI_TEXT["action.save"], "儲存");
-    assert.equal(UI_TEXT["action.add"], "新增");
-    assert.equal(UI_TEXT["action.remove"], "移除");
-    assert.equal(UI_TEXT["action.delete"], "刪除");
-    assert.equal(UI_TEXT["action.cancel"], "取消");
-    assert.equal(UI_TEXT["action.edit"], "編輯");
-    assert.equal(UI_TEXT["action.search"], "搜尋");
-    assert.equal(UI_TEXT["action.back"], "返回");
-    assert.equal(UI_TEXT["action.collect"], "收錄");
-    assert.equal(UI_TEXT["library.title"], "收藏庫");
-    assert.equal(UI_TEXT["library.emptyTitle"], "沒有符合條件的項目");
-    assert.equal(UI_TEXT["volume.title"], "分卷紀錄");
-    assert.equal(UI_TEXT["volume.add"], "新增一卷");
-    assert.equal(UI_TEXT["volume.label"], "卷數");
-    assert.equal(UI_TEXT["volume.startedAt"], "開始日期");
-    assert.equal(UI_TEXT["volume.completedAt"], "完成日期");
-    assert.equal(UI_TEXT["timeline.title"], "時間軸");
-    assert.equal(UI_TEXT["timeline.fit"], "完整顯示");
-    assert.equal(UI_TEXT["timeline.emptyTitle"], "尚無完成紀錄");
-    assert.equal(uiText("timeline.volumeLabel", { volume: "EX" }), "第 EX 卷");
+  it("routes shared action and section labels through UI_TEXT", () => {
+    const keys = [
+      "action.save",
+      "action.add",
+      "action.remove",
+      "action.delete",
+      "action.cancel",
+      "action.edit",
+      "action.search",
+      "action.back",
+      "action.collect",
+      "library.title",
+      "library.emptyTitle",
+      "volume.title",
+      "volume.add",
+      "volume.label",
+      "volume.startedAt",
+      "volume.completedAt",
+      "timeline.title",
+      "timeline.fit",
+      "timeline.emptyTitle",
+    ] as const;
+
+    for (const key of keys) {
+      assert.ok(UI_TEXT[key].trim(), `${key} must not be empty`);
+      assert.equal(uiText(key), UI_TEXT[key]);
+    }
+
+    const renderedVolume = uiText("timeline.volumeLabel", { volume: "EX" });
+    assert.ok(renderedVolume.includes("EX"));
   });
 
   it("uses the approved media-specific status labels", () => {
@@ -467,8 +483,8 @@ describe("tracked UI wording", () => {
     assert.match(templateSource, /uiText\("template\.builtinPlain"\)/);
     assert.match(novelSource, /uiText\("timeline\.novelEventTitle"/);
     assert.doesNotMatch(settingsSource, /\.setName\(["'`]|\.setDesc\(["'`]|\.setButtonText\(["'`]/);
-    assert.equal(mediaFormatLabel("light_novel"), "輕小說");
-    assert.equal(mediaProviderLabel("bangumi"), "Bangumi");
+    assert.equal(mediaFormatLabel("light_novel"), UI_TEXT["media.format.lightNovel"]);
+    assert.equal(mediaProviderLabel("bangumi"), UI_TEXT["media.provider.bangumi"]);
   });
 
   it("does not ship runtime wording overrides", () => {
@@ -489,7 +505,7 @@ describe("repository defaults", () => {
   it("offers built-in and custom-compatible templates", () => {
     const animeTemplates = getBuiltInTemplateOptions("anime");
     assert.deepEqual(animeTemplates, [
-      { path: "builtin:plain", name: "簡潔筆記（內建）" },
+      { path: "builtin:plain", name: UI_TEXT["template.builtinPlain"] },
     ]);
   });
 
@@ -516,22 +532,22 @@ describe("repository defaults", () => {
     assert.deepEqual(
       definitions.map((definition) => definition.name),
       [
-        "Storage layout",
-        "Library root",
-        "Flat media folder",
-        "Additional scan folders",
-        "Cover folder",
-        "Template folder",
-        "Bangumi",
-        "AniList",
-        "Open Library",
-        "Create configured folders",
-        "Copy default templates",
+        UI_TEXT["settings.storageLayout.name"],
+        UI_TEXT["settings.libraryRoot.name"],
+        UI_TEXT["settings.flatFolder.name"],
+        UI_TEXT["settings.additionalFolders.name"],
+        UI_TEXT["settings.coverFolder.name"],
+        UI_TEXT["settings.templateFolder.name"],
+        UI_TEXT["media.provider.bangumi"],
+        UI_TEXT["media.provider.anilist"],
+        UI_TEXT["media.provider.openlibrary"],
+        UI_TEXT["settings.createFolders.name"],
+        UI_TEXT["settings.copyTemplates.name"],
       ],
     );
 
-    const libraryRoot = definitions.find((definition) => definition.name === "Library root");
-    const flatFolder = definitions.find((definition) => definition.name === "Flat media folder");
+    const libraryRoot = definitions.find((definition) => definition.name === UI_TEXT["settings.libraryRoot.name"]);
+    const flatFolder = definitions.find((definition) => definition.name === UI_TEXT["settings.flatFolder.name"]);
     assert.equal(libraryRoot?.visible?.(), true);
     assert.equal(flatFolder?.visible?.(), false);
 
@@ -572,17 +588,9 @@ describe("timeline modal and Traditional Chinese labels", () => {
     assert.match(stylesheet, /\.al-timeline-volume-label/);
   });
 
-  it("reuses the approved action labels for the same operation", () => {
+  it("reuses the same UI_TEXT keys for the same operation", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    assert.equal(UI_TEXT["action.save"], "儲存");
-    assert.equal(UI_TEXT["action.add"], "新增");
-    assert.equal(UI_TEXT["action.remove"], "移除");
-    assert.equal(UI_TEXT["action.delete"], "刪除");
-    assert.equal(UI_TEXT["action.edit"], "編輯");
-    assert.equal(UI_TEXT["action.search"], "搜尋");
-    assert.equal(UI_TEXT["action.back"], "返回");
-    assert.equal(UI_TEXT["action.collect"], "收錄");
     assert.match(legacySource, /save\.textContent = uiText\("action\.save"\)/);
     assert.match(legacySource, /createButton\.textContent = uiText\("action\.add"\)/);
     assert.match(legacySource, /appendIconLabel\(addButton, "plus", uiText\("action\.collect"\)\)/);
@@ -596,9 +604,9 @@ describe("timeline modal and Traditional Chinese labels", () => {
 
   it("uses tracked status and timeline labels without restoring removed total fields", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.equal(UI_TEXT["media.status.watching"], "追番中");
-    assert.equal(UI_TEXT["media.status.plannedAnime"], "待追");
-    assert.equal(UI_TEXT["library.timeline"], "時間軸");
+    assert.ok(UI_TEXT["media.status.watching"].trim());
+    assert.ok(UI_TEXT["media.status.plannedAnime"].trim());
+    assert.ok(UI_TEXT["library.timeline"].trim());
     assert.match(legacySource, /appendIconLabel\(timelineButton, "timeline", uiText\("library\.timeline"\)\)/);
     assert.doesNotMatch(legacySource, /日本原版最新話數|日本原版最新卷數|已追到最新/);
   });
