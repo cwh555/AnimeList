@@ -504,7 +504,6 @@ describe("repository hygiene", () => {
     const documentation = [
       "README.md",
       "CONTRIBUTING.md",
-      "docs/PREVIEW_1.1.0.md",
       "docs/MANUAL_TEST_CHECKLIST.md",
       "docs/VERSION_SESSIONS.md",
     ].map((file) => readFileSync(path.join(process.cwd(), file), "utf8")).join("\n");
@@ -580,16 +579,38 @@ describe("repository defaults", () => {
 
 
 describe("version documentation", () => {
-  it("records feature-level sessions for the public foundation and 1.1.0", () => {
+  it("keeps release notes current and the README focused", () => {
     const sessions = readFileSync(path.join(process.cwd(), "docs/VERSION_SESSIONS.md"), "utf8");
     const changelog = readFileSync(path.join(process.cwd(), "CHANGELOG.md"), "utf8");
     const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
 
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
-    assert.match(sessions, /normal series cover, and vertical collision lanes/);
-    assert.match(changelog, /## 1\.1\.0 - Unreleased/);
-    assert.match(readme, /docs\/VERSION_SESSIONS\.md/);
+    assert.match(changelog, /## 1\.1\.1 - Unreleased/);
+    assert.match(changelog, /## 1\.1\.0 - 2026-07-21/);
+    assert.match(readme, /> \[!NOTE\]/);
+    assert.match(readme, /> \*\*What's new in 1\.1\.0\*\*/);
+    assert.doesNotMatch(readme, /1\.1\.0 highlights — Unreleased/);
+  });
+
+  it("keeps every runtime and release version synchronized", () => {
+    const manifest = JSON.parse(readFileSync(path.join(process.cwd(), "manifest.json"), "utf8")) as { version: string };
+    const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
+    const packageLock = JSON.parse(readFileSync(path.join(process.cwd(), "package-lock.json"), "utf8")) as {
+      version: string;
+      packages: Record<string, { version?: string }>;
+    };
+    const versions = JSON.parse(readFileSync(path.join(process.cwd(), "versions.json"), "utf8")) as Record<string, string>;
+    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+
+    assert.equal(manifest.version, "1.1.1");
+    assert.equal(packageJson.version, manifest.version);
+    assert.equal(packageLock.version, manifest.version);
+    assert.equal(packageLock.packages[""]?.version, manifest.version);
+    assert.equal(versions[manifest.version], "1.5.0");
+    assert.match(mainSource, /const PLUGIN_VERSION = "1\.1\.1";/);
+    assert.match(legacySource, /const PLUGIN_VERSION = "1\.1\.1";/);
   });
 });
 

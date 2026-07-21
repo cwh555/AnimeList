@@ -24,7 +24,7 @@ import {
   serializeVolumeLog,
 } from "./novel-progress";
 
-const PLUGIN_VERSION = "1.1.0";
+const PLUGIN_VERSION = "1.1.1";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";

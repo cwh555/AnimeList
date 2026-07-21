@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.1.0 - Unreleased
+## 1.1.1 - Unreleased
+
+- Reorganizes the README around installation, everyday use, the Markdown data model, and concise development links.
+- Presents the released 1.1.0 feature summary in a GitHub callout instead of marking it unreleased.
+
+## 1.1.0 - 2026-07-21
 
 - Separates personal reading status from Japanese publication status for manga and novels without relying on unreliable latest chapter or volume totals.
 - Supports novel volume labels such as `7.5` and `EX`; newly added volumes default to completed today while the dates remain editable.

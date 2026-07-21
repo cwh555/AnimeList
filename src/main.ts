@@ -33,7 +33,7 @@ import {
 } from "./novel-progress";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.1.0";
+const PLUGIN_VERSION = "1.1.1";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 const DISPLAY_NAME = "AnimeList";
 
