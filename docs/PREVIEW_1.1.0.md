@@ -29,7 +29,7 @@ The release preflight is only a local consistency check. Do not create or push a
 
 ## Safe local installation
 
-1. Make a copy of the test vault or commit it to Git before testing.
+1. Use a disposable vault, or back up the vault before testing.
 2. Disable AnimeList.
 3. Copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/animelist/`.
 4. Reload Obsidian and enable AnimeList.

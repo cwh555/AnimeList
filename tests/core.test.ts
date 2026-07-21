@@ -495,6 +495,27 @@ describe("tracked UI wording", () => {
   });
 });
 
+describe("repository hygiene", () => {
+  it("keeps manual test vaults local and out of project documentation", () => {
+    const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const gitignore = readFileSync(path.join(process.cwd(), ".gitignore"), "utf8");
+    const documentation = [
+      "README.md",
+      "CONTRIBUTING.md",
+      "docs/PREVIEW_1.1.0.md",
+      "docs/MANUAL_TEST_CHECKLIST.md",
+      "docs/VERSION_SESSIONS.md",
+    ].map((file) => readFileSync(path.join(process.cwd(), file), "utf8")).join("\n");
+
+    assert.equal(PathExists(path.join(process.cwd(), "scripts/link-test-vault.mjs")), false);
+    assert.equal("test-vault:link" in (packageJson.scripts ?? {}), false);
+    assert.match(gitignore, /^\/test-vault\/$/m);
+    assert.doesNotMatch(documentation, /test[-_ ]vault/i);
+  });
+});
+
 describe("repository defaults", () => {
   it("uses a managed AnimeList folder by default", () => {
     assert.equal(DEFAULT_SETTINGS.storageMode, "managed");

@@ -32,8 +32,5 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Obsidian transient state
-test-vault/.obsidian/workspace.json
-test-vault/.obsidian/workspace-mobile.json
-test-vault/.obsidian/cache
-test-vault/.obsidian/plugins/animelist
+# Local manual-test vaults
+/test-vault/

@@ -4,9 +4,9 @@
 
 1. Install Node.js 18 or newer.
 2. Run `npm ci`.
-3. Run `npm run test-vault:link`.
-4. Run `npm run dev`.
-5. Open `test-vault` in Obsidian and enable AnimeList under Community plugins.
+3. Run `npm run check`.
+4. Run `npm run dev` while editing.
+5. For manual Obsidian testing, copy `main.js`, `manifest.json`, and `styles.css` into a vault you control. Do not commit that vault or its media records.
 
 Before opening a pull request, run:
 

@@ -64,7 +64,7 @@ After this repository is public and has a release, it can also be installed thro
 
 1. Enable AnimeList.
 2. Select the library icon in the left ribbon, or run **AnimeList: Open library** from the command palette.
-3. Select **收錄作品** to search for an anime, manga, or novel.
+3. Select **收錄** to search for an anime, manga, or novel.
 4. Choose a search result, set progress and status, select a template, and create the note. Score and completion date are required only for completed works.
 
 The interface uses Traditional Chinese. Text returned directly by metadata providers may remain in the provider's original language.
@@ -86,7 +86,6 @@ AnimeList/
 │   ├── anime/
 │   ├── manga/
 │   └── novel/
-│       └── volumes/
 └── Templates/
     ├── Anime/
     ├── Manga/
@@ -295,7 +294,7 @@ Personal scores, progress, dates, favorites, and note bodies are not uploaded by
 
 - Node.js 18 or newer.
 - npm.
-- Obsidian Desktop for the local test vault.
+- Obsidian Desktop for manual plugin testing.
 
 ### Install dependencies
 
@@ -331,38 +330,6 @@ Or run all checks:
 npm run check
 ```
 
-### Test in the included vault
-
-The repository includes `test-vault` with example anime, manga, and novel records plus local cover images. Normal plugin installation does not add these examples.
-
-Run:
-
-```bash
-npm run test-vault:link
-npm run dev
-```
-
-Then:
-
-1. Open `test-vault` as an Obsidian vault.
-2. Allow community plugins.
-3. Enable **AnimeList**.
-4. Select the library ribbon icon.
-5. Test card, list, and compact views; editing; favorites; filters; metadata search; storage settings; and the completion timeline.
-6. After source changes, reload Obsidian or disable and re-enable AnimeList.
-
-`npm run test-vault:link` creates this development link:
-
-```text
-test-vault/.obsidian/plugins/animelist -> repository root
-```
-
-Set `ANIMELIST_TEST_VAULT` to link a different local vault:
-
-```bash
-ANIMELIST_TEST_VAULT=/path/to/vault npm run test-vault:link
-```
-
 ### Test a production build manually
 
 ```bash
@@ -383,7 +350,7 @@ The plugin is not desktop-only. Before a community submission, test at least:
 - Timeline panning and toolbar controls.
 - Local cover loading.
 
-The desktop test vault can be used for initial responsive checks, but an actual iOS or Android vault should be tested before release.
+Test on an actual iOS or Android vault before release.
 
 ## Releasing on GitHub
 
@@ -454,10 +421,11 @@ AnimeList/
 │   ├── builtin-templates.ts
 │   ├── legacy.ts
 │   ├── main.ts
+│   ├── novel-progress.ts
 │   ├── settings.ts
-│   └── types.ts
+│   ├── types.ts
+│   └── ui-text.ts
 ├── tests/
-├── test-vault/
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE
