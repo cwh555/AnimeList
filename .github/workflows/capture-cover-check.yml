@@ -1,0 +1,62 @@
+name: Capture cover thumbnail check
+
+on:
+  pull_request:
+    branches: [preview]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/cover-thumbnails
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply the canonical integration script
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { spawnSync } from "node:child_process";
+          const workflow = readFileSync(".github/workflows/validate-cover-thumbnails.yml", "utf8");
+          const marker = "          node --input-type=module <<'NODE'\n";
+          const start = workflow.indexOf(marker);
+          const end = workflow.indexOf("\n          NODE", start + marker.length);
+          if (start < 0 || end < 0) throw new Error("Canonical integration script was not found");
+          const script = workflow.slice(start + marker.length, end)
+            .split("\n")
+            .map((line) => line.startsWith("          ") ? line.slice(10) : line)
+            .join("\n");
+          writeFileSync("/tmp/apply-cover-integration.mjs", script);
+          const result = spawnSync(process.execPath, ["/tmp/apply-cover-integration.mjs"], { stdio: "inherit" });
+          if (result.status !== 0) process.exit(result.status ?? 1);
+          NODE
+      - name: Capture complete check
+        shell: bash
+        run: |
+          set +e
+          npm run check > cover-check.log 2>&1
+          status=$?
+          cat cover-check.log
+          echo "$status" > cover-check.status
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cover-check-log
+          path: |
+            cover-check.log
+            cover-check.status
+            src/cover-cache.ts
+            src/main.ts
+            src/legacy.ts
+            src/types.ts
+            src/ui-text.ts
+            types/obsidian.d.ts
+            scripts/run-tests.mjs
+            styles.css
