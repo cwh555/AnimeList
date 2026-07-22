@@ -77,6 +77,21 @@ export function progressRatio(current: ProgressValue, total: ProgressValue, unit
   return currentLabel !== null && totalLabel !== null && currentLabel === totalLabel ? 1 : null;
 }
 
+export function libraryProgressRatio(
+  mediaType: string,
+  status: string,
+  current: ProgressValue,
+  total: ProgressValue,
+  unit: string,
+): number | null {
+  if (mediaType === "anime") return progressRatio(current, total, unit);
+  if (mediaType !== "manga" && mediaType !== "novel") return null;
+  if (status === "completed") return 1;
+  if (status === "reading" || status === "on_hold" || status === "dropped") return 0.5;
+  if (status === "planned") return 0;
+  return null;
+}
+
 function stringValue(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }

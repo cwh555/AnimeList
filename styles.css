@@ -103,7 +103,7 @@
 .al-grid.is-list .al-card-body { padding:15px 17px; }
 .al-shell .al-grid.is-list .al-card-title { min-height:0; font-size:1rem; }
 .al-grid.is-list .al-original-title { font-size:.68rem; }
-.al-grid.is-list .al-progress { max-width:420px; }
+.al-grid.is-list .al-progress { width:100%; max-width:none; }
 .al-grid.is-poster .al-card-body { position:absolute; z-index:3; inset:auto 0 0; padding:36px 10px 10px; color:#fff; background:linear-gradient(to top,rgba(7,8,12,.94),transparent); }
 .al-shell .al-grid.is-poster .al-card-title { min-height:0; color:#fff; font-size:.72rem; text-shadow:0 1px 3px #000; }
 .al-grid.is-poster .al-original-title, .al-grid.is-poster .al-facts, .al-grid.is-poster .al-tags, .al-grid.is-poster .al-progress, .al-grid.is-poster .al-card-footer, .al-grid.is-poster .al-cover-bottom { display:none; }
@@ -550,5 +550,31 @@
   .animelist-modal .al-volume-row-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+}
+
+
+/* Serial-reading editor and status-based progress presentation. */
+.animelist-modal .al-volume-editor {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.animelist-modal .al-volume-editor-header {
+  align-items: flex-end;
+}
+.animelist-modal .al-volume-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.animelist-modal .al-volume-row-fields {
+  grid-template-columns: minmax(96px, 120px) repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.animelist-modal .al-volume-row-fields > .al-form-field:first-child {
+  grid-column: auto;
+}
+@media (max-width: 700px) {
+  .animelist-modal .al-volume-row-fields {
+    grid-template-columns: 1fr;
   }
 }

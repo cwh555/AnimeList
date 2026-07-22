@@ -21,6 +21,7 @@ import {
   normalizeVolumeLog,
   progressDisplayValue,
   progressRatio,
+  libraryProgressRatio,
   serializeVolumeLog,
 } from "./novel-progress";
 
@@ -510,7 +511,7 @@ export const AnimeListUI = (() => {
     };
   };
 
-  const ratio = (item) => item.mediaType === "anime" ? progressRatio(item.progress, item.total, item.unit) : null;
+  const ratio = (item) => libraryProgressRatio(item.mediaType, item.status, item.progress, item.total, item.unit);
   const hasProgress = (value) => value !== "" && value != null && !(typeof value === "number" && value <= 0) && String(value) !== "0";
 
   const progressText = (item) => {
@@ -522,7 +523,7 @@ export const AnimeListUI = (() => {
       item.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress",
       { progress: current, unit },
     ).trim();
-    return uiText("library.notStarted");
+    return "";
   };
 
   const statusMatch = (item, filter) => {
@@ -753,7 +754,9 @@ export const AnimeListUI = (() => {
       const bottom = makeEl("div", "al-cover-bottom");
       const statusBadges = makeEl("span", "al-status-group");
       statusBadges.appendChild(makeEl("span", `al-status status-${item.status}`, itemStatusLabel(item)));
-      bottom.append(statusBadges, makeEl("span", "al-progress-on-cover", progressText(item)));
+      bottom.appendChild(statusBadges);
+      const coverProgressText = progressText(item);
+      if (coverProgressText) bottom.appendChild(makeEl("span", "al-progress-on-cover", coverProgressText));
       media.appendChild(bottom);
 
       const body = makeEl("div", "al-card-body");
@@ -784,9 +787,13 @@ export const AnimeListUI = (() => {
         progress.appendChild(bar);
       }
       const progressRow = makeEl("div", "al-progress-row");
-      progressRow.appendChild(makeEl("span", "", progressText(item)));
-      if (itemRatio !== null) progressRow.appendChild(makeEl("span", "", `${Math.round(itemRatio * 100)}%`));
-      else if (item.mediaType !== "anime") progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));
+      const itemProgressText = progressText(item);
+      if (itemProgressText) progressRow.appendChild(makeEl("span", "", itemProgressText));
+      if (item.mediaType === "anime" && itemRatio !== null) {
+        progressRow.appendChild(makeEl("span", "", `${Math.round(itemRatio * 100)}%`));
+      } else if (item.mediaType !== "anime") {
+        progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));
+      }
       progress.appendChild(progressRow);
       body.appendChild(progress);
       const footer = makeEl("div", "al-card-footer");
@@ -1408,11 +1415,13 @@ function createNovelVolumeEditor(parent, initialEntries = []) {
     makeEl("strong", "", uiText("volume.title")),
     makeEl("small", "", uiText("volume.description")),
   );
+  header.appendChild(copy);
+  const rows = makeEl("div", "al-volume-editor-rows");
+  const addActions = makeEl("div", "al-volume-editor-actions");
   const add = makeEl("button", "al-secondary-button", uiText("volume.add"));
   add.type = "button";
-  header.append(copy, add);
-  const rows = makeEl("div", "al-volume-editor-rows");
-  section.append(header, rows);
+  addActions.appendChild(add);
+  section.append(header, rows, addActions);
   parent.appendChild(section);
 
   const entries = normalizeVolumeLog(initialEntries).map((entry) => ({ ...entry }));

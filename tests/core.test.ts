@@ -14,6 +14,7 @@ import {
   normalizeVolumeLabel,
   normalizeVolumeLog,
   progressRatio,
+  libraryProgressRatio,
   serializeVolumeLog,
 } from "../src/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
@@ -978,5 +979,33 @@ describe("scoped vault access", () => {
       getScopedMarkdownFiles(app, [""]).map((file) => file.path),
       ["Root note.md"],
     );
+  });
+});
+
+
+describe("serial progress UI", () => {
+  it("keeps anime progress numeric while mapping serial reading statuses", () => {
+    assert.equal(libraryProgressRatio("anime", "watching", 3, 12, "episode"), 0.25);
+    assert.equal(libraryProgressRatio("manga", "completed", 0, 0, "chapter"), 1);
+    assert.equal(libraryProgressRatio("manga", "reading", 18, 0, "chapter"), 0.5);
+    assert.equal(libraryProgressRatio("novel", "on_hold", 4, 0, "volume"), 0.5);
+    assert.equal(libraryProgressRatio("novel", "dropped", 2, 0, "volume"), 0.5);
+    assert.equal(libraryProgressRatio("novel", "planned", 0, 0, "volume"), 0);
+    assert.equal(libraryProgressRatio("unknown", "planned", 0, 0, "volume"), null);
+  });
+
+  it("keeps repeated volume entry controls at the end and uses the modal width", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+    assert.match(legacySource, /section\.append\(header, rows, addActions\)/);
+    assert.doesNotMatch(legacySource, /header\.append\(copy, add\)/);
+    assert.match(stylesheet, /\.animelist-modal \.al-volume-editor \{[\s\S]*grid-column: 1 \/ -1/);
+    assert.match(stylesheet, /\.al-grid\.is-list \.al-progress \{ width:100%; max-width:none; \}/);
+  });
+
+  it("does not render not-started copy or fake serial percentages", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    assert.doesNotMatch(legacySource, /return uiText\("library\.notStarted"\)/);
+    assert.match(legacySource, /item\.mediaType === "anime" && itemRatio !== null/);
   });
 });
