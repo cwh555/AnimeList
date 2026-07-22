@@ -58,6 +58,10 @@ jobs:
             '  "notice.coverOptimizeProgress": "正在最佳化封面：已完成 {completed} 張，共 {total} 張",',
             "cover optimization progress wording",
           );
+          const duplicateNoticeBlock = '\n  "notice.coverOptimizeEmpty": "收藏庫中沒有可最佳化的本地封面。",\n  "notice.coverOptimizeProgress": "正在最佳化封面：{completed}，共 {total}",\n  "notice.coverOptimizeDone": "封面最佳化完成：成功 {optimized}，失敗 {failed}。",\n  "notice.coverCacheCleared": "已清除 {removed} 個封面縮圖快取檔案。"';
+          const duplicateMatches = text.split(duplicateNoticeBlock).length - 1;
+          if (duplicateMatches !== 1) throw new Error(`duplicate cover notices: expected one match, found ${duplicateMatches}`);
+          text = text.replace(duplicateNoticeBlock, "");
           writeFileSync(textPath, text);
 
           const testPath = "tests/core.test.ts";
