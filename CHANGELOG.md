@@ -5,6 +5,9 @@
 - Retries localized season and subtitle searches with broader series queries, then ranks explicit season matches from provider aliases.
 - Uses the outer Obsidian modal as the only vertical scroll container so wheel scrolling does not become trapped in search results.
 - Naturally orders same-day timeline entries by related title and volume number.
+- Separates timeline date-spacing controls from an independent visual-size scale.
+- Keeps compact rows at cover height, truncates overflowing text, and starts compact cover loading immediately.
+- Uses consistent year, month, and day date segments that advance after four, two, and two digits.
 
 ## 1.1.1 - 2026-07-21
 

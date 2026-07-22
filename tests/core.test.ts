@@ -28,6 +28,7 @@ const {
   compareTimelineEntries,
   dedupeSearchResults,
   filterTimelineEntries,
+  normalizeDateParts,
   normalizeGenres,
   sanitizePathPart,
 } = legacyTest;
@@ -167,6 +168,29 @@ describe("external search fallbacks", () => {
 
     const response = await plugin.searchExternal("anime", "輝夜姬想讓人告白 永不結束的初吻");
     assert.equal(response.results.some((result) => result.sourceId === "425211"), true);
+  });
+});
+
+describe("segmented date input", () => {
+  it("normalizes only complete real calendar dates", () => {
+    assert.equal(normalizeDateParts("2026", "07", "21"), "2026-07-21");
+    assert.equal(normalizeDateParts("2026", "02", "29"), "");
+    assert.equal(normalizeDateParts("2024", "02", "29"), "2024-02-29");
+    assert.equal(normalizeDateParts("2026", "7", "21"), "");
+  });
+
+  it("advances year, month, and day segments at consistent lengths", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+
+    assert.match(legacySource, /\[year, 4, "YYYY", uiText\("date\.year"\)\]/);
+    assert.match(legacySource, /\[month, 2, "MM", uiText\("date\.month"\)\]/);
+    assert.match(legacySource, /\[day, 2, "DD", uiText\("date\.day"\)\]/);
+    assert.match(legacySource, /bindSegment\(year, 4, month\)/);
+    assert.match(legacySource, /bindSegment\(month, 2, day\)/);
+    assert.match(legacySource, /bindSegment\(day, 2\)/);
+    assert.match(legacySource, /if \(type === "date"\) return createDateInput\(value\)/);
+    assert.match(stylesheet, /\.al-date-input \{/);
   });
 });
 
@@ -483,6 +507,20 @@ describe("modal scrolling", () => {
   });
 });
 
+describe("compact library rendering", () => {
+  it("keeps compact rows at cover height and starts their covers immediately", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+
+    assert.match(legacySource, /image\.loading = state\.view === "poster" \? "eager" : "lazy"/);
+    assert.match(legacySource, /image\.decoding = "async"/);
+    assert.match(stylesheet, /\.al-grid\.is-poster \.al-card \{[^}]*height: 138px[^}]*max-height: 138px/s);
+    assert.match(stylesheet, /\.al-grid\.is-poster \.al-card-body \{[^}]*max-height: 138px[^}]*overflow: hidden/s);
+    assert.match(stylesheet, /\.al-grid\.is-poster \.al-original-title \{[^}]*text-overflow:ellipsis/);
+    assert.match(stylesheet, /\.al-grid\.is-poster \.al-facts span,[\s\S]*text-overflow:ellipsis/);
+  });
+});
+
 describe("timeline connector geometry", () => {
   it("connects every card lane back to the main axis behind cards", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
@@ -526,6 +564,20 @@ describe("timeline media filters", () => {
     assert.match(legacySource, /\["novel", uiText\("media\.type\.novel"\)\]/);
     assert.match(legacySource, /render\(container, inputItems, \{ \.\.\.adapters, typeFilter: type \}\)/);
     assert.match(stylesheet, /\.al-timeline-type-filter\.is-active/);
+  });
+
+  it("keeps date spacing and overall scene scale independent", () => {
+    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+
+    assert.match(legacySource, /daySpacing: baseSpacing, viewScale: 1/);
+    assert.match(legacySource, /translate\(\$\{state\.x\}px, \$\{state\.y\}px\) scale\(\$\{state\.viewScale\}\)/);
+    assert.match(legacySource, /const setDaySpacingAt =/);
+    assert.match(legacySource, /const setViewScaleAt =/);
+    assert.match(legacySource, /getViewScale: \(\) => state\.viewScale/);
+    assert.match(legacySource, /uiText\("timeline\.scaleOut"\)/);
+    assert.match(legacySource, /uiText\("timeline\.scaleIn"\)/);
+    assert.match(stylesheet, /\.al-timeline-control-group/);
   });
 });
 

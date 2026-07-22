@@ -24,6 +24,8 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Card view renders correct 2:3 covers.
 - [ ] List view renders correct 2:3 covers without metadata wrapping over the poster.
 - [ ] Compact view shows the edit button, rating badge, and favorite button.
+- [ ] Compact rows never exceed the cover height; long titles and metadata end with an ellipsis instead of stretching the row.
+- [ ] Compact covers appear promptly while scrolling quickly through a large library.
 - [ ] The active view remains selected after editing or toggling a favorite.
 - [ ] Search, media type, status, and genre filters can be combined.
 - [ ] Default sorting is newest completion date first.
@@ -43,6 +45,7 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Switching status to completed immediately makes score and completion date required.
 - [ ] Completed status rejects an empty score, a score below 0 or above 10, and an empty completion date.
 - [ ] Changing a completed record back to active allows the score to be cleared and removes `score` from frontmatter.
+- [ ] Date fields advance from a four-digit year to month, from a two-digit month to day, and leave the date after a two-digit day; invalid dates are not saved.
 
 ### Progress rules
 
@@ -84,8 +87,9 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Records on the same or nearby dates move into alternating vertical lanes and do not overlap at fit, zoomed-in, or zoomed-out scales.
 - [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and novel volumes appear in `1`, `2`, `3` order.
 - [ ] Dragging pans the timeline.
-- [ ] Zoom changes day spacing, not poster dimensions.
-- [ ] Fit shows all completion dates.
+- [ ] Date-spacing controls change horizontal time distance without resizing cards.
+- [ ] Visual-size controls independently shrink and enlarge the complete timeline scene.
+- [ ] Fit shows all completion dates at the selected visual size.
 - [ ] Selecting a poster opens the media note.
 
 ## Mobile

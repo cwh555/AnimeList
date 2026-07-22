@@ -709,7 +709,8 @@ export const AnimeListUI = (() => {
         const image = makeEl("img", "al-cover");
         image.src = item.cover;
         image.alt = uiText("library.coverAlt", { title: item.title });
-        image.loading = "lazy";
+        image.loading = state.view === "poster" ? "eager" : "lazy";
+        image.decoding = "async";
         media.appendChild(image);
       } else {
         const missing = makeEl("div", "al-cover-missing");
@@ -862,6 +863,8 @@ export const TimelineUI = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const MIN_DAY_SPACING = 0.18;
   const MAX_DAY_SPACING = 96;
+  const MIN_VIEW_SCALE = 0.55;
+  const MAX_VIEW_SCALE = 1.6;
   const CARD_WIDTH = 120;
   const CARD_HEIGHT = 146;
   const CARD_GAP_X = 16;
@@ -928,7 +931,7 @@ export const TimelineUI = (() => {
     const maxTime = dates[dates.length - 1] || minTime;
     const rangeDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS));
     const baseSpacing = initialDaySpacing(rangeDays);
-    const state = { x: 0, y: 0, daySpacing: baseSpacing, sceneWidth: 0, sceneHeight: 0 };
+    const state = { x: 0, y: 0, daySpacing: baseSpacing, viewScale: 1, sceneWidth: 0, sceneHeight: 0 };
 
     const root = makeEl("div", "al-timeline-root");
     const toolbar = makeEl("div", "al-timeline-toolbar");
@@ -959,14 +962,29 @@ export const TimelineUI = (() => {
       typeFilters.appendChild(button);
     }
     const controls = makeEl("div", "al-timeline-controls");
+    const spacingControls = makeEl("div", "al-timeline-control-group");
+    spacingControls.setAttribute("role", "group");
+    spacingControls.setAttribute("aria-label", uiText("timeline.spacingControls"));
     const zoomOut = makeEl("button", "", "");
-    zoomOut.type = "button"; zoomOut.title = uiText("timeline.zoomOut"); setAnimeListIcon(zoomOut, "minus");
+    zoomOut.type = "button"; zoomOut.title = uiText("timeline.zoomOut"); zoomOut.setAttribute("aria-label", zoomOut.title); setAnimeListIcon(zoomOut, "minus");
     const zoomLabel = makeEl("span", "al-timeline-zoom", "100%");
     const zoomIn = makeEl("button", "", "");
-    zoomIn.type = "button"; zoomIn.title = uiText("timeline.zoomIn"); setAnimeListIcon(zoomIn, "plus");
+    zoomIn.type = "button"; zoomIn.title = uiText("timeline.zoomIn"); zoomIn.setAttribute("aria-label", zoomIn.title); setAnimeListIcon(zoomIn, "plus");
+    spacingControls.append(zoomOut, zoomLabel, zoomIn);
+
+    const scaleControls = makeEl("div", "al-timeline-control-group");
+    scaleControls.setAttribute("role", "group");
+    scaleControls.setAttribute("aria-label", uiText("timeline.scaleControls"));
+    const scaleOut = makeEl("button", "", "");
+    scaleOut.type = "button"; scaleOut.title = uiText("timeline.scaleOut"); scaleOut.setAttribute("aria-label", scaleOut.title); setAnimeListIcon(scaleOut, "minus");
+    const scaleLabel = makeEl("span", "al-timeline-scale", uiText("timeline.scaleLabel", { percent: 100 }));
+    const scaleIn = makeEl("button", "", "");
+    scaleIn.type = "button"; scaleIn.title = uiText("timeline.scaleIn"); scaleIn.setAttribute("aria-label", scaleIn.title); setAnimeListIcon(scaleIn, "plus");
+    scaleControls.append(scaleOut, scaleLabel, scaleIn);
+
     const fit = makeEl("button", "", "");
-    fit.type = "button"; fit.title = uiText("timeline.fit"); setAnimeListIcon(fit, "fit");
-    controls.append(zoomOut, zoomLabel, zoomIn, fit);
+    fit.type = "button"; fit.title = uiText("timeline.fit"); fit.setAttribute("aria-label", fit.title); setAnimeListIcon(fit, "fit");
+    controls.append(spacingControls, scaleControls, fit);
     controls.hidden = !items.length;
     toolbar.append(copy, typeFilters, controls);
     root.appendChild(toolbar);
@@ -991,14 +1009,15 @@ export const TimelineUI = (() => {
     const openFile = adapters.openFile || (() => {});
 
     const applyPan = () => {
-      scene.style.transform = `translate(${state.x}px, ${state.y}px)`;
+      scene.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.viewScale})`;
       zoomLabel.textContent = uiText("timeline.zoomLabel", { percent: Math.round((state.daySpacing / baseSpacing) * 100), spacing: state.daySpacing.toFixed(state.daySpacing < 10 ? 1 : 0) });
+      scaleLabel.textContent = uiText("timeline.scaleLabel", { percent: Math.round(state.viewScale * 100) });
     };
 
     const renderGeometry = () => {
       scene.replaceChildren();
       const viewportWidth = Math.max(720, viewport.clientWidth || 1200);
-      state.sceneWidth = Math.max(viewportWidth, sidePadding * 2 + rangeDays * state.daySpacing);
+      state.sceneWidth = Math.max(viewportWidth / state.viewScale, sidePadding * 2 + rangeDays * state.daySpacing);
 
       const positionedItems = items.map((item) => ({
         item,
@@ -1096,24 +1115,46 @@ export const TimelineUI = (() => {
       const previous = state.daySpacing;
       const next = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, nextSpacing));
       if (Math.abs(next - previous) < 1e-6) return;
-      const dayAtCursor = ((localX - state.x) - sidePadding) / previous;
+      const dayAtCursor = (((localX - state.x) / state.viewScale) - sidePadding) / previous;
       state.daySpacing = next;
       renderGeometry();
-      state.x = localX - (sidePadding + dayAtCursor * next);
+      state.x = localX - (sidePadding + dayAtCursor * next) * state.viewScale;
+      applyPan();
+    };
+
+    const setViewScaleAt = (nextScale, clientX, clientY) => {
+      const rect = viewport.getBoundingClientRect();
+      const localX = Number.isFinite(clientX) ? clientX - rect.left : viewport.clientWidth / 2;
+      const localY = Number.isFinite(clientY) ? clientY - rect.top : viewport.clientHeight / 2;
+      const previous = state.viewScale;
+      const next = Math.min(MAX_VIEW_SCALE, Math.max(MIN_VIEW_SCALE, nextScale));
+      if (Math.abs(next - previous) < 1e-6) return;
+      const sceneX = (localX - state.x) / previous;
+      const sceneY = (localY - state.y) / previous;
+      state.viewScale = next;
+      renderGeometry();
+      state.x = localX - sceneX * next;
+      state.y = localY - sceneY * next;
       applyPan();
     };
 
     const fitScene = () => {
-      const availableWidth = Math.max(260, viewport.clientWidth - sidePadding * 2);
+      const availableWidth = Math.max(260, viewport.clientWidth / state.viewScale - sidePadding * 2);
       state.daySpacing = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, availableWidth / rangeDays));
       renderGeometry();
-      state.x = (viewport.clientWidth - state.sceneWidth) / 2;
-      state.y = (viewport.clientHeight - state.sceneHeight) / 2;
+      state.x = (viewport.clientWidth - state.sceneWidth * state.viewScale) / 2;
+      state.y = (viewport.clientHeight - state.sceneHeight * state.viewScale) / 2;
       applyPan();
     };
 
-    zoomIn.addEventListener("click", () => setDaySpacingAt(state.daySpacing * 1.25, viewport.getBoundingClientRect().left + viewport.clientWidth / 2));
-    zoomOut.addEventListener("click", () => setDaySpacingAt(state.daySpacing / 1.25, viewport.getBoundingClientRect().left + viewport.clientWidth / 2));
+    const viewportCenter = () => {
+      const rect = viewport.getBoundingClientRect();
+      return { x: rect.left + viewport.clientWidth / 2, y: rect.top + viewport.clientHeight / 2 };
+    };
+    zoomIn.addEventListener("click", () => { const center = viewportCenter(); setDaySpacingAt(state.daySpacing * 1.25, center.x); });
+    zoomOut.addEventListener("click", () => { const center = viewportCenter(); setDaySpacingAt(state.daySpacing / 1.25, center.x); });
+    scaleIn.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale * 1.15, center.x, center.y); });
+    scaleOut.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale / 1.15, center.x, center.y); });
     fit.addEventListener("click", fitScene);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
@@ -1154,6 +1195,7 @@ export const TimelineUI = (() => {
       type: selectedType,
       fitScene,
       getDaySpacing: () => state.daySpacing,
+      getViewScale: () => state.viewScale,
       getSceneWidth: () => state.sceneWidth,
     };
   }
@@ -1173,7 +1215,104 @@ function createLabeledField(parent, labelText, input, hintText = "") {
   return input;
 }
 
+function normalizeDateParts(year, month, day) {
+  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || !/^\d{2}$/.test(day)) return "";
+  const yearNumber = Number(year);
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+  const date = new Date(yearNumber, monthNumber - 1, dayNumber);
+  if (date.getFullYear() !== yearNumber || date.getMonth() !== monthNumber - 1 || date.getDate() !== dayNumber) return "";
+  return `${year}-${month}-${day}`;
+}
+
+function focusNextFormControl(control) {
+  const scope = control.closest(".modal-content") || control.ownerDocument.body;
+  const controls = [...scope.querySelectorAll("input, select, textarea, button, [tabindex]")]
+    .filter((candidate) => !candidate.disabled && candidate.tabIndex >= 0 && candidate.offsetParent !== null);
+  const index = controls.indexOf(control);
+  controls[index + 1]?.focus();
+}
+
+function createDateInput(value = "") {
+  const root = createDiv();
+  root.className = "al-date-input";
+  root.setAttribute("role", "group");
+  const year = createEl("input");
+  const month = createEl("input");
+  const day = createEl("input");
+  const segments = [
+    [year, 4, "YYYY", uiText("date.year")],
+    [month, 2, "MM", uiText("date.month")],
+    [day, 2, "DD", uiText("date.day")],
+  ];
+  for (const [input, length, placeholder, label] of segments) {
+    input.type = "text";
+    input.inputMode = "numeric";
+    input.autocomplete = "off";
+    input.maxLength = length;
+    input.placeholder = placeholder;
+    input.setAttribute("aria-label", label);
+  }
+  year.className = "al-date-year";
+  month.className = "al-date-month";
+  day.className = "al-date-day";
+  root.append(year, makeEl("span", "al-date-separator", "-"), month, makeEl("span", "al-date-separator", "-"), day);
+
+  const emit = (name) => root.dispatchEvent(new Event(name, { bubbles: true }));
+  const setValue = (nextValue) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(nextValue || ""));
+    year.value = match?.[1] || "";
+    month.value = match?.[2] || "";
+    day.value = match?.[3] || "";
+  };
+  Object.defineProperty(root, "value", {
+    configurable: true,
+    get: () => normalizeDateParts(year.value, month.value, day.value),
+    set: setValue,
+  });
+  Object.defineProperty(root, "required", {
+    configurable: true,
+    get: () => year.required,
+    set: (required) => {
+      year.required = Boolean(required);
+      month.required = Boolean(required);
+      day.required = Boolean(required);
+      root.setAttribute("aria-required", required ? "true" : "false");
+    },
+  });
+
+  const bindSegment = (input, maxLength, nextInput = null) => {
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/\D/g, "").slice(0, maxLength);
+      if (input.value.length !== maxLength) return;
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+      } else focusNextFormControl(input);
+    });
+    input.addEventListener("change", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Backspace" || input.value) return;
+      const previous = input === day ? month : input === month ? year : null;
+      if (previous) {
+        event.preventDefault();
+        previous.focus();
+        previous.select();
+      }
+    });
+  };
+  bindSegment(year, 4, month);
+  bindSegment(month, 2, day);
+  bindSegment(day, 2);
+  root.addEventListener("focusout", (event) => {
+    if (!root.contains(event.relatedTarget)) emit("change");
+  });
+  setValue(value);
+  return root;
+}
+
 function createTextInput(type = "text", value = "") {
+  if (type === "date") return createDateInput(value);
   const input = createEl("input");
   input.type = type;
   input.value = value == null ? "" : String(value);
@@ -2177,7 +2316,7 @@ export const legacyTest = {
   normalizeBangumiSubject, normalizeAniListMedia, normalizeOpenLibraryBook, dedupeSearchResults,
   buildMediaMarkdown, sanitizePathPart, normalizeGenres, completedProgress, applyTemplateVariables, formatFileModifiedTime,
   ensureDetailBlock, AnimeListUI, TimelineUI, assignTimelineLanes, filterTimelineEntries,
-  compareTimelineEntries,
+  compareTimelineEntries, normalizeDateParts,
 };
 
 export default LegacyAnimeListPlugin;

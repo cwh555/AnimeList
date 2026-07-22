@@ -186,6 +186,10 @@
 .al-form-field { display:flex; min-width:0; flex-direction:column; gap:6px; }
 .al-form-label { color:var(--text-muted); font-size:.68rem; font-weight:650; }
 .al-form-field input,.al-form-field select { width:100%; min-height:38px; }
+.al-date-input { display:grid; grid-template-columns:minmax(4.6em,1fr) auto minmax(2.8em,.58fr) auto minmax(2.8em,.58fr); align-items:center; overflow:hidden; min-height:38px; border:1px solid var(--background-modifier-border); border-radius:var(--input-radius,5px); background:var(--background-modifier-form-field); box-shadow:var(--input-shadow); }
+.al-form-field .al-date-input input { width:100%; min-width:0; min-height:36px; padding:0 6px; border:0; border-radius:0; box-shadow:none; background:transparent; text-align:center; }
+.al-form-field .al-date-input input:focus { box-shadow:inset 0 -2px 0 var(--interactive-accent); }
+.al-date-separator { color:var(--text-faint); user-select:none; }
 .al-form-field:first-child { grid-column:1/-1; }
 .al-form-checkbox { grid-column:1/-1; color:var(--text-muted); font-size:.72rem; }
 .al-source-note { margin-top:13px; padding:9px 11px; border-radius:9px; color:var(--text-faint); background:var(--background-secondary); font-size:.65rem; line-height:1.5; }
@@ -260,10 +264,14 @@
 .al-timeline-type-filter { min-height:28px; padding:0 10px; border:0; border-radius:7px; color:var(--text-muted); background:transparent; cursor:pointer; font-size:.7rem; }
 .al-timeline-type-filter:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
 .al-timeline-type-filter.is-active { color:var(--text-on-accent); background:var(--interactive-accent); }
-.al-timeline-controls { display:flex; align-items:center; gap:4px; }
+.al-timeline-controls { display:flex; align-items:center; gap:7px; }
+.al-timeline-control-group { display:flex; align-items:center; gap:4px; padding:3px; border:1px solid var(--background-modifier-border); border-radius:10px; background:var(--background-primary); }
 .al-timeline-controls button { display:grid; place-items:center; width:34px; height:32px; padding:0; border:1px solid var(--background-modifier-border); border-radius:8px; background:var(--background-primary); cursor:pointer; }
+.al-timeline-control-group button { width:30px; height:28px; border:0; background:transparent; }
 .al-timeline-controls button:hover { background:var(--background-modifier-hover); }
-.al-timeline-zoom { min-width:54px; color:var(--text-muted); text-align:center; font-size:.7rem; }
+.al-timeline-zoom,.al-timeline-scale { color:var(--text-muted); text-align:center; font-size:.7rem; white-space:nowrap; }
+.al-timeline-zoom { min-width:112px; }
+.al-timeline-scale { min-width:72px; }
 .al-timeline-viewport { position:relative; flex:1; min-height:0; overflow:hidden; cursor:grab; background-color:var(--background-primary); background-image:radial-gradient(circle,color-mix(in srgb,var(--text-faint) 18%,transparent) 1px,transparent 1px); background-size:22px 22px; touch-action:none; }
 .al-timeline-viewport.is-dragging { cursor:grabbing; }
 .al-timeline-scene { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
@@ -309,6 +317,8 @@
   .al-timeline-copy { flex:1 1 100%; }
   .al-timeline-type-filters { flex:1 1 auto; overflow-x:auto; }
   .al-timeline-type-filter { flex:1 0 auto; }
+  .al-timeline-controls { width:100%; flex-wrap:wrap; }
+  .al-timeline-control-group { flex:1 1 auto; justify-content:center; }
 }
 .al-timeline-controls svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 
@@ -359,7 +369,9 @@
   gap: 11px;
 }
 .al-grid.is-poster .al-card {
+  height: 138px;
   min-height: 138px;
+  max-height: 138px;
 }
 .al-grid.is-poster .al-cover-wrap {
   width: 92px;
@@ -371,6 +383,9 @@
   position: static;
   inset: auto;
   min-width: 0;
+  height: 138px;
+  max-height: 138px;
+  overflow: hidden;
   padding: 10px 11px;
   color: var(--text-normal);
   background: none;
@@ -386,12 +401,14 @@
 .al-grid.is-poster .al-progress {
   display: flex;
 }
-.al-grid.is-poster .al-original-title { display:block; font-size:.59rem; }
-.al-grid.is-poster .al-facts { margin-top:6px; font-size:.58rem; }
+.al-grid.is-poster .al-original-title { display:block; overflow:hidden; font-size:.59rem; white-space:nowrap; text-overflow:ellipsis; }
+.al-grid.is-poster .al-facts { min-width:0; flex-wrap:nowrap; overflow:hidden; margin-top:6px; font-size:.58rem; }
+.al-grid.is-poster .al-facts span,
+.al-grid.is-poster .al-progress-row span { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .al-grid.is-poster .al-tags,
 .al-grid.is-poster .al-date-row,
 .al-grid.is-poster .al-card-footer { display:none; }
-.al-grid.is-poster .al-progress { margin-top:auto; padding-top:8px; }
+.al-grid.is-poster .al-progress { min-width:0; flex:0 0 auto; overflow:hidden; margin-top:auto; padding-top:8px; }
 .al-grid.is-poster .al-progress-row { font-size:.55rem; }
 .al-grid.is-poster .al-cover-shade { height:48%; }
 .al-grid.is-poster .al-cover-bottom { display:flex; right:5px; bottom:5px; left:5px; }
@@ -404,10 +421,8 @@
 .al-grid.is-poster .al-edit-button { width:25px; height:25px; }
 .al-grid.is-poster .al-edit-button { display:none; }
 
-/* Timeline cards remain the same size. Zoom only changes px/day and all x
-   coordinates; the scene itself is translated but never scaled. */
+/* Date spacing and visual scale are independent timeline controls. */
 .al-timeline-scene { transform-origin:0 0; }
-.al-timeline-zoom { min-width:112px; }
 
 @media (max-width: 780px) {
   .al-grid.is-list .al-cover-wrap { width:78px; min-width:78px; height:117px; }
@@ -415,8 +430,8 @@
   .al-grid.is-list .al-card-body { padding:9px 10px; }
   .al-grid.is-poster { grid-template-columns:1fr; }
   .al-grid.is-poster .al-cover-wrap { width:78px; min-width:78px; height:117px; }
-  .al-grid.is-poster .al-card { min-height:117px; }
-  .al-grid.is-poster .al-card-body { padding:9px 10px; }
+  .al-grid.is-poster .al-card { height:117px; min-height:117px; max-height:117px; }
+  .al-grid.is-poster .al-card-body { height:117px; max-height:117px; padding:9px 10px; }
 }
 
 
