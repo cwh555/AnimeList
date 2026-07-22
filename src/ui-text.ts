@@ -177,6 +177,8 @@ export const UI_TEXT = {
   "add.title": "收錄",
   "add.description": "選擇類型並搜尋作品。",
   "add.searching": "尋找中…",
+  "add.loadMore": "載入更多",
+  "add.loadingMore": "載入中…",
   "add.processing": "新增中…",
   "add.placeholderAnime": "例如：輝夜姬想讓人告白",
   "add.placeholderManga": "例如：葬送的芙莉蓮",
