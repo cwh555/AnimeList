@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-misused-promises, @typescript-eslint/unbound-method -- Runtime compatibility adapter for the legacy modal. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-return -- Runtime compatibility adapter for the legacy modal. */
 // @ts-nocheck
 import { requestUrl } from "obsidian";
 import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
@@ -282,3 +282,5 @@ if (prototype[PATCH_MARKER] !== true) {
   };
   Object.defineProperty(prototype, PATCH_MARKER, { value: true });
 }
+
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-return -- End runtime compatibility adapter lint scope. */
