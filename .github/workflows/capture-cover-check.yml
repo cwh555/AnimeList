@@ -5,7 +5,7 @@ on:
     branches: [preview]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
@@ -36,27 +36,26 @@ jobs:
           writeFileSync("/tmp/apply-cover-integration.mjs", script);
           const result = spawnSync(process.execPath, ["/tmp/apply-cover-integration.mjs"], { stdio: "inherit" });
           if (result.status !== 0) process.exit(result.status ?? 1);
+
+          const cachePath = "src/cover-cache.ts";
+          let cache = readFileSync(cachePath, "utf8");
+          const before = "    if (active) return active;";
+          const after = "    if (active !== undefined) return active;";
+          if (!cache.includes(after)) {
+            const matches = cache.split(before).length - 1;
+            if (matches !== 1) throw new Error(`active promise guard: expected one match, found ${matches}`);
+            cache = cache.replace(before, after);
+            writeFileSync(cachePath, cache);
+          }
           NODE
-      - name: Capture complete check
-        shell: bash
+      - run: npm run check
+      - name: Commit validated feature source
         run: |
-          set +e
-          npm run check > cover-check.log 2>&1
-          status=$?
-          cat cover-check.log
-          echo "$status" > cover-check.status
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cover-check-log
-          path: |
-            cover-check.log
-            cover-check.status
-            src/cover-cache.ts
-            src/main.ts
-            src/legacy.ts
-            src/types.ts
-            src/ui-text.ts
-            types/obsidian.d.ts
-            scripts/run-tests.mjs
-            styles.css
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/cover-cache.ts src/types.ts src/main.ts src/legacy.ts src/ui-text.ts types/obsidian.d.ts scripts/run-tests.mjs styles.css tests/cover-cache.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: optimize library cover loading"
+          git push origin HEAD:feature/cover-thumbnails
