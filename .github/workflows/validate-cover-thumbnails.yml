@@ -1,0 +1,204 @@
+name: Validate cover thumbnails
+
+on:
+  push:
+    branches: [feature/cover-thumbnails]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/cover-thumbnails
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply complete cover thumbnail integration
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          function update(path, transform) {
+            const before = readFileSync(path, "utf8");
+            const after = transform(before);
+            if (after !== before) writeFileSync(path, after);
+          }
+
+          function replaceOnce(source, before, after, label) {
+            if (source.includes(after)) return source;
+            const matches = source.split(before).length - 1;
+            if (matches !== 1) throw new Error(`${label}: expected one match, found ${matches}`);
+            return source.replace(before, after);
+          }
+
+          update("src/cover-cache.ts", (source) => replaceOnce(
+            source,
+            '  for (const group of groups.values()) {\n    if (group.newestMtime < staleBefore) {',
+            '  for (const group of groups.values()) {\n    const widths = new Set(group.files.map((file) => /-(24|320|640)\\.webp$/i.exec(file.path)?.[1] ?? ""));\n    const incomplete = widths.size !== 3 || !widths.has("24") || !widths.has("320") || !widths.has("640");\n    if (incomplete || group.newestMtime < staleBefore) {',
+            "incomplete cache cleanup",
+          ));
+
+          update("src/types.ts", (source) => {
+            source = replaceOnce(
+              source,
+              'export interface MediaItem {',
+              'export interface CoverSources {\n  src: string;\n  srcset: string;\n  placeholder: string;\n}\n\nexport interface MediaItem {',
+              "CoverSources interface",
+            );
+            return replaceOnce(
+              source,
+              '  cover: string;\n  filePath: string;',
+              '  cover: string;\n  coverSources?: CoverSources;\n  filePath: string;',
+              "MediaItem coverSources",
+            );
+          });
+
+          update("types/obsidian.d.ts", (source) => {
+            source = replaceOnce(
+              source,
+              '  export interface Vault {',
+              '  export interface DataAdapterStat {\n    type: "file" | "folder";\n    ctime: number;\n    mtime: number;\n    size: number;\n  }\n\n  export interface DataAdapter {\n    exists(path: string): Promise<boolean>;\n    mkdir(path: string): Promise<void>;\n    list(path: string): Promise<{ files: string[]; folders: string[] }>;\n    stat(path: string): Promise<DataAdapterStat | null>;\n    readBinary(path: string): Promise<ArrayBuffer>;\n    writeBinary(path: string, data: ArrayBuffer): Promise<void>;\n    remove(path: string): Promise<void>;\n    getResourcePath(path: string): string;\n  }\n\n  export interface Vault {',
+              "DataAdapter types",
+            );
+            return replaceOnce(
+              source,
+              '  export interface Vault {\n    getRoot(): TFolder;',
+              '  export interface Vault {\n    configDir: string;\n    adapter: DataAdapter;\n    getRoot(): TFolder;',
+              "Vault adapter fields",
+            );
+          });
+
+          update("src/main.ts", (source) => {
+            source = replaceOnce(
+              source,
+              'import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";',
+              'import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";\nimport { CoverThumbnailCache } from "./cover-cache";',
+              "cover cache import",
+            );
+            source = replaceOnce(
+              source,
+              'export class AnimeListPlugin extends LegacyAnimeListPlugin {\n  settings: AnimeListSettings = structuredClone(DEFAULT_SETTINGS);\n  private saveUiTimer: number | null = null;',
+              'export class AnimeListPlugin extends LegacyAnimeListPlugin {\n  settings: AnimeListSettings = structuredClone(DEFAULT_SETTINGS);\n  private saveUiTimer: number | null = null;\n  private coverCache!: CoverThumbnailCache;',
+              "cover cache field",
+            );
+            source = replaceOnce(
+              source,
+              '  async onload(): Promise<void> {\n    await this.loadSettings();\n\n    this.registerView',
+              '  async onload(): Promise<void> {\n    await this.loadSettings();\n    this.coverCache = new CoverThumbnailCache(this.app, this.manifest.id);\n    await this.coverCache.initialize();\n    this.coverCache.scheduleCleanup();\n    this.register(() => this.coverCache.dispose());\n\n    this.registerView',
+              "cover cache initialization",
+            );
+            source = replaceOnce(
+              source,
+              '    this.addCommand({ id: "initialize-library", name: uiText("app.initializeLibrary"), callback: () => void this.initializeLibrary(false) });\n    this.addSettingTab',
+              '    this.addCommand({ id: "initialize-library", name: uiText("app.initializeLibrary"), callback: () => void this.initializeLibrary(false) });\n    this.addCommand({ id: "optimize-cover-thumbnails", name: uiText("app.optimizeCovers"), callback: () => void this.optimizeExistingCovers() });\n    this.addCommand({ id: "clear-cover-thumbnail-cache", name: uiText("app.clearCoverCache"), callback: () => void this.clearCoverCache() });\n    this.addSettingTab',
+              "cover cache commands",
+            );
+            source = replaceOnce(
+              source,
+              '  resolveMediaCoverPath(value: unknown, sourcePath: string): string {\n    const coverPath = stringValue(value)\n      .replace(/^!\\[\\[/, "")\n      .replace(/^\\[\\[/, "")\n      .replace(/\\]\\]$/, "")\n      .split("|")[0];\n    if (/^https?:\\/\\//i.test(coverPath)) return coverPath;\n    if (!coverPath) return "";\n    const coverFile = this.app.metadataCache.getFirstLinkpathDest(coverPath, sourcePath)\n      ?? this.app.vault.getAbstractFileByPath(coverPath);\n    return coverFile instanceof TFile ? this.app.vault.getResourcePath(coverFile) : "";\n  }',
+              '  private normalizedCoverPath(value: unknown): string {\n    return stringValue(value)\n      .replace(/^!\\[\\[/, "")\n      .replace(/^\\[\\[/, "")\n      .replace(/\\]\\]$/, "")\n      .split("|")[0];\n  }\n\n  resolveMediaCoverFile(value: unknown, sourcePath: string): TFile | null {\n    const coverPath = this.normalizedCoverPath(value);\n    if (!coverPath || /^https?:\\/\\//i.test(coverPath)) return null;\n    const coverFile = this.app.metadataCache.getFirstLinkpathDest(coverPath, sourcePath)\n      ?? this.app.vault.getAbstractFileByPath(coverPath);\n    return coverFile instanceof TFile ? coverFile : null;\n  }\n\n  resolveMediaCoverPath(value: unknown, sourcePath: string): string {\n    const coverPath = this.normalizedCoverPath(value);\n    if (/^https?:\\/\\//i.test(coverPath)) return coverPath;\n    const coverFile = this.resolveMediaCoverFile(value, sourcePath);\n    return coverFile ? this.app.vault.getResourcePath(coverFile) : "";\n  }',
+              "cover resolution helpers",
+            );
+            source = replaceOnce(
+              source,
+              '        const cover = this.resolveMediaCoverPath(frontmatter.cover, file.path);\n\n        const studios',
+              '        const coverFile = this.resolveMediaCoverFile(frontmatter.cover, file.path);\n        const cover = this.resolveMediaCoverPath(frontmatter.cover, file.path);\n        const coverSources = coverFile ? this.coverCache.getSources(coverFile) : undefined;\n\n        const studios',
+              "collect cover sources",
+            );
+            source = replaceOnce(
+              source,
+              '          cover,\n          filePath: file.path,',
+              '          cover,\n          coverSources,\n          filePath: file.path,',
+              "MediaItem cover sources",
+            );
+            source = replaceOnce(
+              source,
+              '  async setFavorite(path: string, next: boolean): Promise<void> {',
+              '  private localCoverFiles(): TFile[] {\n    const unique = new Map<string, TFile>();\n    for (const note of getScopedMarkdownFiles(this.app, this.getScanFolders())) {\n      const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;\n      const cover = this.resolveMediaCoverFile(frontmatter?.cover, note.path);\n      if (cover) unique.set(cover.path, cover);\n    }\n    return Array.from(unique.values());\n  }\n\n  async optimizeExistingCovers(): Promise<void> {\n    const files = this.localCoverFiles();\n    if (!files.length) {\n      new Notice(uiText("notice.coverOptimizeEmpty"));\n      return;\n    }\n    const progress = new Notice(uiText("notice.coverOptimizeProgress", { completed: 0, total: files.length }), 0);\n    const result = await this.coverCache.optimizeFiles(files, (completed, total) => {\n      progress.setMessage(uiText("notice.coverOptimizeProgress", { completed, total }));\n    });\n    progress.setMessage(uiText("notice.coverOptimizeDone", result));\n    window.setTimeout(() => progress.hide(), 5000);\n    this.refreshViews();\n  }\n\n  async clearCoverCache(): Promise<void> {\n    const removed = await this.coverCache.clear();\n    new Notice(uiText("notice.coverCacheCleared", { removed }));\n    this.refreshViews();\n  }\n\n  async setFavorite(path: string, next: boolean): Promise<void> {',
+              "cover optimization methods",
+            );
+            source = replaceOnce(
+              source,
+              '    await this.app.vault.createBinary(path, response.arrayBuffer);\n    return path;',
+              '    const file = await this.app.vault.createBinary(path, response.arrayBuffer);\n    try {\n      await this.coverCache.optimizeFile(file);\n    } catch (error) {\n      console.warn("AnimeList cover thumbnail generation failed", error);\n    }\n    return path;',
+              "new cover optimization",
+            );
+            return source;
+          });
+
+          update("src/legacy.ts", (source) => {
+            source = replaceOnce(
+              source,
+              '    const grid = makeEl("div", "al-grid is-grid");\n    shell.appendChild(grid);\n\n    const makeCard = (item) => {',
+              '    const grid = makeEl("div", "al-grid is-grid");\n    shell.appendChild(grid);\n    const cardCache = new Map();\n    const coverSizes = (view) => view === "list"\n      ? "116px"\n      : view === "poster"\n        ? "(max-width: 440px) 50vw, 180px"\n        : "(max-width: 780px) 50vw, (min-width: 1500px) 20vw, 240px";\n    const eagerCoverCount = (view) => view === "poster" ? 10 : view === "list" ? 4 : 6;\n\n    const makeCard = (item) => {',
+              "card cache setup",
+            );
+            source = replaceOnce(
+              source,
+              '      if (item.cover) {\n        const image = makeEl("img", "al-cover");\n        image.src = item.cover;\n        image.alt = uiText("library.coverAlt", { title: item.title });\n        image.loading = state.view === "poster" ? "eager" : "lazy";\n        image.decoding = "async";\n        media.appendChild(image);\n      } else {',
+              '      if (item.cover) {\n        const image = makeEl("img", "al-cover");\n        const sources = item.coverSources;\n        image.alt = uiText("library.coverAlt", { title: item.title });\n        image.loading = "lazy";\n        image.decoding = "async";\n        image.fetchPriority = "auto";\n        if (sources?.placeholder) {\n          media.classList.add("has-cover-placeholder");\n          media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;\n        }\n        if (sources?.srcset) image.srcset = sources.srcset;\n        image.src = sources?.src || item.cover;\n        const reveal = () => image.classList.add("is-loaded");\n        image.addEventListener("load", reveal, { once: true });\n        image.addEventListener("error", () => {\n          image.remove();\n          media.classList.remove("has-cover-placeholder");\n          media.style.removeProperty("background-image");\n          const missing = makeEl("div", "al-cover-missing");\n          const icon = makeEl("span", "al-icon-large");\n          setAnimeListIcon(icon, "book");\n          missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));\n          media.prepend(missing);\n        }, { once: true });\n        if (image.complete && image.naturalWidth > 0) reveal();\n        media.appendChild(image);\n      } else {',
+              "responsive cover image",
+            );
+            source = replaceOnce(
+              source,
+              '      filtered.forEach((item) => grid.appendChild(makeCard(item)));',
+              '      const eagerCount = eagerCoverCount(state.view);\n      filtered.forEach((item, index) => {\n        let card = cardCache.get(item.filePath);\n        if (!card) {\n          card = makeCard(item);\n          cardCache.set(item.filePath, card);\n        }\n        const image = card.querySelector("img.al-cover");\n        if (image) {\n          image.loading = index < eagerCount ? "eager" : "lazy";\n          image.fetchPriority = index < 2 ? "high" : "auto";\n          image.sizes = coverSizes(state.view);\n        }\n        grid.appendChild(card);\n      });',
+              "card reuse update",
+            );
+            return source;
+          });
+
+          update("src/ui-text.ts", (source) => {
+            source = replaceOnce(
+              source,
+              '  "app.initializeLibrary": "建立收藏庫資料夾",',
+              '  "app.initializeLibrary": "建立收藏庫資料夾",\n  "app.optimizeCovers": "最佳化既有封面縮圖",\n  "app.clearCoverCache": "清除封面縮圖快取",',
+              "cover command labels",
+            );
+            return replaceOnce(
+              source,
+              '  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。"',
+              '  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。",\n  "notice.coverOptimizeEmpty": "收藏庫中沒有可最佳化的本地封面。",\n  "notice.coverOptimizeProgress": "正在最佳化封面：{completed} / {total}",\n  "notice.coverOptimizeDone": "封面最佳化完成：成功 {optimized}，失敗 {failed}。",\n  "notice.coverCacheCleared": "已清除 {removed} 個封面縮圖快取檔案。"',
+              "cover notices",
+            );
+          });
+
+          update("scripts/run-tests.mjs", (source) => replaceOnce(
+            source,
+            '  \'import "../../tests/search-pagination.test.ts";\',\n  "",',
+            '  \'import "../../tests/search-pagination.test.ts";\',\n  \'import "../../tests/cover-cache.test.ts";\',\n  "",',
+            "cover cache test entry",
+          ));
+
+          update("styles.css", (source) => {
+            source = replaceOnce(
+              source,
+              '.al-cover-wrap { position:relative; flex:0 0 auto; overflow:hidden; aspect-ratio:2/3; background:var(--background-secondary-alt,#292930); }',
+              '.al-cover-wrap { position:relative; flex:0 0 auto; overflow:hidden; isolation:isolate; aspect-ratio:2/3; background:var(--background-secondary-alt,#292930); }\n.al-cover-wrap.has-cover-placeholder { background-position:center; background-size:cover; }\n.al-cover-wrap.has-cover-placeholder::before { content:""; position:absolute; z-index:0; inset:-10px; background-image:inherit; background-position:center; background-size:cover; filter:blur(10px); transform:scale(1.08); }',
+              "cover placeholder CSS",
+            );
+            return replaceOnce(
+              source,
+              '.al-cover { display:block; width:100%; height:100%; object-fit:cover; transition:transform .2s ease,filter .2s ease; }',
+              '.al-cover { position:relative; z-index:1; display:block; width:100%; height:100%; opacity:0; object-fit:cover; transition:opacity .16s ease,transform .2s ease,filter .2s ease; }\n.al-cover.is-loaded { opacity:1; }',
+              "cover reveal CSS",
+            );
+          });
+          NODE
+      - run: npm run check
+      - name: Commit validated feature source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/cover-cache.ts src/types.ts src/main.ts src/legacy.ts src/ui-text.ts types/obsidian.d.ts scripts/run-tests.mjs styles.css tests/cover-cache.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: optimize library cover loading"
+          git push origin HEAD:feature/cover-thumbnails
