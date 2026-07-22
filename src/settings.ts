@@ -1,6 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
-import "./search-pagination";
 import type { AnimeListSettings, StorageMode } from "./types";
 import { uiText } from "./ui-text";
 
@@ -23,234 +22,207 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   },
   uiState: {
     section: "library",
-    type: "all",
+    view: "grid",
+    mediaType: "all",
     status: "all",
     genre: "all",
-    sort: "completed-desc",
-    view: "grid",
+    query: "",
+    sort: "updated_desc",
   },
 };
 
-export interface AnimeListSettingsHost {
+interface SettingsPlugin {
   app: App;
   settings: AnimeListSettings;
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
-  refreshViews(): void;
+  openLibrary(): Promise<void>;
 }
 
-function splitFolders(value: string): string[] {
-  return value
-    .split(/[\n,]/)
+function normalizeFolder(value: string, fallback: string): string {
+  return normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || fallback;
+}
+
+function parseAdditionalFolders(value: string): string[] {
+  return [...new Set(value
+    .split(/\r?\n/)
     .map((folder) => normalizePath(folder.trim()).replace(/^\/+|\/+$/g, ""))
-    .filter(Boolean);
+    .filter(Boolean))];
+}
+
+function additionalFolderText(folders: string[]): string {
+  return folders.join("\n");
+}
+
+function storageSettings(plugin: SettingsPlugin): SettingDefinition[] {
+  return [
+    {
+      name: uiText("settings.storageMode"),
+      description: uiText("settings.storageModeDescription"),
+      build(setting) {
+        setting.addDropdown((dropdown) => dropdown
+          .addOption("managed", uiText("settings.storageManaged"))
+          .addOption("flat", uiText("settings.storageFlat"))
+          .setValue(plugin.settings.storageMode)
+          .onChange(async (value) => {
+            plugin.settings.storageMode = value as StorageMode;
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: uiText("settings.libraryRoot"),
+      description: uiText("settings.libraryRootDescription"),
+      build(setting) {
+        setting.addText((text) => text
+          .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
+          .setValue(plugin.settings.libraryRoot)
+          .onChange(async (value) => {
+            plugin.settings.libraryRoot = normalizeFolder(value, DEFAULT_LIBRARY_FOLDER);
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: uiText("settings.flatMediaFolder"),
+      description: uiText("settings.flatMediaFolderDescription"),
+      build(setting) {
+        setting.addText((text) => text
+          .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
+          .setValue(plugin.settings.flatMediaFolder)
+          .onChange(async (value) => {
+            plugin.settings.flatMediaFolder = normalizeFolder(value, DEFAULT_LIBRARY_FOLDER);
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: uiText("settings.additionalFolders"),
+      description: uiText("settings.additionalFoldersDescription"),
+      build(setting) {
+        setting.addTextArea((text) => {
+          text
+            .setPlaceholder(ADDITIONAL_FOLDER_EXAMPLE)
+            .setValue(additionalFolderText(plugin.settings.additionalScanFolders))
+            .onChange(async (value) => {
+              plugin.settings.additionalScanFolders = parseAdditionalFolders(value);
+              await plugin.saveSettings();
+            });
+          text.inputEl.rows = 4;
+        });
+      },
+    },
+    {
+      name: uiText("settings.coverFolder"),
+      description: uiText("settings.coverFolderDescription"),
+      build(setting) {
+        setting.addText((text) => text
+          .setPlaceholder(DEFAULT_COVER_FOLDER)
+          .setValue(plugin.settings.coverFolder)
+          .onChange(async (value) => {
+            plugin.settings.coverFolder = normalizeFolder(value, DEFAULT_COVER_FOLDER);
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: uiText("settings.templateFolder"),
+      description: uiText("settings.templateFolderDescription"),
+      build(setting) {
+        setting.addText((text) => text
+          .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
+          .setValue(plugin.settings.templateFolder)
+          .onChange(async (value) => {
+            plugin.settings.templateFolder = normalizeFolder(value, DEFAULT_TEMPLATE_FOLDER);
+            await plugin.saveSettings();
+          }));
+      },
+    },
+  ];
+}
+
+function providerSettings(plugin: SettingsPlugin): SettingDefinition[] {
+  return [
+    {
+      name: "Bangumi",
+      description: uiText("settings.providerBangumi"),
+      build(setting) {
+        setting.addToggle((toggle) => toggle
+          .setValue(plugin.settings.providers.bangumi)
+          .onChange(async (value) => {
+            plugin.settings.providers.bangumi = value;
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: "AniList",
+      description: uiText("settings.providerAniList"),
+      build(setting) {
+        setting.addToggle((toggle) => toggle
+          .setValue(plugin.settings.providers.anilist)
+          .onChange(async (value) => {
+            plugin.settings.providers.anilist = value;
+            await plugin.saveSettings();
+          }));
+      },
+    },
+    {
+      name: "Open Library",
+      description: uiText("settings.providerOpenLibrary"),
+      build(setting) {
+        setting.addToggle((toggle) => toggle
+          .setValue(plugin.settings.providers.openlibrary)
+          .onChange(async (value) => {
+            plugin.settings.providers.openlibrary = value;
+            await plugin.saveSettings();
+          }));
+      },
+    },
+  ];
 }
 
 export class AnimeListSettingTab extends PluginSettingTab {
-  plugin: AnimeListSettingsHost;
+  private readonly plugin: SettingsPlugin;
 
-  constructor(app: App, plugin: AnimeListSettingsHost) {
+  constructor(app: App, plugin: SettingsPlugin) {
     super(app, plugin as never);
     this.plugin = plugin;
   }
 
-  getSettingDefinitions(): SettingDefinition[] {
-    const definitions: SettingDefinition[] = [
-      {
-        name: uiText("settings.storageLayout.name"),
-        desc: uiText("settings.storageLayout.desc"),
-        render: (setting) => this.renderStorageLayout(setting),
-      },
-      {
-        name: uiText("settings.libraryRoot.name"),
-        desc: uiText("settings.libraryRoot.desc"),
-        visible: () => this.plugin.settings.storageMode === "managed",
-        render: (setting) => this.renderLibraryRoot(setting),
-      },
-      {
-        name: uiText("settings.flatFolder.name"),
-        desc: uiText("settings.flatFolder.desc"),
-        visible: () => this.plugin.settings.storageMode === "flat",
-        render: (setting) => this.renderFlatMediaFolder(setting),
-      },
-      {
-        name: uiText("settings.additionalFolders.name"),
-        desc: uiText("settings.additionalFolders.desc"),
-        render: (setting) => this.renderAdditionalScanFolders(setting),
-      },
-      {
-        name: uiText("settings.coverFolder.name"),
-        desc: uiText("settings.coverFolder.desc"),
-        render: (setting) => this.renderCoverFolder(setting),
-      },
-      {
-        name: uiText("settings.templateFolder.name"),
-        desc: uiText("settings.templateFolder.desc"),
-        render: (setting) => this.renderTemplateFolder(setting),
-      },
-      {
-        name: uiText("media.provider.bangumi"),
-        desc: uiText("settings.provider.bangumi.desc"),
-        render: (setting) => this.renderProvider(setting, "bangumi"),
-      },
-      {
-        name: uiText("media.provider.anilist"),
-        desc: uiText("settings.provider.anilist.desc"),
-        render: (setting) => this.renderProvider(setting, "anilist"),
-      },
-      {
-        name: uiText("media.provider.openlibrary"),
-        desc: uiText("settings.provider.openlibrary.desc"),
-        render: (setting) => this.renderProvider(setting, "openlibrary"),
-      },
-      {
-        name: uiText("settings.createFolders.name"),
-        desc: uiText("settings.createFolders.desc"),
-        render: (setting) => this.renderCreateFolders(setting),
-      },
-      {
-        name: uiText("settings.copyTemplates.name"),
-        desc: uiText("settings.copyTemplates.desc"),
-        render: (setting) => this.renderCopyTemplates(setting),
-      },
-    ];
-    return definitions;
-  }
-
   display(): void {
-    this.renderImperativeSettings();
-  }
-
-  private renderImperativeSettings(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("p", {
-      text: uiText("settings.intro"),
-    });
+    containerEl.createEl("h2", { text: uiText("settings.title") });
 
-    const definitions = this.getSettingDefinitions();
-    definitions.forEach((definition) => {
-      if (definition.visible && !definition.visible()) return;
-      if (definition.name === uiText("media.provider.bangumi")) {
-        new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
-      }
-      if (definition.name === uiText("settings.createFolders.name")) {
-        new Setting(containerEl).setName(uiText("settings.setup.heading")).setHeading();
-      }
-      const setting = new Setting(containerEl).setName(definition.name);
-      if (definition.desc) setting.setDesc(definition.desc);
-      definition.render?.(setting);
-    });
-  }
-
-  private refreshSettingsTab(): void {
-    if (typeof this.update === "function") {
-      this.update();
-      return;
+    for (const definition of storageSettings(this.plugin)) {
+      definition.build(new Setting(containerEl)
+        .setName(definition.name)
+        .setDesc(definition.description));
     }
-    this.renderImperativeSettings();
-  }
 
-  private renderStorageLayout(setting: Setting): void {
-    setting.addDropdown((dropdown) => {
-      dropdown
-        .addOption("managed", uiText("settings.storageLayout.managed"))
-        .addOption("flat", uiText("settings.storageLayout.flat"))
-        .setValue(this.plugin.settings.storageMode)
-        .onChange(async (value) => {
-          this.plugin.settings.storageMode = value as StorageMode;
-          await this.plugin.saveSettings();
-          this.refreshSettingsTab();
-          this.plugin.refreshViews();
-        });
-    });
-  }
+    containerEl.createEl("h3", { text: uiText("settings.providers") });
+    for (const definition of providerSettings(this.plugin)) {
+      definition.build(new Setting(containerEl)
+        .setName(definition.name)
+        .setDesc(definition.description));
+    }
 
-  private renderLibraryRoot(setting: Setting): void {
-    setting.addText((text) => {
-      text
-        .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
-        .setValue(this.plugin.settings.libraryRoot)
-        .onChange(async (value) => {
-          this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
-          await this.plugin.saveSettings();
-        });
-    });
-  }
+    new Setting(containerEl)
+      .setName(uiText("settings.initialize"))
+      .setDesc(uiText("settings.initializeDescription"))
+      .addButton((button) => button
+        .setButtonText(uiText("settings.initializeButton"))
+        .onClick(async () => {
+          await this.plugin.initializeLibrary(true);
+          new Notice(uiText("settings.initializeDone"));
+        }));
 
-  private renderFlatMediaFolder(setting: Setting): void {
-    setting.addText((text) => {
-      text
-        .setPlaceholder("Media")
-        .setValue(this.plugin.settings.flatMediaFolder)
-        .onChange(async (value) => {
-          this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
-          await this.plugin.saveSettings();
-        });
-    });
-  }
-
-  private renderAdditionalScanFolders(setting: Setting): void {
-    setting.addTextArea((text) => {
-      text
-        .setPlaceholder(ADDITIONAL_FOLDER_EXAMPLE)
-        .setValue(this.plugin.settings.additionalScanFolders.join("\n"))
-        .onChange(async (value) => {
-          this.plugin.settings.additionalScanFolders = splitFolders(value);
-          await this.plugin.saveSettings();
-          this.plugin.refreshViews();
-        });
-    });
-  }
-
-  private renderCoverFolder(setting: Setting): void {
-    setting.addText((text) => {
-      text
-        .setPlaceholder(DEFAULT_COVER_FOLDER)
-        .setValue(this.plugin.settings.coverFolder)
-        .onChange(async (value) => {
-          this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
-          await this.plugin.saveSettings();
-        });
-    });
-  }
-
-  private renderTemplateFolder(setting: Setting): void {
-    setting.addText((text) => {
-      text
-        .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
-        .setValue(this.plugin.settings.templateFolder)
-        .onChange(async (value) => {
-          this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
-          await this.plugin.saveSettings();
-        });
-    });
-  }
-
-  private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
-    setting.addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
-        this.plugin.settings.providers[key] = value;
-        await this.plugin.saveSettings();
-      });
-    });
-  }
-
-  private renderCreateFolders(setting: Setting): void {
-    setting.addButton((button) => {
-      button.setButtonText(uiText("settings.createFolders.button")).onClick(async () => {
-        await this.plugin.initializeLibrary(false);
-        new Notice(uiText("settings.createFolders.notice"));
-      });
-    });
-  }
-
-  private renderCopyTemplates(setting: Setting): void {
-    setting.addButton((button) => {
-      button.setButtonText(uiText("settings.copyTemplates.button")).onClick(async () => {
-        await this.plugin.initializeLibrary(true);
-        new Notice(uiText("settings.copyTemplates.notice"));
-      });
-    });
+    new Setting(containerEl)
+      .setName(uiText("settings.openLibrary"))
+      .setDesc(uiText("settings.openLibraryDescription"))
+      .addButton((button) => button
+        .setButtonText(uiText("settings.openLibraryButton"))
+        .onClick(async () => this.plugin.openLibrary()));
   }
 }
