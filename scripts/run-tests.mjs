@@ -16,6 +16,7 @@ await mkdir(outputDir, { recursive: true });
 await writeFile(entryFile, [
   'import "../../tests/core.test.ts";',
   'import "../../tests/search-pagination.test.ts";',
+  'import "../../tests/cover-cache.test.ts";',
   "",
 ].join("\n"));
 

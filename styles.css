@@ -64,9 +64,12 @@
 .al-card { position:relative; display:flex; min-width:0; overflow:hidden; border:1px solid var(--al-border); border-radius:var(--al-radius); background:var(--al-panel); cursor:pointer; box-shadow:0 5px 17px rgba(0,0,0,.08); transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease; }
 .al-grid.is-grid .al-card, .al-grid.is-poster .al-card { flex-direction:column; }
 .al-card:hover, .al-card:focus-visible { transform:translateY(-3px); border-color:color-mix(in srgb,var(--al-accent) 52%,var(--al-border)); box-shadow:0 12px 30px rgba(0,0,0,.16); outline:none; }
-.al-cover-wrap { position:relative; flex:0 0 auto; overflow:hidden; aspect-ratio:2/3; background:var(--background-secondary-alt,#292930); }
+.al-cover-wrap { position:relative; flex:0 0 auto; overflow:hidden; isolation:isolate; aspect-ratio:2/3; background:var(--background-secondary-alt,#292930); }
+.al-cover-wrap.has-cover-placeholder { background-position:center; background-size:cover; }
+.al-cover-wrap.has-cover-placeholder::before { content:""; position:absolute; z-index:0; inset:-10px; background-image:inherit; background-position:center; background-size:cover; filter:blur(10px); transform:scale(1.08); }
 .al-grid.is-grid .al-cover-wrap, .al-grid.is-poster .al-cover-wrap { width:100%; }
-.al-cover { display:block; width:100%; height:100%; object-fit:cover; transition:transform .2s ease,filter .2s ease; }
+.al-cover { position:relative; z-index:1; display:block; width:100%; height:100%; opacity:0; object-fit:cover; transition:opacity .16s ease,transform .2s ease,filter .2s ease; }
+.al-cover.is-loaded { opacity:1; }
 .al-card:hover .al-cover { transform:scale(1.025); }
 .al-cover-missing { display:flex; height:100%; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--text-faint,#777); font-size:.7rem; }
 .al-icon-large svg { width:34px; height:34px; fill:none; stroke:currentColor; stroke-width:1.4; }
