@@ -81,7 +81,9 @@ export function planCoverCacheCleanup(
   const retained: Array<{ files: CoverCacheFileRecord[]; size: number; newestMtime: number }> = [];
   const staleBefore = now - policy.maxAgeMs;
   for (const group of groups.values()) {
-    if (group.newestMtime < staleBefore) {
+    const widths = new Set(group.files.map((file) => /-(24|320|640)\.webp$/i.exec(file.path)?.[1] ?? ""));
+    const incomplete = widths.size !== 3 || !widths.has("24") || !widths.has("320") || !widths.has("640");
+    if (incomplete || group.newestMtime < staleBefore) {
       group.files.forEach((file) => remove.add(file.path));
     } else {
       retained.push(group);
@@ -222,7 +224,7 @@ export class CoverThumbnailCache {
     if (existing) return existing;
     const key = coverCacheKey(file.path, file.stat.mtime);
     const active = this.pending.get(key);
-    if (active) return active;
+    if (active !== undefined) return active;
     const task = this.generate(file, idle).finally(() => this.pending.delete(key));
     this.pending.set(key, task);
     return task;

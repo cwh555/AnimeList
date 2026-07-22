@@ -694,6 +694,13 @@ export const AnimeListUI = (() => {
     shell.appendChild(resultHead);
     const grid = makeEl("div", "al-grid is-grid");
     shell.appendChild(grid);
+    const cardCache = new Map();
+    const coverSizes = (view) => view === "list"
+      ? "116px"
+      : view === "poster"
+        ? "(max-width: 440px) 50vw, 180px"
+        : "(max-width: 780px) 50vw, (min-width: 1500px) 20vw, 240px";
+    const eagerCoverCount = (view) => view === "poster" ? 10 : view === "list" ? 4 : 6;
 
     const makeCard = (item) => {
       const card = makeEl("article", `al-card status-${item.status}`);
@@ -707,10 +714,30 @@ export const AnimeListUI = (() => {
       const media = makeEl("div", "al-cover-wrap");
       if (item.cover) {
         const image = makeEl("img", "al-cover");
-        image.src = item.cover;
+        const sources = item.coverSources;
         image.alt = uiText("library.coverAlt", { title: item.title });
-        image.loading = state.view === "poster" ? "eager" : "lazy";
+        image.loading = "lazy";
         image.decoding = "async";
+        image.fetchPriority = "auto";
+        if (sources?.placeholder) {
+          media.classList.add("has-cover-placeholder");
+          media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;
+        }
+        if (sources?.srcset) image.srcset = sources.srcset;
+        image.src = sources?.src || item.cover;
+        const reveal = () => image.classList.add("is-loaded");
+        image.addEventListener("load", reveal, { once: true });
+        image.addEventListener("error", () => {
+          image.remove();
+          media.classList.remove("has-cover-placeholder");
+          media.style.removeProperty("background-image");
+          const missing = makeEl("div", "al-cover-missing");
+          const icon = makeEl("span", "al-icon-large");
+          setAnimeListIcon(icon, "book");
+          missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
+          media.prepend(missing);
+        }, { once: true });
+        if (image.complete && image.naturalWidth > 0) reveal();
         media.appendChild(image);
       } else {
         const missing = makeEl("div", "al-cover-missing");
@@ -834,7 +861,21 @@ export const AnimeListUI = (() => {
         grid.appendChild(empty);
         return;
       }
-      filtered.forEach((item) => grid.appendChild(makeCard(item)));
+      const eagerCount = eagerCoverCount(state.view);
+      filtered.forEach((item, index) => {
+        let card = cardCache.get(item.filePath);
+        if (!card) {
+          card = makeCard(item);
+          cardCache.set(item.filePath, card);
+        }
+        const image = card.querySelector("img.al-cover");
+        if (image) {
+          image.loading = index < eagerCount ? "eager" : "lazy";
+          image.fetchPriority = index < 2 ? "high" : "auto";
+          image.sizes = coverSizes(state.view);
+        }
+        grid.appendChild(card);
+      });
       if (adapters.onStateChange) adapters.onStateChange({ ...state });
     }
 

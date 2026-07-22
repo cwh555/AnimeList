@@ -86,7 +86,27 @@ declare module "obsidian" {
     frontmatter?: Record<string, unknown>;
   }
 
+  export interface DataAdapterStat {
+    type: "file" | "folder";
+    ctime: number;
+    mtime: number;
+    size: number;
+  }
+
+  export interface DataAdapter {
+    exists(path: string): Promise<boolean>;
+    mkdir(path: string): Promise<void>;
+    list(path: string): Promise<{ files: string[]; folders: string[] }>;
+    stat(path: string): Promise<DataAdapterStat | null>;
+    readBinary(path: string): Promise<ArrayBuffer>;
+    writeBinary(path: string, data: ArrayBuffer): Promise<void>;
+    remove(path: string): Promise<void>;
+    getResourcePath(path: string): string;
+  }
+
   export interface Vault {
+    configDir: string;
+    adapter: DataAdapter;
     getRoot(): TFolder;
     getAbstractFileByPath(path: string): TAbstractFile | null;
     create(path: string, data: string): Promise<TFile>;

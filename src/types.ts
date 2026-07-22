@@ -44,6 +44,12 @@ export interface NovelVolumeEntry {
 }
 
 
+export interface CoverSources {
+  src: string;
+  srcset: string;
+  placeholder: string;
+}
+
 export interface MediaItem {
   title: string;
   originalTitle: string;
@@ -62,6 +68,7 @@ export interface MediaItem {
   platforms: string[];
   sourceUrls: string[];
   cover: string;
+  coverSources?: CoverSources;
   filePath: string;
   updated: number;
   updatedLabel: string;

@@ -508,11 +508,15 @@ describe("modal scrolling", () => {
 });
 
 describe("compact library rendering", () => {
-  it("keeps compact rows at cover height and starts their covers immediately", () => {
+  it("keeps compact rows at cover height and bounds eager cover loading", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
 
-    assert.match(legacySource, /image\.loading = state\.view === "poster" \? "eager" : "lazy"/);
+    assert.match(legacySource, /image\.loading = "lazy"/);
+    assert.match(legacySource, /const eagerCoverCount = \(view\) => view === "poster" \? 10 : view === "list" \? 4 : 6/);
+    assert.match(legacySource, /image\.loading = index < eagerCount \? "eager" : "lazy"/);
+    assert.match(legacySource, /image\.fetchPriority = index < 2 \? "high" : "auto"/);
+    assert.match(legacySource, /image\.sizes = coverSizes\(state\.view\)/);
     assert.match(legacySource, /image\.decoding = "async"/);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card \{[^}]*height: 138px[^}]*max-height: 138px/s);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card-body \{[^}]*max-height: 138px[^}]*overflow: hidden/s);

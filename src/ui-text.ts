@@ -9,6 +9,8 @@ export const UI_TEXT = {
   "app.openLibrary": "開啟 AnimeList",
   "app.openTimeline": "開啟時間軸",
   "app.initializeLibrary": "建立收藏庫資料夾",
+  "app.optimizeCovers": "最佳化既有封面縮圖",
+  "app.clearCoverCache": "清除封面縮圖快取",
 
   "settings.intro": "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.",
   "settings.storageLayout.name": "Storage layout",
@@ -260,7 +262,11 @@ export const UI_TEXT = {
   "notice.favoriteRemoved": "已從最愛中移除。",
   "notice.existingSource": "這筆外部資料已經在收藏庫中，已開啟原筆記。",
   "notice.existingMedia": "作品已存在，已開啟原筆記。",
-  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。"
+  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。",
+  "notice.coverOptimizeEmpty": "收藏庫中沒有可最佳化的本地封面。",
+  "notice.coverOptimizeProgress": "正在最佳化封面：{completed}，共 {total}",
+  "notice.coverOptimizeDone": "封面最佳化完成：成功 {optimized}，失敗 {failed}。",
+  "notice.coverCacheCleared": "已清除 {removed} 個封面縮圖快取檔案。"
 } as const;
 
 export type UiMediaType = "all" | MediaType;
