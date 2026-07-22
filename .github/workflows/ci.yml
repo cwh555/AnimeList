@@ -18,5 +18,21 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run complete check
+        shell: bash
+        run: |
+          set +e
+          npm run check > full-check.log 2>&1
+          status=$?
+          cat full-check.log
+          echo "$status" > full-check.status
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-preview-check-log
+          path: |
+            full-check.log
+            full-check.status
+      - name: Verify complete check
+        run: test "$(cat full-check.status)" = "0"
       - run: npm run release:check
