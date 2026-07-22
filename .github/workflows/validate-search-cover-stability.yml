@@ -1,0 +1,596 @@
+name: Validate search and cover stability
+
+on:
+  pull_request:
+    branches: [preview]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/search-cover-stability
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply stability integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_one(path: str, before: str, after: str, label: str) -> None:
+              file = Path(path)
+              source = file.read_text()
+              if after in source:
+                  return
+              count = source.count(before)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              file.write_text(source.replace(before, after))
+
+          replace_one(
+              "src/legacy.ts",
+              'import { getScopedMarkdownFiles } from "./vault-scope";\n',
+              'import { getScopedMarkdownFiles } from "./vault-scope";\nimport { SEARCH_PAGINATION_LIMITS, mergeSearchPages } from "./search-pagination";\n',
+              "pagination helper import",
+          )
+          replace_one(
+              "src/legacy.ts",
+              '''    this.query = "";
+    this.results = [];
+    this.warnings = [];
+''',
+              '''    this.query = "";
+    this.results = [];
+    this.warnings = [];
+    this.pageLoads = 0;
+    this.hasMore = false;
+    this.loading = false;
+    this.searchGeneration = 0;
+    this.restoreScrollTop = null;
+''',
+              "modal pagination state",
+          )
+          replace_one(
+              "src/legacy.ts",
+              '''        this.mediaType = value;
+        this.results = [];
+        this.warnings = [];
+        this.renderSearch();
+''',
+              '''        this.mediaType = value;
+        this.results = [];
+        this.warnings = [];
+        this.pageLoads = 0;
+        this.hasMore = false;
+        this.searchGeneration += 1;
+        this.renderSearch();
+''',
+              "type reset pagination",
+          )
+          replace_one(
+              "src/legacy.ts",
+              '''    this.results.forEach((result) => resultsEl.appendChild(this.createResultRow(result)));
+    this.contentEl.appendChild(resultsEl);
+    window.setTimeout(() => input.focus(), 0);
+  }
+
+  async search(button) {
+    button.disabled = true;
+    button.textContent = uiText("add.searching");
+    try {
+      const response = await this.plugin.searchExternal(this.mediaType, this.query);
+      this.results = response.results;
+      this.warnings = response.warnings;
+      if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
+    } catch (error) {
+      console.error("AnimeList external search failed", error);
+      this.results = [];
+      this.warnings = [error?.message || String(error)];
+      new Notice(uiText("notice.searchUnavailable"));
+    }
+    this.renderSearch();
+  }
+
+  createResultRow(result) {
+''',
+              '''    this.results.forEach((result) => resultsEl.appendChild(this.createResultRow(result)));
+    this.contentEl.appendChild(resultsEl);
+
+    const canLoadMore = this.results.length > 0
+      && this.hasMore
+      && !this.loading
+      && this.pageLoads < SEARCH_PAGINATION_LIMITS.maxLoads
+      && this.results.length < SEARCH_PAGINATION_LIMITS.maxResults;
+    if (canLoadMore) {
+      const actions = createDiv();
+      actions.className = "al-modal-actions al-search-pagination";
+      const loadMore = createEl("button");
+      loadMore.type = "button";
+      loadMore.className = "al-secondary-button";
+      loadMore.textContent = uiText("add.loadMore");
+      loadMore.addEventListener("click", () => this.loadMore(loadMore));
+      actions.appendChild(loadMore);
+      this.contentEl.appendChild(actions);
+    }
+
+    if (this.restoreScrollTop !== null) {
+      const scrollTop = this.restoreScrollTop;
+      this.restoreScrollTop = null;
+      window.setTimeout(() => { this.modalEl.scrollTop = scrollTop; }, 0);
+    } else {
+      window.setTimeout(() => input.focus(), 0);
+    }
+  }
+
+  async search(button) {
+    const generation = ++this.searchGeneration;
+    this.pageLoads = 0;
+    this.hasMore = false;
+    this.loading = true;
+    button.disabled = true;
+    button.textContent = uiText("add.searching");
+    try {
+      const response = await this.plugin.searchExternal(this.mediaType, this.query);
+      if (generation !== this.searchGeneration) return;
+      this.results = response.results;
+      this.warnings = response.warnings;
+      this.hasMore = response.hasMore === true
+        && this.results.length < SEARCH_PAGINATION_LIMITS.maxResults;
+      if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
+    } catch (error) {
+      if (generation !== this.searchGeneration) return;
+      console.error("AnimeList external search failed", error);
+      this.results = [];
+      this.warnings = [error?.message || String(error)];
+      new Notice(uiText("notice.searchUnavailable"));
+    } finally {
+      if (generation === this.searchGeneration) {
+        this.loading = false;
+        this.renderSearch();
+      }
+    }
+  }
+
+  async loadMore(button) {
+    if (this.loading || !this.hasMore || this.pageLoads >= SEARCH_PAGINATION_LIMITS.maxLoads) return;
+    if (typeof this.plugin.searchExternalPage !== "function") {
+      this.hasMore = false;
+      this.renderSearch();
+      return;
+    }
+    const generation = this.searchGeneration;
+    const mediaType = this.mediaType;
+    const query = this.query;
+    const page = this.pageLoads + 2;
+    const previousLength = this.results.length;
+    this.loading = true;
+    this.restoreScrollTop = this.modalEl.scrollTop;
+    button.disabled = true;
+    button.textContent = uiText("add.loadingMore");
+    try {
+      const response = await this.plugin.searchExternalPage(mediaType, query, page);
+      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
+      this.results = mergeSearchPages(this.results, [response.results]);
+      this.warnings = [...new Set([...this.warnings, ...response.warnings])];
+      this.pageLoads += 1;
+      this.hasMore = response.hasMore === true
+        && this.pageLoads < SEARCH_PAGINATION_LIMITS.maxLoads
+        && this.results.length > previousLength
+        && this.results.length < SEARCH_PAGINATION_LIMITS.maxResults;
+    } catch (error) {
+      if (generation !== this.searchGeneration) return;
+      console.error("AnimeList external search page failed", error);
+      this.warnings = [...new Set([...this.warnings, error?.message || String(error)])];
+      this.hasMore = false;
+    } finally {
+      if (generation === this.searchGeneration) {
+        this.loading = false;
+        this.renderSearch();
+      }
+    }
+  }
+
+  createResultRow(result) {
+''',
+              "modal integrated pagination",
+          )
+
+          replace_one(
+              "src/main.ts",
+              '''  private saveUiTimer: number | null = null;
+  private coverCache!: CoverThumbnailCache;
+''',
+              '''  private saveUiTimer: number | null = null;
+  private coverBackfillTimer: number | null = null;
+  private coverCache!: CoverThumbnailCache;
+''',
+              "cover backfill timer field",
+          )
+          replace_one(
+              "src/main.ts",
+              '''    this.coverCache = new CoverThumbnailCache(this.app, this.manifest.id);
+    await this.coverCache.initialize();
+    this.coverCache.scheduleCleanup();
+    this.register(() => this.coverCache.dispose());
+''',
+              '''    this.coverCache = new CoverThumbnailCache(this.app, this.manifest.id, () => this.refreshViews());
+    await this.coverCache.initialize();
+    this.register(() => this.coverCache.dispose());
+''',
+              "cover cache initialization",
+          )
+          replace_one(
+              "src/main.ts",
+              '''    this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
+    this.registerEvent(this.app.vault.on("delete", () => this.refreshViews()));
+    this.registerEvent(this.app.vault.on("rename", () => this.refreshViews()));
+  }
+''',
+              '''    this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
+    this.registerEvent(this.app.vault.on("delete", () => this.refreshViews()));
+    this.registerEvent(this.app.vault.on("rename", () => this.refreshViews()));
+    this.coverBackfillTimer = window.setTimeout(() => {
+      this.coverBackfillTimer = null;
+      void this.startCoverBackfill();
+    }, 1500);
+    this.register(() => {
+      if (this.coverBackfillTimer !== null) window.clearTimeout(this.coverBackfillTimer);
+    });
+  }
+''',
+              "automatic cover backfill scheduling",
+          )
+          replace_one(
+              "src/main.ts",
+              '''        const coverFile = this.resolveMediaCoverFile(frontmatter.cover, file.path);
+        const cover = this.resolveMediaCoverPath(frontmatter.cover, file.path);
+        const coverSources = coverFile ? this.coverCache.getSources(coverFile) : undefined;
+''',
+              '''        const coverFile = this.resolveMediaCoverFile(frontmatter.cover, file.path);
+        const cover = this.resolveMediaCoverPath(frontmatter.cover, file.path);
+        const coverSources = coverFile ? this.coverCache.getSources(coverFile) : undefined;
+        if (coverFile && !coverSources) this.coverCache.enqueue(coverFile);
+''',
+              "enqueue cache misses",
+          )
+          replace_one(
+              "src/main.ts",
+              '''  async optimizeExistingCovers(): Promise<void> {
+''',
+              '''  private async startCoverBackfill(): Promise<void> {
+    const files = this.localCoverFiles();
+    if (!files.length) return;
+    try {
+      await this.coverCache.cleanupForFiles(files);
+      this.coverCache.enqueueFiles(files);
+    } catch (error) {
+      console.warn("AnimeList automatic cover backfill failed", error);
+    }
+  }
+
+  async optimizeExistingCovers(): Promise<void> {
+''',
+              "automatic backfill method",
+          )
+          replace_one(
+              "src/main.ts",
+              '''  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
+''',
+              '''  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> {
+''',
+              "initial search return type",
+          )
+          replace_one(
+              "src/main.ts",
+              '''    if (!tasks.length) return { results: [], warnings: ["No metadata provider is enabled."] };
+
+    const settled = await Promise.all(tasks);
+    const warnings = settled
+      .filter((entry) => entry.error)
+      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
+    const results = settled.flatMap((entry) => entry.items ?? []);
+    const deduped: ExternalMediaResult[] = dedupeSearchResults(results);
+    return { results: rankSearchResults(deduped, query).slice(0, 24), warnings };
+  }
+
+  async searchBangumi(mediaType: MediaType, query: string) {
+''',
+              '''    if (!tasks.length) return { results: [], warnings: ["No metadata provider is enabled."], hasMore: false };
+
+    const settled = await Promise.all(tasks);
+    const warnings = settled
+      .filter((entry) => entry.error)
+      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
+    const results = settled.flatMap((entry) => entry.items ?? []);
+    const deduped: ExternalMediaResult[] = dedupeSearchResults(results);
+    const ranked = rankSearchResults(deduped, query).slice(0, 24);
+    return { results: ranked, warnings, hasMore: ranked.length >= 24 };
+  }
+
+  async searchExternalPage(
+    mediaType: MediaType,
+    query: string,
+    page: number,
+  ): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> {
+    const tasks: Array<Promise<{ provider: string; page?: { items: ExternalMediaResult[]; hasMore: boolean }; error?: unknown }>> = [];
+    if (this.settings.providers.bangumi) {
+      tasks.push(this.searchBangumiPage(mediaType, query, page)
+        .then((result) => ({ provider: "Bangumi", page: result }))
+        .catch((error) => ({ provider: "Bangumi", error })));
+    }
+    if (this.settings.providers.anilist) {
+      tasks.push(this.searchAniListPage(mediaType, query, page)
+        .then((result) => ({ provider: "AniList", page: result }))
+        .catch((error) => ({ provider: "AniList", error })));
+    }
+    if (mediaType === "novel" && this.settings.providers.openlibrary) {
+      tasks.push(this.searchOpenLibraryPage(query, page)
+        .then((result) => ({ provider: "Open Library", page: result }))
+        .catch((error) => ({ provider: "Open Library", error })));
+    }
+    if (!tasks.length) return { results: [], warnings: ["No metadata provider is enabled."], hasMore: false };
+
+    const settled = await Promise.all(tasks);
+    const warnings = settled
+      .filter((entry) => entry.error !== undefined)
+      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
+    const merged = dedupeSearchResults(settled.flatMap((entry) => entry.page?.items ?? []));
+    return {
+      results: rankSearchResults(merged, query).slice(0, 24),
+      warnings,
+      hasMore: settled.some((entry) => entry.page?.hasMore === true),
+    };
+  }
+
+  private async searchBangumiPage(mediaType: MediaType, query: string, page: number) {
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const response = await requestUrl({
+      url: `https://api.bgm.tv/v0/search/subjects?limit=${limit}&offset=${offset}`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
+      body: JSON.stringify({
+        keyword: query,
+        sort: "match",
+        filter: { type: [mediaType === "anime" ? 2 : 1], nsfw: false },
+      }),
+    });
+    const payload = response.json ?? JSON.parse(response.text || "{}");
+    const items = asArray(payload.data).map((subject) => normalizeBangumiSubject(subject, mediaType));
+    const total = typeof payload.total === "number" ? payload.total : null;
+    return { items, hasMore: total === null ? items.length === limit : offset + items.length < total };
+  }
+
+  private async searchAniListPage(mediaType: MediaType, query: string, page: number) {
+    const graphQuery = `
+      query ($search: String, $type: MediaType, $format: MediaFormat, $page: Int) {
+        Page(page: $page, perPage: 20) {
+          pageInfo { hasNextPage }
+          media(search: $search, type: $type, format: $format, sort: SEARCH_MATCH) {
+            id siteUrl type format status episodes chapters volumes averageScore description(asHtml: false) genres synonyms
+            startDate { year month day }
+            title { romaji english native }
+            coverImage { extraLarge large medium }
+            studios(isMain: true) { nodes { name } }
+            staff(perPage: 10, sort: RELEVANCE) { edges { role node { name { full native } } } }
+          }
+        }
+      }`;
+    const response = await requestUrl({
+      url: "https://graphql.anilist.co",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
+      body: JSON.stringify({
+        query: graphQuery,
+        variables: {
+          search: query,
+          type: mediaType === "anime" ? "ANIME" : "MANGA",
+          format: mediaType === "novel" ? "NOVEL" : null,
+          page,
+        },
+      }),
+    });
+    const payload = response.json ?? JSON.parse(response.text || "{}");
+    let media = asArray(payload?.data?.Page?.media);
+    if (mediaType === "manga") {
+      media = media.filter((item: unknown) => !isRecord(item) || stringValue(item.format).toUpperCase() !== "NOVEL");
+    }
+    return {
+      items: media.map((item) => normalizeAniListMedia(item, mediaType)),
+      hasMore: payload?.data?.Page?.pageInfo?.hasNextPage === true,
+    };
+  }
+
+  private async searchOpenLibraryPage(query: string, page: number) {
+    const limit = 8;
+    const fields = "key,title,author_name,first_publish_year,cover_i,subject";
+    const response = await requestUrl({
+      url: `https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&limit=${limit}&page=${page}&lang=zh`,
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    });
+    const payload = response.json ?? JSON.parse(response.text || "{}");
+    const items = asArray(payload.docs).map(normalizeOpenLibraryBook);
+    const total = typeof payload.numFound === "number" ? payload.numFound : null;
+    const start = typeof payload.start === "number" ? payload.start : (page - 1) * limit;
+    return { items, hasMore: total === null ? items.length === limit : start + items.length < total };
+  }
+
+  async searchBangumi(mediaType: MediaType, query: string) {
+''',
+              "provider-native additional pages",
+          )
+          replace_one(
+              "src/main.ts",
+              '''    const file = await this.app.vault.createBinary(path, response.arrayBuffer);
+    try {
+      await this.coverCache.optimizeFile(file);
+    } catch (error) {
+      console.warn("AnimeList cover thumbnail generation failed", error);
+    }
+    return path;
+''',
+              '''    const file = await this.app.vault.createBinary(path, response.arrayBuffer);
+    this.coverCache.enqueue(file);
+    return path;
+''',
+              "nonblocking new cover optimization",
+          )
+
+          Path("tests/search-pagination.test.ts").write_text('''import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { SEARCH_PAGINATION_LIMITS, mergeSearchPages } from "../src/search-pagination";
+import type { ExternalMediaResult } from "../src/types";
+
+function result(id: number): ExternalMediaResult {
+  return {
+    provider: "anilist",
+    sourceId: String(id),
+    title: `Title ${id}`,
+    originalTitle: "",
+    romajiTitle: "",
+    mediaType: "anime",
+    format: "tv",
+    total: 12,
+    unit: "episode",
+    year: 2026,
+    genres: [],
+    rawGenres: [],
+    people: [],
+    platforms: [],
+    sourceUrl: "",
+    coverUrl: "",
+    summary: "",
+    externalScore: null,
+    releaseStatus: "finished",
+  };
+}
+
+describe("search pagination", () => {
+  it("keeps the bounded product limits", () => {
+    assert.deepEqual(SEARCH_PAGINATION_LIMITS, { pageSize: 24, maxLoads: 2, maxResults: 72 });
+  });
+
+  it("appends new pages without moving existing results", () => {
+    const merged = mergeSearchPages([result(1), result(2)], [[result(2), result(3)], [result(4)]]);
+    assert.deepEqual(merged.map((item) => item.sourceId), ["1", "2", "3", "4"]);
+  });
+
+  it("caps the merged result set at 72 unique entries", () => {
+    const initial = Array.from({ length: 24 }, (_, index) => result(index));
+    const pageTwo = Array.from({ length: 24 }, (_, index) => result(index + 24));
+    const pageThree = Array.from({ length: 40 }, (_, index) => result(index + 48));
+    const merged = mergeSearchPages(initial, [pageTwo, pageThree]);
+    assert.equal(merged.length, 72);
+    assert.equal(merged[0]?.sourceId, "0");
+    assert.equal(merged[71]?.sourceId, "71");
+  });
+
+  it("uses modal-owned state without mutation observers or prototype patches", () => {
+    const legacy = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+    assert.doesNotMatch(legacy, /MutationObserver/);
+    assert.doesNotMatch(legacy, /prototype\.openAddModal/);
+    assert.match(legacy, /async loadMore\(button\)/);
+  });
+
+  it("uses provider-native page cursors for additional requests", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+    assert.match(source, /offset = \(page - 1\) \* limit/);
+    assert.match(source, /Page\(page: \$page, perPage: 20\)/);
+    assert.match(source, /pageInfo \{ hasNextPage \}/);
+    assert.match(source, /limit=\$\{limit\}&page=\$\{page\}/);
+  });
+});
+''')
+
+          Path("tests/cover-cache.test.ts").write_text('''import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  coverCacheGroupKey,
+  coverCacheKey,
+  coverCachePaths,
+  planCoverCacheCleanup,
+} from "../src/cover-cache";
+
+function record(path: string, size: number, mtime: number) {
+  return { path, size, mtime };
+}
+
+describe("cover thumbnail cache", () => {
+  it("keys thumbnails by normalized source path and mtime", () => {
+    assert.equal(coverCacheKey("AnimeList\\\\Covers\\\\a.jpg", 1234), coverCacheKey("AnimeList/Covers/a.jpg", 1234));
+    assert.notEqual(coverCacheKey("AnimeList/Covers/a.jpg", 1234), coverCacheKey("AnimeList/Covers/a.jpg", 1235));
+  });
+
+  it("creates a complete immutable thumbnail group", () => {
+    const paths = coverCachePaths(".obsidian/plugins/animelist/cache/covers", "Covers/a.jpg", 42);
+    assert.match(paths.placeholder, /-24\\.webp$/);
+    assert.match(paths.small, /-320\\.webp$/);
+    assert.match(paths.large, /-640\\.webp$/);
+    assert.equal(new Set(Object.values(paths).map(coverCacheGroupKey)).size, 1);
+  });
+
+  it("removes orphan and incomplete groups while retaining valid complete groups", () => {
+    const removals = planCoverCacheCleanup([
+      record("cache/orphan-24.webp", 10, 1),
+      record("cache/orphan-320.webp", 20, 2),
+      record("cache/orphan-640.webp", 30, 3),
+      record("cache/incomplete-320.webp", 20, 4),
+      record("cache/valid-24.webp", 10, 5),
+      record("cache/valid-320.webp", 20, 5),
+      record("cache/valid-640.webp", 30, 5),
+    ], new Set(["cache/valid", "cache/incomplete"]));
+    assert.deepEqual(removals, [
+      "cache/incomplete-320.webp",
+      "cache/orphan-24.webp",
+      "cache/orphan-320.webp",
+      "cache/orphan-640.webp",
+    ]);
+  });
+
+  it("evicts oldest valid groups until the target size", () => {
+    const records = [
+      record("cache/a-24.webp", 20, 100), record("cache/a-320.webp", 20, 100), record("cache/a-640.webp", 20, 100),
+      record("cache/b-24.webp", 20, 200), record("cache/b-320.webp", 20, 200), record("cache/b-640.webp", 20, 200),
+      record("cache/c-24.webp", 20, 300), record("cache/c-320.webp", 20, 300), record("cache/c-640.webp", 20, 300),
+    ];
+    const removals = planCoverCacheCleanup(records, new Set(["cache/a", "cache/b", "cache/c"]), {
+      maxBytes: 150,
+      targetBytes: 100,
+    });
+    assert.deepEqual(removals, [
+      "cache/a-24.webp", "cache/a-320.webp", "cache/a-640.webp",
+      "cache/b-24.webp", "cache/b-320.webp", "cache/b-640.webp",
+    ]);
+  });
+});
+''')
+          PY
+      - run: npm run check
+      - name: Commit validated source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/legacy.ts src/main.ts tests/search-pagination.test.ts tests/cover-cache.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "fix: stabilize search and automate cover backfill"
+          git push origin HEAD:feature/search-cover-stability
