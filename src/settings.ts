@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
+import "./search-pagination";
 import type { AnimeListSettings, StorageMode } from "./types";
 import { uiText } from "./ui-text";
 
@@ -128,7 +129,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
 
     const definitions = this.getSettingDefinitions();
-    definitions.forEach((definition, index) => {
+    definitions.forEach((definition) => {
       if (definition.visible && !definition.visible()) return;
       if (definition.name === uiText("media.provider.bangumi")) {
         new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
@@ -225,8 +226,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
         });
     });
   }
-
-
 
   private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
     setting.addToggle((toggle) => {
