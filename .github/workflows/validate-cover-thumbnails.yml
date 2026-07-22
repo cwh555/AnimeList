@@ -1,8 +1,8 @@
 name: Validate cover thumbnails
 
 on:
-  push:
-    branches: [feature/cover-thumbnails]
+  pull_request:
+    branches: [preview]
 
 permissions:
   contents: write
