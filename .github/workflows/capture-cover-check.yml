@@ -60,7 +60,7 @@ jobs:
           text = replaceOne(
             text,
             '  "notice.coverOptimizeProgress": "正在最佳化封面：{completed} / {total}",',
-            '  "notice.coverOptimizeProgress": "正在最佳化封面：{completed}，共 {total}",',
+            '  "notice.coverOptimizeProgress": "正在最佳化封面：已完成 {completed} 張，共 {total} 張",',
             "cover optimization progress wording",
           );
           writeFileSync(textPath, text);
