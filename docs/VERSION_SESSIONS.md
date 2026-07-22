@@ -22,7 +22,7 @@ This document preserves the product-level decisions introduced by each major dev
 
 ## 1.1.0 — Serial reading and novel-volume timeline
 
-**Release state:** Preview; not tagged or published.
+**Release state:** Published through `1.1.2`.
 
 ### Main outcomes
 

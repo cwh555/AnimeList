@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.2 - Unreleased
+## 1.1.2 - 2026-07-22
 
 - Retries localized season and subtitle searches with broader series queries, then ranks explicit season matches from provider aliases.
 - Uses the outer Obsidian modal as the only vertical scroll container so wheel scrolling does not become trapped in search results.

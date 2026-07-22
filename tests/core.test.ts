@@ -803,7 +803,8 @@ describe("version documentation", () => {
 
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
-    assert.match(changelog, /## 1\.1\.2 - Unreleased/);
+    assert.match(sessions, /\*\*Release state:\*\* Published through `1\.1\.2`\./);
+    assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
     assert.match(changelog, /## 1\.1\.1 - 2026-07-21/);
     assert.match(changelog, /## 1\.1\.0 - 2026-07-21/);
     assert.match(readme, /> \[!NOTE\]/);
