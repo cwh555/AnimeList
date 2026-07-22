@@ -6,7 +6,7 @@ on:
       - validation/full-preview-check
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
@@ -18,21 +18,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Run complete check
-        shell: bash
-        run: |
-          set +e
-          npm run check > full-check.log 2>&1
-          status=$?
-          cat full-check.log
-          echo "$status" > full-check.status
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: full-preview-check-log
-          path: |
-            full-check.log
-            full-check.status
-      - name: Verify complete check
-        run: test "$(cat full-check.status)" = "0"
+      - run: npm run check
       - run: npm run release:check
+      - name: Delete temporary branches
+        if: success()
+        run: |
+          git push origin --delete feature/search-cover-stability || true
+          git push origin --delete validation/full-preview-run || true
+          git push origin --delete validation/stability-squash || true
