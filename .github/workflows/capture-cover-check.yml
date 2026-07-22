@@ -5,7 +5,7 @@ on:
     branches: [preview]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   capture:
@@ -48,14 +48,27 @@ jobs:
             writeFileSync(cachePath, cache);
           }
           NODE
-      - run: npm run check
-      - name: Commit validated feature source
+      - name: Capture complete check
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/cover-cache.ts src/types.ts src/main.ts src/legacy.ts src/ui-text.ts types/obsidian.d.ts scripts/run-tests.mjs styles.css tests/cover-cache.test.ts
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "feat: optimize library cover loading"
-          git push origin HEAD:feature/cover-thumbnails
+          set +e
+          npm run check > cover-check.log 2>&1
+          status=$?
+          cat cover-check.log
+          echo "$status" > cover-check.status
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cover-check-log
+          path: |
+            cover-check.log
+            cover-check.status
+            src/cover-cache.ts
+            src/main.ts
+            src/legacy.ts
+            src/types.ts
+            src/ui-text.ts
+            types/obsidian.d.ts
+            scripts/run-tests.mjs
+            styles.css
+            tests/cover-cache.test.ts
