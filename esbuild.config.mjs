@@ -13,11 +13,8 @@ async function buildStyles() {
     readFile("styles.css", "utf8"),
     readFile("styles.serial-reading.css", "utf8"),
   ]);
-  const generatedBlock = new RegExp(
-    `\\n?${SERIAL_STYLE_START.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}[\\s\\S]*?${SERIAL_STYLE_END.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\n?`,
-    "g",
-  );
-  const baseStyles = currentStyles.replace(generatedBlock, "").trimEnd();
+  const generatedStart = currentStyles.indexOf(SERIAL_STYLE_START);
+  const baseStyles = (generatedStart >= 0 ? currentStyles.slice(0, generatedStart) : currentStyles).trimEnd();
   const outputStyles = `${baseStyles}\n\n${SERIAL_STYLE_START}\n${serialStyles.trim()}\n${SERIAL_STYLE_END}\n`;
   await writeFile("styles.css", outputStyles, "utf8");
 }
