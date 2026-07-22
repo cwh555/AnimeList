@@ -5,7 +5,7 @@ on:
     branches: [preview]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
@@ -19,11 +19,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Apply the canonical integration script
+      - name: Apply final cover integration
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from "node:fs";
           import { spawnSync } from "node:child_process";
+
+          function replaceOne(source, before, after, label) {
+            if (source.includes(after)) return source;
+            const matches = source.split(before).length - 1;
+            if (matches !== 1) throw new Error(`${label}: expected one match, found ${matches}`);
+            return source.replace(before, after);
+          }
+
           const workflow = readFileSync(".github/workflows/validate-cover-thumbnails.yml", "utf8");
           const marker = "          node --input-type=module <<'NODE'\n";
           const start = workflow.indexOf(marker);
@@ -39,36 +47,42 @@ jobs:
 
           const cachePath = "src/cover-cache.ts";
           let cache = readFileSync(cachePath, "utf8");
-          const before = "    if (active) return active;";
-          const after = "    if (active !== undefined) return active;";
-          if (!cache.includes(after)) {
-            const matches = cache.split(before).length - 1;
-            if (matches !== 1) throw new Error(`active promise guard: expected one match, found ${matches}`);
-            cache = cache.replace(before, after);
-            writeFileSync(cachePath, cache);
-          }
+          cache = replaceOne(
+            cache,
+            "    if (active) return active;",
+            "    if (active !== undefined) return active;",
+            "active promise guard",
+          );
+          writeFileSync(cachePath, cache);
+
+          const textPath = "src/ui-text.ts";
+          let text = readFileSync(textPath, "utf8");
+          text = replaceOne(
+            text,
+            '  "notice.coverOptimizeProgress": "正在最佳化封面：{completed} / {total}",',
+            '  "notice.coverOptimizeProgress": "正在最佳化封面：{completed}，共 {total}",',
+            "cover optimization progress wording",
+          );
+          writeFileSync(textPath, text);
+
+          const testPath = "tests/core.test.ts";
+          let tests = readFileSync(testPath, "utf8");
+          tests = replaceOne(
+            tests,
+            '  it("keeps compact rows at cover height and starts their covers immediately", () => {\n    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");\n    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");\n\n    assert.match(legacySource, /image\\.loading = state\\.view === "poster" \\? "eager" : "lazy"/);\n    assert.match(legacySource, /image\\.decoding = "async"/);',
+            '  it("keeps compact rows at cover height and bounds eager cover loading", () => {\n    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");\n    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");\n\n    assert.match(legacySource, /image\\.loading = "lazy"/);\n    assert.match(legacySource, /const eagerCoverCount = \\(view\\) => view === "poster" \\? 10 : view === "list" \\? 4 : 6/);\n    assert.match(legacySource, /image\\.loading = index < eagerCount \\? "eager" : "lazy"/);\n    assert.match(legacySource, /image\\.fetchPriority = index < 2 \\? "high" : "auto"/);\n    assert.match(legacySource, /image\\.sizes = coverSizes\\(state\\.view\\)/);\n    assert.match(legacySource, /image\\.decoding = "async"/);',
+            "compact cover loading test",
+          );
+          writeFileSync(testPath, tests);
           NODE
-      - name: Capture complete check
-        shell: bash
+      - run: npm run check
+      - name: Commit validated feature source
         run: |
-          set +e
-          npm run check > cover-check.log 2>&1
-          status=$?
-          cat cover-check.log
-          echo "$status" > cover-check.status
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cover-check-log
-          path: |
-            cover-check.log
-            cover-check.status
-            src/cover-cache.ts
-            src/main.ts
-            src/legacy.ts
-            src/types.ts
-            src/ui-text.ts
-            types/obsidian.d.ts
-            scripts/run-tests.mjs
-            styles.css
-            tests/cover-cache.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/cover-cache.ts src/types.ts src/main.ts src/legacy.ts src/ui-text.ts types/obsidian.d.ts scripts/run-tests.mjs styles.css tests/cover-cache.test.ts tests/core.test.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: optimize library cover loading"
+          git push origin HEAD:feature/cover-thumbnails
