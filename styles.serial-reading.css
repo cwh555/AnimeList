@@ -1,0 +1,129 @@
+/* Serial-reading UI overrides.
+ * Kept separate from the established stylesheet so this feature branch remains
+ * isolated and the production build can append the rules idempotently.
+ */
+
+/* The novel volume editor belongs to the whole form, not one half of its grid. */
+.animelist-modal .al-volume-editor {
+  grid-column: 1 / -1;
+  grid-template-areas:
+    "copy"
+    "rows"
+    "add";
+}
+
+/* Keep the explanatory copy above the rows while moving Add another below them. */
+.animelist-modal .al-volume-editor-header {
+  display: contents;
+}
+
+.animelist-modal .al-volume-editor-header > div {
+  grid-area: copy;
+}
+
+.animelist-modal .al-volume-editor-header > .al-secondary-button {
+  grid-area: add;
+  justify-self: start;
+}
+
+.animelist-modal .al-volume-editor-rows {
+  grid-area: rows;
+}
+
+/* Use the full modal width: compact volume label, two comfortable date fields,
+ * and a content-sized remove action. */
+.animelist-modal .al-volume-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.animelist-modal .al-volume-row-fields {
+  grid-template-columns: minmax(96px, 0.42fr) repeat(2, minmax(190px, 1fr));
+  width: 100%;
+}
+
+/* List mode should consume every available horizontal pixel. */
+.al-grid.is-list .al-progress {
+  width: 100%;
+  max-width: none;
+}
+
+/* Manga and novel totals are frequently unknown. When no numeric track was
+ * rendered, show a state-based track instead: completed=full, active/paused/
+ * dropped=half, planned=empty. This deliberately avoids presenting a fake
+ * percentage value. */
+.al-progress:not(:has(.al-progress-track)) {
+  position: relative;
+  padding-top: 18px;
+}
+
+.al-progress:not(:has(.al-progress-track))::before,
+.al-progress:not(:has(.al-progress-track))::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 0;
+  height: 4px;
+  border-radius: 99px;
+}
+
+.al-progress:not(:has(.al-progress-track))::before {
+  width: 100%;
+  background: var(--background-modifier-border, #383840);
+}
+
+.al-progress:not(:has(.al-progress-track))::after {
+  width: 0;
+  background: var(--al-accent);
+}
+
+.al-card.status-completed .al-progress:not(:has(.al-progress-track))::after {
+  width: 100%;
+}
+
+.al-card.status-watching .al-progress:not(:has(.al-progress-track))::after,
+.al-card.status-reading .al-progress:not(:has(.al-progress-track))::after,
+.al-card.status-on_hold .al-progress:not(:has(.al-progress-track))::after,
+.al-card.status-dropped .al-progress:not(:has(.al-progress-track))::after {
+  width: 50%;
+}
+
+/* Planned/wishlist cards keep the empty track but do not repeat a
+ * "not started" sentence below it. */
+.al-card.status-planned .al-progress-row > span:first-child {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .animelist-modal .al-volume-row-fields {
+    grid-template-columns: minmax(90px, 0.55fr) minmax(0, 1fr);
+  }
+
+  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .animelist-modal .al-volume-row {
+    grid-template-columns: 1fr;
+  }
+
+  .animelist-modal .al-volume-row-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
+    grid-column: auto;
+  }
+
+  .animelist-modal .al-volume-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .animelist-modal .al-volume-editor-header > .al-secondary-button {
+    width: 100%;
+  }
+}
