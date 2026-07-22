@@ -682,22 +682,53 @@ describe("tracked UI wording", () => {
 });
 
 describe("repository hygiene", () => {
-  it("keeps manual test vaults local and out of project documentation", () => {
-    const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
+  it("keeps test vault data local while tracking reproducible tooling", () => {
+    const packageJson = JSON.parse(
+      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    ) as {
       scripts?: Record<string, string>;
     };
+    const scripts = packageJson.scripts ?? {};
     const gitignore = readFileSync(path.join(process.cwd(), ".gitignore"), "utf8");
-    const documentation = [
-      "README.md",
-      "CONTRIBUTING.md",
-      "docs/MANUAL_TEST_CHECKLIST.md",
-      "docs/VERSION_SESSIONS.md",
-    ].map((file) => readFileSync(path.join(process.cwd(), file), "utf8")).join("\n");
+    const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
+    const contributing = readFileSync(path.join(process.cwd(), "CONTRIBUTING.md"), "utf8");
+    const testVaultSource = readFileSync(
+      path.join(process.cwd(), "scripts/test-vault.mjs"),
+      "utf8",
+    );
 
-    assert.equal(PathExists(path.join(process.cwd(), "scripts/link-test-vault.mjs")), false);
-    assert.equal("test-vault:link" in (packageJson.scripts ?? {}), false);
+    // Generated vault contents and Obsidian state must remain local-only.
     assert.match(gitignore, /^\/test-vault\/$/m);
-    assert.doesNotMatch(documentation, /test[-_ ]vault/i);
+
+    // Reproducible tooling is tracked; the retired repository symlink helper
+    // and its package command must not return.
+    assert.equal(PathExists(path.join(process.cwd(), "scripts/test-vault.mjs")), true);
+    assert.equal(PathExists(path.join(process.cwd(), "scripts/link-test-vault.mjs")), false);
+    assert.equal("test-vault:link" in scripts, false);
+
+    // package.json exposes stable development and release-equivalent commands.
+    assert.equal(
+      scripts["test-vault"],
+      "npm run check && npm run release:check && node scripts/test-vault.mjs production",
+    );
+    assert.equal(
+      scripts["test-vault:dev"],
+      "node scripts/test-vault.mjs development",
+    );
+
+    // Production testing installs exactly the three public release artifacts.
+    assert.match(
+      testVaultSource,
+      /const RELEASE_FILES = \["main\.js", "manifest\.json", "styles\.css"\]/,
+    );
+    assert.match(testVaultSource, /ANIMELIST_TEST_VAULT/);
+    assert.doesNotMatch(testVaultSource, /symlinkSync\(repoRoot/);
+
+    // Contributor documentation explains the local workflow while the public
+    // README remains focused on installation and use.
+    assert.doesNotMatch(readme, /test[-_ ]vault/i);
+    assert.match(contributing, /npm run test-vault\b/);
+    assert.match(contributing, /npm run test-vault:dev\b/);
   });
 });
 

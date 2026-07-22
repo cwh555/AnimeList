@@ -4,15 +4,39 @@
 
 1. Install Node.js 18 or newer.
 2. Run `npm ci`.
-3. Run `npm run check`.
-4. Run `npm run dev` while editing.
-5. For manual Obsidian testing, copy `main.js`, `manifest.json`, and `styles.css` into a vault you control. Do not commit that vault or its media records.
+3. Run `npm run check` before committing.
+
+For development with an Obsidian test vault:
+
+```bash
+npm run test-vault:dev
+```
+
+This creates the ignored local `test-vault`, writes the development bundle directly into its plugin directory, opens the vault, and watches source files. Reload AnimeList in Obsidian after a rebuild.
+
+Before a release, run the production-equivalent manual test setup:
+
+```bash
+npm run test-vault
+```
+
+This runs the complete repository checks, verifies release consistency, and installs only `main.js`, `manifest.json`, and `styles.css` into the ignored test vault. This mode deliberately avoids repository-directory symlinks so it matches a manual GitHub Release installation.
+
+To use another disposable vault:
+
+```bash
+ANIMELIST_TEST_VAULT=/absolute/path/to/vault npm run test-vault
+```
+
+Use `-- --no-open` when the vault should be prepared without launching Obsidian.
 
 Before opening a pull request, run:
 
 ```bash
 npm run check
 ```
+
+Do not commit the test vault, its media data, or Obsidian workspace state.
 
 ## Code and UI language
 
