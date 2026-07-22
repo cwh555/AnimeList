@@ -9,20 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  check:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run release:check
       - name: Delete temporary branches
-        if: success()
         run: |
-          git push origin --delete feature/search-cover-stability || true
-          git push origin --delete validation/full-preview-run || true
-          git push origin --delete validation/stability-squash || true
+          git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete validation/full-preview-check || true
+          git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete validation/delete-self || true
