@@ -1,0 +1,286 @@
+diff --git a/src/legacy.ts b/src/legacy.ts
+index 901e2cc..be966b8 100644
+--- a/src/legacy.ts
++++ b/src/legacy.ts
+@@ -6,2 +6,3 @@ import {
+   mediaStatusLabel,
++  mediaStatusOptions,
+   statusFilterOptions,
+@@ -9,2 +10,3 @@ import {
+ } from "./ui-text";
++import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+ 
+@@ -18,4 +20,5 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+   const completedAt = String(form.completedAt || "").trim();
++  const status = normalizeMediaStatus(form.status);
+   if (!title) throw new Error(uiText("validation.titleRequired"));
+-  if (form.status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
++  if (status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+   if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
+@@ -23,3 +26,3 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+   }
+-  if (form.status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
++  if (status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
+   const total = result.mediaType === "anime"
+@@ -27,3 +30,3 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+     : 0;
+-  const progress = completedProgress(form.status, total, form.progress, result.mediaType);
++  const progress = completedProgress(status, total, form.progress, result.mediaType);
+   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
+@@ -39,3 +42,3 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+   lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
+-  lines.push(`status: ${yamlScalar(form.status || "planned")}`);
++  lines.push(`status: ${yamlScalar(status)}`);
+ }
+@@ -51,3 +54,3 @@ export const AnimeListUI = (() => {
+     mediaType,
+-    status: String(item.status || "planned").toLowerCase(),
++    status: normalizeMediaStatus(item.status),
+     format: String(item.format || item.mediaType || item.media_type || "").toLowerCase(),
+@@ -57,5 +60,3 @@ export const AnimeListUI = (() => {
+   const statusMatch = (item, filter) => {
+-    if (filter === "all") return true;
+-    if (filter === "active") return ["watching", "reading"].includes(item.status);
+-    return item.status === filter;
++    return mediaStatusMatches(item.status, filter);
+   };
+@@ -66,3 +67,3 @@ export const AnimeListUI = (() => {
+       type: ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all",
+-      status: initialState.status || "all",
++      status: normalizeStatusFilter(initialState.status),
+       genre: initialState.genre || "all",
+@@ -77,5 +78,3 @@ class AddMediaModal extends Modal {
+   async renderDetails(result) {
+-    const statusOptions = result.mediaType === "anime"
+-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
+-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
++    const statusOptions = mediaStatusOptions();
+     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, "planned"));
+@@ -85,3 +84,3 @@ class AddMediaModal extends Modal {
+     createButton.className = "mod-cta";
+-    createButton.textContent = uiText("action.add");
++    createButton.textContent = uiText("action.collect");
+     createButton.addEventListener("click", async () => {
+@@ -90,3 +89,3 @@ class AddMediaModal extends Modal {
+         createButton.disabled = false;
+-        createButton.textContent = uiText("action.add");
++        createButton.textContent = uiText("action.collect");
+       }
+@@ -101,8 +100,6 @@ class EditMediaModal extends Modal {
+   onOpen() {
+-    const statusOptions = mediaType === "anime"
+-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
+-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
++    const statusOptions = mediaStatusOptions();
+     const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", frontmatter.title || this.file.basename), uiText("add.required"));
+     titleInput.required = true;
+-    const currentStatus = String(frontmatter.status || "planned");
++    const currentStatus = normalizeMediaStatus(frontmatter.status);
+     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, currentStatus));
+@@ -112,3 +109,3 @@ class EditMediaModal extends Modal {
+       fm.title = nextTitle;
+-      fm.status = status.value;
++      fm.status = normalizeMediaStatus(status.value);
+     });
+diff --git a/src/main.ts b/src/main.ts
+index 7b36c28..a04b571 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -3,2 +3,3 @@ import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
+ import { completedRequirementMessage, uiText } from "./ui-text";
++import { normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+ import { rankSearchResults, searchQueryVariants } from "./search";
+@@ -11,3 +12,3 @@ import { rankSearchResults, searchQueryVariants } from "./search";
+         type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel" ? uiState.type : "all",
+-        status: typeof uiState.status === "string" ? uiState.status : DEFAULT_SETTINGS.uiState.status,
++        status: normalizeStatusFilter(uiState.status),
+         genre: typeof uiState.genre === "string" ? uiState.genre : DEFAULT_SETTINGS.uiState.genre,
+@@ -22,3 +23,3 @@ import { rankSearchResults, searchQueryVariants } from "./search";
+           format: stringValue(frontmatter.format, stringValue(frontmatter.media_type)),
+-          status: stringValue(frontmatter.status, "planned"),
++          status: normalizeMediaStatus(frontmatter.status),
+           releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
+@@ -30,2 +31,3 @@ import { rankSearchResults, searchQueryVariants } from "./search";
+       ...form,
++      status: normalizeMediaStatus(form.status),
+       volumeLog: result.mediaType === "novel"
+diff --git a/src/ui-text.ts b/src/ui-text.ts
+index d0f1f2c..1df78f7 100644
+--- a/src/ui-text.ts
++++ b/src/ui-text.ts
+@@ -1,2 +1,8 @@
+ import type { MediaType } from "./types";
++import {
++  MEDIA_STATUS_FILTER_ORDER,
++  MEDIA_STATUS_VALUES,
++  normalizeMediaStatus,
++} from "./media-status";
++import type { MediaStatus, MediaStatusFilter } from "./media-status";
+ 
+@@ -11,19 +17,6 @@ export const UI_TEXT = {
+   "media.status.all": "所有",
+-  // Cross-media filters use one concise name. Edit these five values to choose
+-  // the common wording shown while the library is on the "全部" tab.
+-  "media.status.active": "進行中",
+-  "media.status.completed": "完成",
++  "media.status.ongoing": "進行中",
++  "media.status.completed": "已完成",
+   "media.status.planned": "願望清單",
+-  "media.status.paused": "擱置",
+   "media.status.dropped": "棄置",
+-  "media.status.watching": "追番中",
+-  "media.status.reading": "閱讀中",
+-  "media.status.completedAnime": "已完成",
+-  "media.status.completedReading": "已完成",
+-  "media.status.plannedAnime": "待追",
+-  "media.status.plannedReading": "待讀",
+-  "media.status.pausedAnime": "擱置",
+-  "media.status.droppedAnime": "棄番",
+-  "media.status.pausedReading": "擱置",
+-  "media.status.droppedReading": "棄讀",
+   "media.unit.episode": "集",
+@@ -35,7 +28,7 @@ export const UI_TEXT = {
+   "add.unknownYear": "年份不明",
+-  "add.titleLabel": "書架上的名稱",
++  "add.titleLabel": "作品名稱",
+   "add.required": "必填",
+   "add.statusLabel": "目前狀態",
+-  "add.releaseStatusLabel": "日本原版出版狀態",
+-  "add.scoreLabel": "我的評分（0–10）",
++  "add.releaseStatusLabel": "發行狀態",
++  "add.scoreLabel": "評分（0–10）",
+   "add.scoreHint": "{status}時必填；其他狀態可留空。",
+@@ -47,3 +40,3 @@ export const UI_TEXT = {
+   "add.template": "筆記模板",
+-  "add.templateHint": "模板直接讀取 Templates 資料夾；可自行新增或修改。",
++  "add.templateHint": "模板直接讀取 Templates Folder；可自行新增或修改。",
+   "add.noTemplate": "不套用模板",
+@@ -56,3 +49,3 @@ export const UI_TEXT = {
+   "delete.title": "刪除作品？",
+-  "delete.description": "「{title}」的 Markdown 筆記會移到系統垃圾桶；本地封面不會一併刪除。",
++  "delete.description": "「{title}」的 Markdown notes 會移到系統垃圾桶；本地封面不會一併刪除。",
+ 
+@@ -64,3 +57,3 @@ export const UI_TEXT = {
+ 
+-  "field.score": "個人評分",
++  "field.score": "評分",
+   "field.completedAt": "完成日期",
+@@ -68,3 +61,3 @@ export const UI_TEXT = {
+   "validation.completedFieldRequired": "{status}狀態必須填寫{field}",
+-  "validation.scoreRange": "個人評分必須是 0 到 10 之間的數字",
++  "validation.scoreRange": "評分必須是 0 到 10 之間的數字",
+ 
+@@ -76,3 +69,3 @@ export const UI_TEXT = {
+   "notice.collected": "已收錄：{title}",
+-  "notice.createFailed": "新增失敗：{error}",
++  "notice.createFailed": "收錄失敗：{error}",
+   "notice.favoriteRemoved": "已從最愛中移除。",
+@@ -81,3 +74,3 @@ export const UI_TEXT = {
+ export type UiMediaType = "all" | MediaType;
+-export type UiStatusFilter = "all" | "active" | "completed" | "planned" | "on_hold" | "dropped";
++export type UiStatusFilter = MediaStatusFilter;
+ export type UiTextKey = keyof typeof UI_TEXT;
+@@ -85,2 +78,9 @@ export type UiTextVariables = Record<string, string | number>;
+ 
++const STATUS_TEXT_KEYS = {
++  planned: "media.status.planned",
++  ongoing: "media.status.ongoing",
++  completed: "media.status.completed",
++  dropped: "media.status.dropped",
++} as const satisfies Record<MediaStatus, UiTextKey>;
++
+ export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string {
+@@ -92,37 +92,19 @@ export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string
+ 
+-export function completedStatusLabel(mediaType: MediaType): string {
+-  return uiText(mediaType === "anime" ? "media.status.completedAnime" : "media.status.completedReading");
++export function completedStatusLabel(_mediaType: MediaType): string {
++  return uiText("media.status.completed");
++}
++
++export function mediaStatusLabel(status: string, _mediaType: UiMediaType = "all"): string {
++  const normalized = normalizeMediaStatus(status);
++  return uiText(STATUS_TEXT_KEYS[normalized]);
+ }
+ 
+-export function mediaStatusLabel(status: string, mediaType: UiMediaType = "all"): string {
+-  if (mediaType === "anime") {
+-    if (status === "watching" || status === "active") return uiText("media.status.watching");
+-    if (status === "completed") return uiText("media.status.completedAnime");
+-    if (status === "planned") return uiText("media.status.plannedAnime");
+-    if (status === "on_hold") return uiText("media.status.pausedAnime");
+-    if (status === "dropped") return uiText("media.status.droppedAnime");
+-  } else if (mediaType === "manga" || mediaType === "novel") {
+-    if (status === "reading" || status === "active") return uiText("media.status.reading");
+-    if (status === "completed") return uiText("media.status.completedReading");
+-    if (status === "planned") return uiText("media.status.plannedReading");
+-    if (status === "on_hold") return uiText("media.status.pausedReading");
+-    if (status === "dropped") return uiText("media.status.droppedReading");
+-  }
+-
+-  if (status === "active" || status === "watching" || status === "reading") return uiText("media.status.active");
+-  if (status === "completed") return uiText("media.status.completed");
+-  if (status === "planned") return uiText("media.status.planned");
+-  if (status === "on_hold") return uiText("media.status.paused");
+-  if (status === "dropped") return uiText("media.status.dropped");
+-  return status;
++export function mediaStatusOptions(): Array<[MediaStatus, string]> {
++  return MEDIA_STATUS_VALUES.map((status) => [status, uiText(STATUS_TEXT_KEYS[status])]);
+ }
+ 
+-export function statusFilterOptions(mediaType: UiMediaType): Array<[UiStatusFilter, string]> {
++export function statusFilterOptions(_mediaType: UiMediaType): Array<[UiStatusFilter, string]> {
+   return [
+     ["all", uiText("media.status.all")],
+-    ["active", mediaStatusLabel("active", mediaType)],
+-    ["completed", mediaStatusLabel("completed", mediaType)],
+-    ["planned", mediaStatusLabel("planned", mediaType)],
+-    ["on_hold", mediaStatusLabel("on_hold", mediaType)],
+-    ["dropped", mediaStatusLabel("dropped", mediaType)],
++    ...MEDIA_STATUS_FILTER_ORDER.map((status): [MediaStatus, string] => [status, uiText(STATUS_TEXT_KEYS[status])]),
+   ];
+diff --git a/tests/core.test.ts b/tests/core.test.ts
+index 9239c3e..f7535d2 100644
+--- a/tests/core.test.ts
++++ b/tests/core.test.ts
+@@ -1,9 +1,8 @@
+-  it("uses the approved media-specific status labels", () => {
++  it("uses the approved shared status labels without a paused option", () => {
+     assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), [
+       UI_TEXT["media.status.all"],
+-      UI_TEXT["media.status.watching"],
+-      UI_TEXT["media.status.completedAnime"],
+-      UI_TEXT["media.status.plannedAnime"],
+-      UI_TEXT["media.status.pausedAnime"],
+-      UI_TEXT["media.status.droppedAnime"],
++      UI_TEXT["media.status.ongoing"],
++      UI_TEXT["media.status.completed"],
++      UI_TEXT["media.status.planned"],
++      UI_TEXT["media.status.dropped"],
+     ]);
+@@ -11,21 +10,12 @@
+       UI_TEXT["media.status.all"],
+-      UI_TEXT["media.status.reading"],
+-      UI_TEXT["media.status.completedReading"],
+-      UI_TEXT["media.status.plannedReading"],
+-      UI_TEXT["media.status.pausedReading"],
+-      UI_TEXT["media.status.droppedReading"],
+-    ]);
+-    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), [
+-      UI_TEXT["media.status.all"],
+-      UI_TEXT["media.status.active"],
++      UI_TEXT["media.status.ongoing"],
+       UI_TEXT["media.status.completed"],
+       UI_TEXT["media.status.planned"],
+-      UI_TEXT["media.status.paused"],
+       UI_TEXT["media.status.dropped"],
+     ]);
++    assert.deepEqual(statusFilterOptions("all"), statusFilterOptions("novel"));
+     assert.equal(Object.values(UI_TEXT).some((label) => label.includes("/") || label.includes("／")), false);
+     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedAnime"\)\]/);
+-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedReading"\)\]/);
+-    assert.doesNotMatch(legacySource, /value === "dropped" \? "on_hold"/);
++    assert.doesNotMatch(legacySource, /plannedAnime|plannedReading|pausedAnime|pausedReading|droppedAnime|droppedReading/);
++    assert.doesNotMatch(legacySource, /\["on_hold"|\["watching"|\["reading"/);
+   });
