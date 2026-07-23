@@ -89,7 +89,7 @@ A note is discoverable when it contains a supported `media_type`:
 ---
 title: Example work
 media_type: anime
-status: watching
+status: ongoing
 progress: 3
 progress_total: 12
 progress_unit: episode
@@ -104,7 +104,7 @@ Supported media types are `anime`, `manga`, and `novel`. Existing published 1.0.
 - **Manga:** progress records the current chapter; completion is selected explicitly.
 - **Novel:** progress records the current volume and accepts whole numbers, `.5`, and `EX`.
 - **Completed works:** personal score and completion date are required.
-- **Active, planned, or paused works:** score and completion date may be empty.
+- **Ongoing or planned works:** score and completion date may be empty.
 
 Novel notes can additionally keep local per-volume history:
 

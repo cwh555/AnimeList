@@ -41,10 +41,10 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Searching `輝夜姬想讓人告白第二季` returns the second season, and searching `輝夜姬想讓人告白 永不結束的初吻` returns the matching special through broader-title fallback.
 - [ ] General novel search works with Open Library enabled.
 - [ ] A title is always required.
-- [ ] Planned, watching/reading, and on-hold records can be saved with an empty score and empty completion date.
+- [ ] Planned and ongoing records can be saved with an empty score and empty completion date.
 - [ ] Switching status to completed immediately makes score and completion date required.
 - [ ] Completed status rejects an empty score, a score below 0 or above 10, and an empty completion date.
-- [ ] Changing a completed record back to active allows the score to be cleared and removes `score` from frontmatter.
+- [ ] Changing a completed record back to ongoing allows the score to be cleared and removes `score` from frontmatter.
 - [ ] Date fields advance from a four-digit year to month, from a two-digit month to day, and leave the date after a two-digit day; invalid dates are not saved.
 
 ### Progress rules

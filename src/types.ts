@@ -1,3 +1,5 @@
+import type { MediaStatus, MediaStatusFilter } from "./media-status";
+
 export type MediaType = "anime" | "manga" | "novel";
 export type StorageMode = "managed" | "flat";
 export type LibrarySection = "library" | "timeline";
@@ -18,10 +20,14 @@ export interface SearchLanguageSettings {
   original: boolean;
 }
 
+export interface MigrationSettings {
+  mediaStatus: number;
+}
+
 export interface LibraryUiState {
   section: LibrarySection;
   type: "all" | MediaType;
-  status: string;
+  status: MediaStatusFilter;
   genre: string;
   sort: string;
   view: LibraryViewMode;
@@ -37,6 +43,7 @@ export interface AnimeListSettings {
   timelineMaxStackDepth: number;
   providers: ProviderSettings;
   searchLanguages?: SearchLanguageSettings;
+  migrations: MigrationSettings;
   uiState: LibraryUiState;
 }
 
@@ -62,7 +69,7 @@ export interface MediaItem {
   originalTitle: string;
   mediaType: MediaType;
   format: string;
-  status: string;
+  status: MediaStatus;
   releaseStatus: ReleaseStatus;
   progress: ProgressValue;
   total: ProgressValue;
@@ -114,7 +121,7 @@ export interface ExternalMediaResult {
 
 export interface MediaNoteForm {
   title: string;
-  status: string;
+  status: MediaStatus;
   releaseStatus: ReleaseStatus;
   progress: ProgressValue;
   total: ProgressValue;

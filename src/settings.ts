@@ -41,6 +41,9 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     openlibrary: true,
   },
   searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
+  migrations: {
+    mediaStatus: 0,
+  },
   uiState: {
     section: "library",
     type: "all",

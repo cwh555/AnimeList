@@ -8,9 +8,12 @@ import {
   mediaFormatLabel,
   mediaProviderLabel,
   mediaStatusLabel,
+  mediaStatusOptions,
   statusFilterOptions,
   uiText,
 } from "./ui-text";
+import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+import { CURRENT_MEDIA_SCHEMA_VERSION } from "./schema-migration";
 import {
   compareVolumeLabels,
   expandTimelineEntries,
@@ -394,28 +397,29 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   const hasScore = form.score !== "" && form.score != null;
   const score = hasScore ? Number(form.score) : null;
   const completedAt = String(form.completedAt || "").trim();
+  const status = normalizeMediaStatus(form.status);
   if (!title) throw new Error(uiText("validation.titleRequired"));
-  if (form.status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+  if (status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
   if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
     throw new Error(uiText("validation.scoreRange"));
   }
-  if (form.status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
+  if (status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
   const total = result.mediaType === "anime"
     ? Math.max(0, numeric(form.total ?? result.total))
     : 0;
-  const progress = completedProgress(form.status, total, form.progress, result.mediaType);
+  const progress = completedProgress(status, total, form.progress, result.mediaType);
   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
     : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
   const volumeLog = result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [];
-  const lines = ["---", "schema_version: 5"];
+  const lines = ["---", `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`];
   lines.push(`title: ${yamlScalar(title)}`);
   if (result.originalTitle) lines.push(`title_original: ${yamlScalar(result.originalTitle)}`);
   if (result.romajiTitle && result.romajiTitle !== result.originalTitle) lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
-  lines.push(`status: ${yamlScalar(form.status || "planned")}`);
+  lines.push(`status: ${yamlScalar(status)}`);
   if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
   lines.push(`progress: ${yamlScalar(progress)}`);
   if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
@@ -502,7 +506,7 @@ export const AnimeListUI = (() => {
     return {
     ...item,
     mediaType,
-    status: String(item.status || "planned").toLowerCase(),
+    status: normalizeMediaStatus(item.status),
     format: String(item.format || item.mediaType || item.media_type || "").toLowerCase(),
     releaseStatus: normalizeReleaseStatus(item.releaseStatus || item.release_status),
     progress: normalizeProgressValue(item.progress),
@@ -535,11 +539,7 @@ export const AnimeListUI = (() => {
     return uiText("library.notStarted");
   };
 
-  const statusMatch = (item, filter) => {
-    if (filter === "all") return true;
-    if (filter === "active") return ["watching", "reading"].includes(item.status);
-    return item.status === filter;
-  };
+  const statusMatch = (item, filter) => mediaStatusMatches(item.status, filter);
 
   function renderLibrary(container, inputItems, adapters = {}) {
     container.replaceChildren();
@@ -549,7 +549,7 @@ export const AnimeListUI = (() => {
     const initialView = ["grid", "list", "poster"].includes(initialState.view || adapters.initialView) ? (initialState.view || adapters.initialView) : "grid";
     const state = {
       type: ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all",
-      status: initialState.status || "all",
+      status: normalizeStatusFilter(initialState.status),
       genre: initialState.genre || "all",
       query: initialState.query || "",
       sort: initialState.sort || "completed-desc",
@@ -1781,9 +1781,7 @@ class AddMediaModal extends Modal {
     form.className = "al-media-form";
     const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", result.title), uiText("add.required"));
     titleInput.required = true;
-    const statusOptions = result.mediaType === "anime"
-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const statusOptions = mediaStatusOptions();
     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, "planned"));
     const releaseStatus = result.mediaType === "anime"
       ? null
@@ -1838,7 +1836,7 @@ class AddMediaModal extends Modal {
     const createButton = createEl("button");
     createButton.type = "button";
     createButton.className = "mod-cta";
-    createButton.textContent = uiText("action.add");
+    createButton.textContent = uiText("action.collect");
     createButton.addEventListener("click", async () => {
       if (!titleInput.value.trim()) { new Notice(uiText("validation.titleRequired")); return; }
       const hasScore = score.value.trim() !== "";
@@ -1867,7 +1865,7 @@ class AddMediaModal extends Modal {
         console.error("AnimeList create note failed", error);
         new Notice(uiText("notice.createFailed", { error: error?.message || error }));
         createButton.disabled = false;
-        createButton.textContent = uiText("action.add");
+        createButton.textContent = uiText("action.collect");
       }
     });
     actions.appendChild(createButton);
@@ -1936,12 +1934,10 @@ class EditMediaModal extends Modal {
     const mediaType = String(frontmatter.media_type || "anime");
     const form = createDiv();
     form.className = "al-media-form";
-    const statusOptions = mediaType === "anime"
-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const statusOptions = mediaStatusOptions();
     const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", frontmatter.title || this.file.basename), uiText("add.required"));
     titleInput.required = true;
-    const currentStatus = String(frontmatter.status || "planned");
+    const currentStatus = normalizeMediaStatus(frontmatter.status);
     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, currentStatus));
     const releaseStatus = mediaType === "anime"
       ? null
@@ -2006,9 +2002,9 @@ class EditMediaModal extends Modal {
         const completedVolume = highestCompletedVolume(volumeLog);
         if (mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
         await this.plugin.app.fileManager.processFrontMatter(this.file, (fm) => {
-          fm.schema_version = 5;
+          fm.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
           fm.title = nextTitle;
-          fm.status = status.value;
+          fm.status = normalizeMediaStatus(status.value);
           if (mediaType !== "anime") fm.release_status = releaseStatus?.value || "unknown";
           if (mediaType === "anime") fm.progress_total = nextTotal;
           else delete fm.progress_total;

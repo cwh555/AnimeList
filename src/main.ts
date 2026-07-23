@@ -18,6 +18,11 @@ import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions }
 import { CoverThumbnailCache } from "./cover-cache";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { completedRequirementMessage, uiText } from "./ui-text";
+import { normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+import {
+  MEDIA_STATUS_MIGRATION_VERSION,
+  migrateMediaStatusNotes,
+} from "./schema-migration";
 import { rankSearchResults, searchQueryVariants } from "./search";
 import { normalizeTimelineMaxStackDepth } from "./timeline-scale";
 import type {
@@ -162,6 +167,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    await this.migrateMediaStatuses();
     this.coverCache = new CoverThumbnailCache(this.app, this.manifest.id);
     await this.coverCache.initialize();
     this.coverCache.scheduleCleanup();
@@ -207,6 +213,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const raw = await this.loadData();
     const loaded = isRecord(raw) ? raw : {};
     const providers = isRecord(loaded.providers) ? loaded.providers : {};
+    const migrations = isRecord(loaded.migrations) ? loaded.migrations : {};
     const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
     this.settings = {
       storageMode: loaded.storageMode === "flat" ? "flat" : "managed",
@@ -225,15 +232,33 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         anilist: typeof providers.anilist === "boolean" ? providers.anilist : DEFAULT_SETTINGS.providers.anilist,
         openlibrary: typeof providers.openlibrary === "boolean" ? providers.openlibrary : DEFAULT_SETTINGS.providers.openlibrary,
       },
+      migrations: {
+        mediaStatus: typeof migrations.mediaStatus === "number" ? migrations.mediaStatus : 0,
+      },
       uiState: {
         section: uiState.section === "timeline" ? "timeline" : "library",
         type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel" ? uiState.type : "all",
-        status: typeof uiState.status === "string" ? uiState.status : DEFAULT_SETTINGS.uiState.status,
+        status: normalizeStatusFilter(uiState.status),
         genre: typeof uiState.genre === "string" ? uiState.genre : DEFAULT_SETTINGS.uiState.genre,
         sort: typeof uiState.sort === "string" ? uiState.sort : DEFAULT_SETTINGS.uiState.sort,
         view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
       },
     };
+  }
+
+  private async migrateMediaStatuses(): Promise<void> {
+    if (this.settings.migrations.mediaStatus >= MEDIA_STATUS_MIGRATION_VERSION) return;
+    try {
+      const result = await migrateMediaStatusNotes(this.app, this.getScanFolders());
+      this.settings.migrations.mediaStatus = MEDIA_STATUS_MIGRATION_VERSION;
+      await this.saveSettings();
+      if (result.total > 0) {
+        new Notice(uiText("notice.statusMigration", { count: result.total }));
+      }
+    } catch (error) {
+      console.error("AnimeList media-status migration failed", error);
+      new Notice(uiText("notice.statusMigrationFailed", { error: errorMessage(error) }));
+    }
   }
 
   async saveSettings(): Promise<void> {
@@ -379,7 +404,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
           originalTitle: stringValue(frontmatter.title_original, stringValue(frontmatter.title_romaji)),
           mediaType,
           format: stringValue(frontmatter.format, stringValue(frontmatter.media_type)),
-          status: stringValue(frontmatter.status, "planned"),
+          status: normalizeMediaStatus(frontmatter.status),
           releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
           progress: normalizeProgressValue(frontmatter.progress),
           total: mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0,
@@ -677,6 +702,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const templateContent = await this.readTemplate(form.templatePath);
     const preparedForm: MediaNoteForm = {
       ...form,
+      status: normalizeMediaStatus(form.status),
       volumeLog: result.mediaType === "novel"
         ? normalizeVolumeLog(form.volumeLog)
         : [],

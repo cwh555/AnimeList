@@ -80,10 +80,9 @@
 .al-format-badge, .al-status { padding:4px 7px; border-radius:7px; color:#fff; background:rgba(10,11,16,.68); backdrop-filter:blur(8px); font-size:.61rem; font-weight:730; }
 .al-favorite { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; color:#ffd66b; background:rgba(10,11,16,.7); font-size:.85rem; backdrop-filter:blur(8px); }
 .al-progress-on-cover { font-size:.64rem; font-weight:700; text-shadow:0 1px 3px #000; }
-.al-status.status-watching, .al-status.status-reading { background:rgba(42,139,105,.86); }
+.al-status.status-ongoing { background:rgba(42,139,105,.86); }
 .al-status.status-completed { background:rgba(73,92,160,.86); }
 .al-status.status-planned { background:rgba(113,84,166,.86); }
-.al-status.status-on_hold { background:rgba(164,115,45,.86); }
 .al-status.status-dropped { background:rgba(143,67,72,.86); }
 
 .al-card-body { display:flex; flex:1; min-width:0; flex-direction:column; padding:12px 13px 13px; }

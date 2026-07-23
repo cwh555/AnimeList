@@ -261,7 +261,7 @@ describe("media note generation", () => {
       genres: [],
       releaseStatus: "unknown",
       volumeLog: [],
-    }, "", ""), /必須填寫個人評分/);
+    }, "", ""), /必須填寫評分/);
   });
 });
 
@@ -289,7 +289,7 @@ describe("serial progress and novel volume records", () => {
       originalTitle: "",
       mediaType: "novel",
       format: "light_novel",
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       progress: 2,
       total: 4,
@@ -350,7 +350,7 @@ describe("serial progress and novel volume records", () => {
     }]);
   });
 
-  it("writes optional dates, release status, and per-volume history to schema version 5", () => {
+  it("writes optional dates, release status, and per-volume history to schema version 6", () => {
     const novelResult = {
       ...baseResult,
       mediaType: "novel",
@@ -362,7 +362,7 @@ describe("serial progress and novel volume records", () => {
     const markdown = buildMediaMarkdown(novelResult, {
       title: "Example novel",
       score: 9,
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       startedAt: "",
       completedAt: "",
@@ -378,7 +378,8 @@ describe("serial progress and novel volume records", () => {
         { label: "EX", completed_at: "2026-04-05" },
       ]),
     }, "", "");
-    assert.match(markdown, /schema_version: 5/);
+    assert.match(markdown, /schema_version: 6/);
+    assert.match(markdown, /status: "ongoing"/);
     assert.match(markdown, /release_status: "releasing"/);
     assert.match(markdown, /progress: 1\.5/);
     assert.doesNotMatch(markdown, /^progress_total:/m);
@@ -396,7 +397,7 @@ describe("serial progress and novel volume records", () => {
       originalTitle: "薬屋のひとりごと",
       mediaType: "novel",
       format: "light_novel",
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       progress: 14,
       total: 0,
@@ -465,7 +466,7 @@ describe("serial progress and novel volume records", () => {
     }, {
       title: "Ongoing manga",
       score: 8,
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       startedAt: "",
       completedAt: "",
@@ -616,38 +617,22 @@ describe("tracked UI wording", () => {
     assert.ok(renderedVolume.includes("EX"));
   });
 
-  it("uses the approved media-specific status labels", () => {
-    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), [
+  it("uses the approved shared status labels without a paused option", () => {
+    const expected = [
       UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.watching"],
-      UI_TEXT["media.status.completedAnime"],
-      UI_TEXT["media.status.plannedAnime"],
-      UI_TEXT["media.status.pausedAnime"],
-      UI_TEXT["media.status.droppedAnime"],
-    ]);
-    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), [
-      UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.reading"],
-      UI_TEXT["media.status.completedReading"],
-      UI_TEXT["media.status.plannedReading"],
-      UI_TEXT["media.status.pausedReading"],
-      UI_TEXT["media.status.droppedReading"],
-    ]);
-    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), [
-      UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.active"],
+      UI_TEXT["media.status.ongoing"],
       UI_TEXT["media.status.completed"],
       UI_TEXT["media.status.planned"],
-      UI_TEXT["media.status.paused"],
       UI_TEXT["media.status.dropped"],
-    ]);
+    ];
+    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), expected);
+    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), expected);
+    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), expected);
     assert.equal(Object.values(UI_TEXT).some((label) => label.includes("/") || label.includes("／")), false);
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedAnime"\)\]/);
-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedReading"\)\]/);
-    assert.doesNotMatch(legacySource, /value === "dropped" \? "on_hold"/);
+    assert.doesNotMatch(legacySource, /plannedAnime|plannedReading|pausedAnime|pausedReading|droppedAnime|droppedReading/);
+    assert.doesNotMatch(legacySource, /\["on_hold"|\["watching"|\["reading"/);
   });
-
 
 
   it("keeps user-visible wording in one tracked source file", () => {
@@ -856,7 +841,7 @@ describe("timeline modal and Traditional Chinese labels", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     assert.match(legacySource, /save\.textContent = uiText\("action\.save"\)/);
-    assert.match(legacySource, /createButton\.textContent = uiText\("action\.add"\)/);
+    assert.match(legacySource, /createButton\.textContent = uiText\("action\.collect"\)/);
     assert.match(legacySource, /appendIconLabel\(addButton, "plus", uiText\("action\.collect"\)\)/);
     assert.match(mainSource, /id: "add-media", name: uiText\("action\.collect"\)/);
     assert.ok((legacySource.match(/uiText\("action\.delete"\)/g) || []).length >= 3);
@@ -868,8 +853,8 @@ describe("timeline modal and Traditional Chinese labels", () => {
 
   it("uses tracked status and timeline labels without restoring removed total fields", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.ok(UI_TEXT["media.status.watching"].trim());
-    assert.ok(UI_TEXT["media.status.plannedAnime"].trim());
+    assert.ok(UI_TEXT["media.status.ongoing"].trim());
+    assert.ok(UI_TEXT["media.status.planned"].trim());
     assert.ok(UI_TEXT["library.timeline"].trim());
     assert.match(legacySource, /appendIconLabel\(timelineButton, "timeline", uiText\("library\.timeline"\)\)/);
     assert.doesNotMatch(legacySource, /日本原版最新話數|日本原版最新卷數|已追到最新/);
