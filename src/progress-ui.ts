@@ -105,9 +105,7 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
 }
 
 // The imported legacy namespace is intentionally narrowed at this integration boundary.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- legacy.ts is runtime-tested but compiled with ts-nocheck.
 const libraryUi: LegacyLibraryUi = AnimeListUI;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- bind preserves the narrowed runtime receiver.
 const originalRenderLibrary: LegacyLibraryUi["renderLibrary"] = libraryUi.renderLibrary.bind(libraryUi);
 libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
   originalRenderLibrary(container, inputItems, adapters);
