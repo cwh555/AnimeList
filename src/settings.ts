@@ -2,7 +2,10 @@ import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian"
 import type { SettingDefinition } from "obsidian";
 import "./search-enhancements";
 import "./search-pagination";
-import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
+import {
+  DEFAULT_SEARCH_LANGUAGES,
+  normalizeSearchLanguageSettings,
+} from "./multilingual-search";
 import { searchFeatureText } from "./search-feature-text";
 import type {
   AnimeListSettings,
@@ -43,6 +46,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
 export interface AnimeListSettingsHost {
   app: App;
   settings: AnimeListSettings;
+  loadData?(): Promise<unknown>;
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
@@ -57,6 +61,8 @@ function splitFolders(value: string): string[] {
 
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private languageSettingsHydrated = false;
+  private languageSettingsHydration: Promise<void> | null = null;
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
@@ -143,6 +149,30 @@ export class AnimeListSettingTab extends PluginSettingTab {
 
   display(): void {
     this.renderImperativeSettings();
+    void this.hydrateLanguageSettings();
+  }
+
+  private async hydrateLanguageSettings(): Promise<void> {
+    if (this.languageSettingsHydrated || this.languageSettingsHydration) return this.languageSettingsHydration ?? undefined;
+    if (typeof this.plugin.loadData !== "function") {
+      this.languageSettingsHydrated = true;
+      return;
+    }
+    this.languageSettingsHydration = (async () => {
+      const loaded = await this.plugin.loadData?.();
+      const rawLanguages = typeof loaded === "object" && loaded !== null && !Array.isArray(loaded)
+        ? (loaded as Record<string, unknown>).searchLanguages
+        : undefined;
+      this.plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawLanguages);
+      this.languageSettingsHydrated = true;
+      this.renderImperativeSettings();
+    })().catch((error) => {
+      console.warn("AnimeList could not restore search language settings", error);
+      this.languageSettingsHydrated = true;
+    }).finally(() => {
+      this.languageSettingsHydration = null;
+    });
+    await this.languageSettingsHydration;
   }
 
   private renderImperativeSettings(): void {
