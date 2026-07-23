@@ -14,6 +14,12 @@ const PROGRESS_UNIT_LABELS: Readonly<Record<ProgressUnit, string>> = {
   volume: "卷",
 };
 
+export const PROGRESS_UNIT_UI_TEXT = {
+  fieldLabel: "進度單位",
+  integerProgressError: "以話或季記錄時，進度必須是 0 或正整數。",
+  readingProgressLabelPrefix: "目前閱讀",
+} as const;
+
 export interface ProgressUnitOption {
   value: string;
   label: string;
