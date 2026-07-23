@@ -18,5 +18,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run repository checks
+        id: repository-checks
+        continue-on-error: true
+        run: npm run check > check.log 2>&1
+      - name: Upload failed check log
+        if: steps.repository-checks.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-check-log
+          path: check.log
+      - name: Fail after collecting diagnostics
+        if: steps.repository-checks.outcome == 'failure'
+        run: exit 1
       - run: npm run release:check
