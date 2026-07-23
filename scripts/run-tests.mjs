@@ -21,6 +21,8 @@ await writeFile(entryFile, [
   'import "../../tests/duplicate-detection.test.ts";',
   'import "../../tests/library-navigation.test.ts";',
   'import "../../tests/search-settings.test.ts";',
+  'import "../../tests/timeline-scale.test.ts";',
+  'import "../../tests/timeline-scale-work-items.test.ts";',
   "",
 ].join("\n"));
 
