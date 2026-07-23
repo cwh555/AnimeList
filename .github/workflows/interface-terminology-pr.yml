@@ -85,6 +85,7 @@ jobs:
       - name: Publish validated feature history
         if: steps.staged.outputs.present == 'true'
         shell: bash
-        env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: git push --force-with-lease=refs/heads/feature/interface-terminology:${EXPECTED_HEAD} origin HEAD:refs/heads/feature/interface-terminology
+        run: |
+          expected_head="$(git ls-remote origin refs/heads/feature/interface-terminology | cut -f1)"
+          test -n "$expected_head"
+          git push --force-with-lease=refs/heads/feature/interface-terminology:${expected_head} origin HEAD:refs/heads/feature/interface-terminology
