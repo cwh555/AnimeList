@@ -22,3 +22,5 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run release:check
+
+# Temporary full-check trigger; removed after validation.
