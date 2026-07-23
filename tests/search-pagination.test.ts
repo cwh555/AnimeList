@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { SEARCH_PAGINATION_LIMITS, mergeSearchPages } from "../src/search-pagination";
+import {
+  SEARCH_PAGINATION_LIMITS,
+  captureSearchScroll,
+  mergeSearchPages,
+  restoreSearchScroll,
+  searchScrollContainer,
+} from "../src/search-pagination";
 import type { ExternalMediaResult } from "../src/types";
 
 function result(id: number): ExternalMediaResult {
@@ -56,13 +62,40 @@ describe("search pagination", () => {
     assert.match(source, /PATCH_MARKER/);
   });
 
-  it("restores the outer modal position after the search input focus timer", () => {
+  it("captures and restores the actual Obsidian modal-content scroll position", () => {
+    const modalContent = { scrollTop: 640, isConnected: true };
+    const modal = {
+      scrollTop: 0,
+      querySelector(selector: string) {
+        return selector === ".modal-content" ? modalContent : null;
+      },
+    };
+
+    assert.equal(searchScrollContainer(modal), modalContent);
+    const snapshot = captureSearchScroll(modal);
+    assert.deepEqual(snapshot, { container: modalContent, scrollTop: 640 });
+
+    modalContent.scrollTop = 0;
+    restoreSearchScroll(snapshot);
+    assert.equal(modalContent.scrollTop, 640);
+    assert.equal(modal.scrollTop, 0);
+  });
+
+  it("falls back to the modal element when modal-content is unavailable", () => {
+    const modal = { scrollTop: 320, isConnected: true, querySelector: () => null };
+    assert.equal(searchScrollContainer(modal), modal);
+    const snapshot = captureSearchScroll(modal);
+    modal.scrollTop = 0;
+    restoreSearchScroll(snapshot);
+    assert.equal(modal.scrollTop, 320);
+  });
+
+  it("restores after the legacy search input focus timer", () => {
     const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
-    assert.match(source, /state\.restoreScrollTop = state\.modalEl\.scrollTop/);
     assert.match(source, /function scheduleScrollRestore\(state\)/);
     assert.match(source, /window\.setTimeout\(\(\) => \{\s*window\.requestAnimationFrame/s);
-    assert.match(source, /state\.modalEl\.scrollTop = scrollTop/);
-    assert.match(source, /restoreScheduled: false/);
+    assert.match(source, /restoreSearchScroll\(snapshot\)/);
+    assert.match(source, /state\.restoreScroll = captureSearchScroll\(state\.modalEl\)/);
   });
 
   it("uses provider-native pages for additional requests", () => {
