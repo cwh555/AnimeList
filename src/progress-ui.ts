@@ -48,6 +48,10 @@ function legacyLibraryUi(value: unknown): LegacyLibraryUi {
   return value as LegacyLibraryUi;
 }
 
+function legacyLibraryRender(value: unknown): LegacyLibraryUi["renderLibrary"] {
+  return value as LegacyLibraryUi["renderLibrary"];
+}
+
 function progressStatusFromCard(card: HTMLElement): string {
   const statusClass = Array.from(card.classList).find((className) => className.startsWith("status-"));
   return statusClass?.slice("status-".length) ?? "planned";
@@ -109,9 +113,9 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
 }
 
 const libraryUi = legacyLibraryUi(AnimeListUI);
-const originalRenderLibrary: LegacyLibraryUi["renderLibrary"] = libraryUi.renderLibrary.bind(libraryUi);
+const originalRenderLibrary = legacyLibraryRender(libraryUi.renderLibrary);
 libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
-  originalRenderLibrary(container, inputItems, adapters);
+  originalRenderLibrary.call(libraryUi, container, inputItems, adapters);
   synchronizeLibraryProgress(container);
 
   const grid = container.querySelector<HTMLElement>(".al-grid");
