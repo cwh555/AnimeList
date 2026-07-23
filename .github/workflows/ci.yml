@@ -18,5 +18,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run checks
+        run: npm run check > check.log 2>&1 || { cat check.log; exit 1; }
+      - name: Upload failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log
+          path: check.log
       - run: npm run release:check
