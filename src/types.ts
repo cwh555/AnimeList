@@ -4,11 +4,18 @@ export type LibrarySection = "library" | "timeline";
 export type LibraryViewMode = "grid" | "list" | "poster";
 export type ReleaseStatus = "releasing" | "finished" | "hiatus" | "cancelled" | "unknown";
 export type ProgressValue = number | string;
+export type SearchLanguage = "chinese" | "english" | "original";
 
 export interface ProviderSettings {
   bangumi: boolean;
   anilist: boolean;
   openlibrary: boolean;
+}
+
+export interface SearchLanguageSettings {
+  chinese: boolean;
+  english: boolean;
+  original: boolean;
 }
 
 export interface LibraryUiState {
@@ -29,6 +36,7 @@ export interface AnimeListSettings {
   coverFolder: string;
   templateFolder: string;
   providers: ProviderSettings;
+  searchLanguages?: SearchLanguageSettings;
   uiState: LibraryUiState;
 }
 
