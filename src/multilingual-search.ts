@@ -1,3 +1,4 @@
+import { collectChineseDiscoveryQueries } from "./chinese-search-variants";
 import {
   filterRelevantSearchResults,
   normalizeSearchComparable,
@@ -13,6 +14,7 @@ import type {
 
 export interface SearchProviderAdapter {
   label: string;
+  supportsChineseDiscovery?: boolean;
   search(query: string): Promise<ExternalMediaResult[]>;
 }
 
@@ -209,26 +211,44 @@ export async function searchMultilingualProviders(
       expandedQueries: [],
     };
   }
+
+  const languages = normalizeSearchLanguageSettings(options.languages);
   const dedupe = options.dedupe ?? defaultDedupe;
   const initialQueries = searchQueryVariants(query);
   const initial = await runProviderQueries(options.providers, initialQueries);
   const initialUnique = dedupe(initial.results);
-  const seedResults = rankSearchResults(initialUnique, query)
+  const initialSeeds = rankSearchResults(initialUnique, query)
     .filter((result) => scoreSearchResult(result, query) >= 36)
     .slice(0, 6);
-  const expandedQueries = collectMultilingualSearchQueries(
-    query,
-    seedResults,
-    options.languages ?? DEFAULT_SEARCH_LANGUAGES,
-  );
-  const expanded = expandedQueries.length
-    ? await runProviderQueries(options.providers, expandedQueries)
+
+  const discoveryProviders = languages.chinese && initialSeeds.length < 2
+    ? options.providers.filter((provider) => provider.supportsChineseDiscovery)
+    : [];
+  const discoveryQueries = discoveryProviders.length
+    ? collectChineseDiscoveryQueries(query)
+      .filter((candidate) => !initialQueries.some((initialQuery) => (
+        normalizeSearchComparable(initialQuery) === normalizeSearchComparable(candidate)
+      )))
+    : [];
+  const discovery = discoveryQueries.length
+    ? await runProviderQueries(discoveryProviders, discoveryQueries)
     : { results: [], warnings: [] };
-  const merged = dedupe([...initial.results, ...expanded.results]);
-  const relevant = filterRelevantSearchResults(merged, query, expandedQueries);
+
+  const seedPool = dedupe([...initial.results, ...discovery.results]);
+  const seedResults = rankSearchResults(seedPool, query, discoveryQueries)
+    .filter((result) => scoreSearchResult(result, query, discoveryQueries) >= 36)
+    .slice(0, 8);
+  const aliasQueries = collectMultilingualSearchQueries(query, seedResults, languages);
+  const expanded = aliasQueries.length
+    ? await runProviderQueries(options.providers, aliasQueries)
+    : { results: [], warnings: [] };
+
+  const relatedQueries = uniqueQueries([...discoveryQueries, ...aliasQueries]);
+  const merged = dedupe([...initial.results, ...discovery.results, ...expanded.results]);
+  const relevant = filterRelevantSearchResults(merged, query, relatedQueries);
   return {
-    results: rankSearchResults(relevant, query, expandedQueries).slice(0, options.maxResults ?? 24),
-    warnings: [...new Set([...initial.warnings, ...expanded.warnings])],
-    expandedQueries,
+    results: rankSearchResults(relevant, query, relatedQueries).slice(0, options.maxResults ?? 24),
+    warnings: [...new Set([...initial.warnings, ...discovery.warnings, ...expanded.warnings])],
+    expandedQueries: relatedQueries,
   };
 }
