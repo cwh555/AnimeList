@@ -1,0 +1,31 @@
+/* Unified progress presentation.
+ * Numeric anime progress and state-based manga/novel progress share the same
+ * DOM structure; only the presentation model decides the fill amount.
+ */
+
+.al-progress.is-state-progress .al-progress-fill {
+  background: color-mix(in srgb, var(--al-accent) 82%, var(--text-muted));
+}
+
+.al-progress.is-empty-progress .al-progress-fill {
+  width: 0;
+}
+
+.al-detail-progress {
+  margin: -8px 0 20px;
+  padding: 0 12px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: var(--background-secondary);
+}
+
+.al-detail-actions:has(+ .al-detail-progress) {
+  margin-bottom: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.al-detail-progress .al-progress-row {
+  margin-top: 7px;
+}
