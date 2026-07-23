@@ -38,6 +38,19 @@ export const DEFAULT_SEARCH_LANGUAGES: SearchLanguageSettings = {
 
 const MAX_EXPANSION_QUERIES = 4;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function normalizeSearchLanguageSettings(value: unknown): SearchLanguageSettings {
+  const record = isRecord(value) ? value : {};
+  return {
+    chinese: typeof record.chinese === "boolean" ? record.chinese : DEFAULT_SEARCH_LANGUAGES.chinese,
+    english: typeof record.english === "boolean" ? record.english : DEFAULT_SEARCH_LANGUAGES.english,
+    original: typeof record.original === "boolean" ? record.original : DEFAULT_SEARCH_LANGUAGES.original,
+  };
+}
+
 function errorMessage(value: unknown): string {
   if (value instanceof Error) return value.message;
   if (typeof value === "string") return value;
