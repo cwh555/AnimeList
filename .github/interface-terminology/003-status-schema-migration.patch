@@ -1,0 +1,288 @@
+diff --git a/src/legacy.ts b/src/legacy.ts
+index e1cd146..ccbb73b 100644
+--- a/src/legacy.ts
++++ b/src/legacy.ts
+@@ -11,2 +11,3 @@ import {
+ import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
++import { CURRENT_MEDIA_SCHEMA_VERSION } from "./schema-migration";
+ 
+@@ -16,3 +17,3 @@ import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from
+ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+-  const lines = ["---", "schema_version: 5"];
++  const lines = ["---", `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`];
+   lines.push(`title: ${yamlScalar(title)}`);
+@@ -24,3 +25,3 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
+         await this.plugin.app.fileManager.processFrontMatter(this.file, (fm) => {
+-          fm.schema_version = 5;
++          fm.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
+           fm.title = nextTitle;
+diff --git a/src/main.ts b/src/main.ts
+index 6aa3568..bf239cc 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -3,2 +3,6 @@ import { completedRequirementMessage, uiText } from "./ui-text";
+ import { normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
++import {
++  MEDIA_STATUS_MIGRATION_VERSION,
++  migrateMediaStatusNotes,
++} from "./schema-migration";
+ import { rankSearchResults, searchQueryVariants } from "./search";
+@@ -14,2 +18,3 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
+     await this.loadSettings();
++    await this.migrateMediaStatuses();
+ 
+@@ -24,2 +29,3 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
+     const providers = isRecord(loaded.providers) ? loaded.providers : {};
++    const migrations = isRecord(loaded.migrations) ? loaded.migrations : {};
+     const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
+@@ -39,2 +45,5 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
+       },
++      migrations: {
++        mediaStatus: typeof migrations.mediaStatus === "number" ? migrations.mediaStatus : 0,
++      },
+       uiState: {
+@@ -45,2 +54,17 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
+ 
++  private async migrateMediaStatuses(): Promise<void> {
++    if (this.settings.migrations.mediaStatus >= MEDIA_STATUS_MIGRATION_VERSION) return;
++    try {
++      const result = await migrateMediaStatusNotes(this.app, this.getScanFolders());
++      this.settings.migrations.mediaStatus = MEDIA_STATUS_MIGRATION_VERSION;
++      await this.saveSettings();
++      if (result.total > 0) {
++        new Notice(uiText("notice.statusMigration", { count: result.total }));
++      }
++    } catch (error) {
++      console.error("AnimeList media-status migration failed", error);
++      new Notice(uiText("notice.statusMigrationFailed", { error: errorMessage(error) }));
++    }
++  }
++
+   async saveSettings(): Promise<void> {
+diff --git a/src/schema-migration.ts b/src/schema-migration.ts
+new file mode 100644
+index 0000000..d3a1944
+--- /dev/null
++++ b/src/schema-migration.ts
+@@ -0,0 +1,66 @@
++import type { App, TFile } from "obsidian";
++import {
++  canonicalMediaStatus,
++  shouldMigrateMediaStatus,
++} from "./media-status";
++import type { MediaStatus } from "./media-status";
++import type { MediaType } from "./types";
++import { getScopedMarkdownFiles } from "./vault-scope";
++
++export const CURRENT_MEDIA_SCHEMA_VERSION = 6;
++export const MEDIA_STATUS_MIGRATION_VERSION = 1;
++
++export interface MediaStatusMigrationResult {
++  total: number;
++  ongoing: number;
++  planned: number;
++}
++
++function isMediaType(value: unknown): value is MediaType {
++  return value === "anime" || value === "manga" || value === "novel";
++}
++
++export function migrateMediaStatusFrontmatter(frontmatter: Record<string, unknown>): MediaStatus | null {
++  if (!isMediaType(frontmatter.media_type) || !shouldMigrateMediaStatus(frontmatter.status)) return null;
++  const status = canonicalMediaStatus(frontmatter.status);
++  if (!status) return null;
++  frontmatter.status = status;
++  frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
++  return status;
++}
++
++function migrationCandidate(app: App, file: TFile): boolean {
++  const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
++  return Boolean(frontmatter
++    && isMediaType(frontmatter.media_type)
++    && shouldMigrateMediaStatus(frontmatter.status));
++}
++
++export async function migrateMediaStatusNotes(
++  app: App,
++  roots: string[],
++  concurrency = 8,
++): Promise<MediaStatusMigrationResult> {
++  const files = getScopedMarkdownFiles(app, roots).filter((file) => migrationCandidate(app, file));
++  const result: MediaStatusMigrationResult = { total: 0, ongoing: 0, planned: 0 };
++  if (!files.length) return result;
++
++  let nextIndex = 0;
++  const worker = async (): Promise<void> => {
++    while (nextIndex < files.length) {
++      const file = files[nextIndex];
++      nextIndex += 1;
++      let migrated: MediaStatus | null = null;
++      await app.fileManager.processFrontMatter(file, (frontmatter) => {
++        migrated = migrateMediaStatusFrontmatter(frontmatter);
++      });
++      if (!migrated) continue;
++      result.total += 1;
++      if (migrated === "ongoing") result.ongoing += 1;
++      if (migrated === "planned") result.planned += 1;
++    }
++  };
++
++  const workers = Math.min(files.length, Math.max(1, Math.floor(concurrency)));
++  await Promise.all(Array.from({ length: workers }, () => worker()));
++  return result;
++}
+diff --git a/src/settings.ts b/src/settings.ts
+index 34d7a5a..8fd35c9 100644
+--- a/src/settings.ts
++++ b/src/settings.ts
+@@ -12,2 +12,5 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
+   },
++  migrations: {
++    mediaStatus: 0,
++  },
+   uiState: {
+diff --git a/src/types.ts b/src/types.ts
+index 00b210e..8990ded 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -10,2 +10,6 @@ export interface ProviderSettings {
+ 
++export interface MigrationSettings {
++  mediaStatus: number;
++}
++
+ export interface LibraryUiState {
+@@ -22,2 +26,3 @@ export interface AnimeListSettings {
+   providers: ProviderSettings;
++  migrations: MigrationSettings;
+   uiState: LibraryUiState;
+diff --git a/src/ui-text.ts b/src/ui-text.ts
+index 54fe5d0..af30b34 100644
+--- a/src/ui-text.ts
++++ b/src/ui-text.ts
+@@ -4,3 +4,3 @@ export const UI_TEXT = {
+   "add.searching": "尋找中…",
+-  "add.processing": "新增中…",
++  "add.processing": "收錄中…",
+ 
+@@ -11,3 +11,5 @@ export const UI_TEXT = {
+   "notice.existingMedia": "作品已存在，已開啟原筆記。",
+-  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。"
++  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。",
++  "notice.statusMigration": "已更新 {count} 部作品的清單狀態。",
++  "notice.statusMigrationFailed": "無法完成清單狀態更新：{error}"
+ } as const;
+diff --git a/tests/core.test.ts b/tests/core.test.ts
+index 89df2be..6e91abf 100644
+--- a/tests/core.test.ts
++++ b/tests/core.test.ts
+@@ -1,2 +1,2 @@
+-  it("writes optional dates, release status, and per-volume history to schema version 5", () => {
++  it("writes optional dates, release status, and per-volume history to schema version 6", () => {
+     const novelResult = {
+@@ -7,3 +7,3 @@
+       score: 9,
+-      status: "reading",
++      status: "ongoing",
+       releaseStatus: "releasing",
+@@ -19,3 +19,4 @@
+     }, "", "");
+-    assert.match(markdown, /schema_version: 5/);
++    assert.match(markdown, /schema_version: 6/);
++    assert.match(markdown, /status: "ongoing"/);
+     assert.match(markdown, /release_status: "releasing"/);
+@@ -33,3 +34,3 @@
+       score: 8,
+-      status: "reading",
++      status: "ongoing",
+       releaseStatus: "releasing",
+diff --git a/tests/schema-migration.test.ts b/tests/schema-migration.test.ts
+new file mode 100644
+index 0000000..b3300c4
+--- /dev/null
++++ b/tests/schema-migration.test.ts
+@@ -0,0 +1,83 @@
++import assert from "node:assert/strict";
++import { describe, it } from "node:test";
++import { App, TFile, TFolder } from "obsidian";
++import {
++  CURRENT_MEDIA_SCHEMA_VERSION,
++  migrateMediaStatusFrontmatter,
++  migrateMediaStatusNotes,
++} from "../src/schema-migration";
++
++function markdownFile(path: string): TFile {
++  const file = new TFile();
++  file.path = path;
++  file.name = path.split("/").at(-1) ?? path;
++  file.basename = file.name.replace(/\.md$/, "");
++  file.extension = "md";
++  return file;
++}
++
++describe("media status schema migration", () => {
++  it("changes only recognized legacy statuses and preserves unrelated fields", () => {
++    const frontmatter: Record<string, unknown> = {
++      schema_version: 5,
++      media_type: "anime",
++      status: "watching",
++      title: "Example",
++      custom: { keep: true },
++    };
++    assert.equal(migrateMediaStatusFrontmatter(frontmatter), "ongoing");
++    assert.deepEqual(frontmatter, {
++      schema_version: CURRENT_MEDIA_SCHEMA_VERSION,
++      media_type: "anime",
++      status: "ongoing",
++      title: "Example",
++      custom: { keep: true },
++    });
++
++    const unknown = { media_type: "anime", status: "custom-state", keep: true };
++    assert.equal(migrateMediaStatusFrontmatter(unknown), null);
++    assert.deepEqual(unknown, { media_type: "anime", status: "custom-state", keep: true });
++  });
++
++  it("scans configured roots once and updates candidates with bounded concurrency", async () => {
++    const anime = markdownFile("AnimeList/Anime/a.md");
++    const manga = markdownFile("AnimeList/Manga/b.md");
++    const canonical = markdownFile("AnimeList/Novel/c.md");
++    const unrelated = markdownFile("AnimeList/Other/d.md");
++    const root = new TFolder();
++    root.path = "AnimeList";
++    root.name = "AnimeList";
++    root.children = [anime, manga, canonical, unrelated];
++
++    const frontmatters = new Map<TFile, Record<string, unknown>>([
++      [anime, { media_type: "anime", status: "watching", title: "A" }],
++      [manga, { media_type: "manga", status: "on_hold", title: "B" }],
++      [canonical, { media_type: "novel", status: "ongoing", title: "C" }],
++      [unrelated, { status: "reading", title: "D" }],
++    ]);
++    const writes: string[] = [];
++    const app = {
++      vault: {
++        getRoot: () => root,
++        getAbstractFileByPath: (path: string) => path === "AnimeList" ? root : null,
++      },
++      metadataCache: {
++        getFileCache: (file: TFile) => ({ frontmatter: frontmatters.get(file) }),
++      },
++      fileManager: {
++        processFrontMatter: async (file: TFile, callback: (frontmatter: Record<string, unknown>) => void) => {
++          writes.push(file.path);
++          callback(frontmatters.get(file) ?? {});
++        },
++      },
++    } as unknown as App;
++
++    const result = await migrateMediaStatusNotes(app, ["AnimeList"], 2);
++    assert.deepEqual(result, { total: 2, ongoing: 1, planned: 1 });
++    assert.deepEqual(writes.sort(), [anime.path, manga.path]);
++    assert.equal(frontmatters.get(anime)?.status, "ongoing");
++    assert.equal(frontmatters.get(manga)?.status, "planned");
++    assert.equal(frontmatters.get(canonical)?.schema_version, undefined);
++    assert.equal(frontmatters.get(unrelated)?.status, "reading");
++  });
++});
