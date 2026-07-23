@@ -24,15 +24,7 @@ jobs:
           set -euxo pipefail
           git fetch origin main preview feature/timeline-scale-optimization
           git diff --binary origin/main..origin/feature/timeline-scale-optimization > /tmp/timeline.patch
-          if ! git apply --3way --index /tmp/timeline.patch; then
-            git status --short
-            git diff --name-only --diff-filter=U
-            for file in $(git diff --name-only --diff-filter=U); do
-              echo "===== $file ====="
-              git diff -- "$file" || true
-            done
-            exit 1
-          fi
+          git apply --index --recount --whitespace=fix /tmp/timeline.patch
       - uses: actions/setup-node@v4
         with:
           node-version: 20
