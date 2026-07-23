@@ -224,14 +224,14 @@ function installDuplicateWarning(
     if (existingWarning?.dataset.duplicateSignature === signature) return;
     existingWarning?.remove();
 
-    const warning = modalEl.ownerDocument.win.createEl("section");
+    const warning = createEl("section");
     warning.className = "al-modal-warning al-duplicate-warning";
     warning.dataset.duplicateSignature = signature;
-    const title = modalEl.ownerDocument.win.createEl("strong");
+    const title = createEl("strong");
     title.textContent = searchFeatureText("duplicate.warning.title");
-    const description = modalEl.ownerDocument.win.createEl("p");
+    const description = createEl("p");
     description.textContent = searchFeatureText("duplicate.warning.description", { title: duplicate.title });
-    const open = modalEl.ownerDocument.win.createEl("button");
+    const open = createEl("button");
     open.type = "button";
     open.className = "al-secondary-button";
     open.textContent = searchFeatureText("duplicate.warning.open");
