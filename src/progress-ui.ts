@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return -- This module is the typed boundary around the legacy renderer and runtime-validated Obsidian frontmatter. */
 import { AnimeListUI, DetailActionsRenderChild } from "./legacy";
 import { normalizeMediaStatus } from "./media-status";
 import { normalizeProgressValue, progressDisplayValue } from "./novel-progress";
@@ -16,6 +15,27 @@ interface ProgressRenderInput {
   trailingText?: string;
 }
 
+interface LegacyLibraryUi {
+  renderLibrary(container: HTMLElement, inputItems: unknown[], adapters?: unknown): unknown;
+}
+
+interface DetailRenderInstance {
+  plugin: {
+    app: {
+      vault: {
+        getAbstractFileByPath(path: string): unknown;
+      };
+      metadataCache: {
+        getFileCache(file: unknown): { frontmatter?: Record<string, unknown> } | null;
+      };
+    };
+  };
+  sourcePath: string;
+  containerEl: HTMLElement;
+}
+
+type DetailRender = (this: DetailRenderInstance) => void;
+
 function progressStatusFromCard(card: HTMLElement): string {
   const statusClass = Array.from(card.classList).find((className) => className.startsWith("status-"));
   return statusClass?.slice("status-".length) ?? "planned";
@@ -24,14 +44,12 @@ function progressStatusFromCard(card: HTMLElement): string {
 function ensureTrack(container: HTMLElement): HTMLElement {
   let track = container.querySelector<HTMLElement>(":scope > .al-progress-track");
   if (!track) {
-    track = document.createElement("div");
-    track.className = "al-progress-track";
+    track = createDiv({ cls: "al-progress-track" });
     container.prepend(track);
   }
   let fill = track.querySelector<HTMLElement>(":scope > .al-progress-fill");
   if (!fill) {
-    fill = document.createElement("div");
-    fill.className = "al-progress-fill";
+    fill = createDiv({ cls: "al-progress-fill" });
     track.appendChild(fill);
   }
   return fill;
@@ -46,21 +64,18 @@ export function renderProgress(container: HTMLElement, input: ProgressRenderInpu
 
   let row = container.querySelector<HTMLElement>(":scope > .al-progress-row");
   if (!row) {
-    row = document.createElement("div");
-    row.className = "al-progress-row";
+    row = createDiv({ cls: "al-progress-row" });
     container.appendChild(row);
   }
   row.replaceChildren();
-  const text = document.createElement("span");
-  text.textContent = input.text;
-  row.appendChild(text);
+  row.appendChild(createSpan({ text: input.text }));
 
   const trailingText = presentation.percentageLabel ?? input.trailingText;
   if (trailingText) {
-    const trailing = document.createElement("span");
-    trailing.textContent = trailingText;
-    if (presentation.kind === "state") trailing.className = "al-release-label";
-    row.appendChild(trailing);
+    row.appendChild(createSpan({
+      cls: presentation.kind === "state" ? "al-release-label" : undefined,
+      text: trailingText,
+    }));
   }
 }
 
@@ -87,8 +102,9 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
   });
 }
 
-const originalRenderLibrary = AnimeListUI.renderLibrary.bind(AnimeListUI);
-AnimeListUI.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
+const libraryUi = AnimeListUI as unknown as LegacyLibraryUi;
+const originalRenderLibrary = libraryUi.renderLibrary.bind(libraryUi);
+libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
   const result = originalRenderLibrary(container, inputItems, adapters);
   synchronizeLibraryProgress(container);
 
@@ -100,8 +116,11 @@ AnimeListUI.renderLibrary = (container: HTMLElement, inputItems: unknown[], adap
   return result;
 };
 
-const originalDetailRender = DetailActionsRenderChild.prototype.render;
-DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress(): void {
+const detailPrototype = DetailActionsRenderChild.prototype as unknown as { render: DetailRender };
+/* eslint-disable @typescript-eslint/unbound-method -- The method is immediately restored with its runtime instance through Function.call. */
+const originalDetailRender = detailPrototype.render;
+/* eslint-enable @typescript-eslint/unbound-method */
+detailPrototype.render = function renderUnifiedDetailProgress(): void {
   originalDetailRender.call(this);
 
   const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
@@ -111,8 +130,7 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
   const progress = normalizeProgressValue(frontmatter.progress);
   const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
   const unit = String(frontmatter.progress_unit || "");
-  const detailContainer = this.containerEl as HTMLElement;
-  const summary = detailContainer.querySelector<HTMLElement>(".al-detail-summary");
+  const summary = this.containerEl.querySelector<HTMLElement>(".al-detail-summary");
   const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
   const text = summaryProgress?.textContent?.trim()
     || (progress !== 0
@@ -123,8 +141,7 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
       : uiText("detail.noProgress"));
   summaryProgress?.remove();
 
-  const progressContainer = document.createElement("div");
-  progressContainer.className = "al-progress al-detail-progress";
+  const progressContainer = createDiv({ cls: "al-progress al-detail-progress" });
   renderProgress(progressContainer, {
     mediaType,
     status: normalizeMediaStatus(frontmatter.status),
@@ -133,5 +150,5 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
     unit,
     text,
   });
-  detailContainer.appendChild(progressContainer);
+  this.containerEl.appendChild(progressContainer);
 };
