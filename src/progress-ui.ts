@@ -16,7 +16,7 @@ interface ProgressRenderInput {
 }
 
 interface LegacyLibraryUi {
-  renderLibrary(container: HTMLElement, inputItems: unknown[], adapters?: unknown): void;
+  renderLibrary: (container: HTMLElement, inputItems: unknown[], adapters?: unknown) => void;
 }
 
 interface DetailRenderInstance {
