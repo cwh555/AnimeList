@@ -1,0 +1,89 @@
+name: Validate interface terminology PR
+
+on:
+  pull_request:
+    branches:
+      - validation/interface-terminology
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+concurrency:
+  group: interface-terminology-pr-rewrite
+  cancel-in-progress: false
+
+jobs:
+  validate-and-publish:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out validation merge
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect staged implementation
+        id: staged
+        shell: bash
+        run: |
+          if [[ -f .github/interface-terminology/trigger-pr ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore deterministic implementation script
+        if: steps.staged.outputs.present == 'true'
+        shell: bash
+        run: |
+          awk '
+            /cat > \/tmp\/apply-interface.py.gz.b64 <<'\''B64'\''/ { capture=1; next }
+            capture && /^B64$/ { exit }
+            capture { print }
+          ' .github/workflows/interface-terminology-validate.yml > /tmp/apply-interface.py.gz.b64
+          base64 --decode /tmp/apply-interface.py.gz.b64 | gzip --decompress > /tmp/apply-interface.py
+          echo "f5dec357e4acd6df011f7b5e6d522f6075c025849189b82cf59d97ea48849d68  /tmp/apply-interface.py" | sha256sum --check --strict
+          python -m py_compile /tmp/apply-interface.py
+
+      - name: Rebuild clean feature history from main
+        if: steps.staged.outputs.present == 'true'
+        shell: bash
+        env:
+          BASE_SHA: e25ddf7e17fcf9a3f323087091ae2532ac4ab187
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git reset --hard "$BASE_SHA"
+          git clean -fdx
+          python /tmp/apply-interface.py
+          git log --oneline --decorate -4
+
+      - name: Set up Node.js
+        if: steps.staged.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.staged.outputs.present == 'true'
+        run: npm ci
+
+      - name: Run full repository check
+        if: steps.staged.outputs.present == 'true'
+        run: npm run check
+
+      - name: Run release validation
+        if: steps.staged.outputs.present == 'true'
+        run: npm run release:check
+
+      - name: Publish validated feature history
+        if: steps.staged.outputs.present == 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git push --force-with-lease=refs/heads/feature/interface-terminology:${EXPECTED_HEAD} origin HEAD:refs/heads/feature/interface-terminology
