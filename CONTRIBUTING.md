@@ -12,7 +12,7 @@ For development with an Obsidian test vault:
 npm run test-vault:dev
 ```
 
-This creates the ignored local `test-vault`, writes the development bundle directly into its plugin directory, opens the vault, and watches source files. Reload AnimeList in Obsidian after a rebuild.
+This creates the ignored local `test-vault`, writes the development bundle directly into its plugin directory, generates deterministic test fixtures, opens `_AnimeList Test Checklist.md`, and watches source files. Reload AnimeList in Obsidian after a rebuild.
 
 Before a release, run the production-equivalent manual test setup:
 
@@ -20,7 +20,15 @@ Before a release, run the production-equivalent manual test setup:
 npm run test-vault
 ```
 
-This runs the complete repository checks, verifies release consistency, and installs only `main.js`, `manifest.json`, and `styles.css` into the ignored test vault. This mode deliberately avoids repository-directory symlinks so it matches a manual GitHub Release installation.
+This runs the complete repository checks, verifies release consistency, installs only `main.js`, `manifest.json`, and `styles.css`, regenerates the local fixtures, and opens the checklist in the ignored test vault. This mode deliberately avoids repository-directory symlinks so it matches a manual GitHub Release installation.
+
+To discard manual fixture edits and restore only the generated baseline data:
+
+```bash
+npm run test-vault:fixtures
+```
+
+The generated data lives under `test-vault/AnimeList/Test Fixtures`, while the entry page is `test-vault/_AnimeList Test Checklist.md`. Both remain local and ignored by Git.
 
 To use another disposable vault:
 
@@ -36,7 +44,7 @@ Before opening a pull request, run:
 npm run check
 ```
 
-Do not commit the test vault, its media data, or Obsidian workspace state.
+Do not commit the test vault, its media data, generated fixtures, or Obsidian workspace state.
 
 ## Code and UI language
 
