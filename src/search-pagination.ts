@@ -75,6 +75,7 @@ function resetState(state, signature) {
   state.exhausted = false;
   state.loading = false;
   state.restoreScrollTop = null;
+  state.restoreScheduled = false;
   state.loadMoreRequested = false;
 }
 
@@ -182,15 +183,25 @@ function queueEnhance(plugin, state) {
   });
 }
 
+function scheduleScrollRestore(state) {
+  if (state.restoreScrollTop === null || state.restoreScheduled) return;
+  state.restoreScheduled = true;
+  const scrollTop = state.restoreScrollTop;
+  window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      state.restoreScheduled = false;
+      state.restoreScrollTop = null;
+      if (state.modalEl.isConnected) state.modalEl.scrollTop = scrollTop;
+    });
+  }, 0);
+}
+
 function enhanceModal(plugin, state) {
   if (!state.modalEl.isConnected) {
     cleanup(plugin, state);
     return;
   }
-  if (state.restoreScrollTop !== null) {
-    state.modalEl.scrollTop = state.restoreScrollTop;
-    state.restoreScrollTop = null;
-  }
+  scheduleScrollRestore(state);
 
   const existing = state.modalEl.querySelector(".al-search-pagination");
   const resultCount = state.modalEl.querySelectorAll(".al-search-result").length;
@@ -262,7 +273,7 @@ function installPagination(plugin, modalEl) {
   state = {
     modalEl, observer, originalSearch, wrappedSearch,
     signature: "", requestedLoads: 0, initial: null, pages: new Map(), exhausted: false,
-    loading: false, restoreScrollTop: null, loadMoreRequested: false, enhanceQueued: false,
+    loading: false, restoreScrollTop: null, restoreScheduled: false, loadMoreRequested: false, enhanceQueued: false,
   };
   plugin.searchExternal = wrappedSearch;
   observer.observe(modalEl.parentElement || document.body, { childList: true, subtree: true });
