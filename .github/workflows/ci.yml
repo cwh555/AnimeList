@@ -18,5 +18,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run repository checks
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee ci.log
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-log
+          path: ci.log
       - run: npm run release:check
