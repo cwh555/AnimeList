@@ -1,0 +1,26 @@
+diff --git a/src/ui-text.ts b/src/ui-text.ts
+index 864809c..61ff9c0 100644
+--- a/src/ui-text.ts
++++ b/src/ui-text.ts
+@@ -1,5 +1,5 @@
+-  "media.release.unknown": "出版狀態未知",
+-  "library.emptyTitle": "沒有符合條件的項目",
+-  "add.description": "選擇類型並搜尋作品。",
+-  "add.favorite": "收進最愛",
+-  "notice.favoriteAdded": "已收進最愛。",
++  "media.release.unknown": "發行狀態未知",
++  "library.emptyTitle": "沒有符合條件的作品",
++  "add.description": "選擇作品類型並搜尋作品。",
++  "add.favorite": "加入最愛",
++  "notice.favoriteAdded": "已加入最愛。",
+diff --git a/styles.css b/styles.css
+index e65db5b..267165b 100644
+--- a/styles.css
++++ b/styles.css
+@@ -1,5 +1,4 @@
+-.al-status.status-watching, .al-status.status-reading { background:rgba(42,139,105,.86); }
++.al-status.status-ongoing { background:rgba(42,139,105,.86); }
+ .al-status.status-completed { background:rgba(73,92,160,.86); }
+ .al-status.status-planned { background:rgba(113,84,166,.86); }
+-.al-status.status-on_hold { background:rgba(164,115,45,.86); }
+ .al-status.status-dropped { background:rgba(143,67,72,.86); }
