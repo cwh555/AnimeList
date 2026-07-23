@@ -17,6 +17,8 @@ await writeFile(entryFile, [
   'import "../../tests/core.test.ts";',
   'import "../../tests/search-pagination.test.ts";',
   'import "../../tests/cover-cache.test.ts";',
+  'import "../../tests/multilingual-search.test.ts";',
+  'import "../../tests/duplicate-detection.test.ts";',
   "",
 ].join("\n"));
 
