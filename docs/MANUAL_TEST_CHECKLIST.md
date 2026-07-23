@@ -49,11 +49,16 @@ Run this checklist before every public release and before the initial Community 
 
 ### Progress rules
 
-- [ ] Completed anime synchronizes progress to its known episode total.
-- [ ] Manga exposes only current chapter progress; there is no latest/total chapter field.
-- [ ] Marking manga completed leaves its current chapter unchanged.
-- [ ] Novel current progress accepts whole volumes, `.5`, and `EX`; there is no latest/total volume field.
-- [ ] Marking a novel completed leaves its current volume unchanged.
+- [ ] Completed anime synchronizes progress to its known episode total and keeps `progress_unit: episode`.
+- [ ] Manga and novel create dialogs offer **話**, **季**, and **卷**; manga defaults to **話** and novel defaults to **卷**.
+- [ ] Manga and novel edit dialogs show the saved unit and can switch among **話**, **季**, and **卷**.
+- [ ] Saving **話** or **季** writes `chapter` or `season` to `progress_unit`, accepts `0` or a positive whole number, and rejects `.5`, negative values, and `EX`.
+- [ ] Saving **卷** writes `volume` to `progress_unit` and accepts whole volumes, `.5`, and `EX`.
+- [ ] Library cards and detail views display **話**, **季**, and **卷** instead of raw unit keys.
+- [ ] Marking manga or novel completed leaves its current reading progress unchanged.
+- [ ] A novel using **話** or **季** keeps its entered progress even when `volume_log` contains a higher completed volume.
+- [ ] A novel using **卷** raises progress to the highest completed `volume_log` entry when necessary.
+- [ ] Editing a note with an unknown legacy `progress_unit` preserves that value unless the user explicitly selects another unit.
 - [ ] Duplicate novel volume labels are rejected after normalization (`01` and `1` are the same).
 - [ ] Adding a novel volume pre-fills its completion date with today; clearing the field and saving restores today.
 
