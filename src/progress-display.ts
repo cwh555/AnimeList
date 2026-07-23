@@ -1,13 +1,12 @@
 import { normalizeMediaStatus } from "./media-status";
 import { progressRatio } from "./novel-progress";
-import type { MediaStatus } from "./media-status";
 import type { MediaType, ProgressValue } from "./types";
 
 export type ProgressKind = "numeric" | "state";
 
 export interface ProgressPresentationInput {
   mediaType: MediaType;
-  status: MediaStatus | string;
+  status: unknown;
   progress: ProgressValue;
   total: ProgressValue;
   unit: string;
@@ -33,13 +32,12 @@ export function progressPresentation(input: ProgressPresentationInput): Progress
   const hasProgress = hasRecordedProgress(input.progress);
 
   if (input.mediaType === "anime") {
-    const ratio = progressRatio(input.progress, input.total, input.unit) ?? 0;
+    const numericRatio = progressRatio(input.progress, input.total, input.unit);
+    const ratio = numericRatio ?? 0;
     return {
       kind: "numeric",
       ratio,
-      percentageLabel: progressRatio(input.progress, input.total, input.unit) === null
-        ? null
-        : `${Math.round(ratio * 100)}%`,
+      percentageLabel: numericRatio === null ? null : `${Math.round(ratio * 100)}%`,
       hasProgress,
     };
   }
