@@ -8,7 +8,7 @@ export type ProgressValidationResult =
   | { ok: true; value: ProgressValue }
   | { ok: false; reason: ProgressValidationFailure };
 
-const READING_PROGRESS_UNITS = ["chapter", "season", "volume"] as const;
+export const READING_PROGRESS_UNITS = ["chapter", "season", "volume"] as const;
 
 function scalarText(value: unknown): string {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
