@@ -1,0 +1,36 @@
+name: Integrate timeline scale
+
+on:
+  push:
+    branches:
+      - integration/timeline-scale-preview
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: integration/timeline-scale-preview
+      - name: Apply feature patch
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git fetch origin main preview feature/timeline-scale-optimization
+          git diff --binary origin/main..origin/feature/timeline-scale-optimization > /tmp/timeline.patch
+          if ! git apply --3way --index /tmp/timeline.patch; then
+            git status --short
+            git diff --name-only --diff-filter=U
+            for file in $(git diff --name-only --diff-filter=U); do
+              echo "===== $file ====="
+              git diff -- "$file" || true
+            done
+            exit 1
+          fi
+          git status --short
