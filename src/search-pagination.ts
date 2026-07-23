@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+import { Modal, Notice, requestUrl } from "obsidian";
 import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
 import { rankSearchResults } from "./search";
 import { uiText } from "./ui-text";
@@ -10,15 +10,9 @@ export const SEARCH_PAGINATION_LIMITS = {
   maxResults: 72,
 } as const;
 
-const MEDIA_TYPES: MediaType[] = ["anime", "manga", "novel"];
-const USER_AGENT = "AnimeList-Obsidian (local personal media library)";
-
-interface SearchResponse {
+interface SearchPage {
   results: ExternalMediaResult[];
   warnings: string[];
-}
-
-interface SearchPage extends SearchResponse {
   hasMore: boolean;
 }
 
@@ -27,74 +21,65 @@ interface ProviderPage {
   hasMore: boolean;
 }
 
-interface ProviderOutcome {
+interface ProviderTaskResult {
   provider: string;
   page?: ProviderPage;
   error?: unknown;
 }
 
-interface PaginationPlugin extends LegacyAnimeListPlugin {
-  settings?: {
-    providers?: ProviderSettings;
-  };
-  searchExternal(mediaType: MediaType, query: string): Promise<SearchResponse>;
+interface PaginatedPlugin {
+  settings?: { providers?: ProviderSettings };
+}
+
+interface AppendTarget<Node> {
+  appendChild(node: Node): unknown;
+}
+
+interface LegacyAddMediaModal extends Modal {
+  plugin: PaginatedPlugin;
+  mediaType: MediaType;
+  query: string;
+  results: ExternalMediaResult[];
+  warnings: string[];
+  renderSearch: () => void;
+  search: (button: HTMLButtonElement) => Promise<void>;
+  createResultRow: (result: ExternalMediaResult) => HTMLElement;
 }
 
 interface PaginationState {
-  modalEl: HTMLElement;
-  observer: MutationObserver;
-  originalSearch: (mediaType: MediaType, query: string) => Promise<SearchResponse>;
-  wrappedSearch: (mediaType: MediaType, query: string) => Promise<SearchResponse>;
   signature: string;
-  requestedLoads: number;
-  initial: SearchResponse | null;
-  pages: Map<number, SearchPage>;
-  exhausted: boolean;
+  results: ExternalMediaResult[];
+  warnings: string[];
+  loads: number;
+  hasMore: boolean;
   loading: boolean;
-  restoreScrollTop: number | null;
-  loadMoreRequested: boolean;
+  initialSearchPending: boolean;
 }
 
-const normalizeBangumiSubject = legacyTest.normalizeBangumiSubject as (
-  subject: unknown,
-  mediaType: MediaType,
-) => ExternalMediaResult;
-const normalizeAniListMedia = legacyTest.normalizeAniListMedia as (
-  media: unknown,
-  mediaType: MediaType,
-) => ExternalMediaResult;
-const normalizeOpenLibraryBook = legacyTest.normalizeOpenLibraryBook as (
-  book: unknown,
-) => ExternalMediaResult;
-const dedupeSearchResults = legacyTest.dedupeSearchResults as (
-  results: ExternalMediaResult[],
-) => ExternalMediaResult[];
-
-function isExternalMediaResult(value: unknown): value is ExternalMediaResult {
-  if (typeof value !== "object" || value === null) return false;
-  const result = value as Partial<ExternalMediaResult>;
-  return typeof result.provider === "string"
-    && typeof result.sourceId === "string"
-    && typeof result.title === "string";
+interface LegacyPluginPrototype extends Record<PropertyKey, unknown> {
+  openAddModal: (this: LegacyAnimeListPlugin, initialType?: string) => void;
 }
 
-function isSearchResponse(value: unknown): value is SearchResponse {
-  if (typeof value !== "object" || value === null) return false;
-  const response = value as Partial<SearchResponse>;
-  return Array.isArray(response.results)
-    && response.results.every(isExternalMediaResult)
-    && Array.isArray(response.warnings)
-    && response.warnings.every((warning) => typeof warning === "string");
+const PATCH_MARKER = Symbol.for("animelist.search-pagination.native-append");
+const USER_AGENT = "AnimeList-Obsidian (local personal media library)";
+const {
+  normalizeBangumiSubject,
+  normalizeAniListMedia,
+  normalizeOpenLibraryBook,
+  dedupeSearchResults,
+} = legacyTest as {
+  normalizeBangumiSubject: (value: unknown, mediaType: MediaType) => ExternalMediaResult;
+  normalizeAniListMedia: (value: unknown, mediaType: MediaType) => ExternalMediaResult;
+  normalizeOpenLibraryBook: (value: unknown) => ExternalMediaResult;
+  dedupeSearchResults: (values: ExternalMediaResult[]) => ExternalMediaResult[];
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
 }
 
 function numberValue(value: unknown): number | null {
@@ -104,16 +89,11 @@ function numberValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
 function errorMessage(value: unknown): string {
   if (value instanceof Error) return value.message;
   if (typeof value === "string") return value;
   try {
-    const serialized = JSON.stringify(value);
-    return serialized || "Unknown error";
+    return JSON.stringify(value) || "Unknown error";
   } catch {
     return "Unknown error";
   }
@@ -140,48 +120,63 @@ export function mergeSearchPages(
   return output;
 }
 
-function currentSearchContext(modalEl: HTMLElement): { mediaType: MediaType; query: string } | null {
-  const input = modalEl.querySelector<HTMLInputElement>(".al-modal-search-row input");
-  const typeButtons = Array.from(modalEl.querySelectorAll<HTMLButtonElement>(".al-modal-type"));
-  const activeIndex = typeButtons.findIndex((button) => button.classList.contains("is-active"));
-  const mediaType = MEDIA_TYPES[activeIndex];
-  const query = input?.value.trim() ?? "";
-  return mediaType && query ? { mediaType, query } : null;
+export function appendSearchResultRows<Node>(
+  target: AppendTarget<Node>,
+  results: readonly ExternalMediaResult[],
+  createRow: (result: ExternalMediaResult) => Node,
+): number {
+  for (const result of results) target.appendChild(createRow(result));
+  return results.length;
 }
 
-function resetState(state: PaginationState, signature: string): void {
-  state.signature = signature;
-  state.requestedLoads = 0;
-  state.initial = null;
-  state.pages.clear();
-  state.exhausted = false;
+function searchSignature(mediaType: MediaType, query: string): string {
+  return `${mediaType}\u0000${query.trim()}`;
+}
+
+function freshState(): PaginationState {
+  return {
+    signature: "",
+    results: [],
+    warnings: [],
+    loads: 0,
+    hasMore: false,
+    loading: false,
+    initialSearchPending: false,
+  };
+}
+
+function resetFromInitialSearch(modal: LegacyAddMediaModal, state: PaginationState): void {
+  state.signature = searchSignature(modal.mediaType, modal.query);
+  state.results = [...modal.results];
+  state.warnings = [...modal.warnings];
+  state.loads = 0;
+  state.hasMore = modal.results.length > 0;
   state.loading = false;
-  state.restoreScrollTop = null;
-  state.loadMoreRequested = false;
+  state.initialSearchPending = false;
 }
 
-async function searchBangumiPage(
-  mediaType: MediaType,
-  query: string,
-  page: number,
-): Promise<ProviderPage> {
+function canLoadMore(state: PaginationState): boolean {
+  return state.hasMore
+    && !state.loading
+    && state.loads < SEARCH_PAGINATION_LIMITS.maxLoads
+    && state.results.length < SEARCH_PAGINATION_LIMITS.maxResults;
+}
+
+async function searchBangumiPage(mediaType: MediaType, query: string, page: number): Promise<ProviderPage> {
   const limit = 20;
   const offset = (page - 1) * limit;
   const response = await requestUrl({
     url: `https://api.bgm.tv/v0/search/subjects?limit=${limit}&offset=${offset}`,
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": USER_AGENT },
     body: JSON.stringify({
       keyword: query,
       sort: "match",
       filter: { type: [mediaType === "anime" ? 2 : 1], nsfw: false },
     }),
   });
-  const payload = asRecord(response.json ?? JSON.parse(response.text || "{}"));
+  const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+  const payload = isRecord(parsed) ? parsed : {};
   const subjects = asArray(payload.data);
   const total = numberValue(payload.total);
   return {
@@ -190,11 +185,7 @@ async function searchBangumiPage(
   };
 }
 
-async function searchAniListPage(
-  mediaType: MediaType,
-  query: string,
-  page: number,
-): Promise<ProviderPage> {
+async function searchAniListPage(mediaType: MediaType, query: string, page: number): Promise<ProviderPage> {
   const graphQuery = `
     query ($search: String, $type: MediaType, $format: MediaFormat, $page: Int) {
       Page(page: $page, perPage: 20) {
@@ -212,11 +203,7 @@ async function searchAniListPage(
   const response = await requestUrl({
     url: "https://graphql.anilist.co",
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-    },
+    headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": USER_AGENT },
     body: JSON.stringify({
       query: graphQuery,
       variables: {
@@ -227,15 +214,22 @@ async function searchAniListPage(
       },
     }),
   });
-  const payload = asRecord(response.json ?? JSON.parse(response.text || "{}"));
-  const pagePayload = asRecord(asRecord(payload.data).Page);
+  const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+  const payload = isRecord(parsed) ? parsed : {};
+  const data = isRecord(payload.data) ? payload.data : {};
+  const pagePayload = isRecord(data.Page) ? data.Page : {};
   let media = asArray(pagePayload.media);
   if (mediaType === "manga") {
-    media = media.filter((item) => stringValue(asRecord(item).format).toUpperCase() !== "NOVEL");
+    media = media.filter((item) => {
+      if (!isRecord(item)) return true;
+      const format = typeof item.format === "string" ? item.format : "";
+      return format.toUpperCase() !== "NOVEL";
+    });
   }
+  const pageInfo = isRecord(pagePayload.pageInfo) ? pagePayload.pageInfo : {};
   return {
     items: media.map((item) => normalizeAniListMedia(item, mediaType)),
-    hasMore: asRecord(pagePayload.pageInfo).hasNextPage === true,
+    hasMore: pageInfo.hasNextPage === true,
   };
 }
 
@@ -247,41 +241,34 @@ async function searchOpenLibraryPage(query: string, page: number): Promise<Provi
     method: "GET",
     headers: { Accept: "application/json", "User-Agent": USER_AGENT },
   });
-  const payload = asRecord(response.json ?? JSON.parse(response.text || "{}"));
+  const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+  const payload = isRecord(parsed) ? parsed : {};
   const docs = asArray(payload.docs);
   const total = numberValue(payload.numFound);
   const start = numberValue(payload.start) ?? (page - 1) * limit;
   return {
-    items: docs.map((book) => normalizeOpenLibraryBook(book)),
+    items: docs.map((item) => normalizeOpenLibraryBook(item)),
     hasMore: total === null ? docs.length === limit : start + docs.length < total,
   };
 }
 
-function providerTask(provider: string, task: Promise<ProviderPage>): Promise<ProviderOutcome> {
-  return task
-    .then((page): ProviderOutcome => ({ provider, page }))
-    .catch((error: unknown): ProviderOutcome => ({ provider, error }));
+function providerTask(provider: string, task: Promise<ProviderPage>): Promise<ProviderTaskResult> {
+  return task.then((page) => ({ provider, page })).catch((error: unknown) => ({ provider, error }));
 }
 
-async function searchExternalPage(
-  plugin: PaginationPlugin,
+export async function fetchExternalSearchPage(
+  plugin: PaginatedPlugin,
   mediaType: MediaType,
   query: string,
   page: number,
 ): Promise<SearchPage> {
-  const providers = plugin.settings?.providers ?? {
-    bangumi: true,
-    anilist: true,
-    openlibrary: true,
-  };
-  const tasks: Array<Promise<ProviderOutcome>> = [];
-
+  const providers = plugin.settings?.providers ?? { bangumi: true, anilist: true, openlibrary: true };
+  const tasks: Array<Promise<ProviderTaskResult>> = [];
   if (providers.bangumi) tasks.push(providerTask("Bangumi", searchBangumiPage(mediaType, query, page)));
   if (providers.anilist) tasks.push(providerTask("AniList", searchAniListPage(mediaType, query, page)));
   if (mediaType === "novel" && providers.openlibrary) {
     tasks.push(providerTask("Open Library", searchOpenLibraryPage(query, page)));
   }
-
   const settled = await Promise.all(tasks);
   const warnings = settled
     .filter((entry) => entry.error !== undefined)
@@ -294,135 +281,130 @@ async function searchExternalPage(
   };
 }
 
-function cleanup(plugin: PaginationPlugin, state: PaginationState): void {
-  state.observer.disconnect();
-  if (plugin.searchExternal === state.wrappedSearch) plugin.searchExternal = state.originalSearch;
+export async function appendNextSearchPage(
+  modal: LegacyAddMediaModal,
+  state: PaginationState,
+  resultsEl: HTMLElement,
+): Promise<number> {
+  if (!canLoadMore(state)) return 0;
+  state.loading = true;
+  const page = state.loads + 2;
+  try {
+    const response = await fetchExternalSearchPage(modal.plugin, modal.mediaType, modal.query, page);
+    const existingKeys = new Set(state.results.map(resultKey));
+    const merged = mergeSearchPages(state.results, [response.results]);
+    const appended = merged.filter((result) => !existingKeys.has(resultKey(result)));
+    state.loads += 1;
+    state.results = merged;
+    state.warnings = [...new Set([...state.warnings, ...response.warnings])];
+    state.hasMore = response.hasMore && appended.length > 0;
+    modal.results = merged;
+    modal.warnings = [...state.warnings];
+
+    const scrollTop = modal.contentEl.scrollTop;
+    appendSearchResultRows(resultsEl, appended, (result) => modal.createResultRow(result));
+    modal.contentEl.scrollTop = scrollTop;
+    return appended.length;
+  } finally {
+    state.loading = false;
+  }
 }
 
-function enhanceModal(plugin: PaginationPlugin, state: PaginationState): void {
-  if (!state.modalEl.isConnected) {
-    cleanup(plugin, state);
-    return;
+function renderPagination(modal: LegacyAddMediaModal, state: PaginationState): void {
+  modal.contentEl.querySelector(".al-search-pagination")?.remove();
+  if (state.initialSearchPending) resetFromInitialSearch(modal, state);
+  const currentSignature = searchSignature(modal.mediaType, modal.query);
+  if (state.signature !== currentSignature || modal.results.length === 0) {
+    state.signature = currentSignature;
+    state.results = [...modal.results];
+    state.warnings = [...modal.warnings];
+    state.loads = 0;
+    state.hasMore = modal.results.length > 0;
   }
-  if (state.restoreScrollTop !== null) {
-    state.modalEl.scrollTop = state.restoreScrollTop;
-    state.restoreScrollTop = null;
-  }
-  state.modalEl.querySelector(".al-search-pagination")?.remove();
-  const resultCount = state.modalEl.querySelectorAll(".al-search-result").length;
-  const canLoadMore = currentSearchContext(state.modalEl) !== null
-    && resultCount > 0
-    && !state.loading
-    && !state.exhausted
-    && state.requestedLoads < SEARCH_PAGINATION_LIMITS.maxLoads
-    && resultCount < SEARCH_PAGINATION_LIMITS.maxResults;
-  if (!canLoadMore) return;
+  if (!canLoadMore(state)) return;
 
-  const actions = state.modalEl.createDiv({ cls: "al-modal-actions al-search-pagination" });
+  const resultsEl = modal.contentEl.querySelector<HTMLElement>(".al-search-results");
+  if (!resultsEl) return;
+  const actions = modal.contentEl.createDiv({ cls: "al-modal-actions al-search-pagination" });
   const button = actions.createEl("button", { text: uiText("add.loadMore"), cls: "al-secondary-button" });
   button.type = "button";
   button.addEventListener("click", () => {
-    const searchButton = state.modalEl.querySelector<HTMLButtonElement>(".al-modal-search-row button");
-    if (!searchButton) return;
-    state.requestedLoads += 1;
-    state.loadMoreRequested = true;
-    state.loading = true;
-    state.restoreScrollTop = state.modalEl.scrollTop;
+    if (state.loading) return;
+    const previousWarningCount = state.warnings.length;
     button.disabled = true;
     button.textContent = uiText("add.loadingMore");
-    searchButton.click();
-  });
-  state.modalEl.querySelector(".al-search-results")?.insertAdjacentElement("afterend", actions);
-}
-
-function installPagination(plugin: PaginationPlugin, modalEl: HTMLElement): void {
-  const searchExternalValue: unknown = Reflect.get(plugin, "searchExternal");
-  if (typeof searchExternalValue !== "function") {
-    throw new TypeError("AnimeList searchExternal is unavailable");
-  }
-  const originalSearch = async (mediaType: MediaType, query: string): Promise<SearchResponse> => {
-    const response: unknown = await Reflect.apply(searchExternalValue, plugin, [mediaType, query]);
-    if (!isSearchResponse(response)) {
-      throw new TypeError("AnimeList searchExternal returned an invalid response");
-    }
-    return response;
-  };
-  let state: PaginationState;
-  const observer = new MutationObserver(() => {
-    window.queueMicrotask(() => enhanceModal(plugin, state));
-  });
-  const wrappedSearch = async (mediaType: MediaType, query: string): Promise<SearchResponse> => {
-    const signature = `${mediaType}\u0000${query.trim()}`;
-    const isLoadMore = state.loadMoreRequested;
-    state.loadMoreRequested = false;
-    if (state.signature !== signature || !isLoadMore) resetState(state, signature);
-    state.loading = true;
-    try {
-      if (!state.initial) state.initial = await originalSearch(mediaType, query);
-      for (let page = 2; page <= state.requestedLoads + 1; page += 1) {
-        if (!state.pages.has(page)) {
-          state.pages.set(page, await searchExternalPage(plugin, mediaType, query, page));
+    button.blur();
+    void appendNextSearchPage(modal, state, resultsEl)
+      .then(() => {
+        if (state.warnings.length > previousWarningCount) {
+          new Notice(uiText("add.warning", { warnings: state.warnings.join("；") }));
         }
-      }
-      const orderedPages = Array.from(state.pages.entries())
-        .sort(([left], [right]) => left - right)
-        .map(([, value]) => value);
-      const results = mergeSearchPages(
-        state.initial.results,
-        orderedPages.map((page) => page.results),
-      );
-      const warnings = Array.from(new Set([
-        ...state.initial.warnings,
-        ...orderedPages.flatMap((page) => page.warnings),
-      ]));
-      const previousResults = orderedPages.length > 0
-        ? mergeSearchPages(
-          state.initial.results,
-          orderedPages.slice(0, -1).map((page) => page.results),
-        )
-        : [];
-      const lastPage = orderedPages[orderedPages.length - 1];
-      state.exhausted = results.length === 0
-        || results.length >= SEARCH_PAGINATION_LIMITS.maxResults
-        || state.requestedLoads >= SEARCH_PAGINATION_LIMITS.maxLoads
-        || (orderedPages.length > 0 && results.length === previousResults.length)
-        || (lastPage !== undefined && !lastPage.hasMore);
-      return { results, warnings };
-    } finally {
-      state.loading = false;
-    }
-  };
-
-  state = {
-    modalEl,
-    observer,
-    originalSearch,
-    wrappedSearch,
-    signature: "",
-    requestedLoads: 0,
-    initial: null,
-    pages: new Map<number, SearchPage>(),
-    exhausted: false,
-    loading: false,
-    restoreScrollTop: null,
-    loadMoreRequested: false,
-  };
-  plugin.searchExternal = wrappedSearch;
-  observer.observe(modalEl.parentElement ?? document.body, { childList: true, subtree: true });
-  enhanceModal(plugin, state);
+        if (!canLoadMore(state)) actions.remove();
+        else {
+          button.disabled = false;
+          button.textContent = uiText("add.loadMore");
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("AnimeList load-more search failed", error);
+        button.disabled = false;
+        button.textContent = uiText("add.loadMore");
+        new Notice(uiText("notice.searchUnavailable"));
+      });
+  });
+  resultsEl.insertAdjacentElement("afterend", actions);
 }
 
-// The legacy modal is still the runtime modal used by the typed plugin.
-// eslint-disable-next-line @typescript-eslint/unbound-method -- Preserve the original prototype method before wrapping it.
-const originalOpenAddModal = LegacyAnimeListPlugin.prototype.openAddModal;
-LegacyAnimeListPlugin.prototype.openAddModal = function openAddModalWithPagination(
-  this: PaginationPlugin,
-  initialType = "anime",
-): void {
-  originalOpenAddModal.call(this, initialType);
-  window.queueMicrotask(() => {
-    const modals = Array.from(document.querySelectorAll<HTMLElement>(".animelist-modal"));
-    const modalEl = modals[modals.length - 1];
-    if (modalEl) installPagination(this, modalEl);
-  });
-};
+function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | null {
+  const originalModalOpen = Reflect.get(Modal.prototype, "open") as (this: Modal) => void;
+  let captured: LegacyAddMediaModal | null = null;
+  Modal.prototype.open = function openAndCapture(this: Modal): void {
+    originalModalOpen.call(this);
+    const candidate = this as Partial<LegacyAddMediaModal>;
+    if (this.modalEl.classList.contains("animelist-modal")
+      && typeof candidate.renderSearch === "function"
+      && typeof candidate.createResultRow === "function") {
+      captured = candidate as LegacyAddMediaModal;
+    }
+  };
+  try {
+    openLegacyModal();
+  } finally {
+    Modal.prototype.open = originalModalOpen;
+  }
+  return captured;
+}
+
+function installNativePagination(modal: LegacyAddMediaModal): void {
+  const state = freshState();
+  const originalRenderSearch = Reflect.get(modal, "renderSearch") as (this: LegacyAddMediaModal) => void;
+  const originalSearch = Reflect.get(modal, "search") as (
+    this: LegacyAddMediaModal,
+    button: HTMLButtonElement,
+  ) => Promise<void>;
+  modal.renderSearch = () => {
+    originalRenderSearch.call(modal);
+    renderPagination(modal, state);
+  };
+  modal.search = async (button: HTMLButtonElement) => {
+    state.initialSearchPending = true;
+    await originalSearch.call(modal, button);
+  };
+  renderPagination(modal, state);
+}
+
+const prototype = LegacyAnimeListPlugin.prototype as unknown as LegacyPluginPrototype;
+if (prototype[PATCH_MARKER] !== true) {
+  const originalOpenAddModal = prototype.openAddModal;
+  prototype.openAddModal = function openAddModalWithNativePagination(
+    this: LegacyAnimeListPlugin,
+    initialType = "anime",
+  ): void {
+    const mediaType: MediaType = initialType === "manga" || initialType === "novel" ? initialType : "anime";
+    const modal = captureLegacyModal(() => {
+      originalOpenAddModal.call(this, mediaType);
+    });
+    if (modal) installNativePagination(modal);
+  };
+  Object.defineProperty(prototype, PATCH_MARKER, { value: true });
+}

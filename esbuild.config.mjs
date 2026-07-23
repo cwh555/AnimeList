@@ -6,7 +6,7 @@ const production = process.argv[2] === "production";
 const outfile = process.env.ANIMELIST_BUILD_OUTFILE || "main.js";
 
 const context = await esbuild.context({
-  entryPoints: ["src/main.ts"],
+  entryPoints: ["src/plugin-entry.ts"],
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/*", "@lezer/*", ...builtinModules],
   format: "cjs",
