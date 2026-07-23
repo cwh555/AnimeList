@@ -16,7 +16,7 @@ interface ProgressRenderInput {
 }
 
 interface LegacyLibraryUi {
-  renderLibrary(container: HTMLElement, inputItems: unknown[], adapters?: unknown): unknown;
+  renderLibrary(container: HTMLElement, inputItems: unknown[], adapters?: unknown): void;
 }
 
 interface DetailRenderInstance {
@@ -35,6 +35,14 @@ interface DetailRenderInstance {
 }
 
 type DetailRender = (this: DetailRenderInstance) => void;
+
+function primitiveString(value: unknown, fallback = ""): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
+}
+
+function mediaTypeValue(value: unknown): MediaType {
+  return value === "manga" || value === "novel" ? value : "anime";
+}
 
 function progressStatusFromCard(card: HTMLElement): string {
   const statusClass = Array.from(card.classList).find((className) => className.startsWith("status-"));
@@ -96,10 +104,13 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
   });
 }
 
-const libraryUi = AnimeListUI as unknown as LegacyLibraryUi;
-const originalRenderLibrary = libraryUi.renderLibrary.bind(libraryUi);
+// The imported legacy namespace is intentionally narrowed at this integration boundary.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- legacy.ts is runtime-tested but compiled with ts-nocheck.
+const libraryUi: LegacyLibraryUi = AnimeListUI;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- bind preserves the narrowed runtime receiver.
+const originalRenderLibrary: LegacyLibraryUi["renderLibrary"] = libraryUi.renderLibrary.bind(libraryUi);
 libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
-  const result = originalRenderLibrary(container, inputItems, adapters);
+  originalRenderLibrary(container, inputItems, adapters);
   synchronizeLibraryProgress(container);
 
   const grid = container.querySelector<HTMLElement>(".al-grid");
@@ -107,23 +118,20 @@ libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapte
     const observer = new MutationObserver(() => synchronizeLibraryProgress(container));
     observer.observe(grid, { childList: true, subtree: true });
   }
-  return result;
 };
 
 const detailPrototype = DetailActionsRenderChild.prototype as unknown as { render: DetailRender };
-/* eslint-disable @typescript-eslint/unbound-method -- The method is immediately restored with its runtime instance through Function.call. */
-const originalDetailRender = detailPrototype.render;
-/* eslint-enable @typescript-eslint/unbound-method */
+const originalDetailRender: DetailRender = detailPrototype.render;
 detailPrototype.render = function renderUnifiedDetailProgress(): void {
   originalDetailRender.call(this);
 
   const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
   if (!file) return;
   const frontmatter = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  const mediaType = String(frontmatter.media_type || "anime") as MediaType;
+  const mediaType = mediaTypeValue(frontmatter.media_type);
   const progress = normalizeProgressValue(frontmatter.progress);
   const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
-  const unit = String(frontmatter.progress_unit || "");
+  const unit = primitiveString(frontmatter.progress_unit);
   const summary = this.containerEl.querySelector<HTMLElement>(".al-detail-summary");
   const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
   const text = summaryProgress?.textContent?.trim()
