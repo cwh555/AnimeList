@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feature/search-quality-duplicate-warning
   pull_request:
 
 permissions:
