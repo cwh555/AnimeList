@@ -153,7 +153,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   private async hydrateLanguageSettings(): Promise<void> {
-    if (this.languageSettingsHydrated || this.languageSettingsHydration) return this.languageSettingsHydration ?? undefined;
+    if (this.languageSettingsHydrated || this.languageSettingsHydration !== null) {
+      await this.languageSettingsHydration;
+      return;
+    }
     if (typeof this.plugin.loadData !== "function") {
       this.languageSettingsHydrated = true;
       return;
