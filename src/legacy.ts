@@ -17,7 +17,6 @@ import { CURRENT_MEDIA_SCHEMA_VERSION } from "./schema-migration";
 import {
   compareVolumeLabels,
   expandTimelineEntries,
-  highestCompletedVolume,
   normalizeProgressValue,
   normalizeReleaseStatus,
   normalizeVolumeLabel,
@@ -26,6 +25,13 @@ import {
   progressRatio,
   serializeVolumeLog,
 } from "./novel-progress";
+import {
+  normalizeProgressUnit,
+  parseProgressForUnit,
+  progressUnitUsesFlexibleValue,
+  progressUnitsForMediaType,
+  synchronizeProgressWithVolumeLog,
+} from "./progress-units";
 import {
   MAX_TIMELINE_DAY_SPACING,
   MAX_TIMELINE_VIEW_SCALE,
@@ -53,6 +59,7 @@ const LABEL = {
   unit: {
     get episode() { return uiText("media.unit.episode"); },
     get chapter() { return uiText("media.unit.chapter"); },
+    get season() { return uiText("media.unit.season"); },
     get volume() { return uiText("media.unit.volume"); },
     get page() { return uiText("media.unit.page"); },
     get percent() { return uiText("media.unit.percent"); },
@@ -407,7 +414,9 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   const total = result.mediaType === "anime"
     ? Math.max(0, numeric(form.total ?? result.total))
     : 0;
-  const progress = completedProgress(status, total, form.progress, result.mediaType);
+  const unit = normalizeProgressUnit(form.unit || result.unit, result.mediaType);
+  const progressLabel = result.mediaType === "anime" ? uiText("add.progressAnime") : uiText("add.progressReading");
+  const progress = completedProgress(status, total, validateProgressForUnit(form.progress, unit, progressLabel), result.mediaType);
   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
@@ -423,7 +432,7 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
   lines.push(`progress: ${yamlScalar(progress)}`);
   if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
-  lines.push(`progress_unit: ${yamlScalar(form.unit || result.unit)}`);
+  lines.push(`progress_unit: ${yamlScalar(unit)}`);
   if (score != null) lines.push(`score: ${score}`);
   lines.push(`favorite: ${form.favorite === true ? "true" : "false"}`);
   if (result.year) lines.push(`year: ${numeric(result.year)}`);
@@ -1488,13 +1497,27 @@ function releaseStatusOptions(selected = "unknown") {
   ], normalizeReleaseStatus(selected));
 }
 
-function validateNovelProgress(value, label, optional = false) {
-  const text = String(value ?? "").normalize("NFKC").trim();
-  if (!text && optional) return 0;
-  if (!text || text === "0") return 0;
-  const normalized = normalizeVolumeLabel(text);
-  if (normalized === null) throw new Error(uiText("validation.volumeFormat", { label }));
-  return normalized === "EX" ? "EX" : Number(normalized);
+function validateProgressForUnit(value, unit, label) {
+  const result = parseProgressForUnit(value, unit);
+  if (result.ok) return result.value;
+  const key = result.reason === "volume" ? "validation.volumeFormat" : "validation.progressInteger";
+  throw new Error(uiText(key, { label }));
+}
+
+function progressUnitOptions(mediaType, currentUnit) {
+  return progressUnitsForMediaType(mediaType, currentUnit).map((value) => [value, LABEL.unit[value] || value]);
+}
+
+function bindProgressUnitInput(progress, unit) {
+  const sync = () => {
+    const flexible = progressUnitUsesFlexibleValue(unit.value);
+    progress.type = flexible ? "text" : "number";
+    if (flexible) { progress.removeAttribute("min"); progress.removeAttribute("step"); }
+    else { progress.min = "0"; progress.step = "1"; }
+  };
+  unit.addEventListener("change", sync);
+  sync();
+  return sync;
 }
 
 function createNovelVolumeEditor(parent, initialEntries = []) {
@@ -1791,20 +1814,16 @@ class AddMediaModal extends Modal {
     bindScoreRequirement(status, score, result.mediaType);
     const startedAt = createLabeledField(form, uiText("add.startedAt"), createTextInput("date", ""), uiText("add.startedHint"));
     const completedAt = createLabeledField(form, uiText("add.completedAt"), createTextInput("date", ""), uiText("add.completedHint", { status: completedStatusLabel(result.mediaType) }));
-    const progressType = result.mediaType === "novel" ? "text" : "number";
-    const progressLabel = result.mediaType === "manga" ? uiText("add.progressManga") : result.mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
-    const progress = createLabeledField(form, progressLabel, createTextInput(progressType, "0"), result.mediaType === "novel" ? uiText("add.progressNovelHint") : "");
-    if (result.mediaType !== "novel") { progress.min = "0"; progress.step = "1"; }
+    const selectedUnit = normalizeProgressUnit(result.unit, result.mediaType);
+    const unit = createLabeledField(form, uiText("add.unit"), createSelect(progressUnitOptions(result.mediaType, selectedUnit), selectedUnit));
+    const progressLabel = result.mediaType === "anime" ? uiText("add.progressAnime") : uiText("add.progressReading");
+    const progressHint = result.mediaType === "anime" ? "" : uiText("add.progressReadingHint");
+    const progress = createLabeledField(form, progressLabel, createTextInput("text", "0"), progressHint);
+    bindProgressUnitInput(progress, unit);
     const total = result.mediaType === "anime"
       ? createLabeledField(form, uiText("add.total"), createTextInput("number", result.total || ""))
       : null;
     if (total) { total.min = "0"; total.step = "1"; }
-    const unitOptions = result.mediaType === "anime"
-      ? [["episode", uiText("media.unit.episode")]]
-      : result.mediaType === "manga"
-        ? [["chapter", uiText("media.unit.chapter")]]
-        : [["volume", uiText("media.unit.volume")]];
-    const unit = createLabeledField(form, uiText("add.unit"), createSelect(unitOptions, unitOptions[0][0]));
     const genreInput = createLabeledField(form, uiText("add.genres"), createTextInput("text", normalizeGenres(result.genres).join("、")), uiText("add.genresHint"));
     const templateOptions = templates.length
       ? templates.map((template) => [template.path, template.name])
@@ -1848,10 +1867,9 @@ class AddMediaModal extends Modal {
       createButton.textContent = uiText("add.processing");
       try {
         const volumeLog = volumeEditor ? volumeEditor.getEntries() : [];
-        let nextProgress = result.mediaType === "novel" ? validateNovelProgress(progress.value, uiText("add.progressNovel")) : Math.max(0, numeric(progress.value));
+        let nextProgress = validateProgressForUnit(progress.value, unit.value, progressLabel);
         const nextTotal = result.mediaType === "anime" ? Math.max(0, numeric(total?.value)) : 0;
-        const completedVolume = highestCompletedVolume(volumeLog);
-        if (result.mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
+        if (result.mediaType === "novel") nextProgress = synchronizeProgressWithVolumeLog(nextProgress, unit.value, volumeLog);
         const file = await this.plugin.createMediaNote(result, {
           title: titleInput.value.trim(), status: status.value, releaseStatus: releaseStatus?.value || "unknown", score: score.value,
           startedAt: startedAt.value, completedAt: completedAt.value,
@@ -1945,10 +1963,12 @@ class EditMediaModal extends Modal {
     const score = createLabeledField(form, uiText("add.scoreLabel"), createTextInput("number", frontmatter.score ?? ""), uiText("add.scoreHint", { status: completedStatusLabel(mediaType) }));
     score.min = "0"; score.max = "10"; score.step = "0.1";
     bindScoreRequirement(status, score, mediaType);
-    const progressType = mediaType === "novel" ? "text" : "number";
-    const progressLabel = mediaType === "manga" ? uiText("add.progressManga") : mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
-    const progress = createLabeledField(form, progressLabel, createTextInput(progressType, frontmatter.progress ?? 0), mediaType === "novel" ? uiText("add.progressNovelHint") : "");
-    if (mediaType !== "novel") progress.min = "0";
+    const selectedUnit = normalizeProgressUnit(frontmatter.progress_unit, mediaType);
+    const unit = createLabeledField(form, uiText("add.unit"), createSelect(progressUnitOptions(mediaType, selectedUnit), selectedUnit));
+    const progressLabel = mediaType === "anime" ? uiText("add.progressAnime") : uiText("add.progressReading");
+    const progressHint = mediaType === "anime" ? "" : uiText("add.progressReadingHint");
+    const progress = createLabeledField(form, progressLabel, createTextInput("text", frontmatter.progress ?? 0), progressHint);
+    bindProgressUnitInput(progress, unit);
     const total = mediaType === "anime"
       ? createLabeledField(form, uiText("add.total"), createTextInput("number", frontmatter.progress_total ?? ""))
       : null;
@@ -1996,11 +2016,8 @@ class EditMediaModal extends Modal {
       try {
         const volumeLog = volumeEditor ? volumeEditor.getEntries() : [];
         const nextTotal = mediaType === "anime" ? Math.max(0, numeric(total?.value)) : 0;
-        let nextProgress = mediaType === "novel"
-          ? validateNovelProgress(progress.value, uiText("add.progressNovel"))
-          : Math.max(0, numeric(progress.value));
-        const completedVolume = highestCompletedVolume(volumeLog);
-        if (mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
+        let nextProgress = validateProgressForUnit(progress.value, unit.value, progressLabel);
+        if (mediaType === "novel") nextProgress = synchronizeProgressWithVolumeLog(nextProgress, unit.value, volumeLog);
         await this.plugin.app.fileManager.processFrontMatter(this.file, (fm) => {
           fm.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
           fm.title = nextTitle;
@@ -2009,6 +2026,7 @@ class EditMediaModal extends Modal {
           if (mediaType === "anime") fm.progress_total = nextTotal;
           else delete fm.progress_total;
           fm.progress = completedProgress(status.value, nextTotal, nextProgress, mediaType);
+          fm.progress_unit = unit.value;
           fm.favorite = favorite.checked;
           fm.genres = genreInputValues(genreInput);
           if (nextScore != null) fm.score = nextScore; else delete fm.score;
