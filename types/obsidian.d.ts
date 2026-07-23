@@ -121,11 +121,23 @@ declare module "obsidian" {
     on(name: string, callback: (...args: unknown[]) => void): EventRef;
   }
 
+  export class MenuItem {
+    setTitle(title: string): this;
+    setIcon(icon: string): this;
+    onClick(callback: (event: MouseEvent) => void): this;
+  }
+
+  export class Menu {
+    addItem(callback: (item: MenuItem) => void): this;
+  }
+
   export interface Workspace {
     getLeavesOfType(type: string): WorkspaceLeaf[];
     getLeaf(newLeaf?: string | boolean): WorkspaceLeaf;
     revealLeaf(leaf: WorkspaceLeaf): void;
     openLinkText(linktext: string, sourcePath: string, newLeaf?: boolean): Promise<void>;
+    getActiveFile(): TFile | null;
+    on(name: "file-menu", callback: (menu: Menu, file: TAbstractFile) => void): EventRef;
   }
 
   export interface MetadataCache {
@@ -154,7 +166,8 @@ declare module "obsidian" {
   export interface Command {
     id: string;
     name: string;
-    callback: () => void | Promise<void>;
+    callback?: () => void | Promise<void>;
+    checkCallback?: (checking: boolean) => boolean | void;
   }
 
   export interface PluginManifest {
