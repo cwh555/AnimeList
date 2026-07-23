@@ -1,2 +1,2 @@
 import "./search-pagination";
-export { default } from "./main";
+export { default } from "./manga-reading-plugin";
