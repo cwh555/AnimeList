@@ -44,6 +44,10 @@ function mediaTypeValue(value: unknown): MediaType {
   return value === "manga" || value === "novel" ? value : "anime";
 }
 
+function legacyLibraryUi(value: unknown): LegacyLibraryUi {
+  return value as LegacyLibraryUi;
+}
+
 function progressStatusFromCard(card: HTMLElement): string {
   const statusClass = Array.from(card.classList).find((className) => className.startsWith("status-"));
   return statusClass?.slice("status-".length) ?? "planned";
@@ -104,8 +108,7 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
   });
 }
 
-// The imported legacy namespace is intentionally narrowed at this integration boundary.
-const libraryUi: LegacyLibraryUi = AnimeListUI;
+const libraryUi = legacyLibraryUi(AnimeListUI);
 const originalRenderLibrary: LegacyLibraryUi["renderLibrary"] = libraryUi.renderLibrary.bind(libraryUi);
 libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
   originalRenderLibrary(container, inputItems, adapters);
