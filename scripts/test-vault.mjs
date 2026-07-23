@@ -4,6 +4,7 @@ import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
+import { prepareTestFixtures, TEST_CHECKLIST_PATH } from "./test-vault-fixtures.mjs";
 
 const RELEASE_FILES = ["main.js", "manifest.json", "styles.css"];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -84,7 +85,7 @@ function createDefaultAppConfig() {
 
 function openVault() {
   if (noOpen) return;
-  const vaultUrl = `obsidian://open?path=${encodeURIComponent(vaultRoot)}`;
+  const vaultUrl = `obsidian://open?path=${encodeURIComponent(vaultRoot)}&file=${encodeURIComponent(TEST_CHECKLIST_PATH)}`;
   const command = process.platform === "darwin"
     ? ["open", [vaultUrl]]
     : process.platform === "win32"
@@ -96,10 +97,13 @@ function openVault() {
   }
 }
 
-function printSummary() {
+function printSummary(fixtures) {
   console.log(`AnimeList ${mode} test vault is ready.`);
   console.log(`Vault: ${vaultRoot}`);
   console.log(`Plugin: ${pluginRoot}`);
+  console.log(`Checklist: ${fixtures.checklistPath}`);
+  console.log(`Generated fixtures: ${fixtures.files.length}`);
+  console.log("Reset only the generated data with: npm run test-vault:fixtures");
 }
 
 async function runDevelopmentWatcher() {
@@ -131,13 +135,14 @@ fs.mkdirSync(pluginsRoot, { recursive: true });
 removePluginInstallation();
 enablePlugin();
 createDefaultAppConfig();
+const fixtures = prepareTestFixtures(vaultRoot);
 
 if (mode === "production") {
   copyReleaseFiles();
-  printSummary();
+  printSummary(fixtures);
   openVault();
 } else {
   prepareDevelopmentFiles();
-  printSummary();
+  printSummary(fixtures);
   await runDevelopmentWatcher();
 }
