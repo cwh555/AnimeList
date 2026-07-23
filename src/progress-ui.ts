@@ -17,7 +17,7 @@ interface ProgressRenderInput {
 }
 
 function progressStatusFromCard(card: HTMLElement): string {
-  const statusClass = [...card.classList].find((className) => className.startsWith("status-"));
+  const statusClass = Array.from(card.classList).find((className) => className.startsWith("status-"));
   return statusClass?.slice("status-".length) ?? "planned";
 }
 
@@ -111,7 +111,8 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
   const progress = normalizeProgressValue(frontmatter.progress);
   const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
   const unit = String(frontmatter.progress_unit || "");
-  const summary = this.containerEl.querySelector<HTMLElement>(".al-detail-summary");
+  const detailContainer = this.containerEl as HTMLElement;
+  const summary = detailContainer.querySelector<HTMLElement>(".al-detail-summary");
   const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
   const text = summaryProgress?.textContent?.trim()
     || (progress !== 0
@@ -132,5 +133,5 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
     unit,
     text,
   });
-  this.containerEl.appendChild(progressContainer);
+  detailContainer.appendChild(progressContainer);
 };
