@@ -137,6 +137,8 @@ export function expandTimelineEntries(items: MediaItem[]): TimelineMediaEntry[] 
           // always reusing the series cover from the library item.
           cover: item.cover,
           volumeLabel: volume.label,
+          progressValue: normalizeProgressValue(volume.label),
+          progressUnit: "volume",
         });
       }
       continue;
