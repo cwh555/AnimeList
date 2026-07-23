@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Runtime adapter around the legacy add modal. */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Runtime adapter around the legacy add modal. */
 import type { TFile } from "obsidian";
 import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
@@ -37,7 +37,7 @@ interface SearchRuntimeMethods {
 }
 
 interface AddModalPrototype {
-  openAddModal(initialType?: MediaType): void;
+  openAddModal: (initialType?: MediaType) => void;
 }
 
 function runtimeMethods(plugin: SearchEnhancedPlugin): SearchRuntimeMethods {
@@ -69,7 +69,7 @@ async function hydrateSearchLanguages(
   state: EnhancementState,
 ): Promise<void> {
   if (state.languagesHydrated) return;
-  if (!state.languageHydration) {
+  if (state.languageHydration === null) {
     state.languageHydration = (async () => {
       const loaded = await plugin.loadData();
       const rawLanguages = isRecord(loaded) ? loaded.searchLanguages : undefined;
@@ -166,7 +166,10 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementS
     return { results: response.results, warnings: response.warnings };
   };
 
-  const originalCreateMediaNote = methods.createMediaNote.bind(plugin);
+  const originalCreateMediaNote = async (
+    result: ExternalMediaResult,
+    form: MediaNoteForm,
+  ): Promise<TFile> => methods.createMediaNote.call(plugin, result, form);
   methods.createMediaNote = async (result, form) => {
     const file = await originalCreateMediaNote(result, form);
     const aliases = aliasesFor(result);
@@ -221,14 +224,14 @@ function installDuplicateWarning(
     if (existingWarning?.dataset.duplicateSignature === signature) return;
     existingWarning?.remove();
 
-    const warning = modalEl.ownerDocument.createElement("section");
+    const warning = modalEl.ownerDocument.win.createEl("section");
     warning.className = "al-modal-warning al-duplicate-warning";
     warning.dataset.duplicateSignature = signature;
-    const title = modalEl.ownerDocument.createElement("strong");
+    const title = modalEl.ownerDocument.win.createEl("strong");
     title.textContent = searchFeatureText("duplicate.warning.title");
-    const description = modalEl.ownerDocument.createElement("p");
+    const description = modalEl.ownerDocument.win.createEl("p");
     description.textContent = searchFeatureText("duplicate.warning.description", { title: duplicate.title });
-    const open = modalEl.ownerDocument.createElement("button");
+    const open = modalEl.ownerDocument.win.createEl("button");
     open.type = "button";
     open.className = "al-secondary-button";
     open.textContent = searchFeatureText("duplicate.warning.open");
@@ -263,4 +266,4 @@ if (markerHost[PATCH_MARKER] !== true) {
   Object.defineProperty(prototype, PATCH_MARKER, { value: true });
 }
 
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- End runtime adapter scope. */
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- End runtime adapter scope. */
