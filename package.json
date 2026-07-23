@@ -9,10 +9,11 @@
     "build": "tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
-    "test": "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs",
+    "test": "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs && node scripts/check-test-vault-fixtures.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
+    "test-vault:fixtures": "node scripts/test-vault-fixtures.mjs",
     "release:check": "node scripts/check-release.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
     "community:check": "node scripts/check-community-review.mjs"
