@@ -44,14 +44,11 @@ function progressStatusFromCard(card: HTMLElement): string {
 function ensureTrack(container: HTMLElement): HTMLElement {
   let track = container.querySelector<HTMLElement>(":scope > .al-progress-track");
   if (!track) {
-    track = createDiv({ cls: "al-progress-track" });
+    track = container.createDiv({ cls: "al-progress-track" });
     container.prepend(track);
   }
   let fill = track.querySelector<HTMLElement>(":scope > .al-progress-fill");
-  if (!fill) {
-    fill = createDiv({ cls: "al-progress-fill" });
-    track.appendChild(fill);
-  }
+  if (!fill) fill = track.createDiv({ cls: "al-progress-fill" });
   return fill;
 }
 
@@ -63,19 +60,16 @@ export function renderProgress(container: HTMLElement, input: ProgressRenderInpu
   container.classList.toggle("is-empty-progress", presentation.ratio === 0);
 
   let row = container.querySelector<HTMLElement>(":scope > .al-progress-row");
-  if (!row) {
-    row = createDiv({ cls: "al-progress-row" });
-    container.appendChild(row);
-  }
+  if (!row) row = container.createDiv({ cls: "al-progress-row" });
   row.replaceChildren();
-  row.appendChild(createSpan({ text: input.text }));
+  row.createSpan({ text: input.text });
 
   const trailingText = presentation.percentageLabel ?? input.trailingText;
   if (trailingText) {
-    row.appendChild(createSpan({
+    row.createSpan({
       cls: presentation.kind === "state" ? "al-release-label" : undefined,
       text: trailingText,
-    }));
+    });
   }
 }
 
@@ -141,7 +135,7 @@ detailPrototype.render = function renderUnifiedDetailProgress(): void {
       : uiText("detail.noProgress"));
   summaryProgress?.remove();
 
-  const progressContainer = createDiv({ cls: "al-progress al-detail-progress" });
+  const progressContainer = this.containerEl.createDiv({ cls: "al-progress al-detail-progress" });
   renderProgress(progressContainer, {
     mediaType,
     status: normalizeMediaStatus(frontmatter.status),
@@ -150,5 +144,4 @@ detailPrototype.render = function renderUnifiedDetailProgress(): void {
     unit,
     text,
   });
-  this.containerEl.appendChild(progressContainer);
 };
