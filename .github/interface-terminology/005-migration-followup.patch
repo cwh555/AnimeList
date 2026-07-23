@@ -1,0 +1,36 @@
+diff --git a/README.md b/README.md
+index c5ac82f..fcdcb0f 100644
+--- a/README.md
++++ b/README.md
+@@ -4,3 +4,3 @@ title: Example work
+ media_type: anime
+-status: watching
++status: ongoing
+ progress: 3
+@@ -11,2 +11,2 @@ progress_unit: episode
+ 
+-- **Active, planned, or paused works:** score and completion date may be empty.
++- **Ongoing or planned works:** score and completion date may be empty.
+diff --git a/docs/MANUAL_TEST_CHECKLIST.md b/docs/MANUAL_TEST_CHECKLIST.md
+index 1ccdcaa..73824a7 100644
+--- a/docs/MANUAL_TEST_CHECKLIST.md
++++ b/docs/MANUAL_TEST_CHECKLIST.md
+@@ -1,2 +1,2 @@
+-- [ ] Planned, watching/reading, and on-hold records can be saved with an empty score and empty completion date.
+-- [ ] Changing a completed record back to active allows the score to be cleared and removes `score` from frontmatter.
++- [ ] Planned and ongoing records can be saved with an empty score and empty completion date.
++- [ ] Changing a completed record back to ongoing allows the score to be cleared and removes `score` from frontmatter.
+diff --git a/tests/core.test.ts b/tests/core.test.ts
+index a1a4295..23b451b 100644
+--- a/tests/core.test.ts
++++ b/tests/core.test.ts
+@@ -2,3 +2,3 @@
+       title: "Example novel",
+-      status: "reading",
++      status: "ongoing",
+     } as const;
+@@ -8,3 +8,3 @@
+       title: "藥屋少女的呢喃",
+-      status: "reading",
++      status: "ongoing",
+     }]);
