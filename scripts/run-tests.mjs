@@ -1,22 +1,29 @@
 import { build, stop } from "esbuild";
 import { builtinModules } from "node:module";
 import { spawnSync } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "tests");
-const outputFile = path.join(outputDir, "core.test.mjs");
+const entryFile = path.join(outputDir, "entry.ts");
+const outputFile = path.join(outputDir, "tests.mjs");
 
 await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
+await writeFile(entryFile, [
+  'import "../../tests/core.test.ts";',
+  'import "../../tests/multilingual-search.test.ts";',
+  'import "../../tests/duplicate-detection.test.ts";',
+  "",
+].join("\n"));
 
 try {
   await build({
     absWorkingDir: root,
-    entryPoints: ["tests/core.test.ts"],
+    entryPoints: [entryFile],
     outfile: outputFile,
     bundle: true,
     platform: "node",
