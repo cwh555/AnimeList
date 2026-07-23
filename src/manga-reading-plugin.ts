@@ -267,6 +267,7 @@ export default class AnimeListWithMangaReading extends AnimeListPlugin {
       },
     });
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+      if (!(file instanceof TFile)) return;
       const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
       if (frontmatter?.media_type !== "manga") return;
       menu.addItem((item) => item
