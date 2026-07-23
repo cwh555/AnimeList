@@ -59,6 +59,19 @@ export function mergeSearchPages(initial, pages) {
   return output;
 }
 
+export function searchScrollContainer(modalEl) {
+  return modalEl.querySelector?.(".modal-content") ?? modalEl;
+}
+
+export function captureSearchScroll(modalEl) {
+  const container = searchScrollContainer(modalEl);
+  return { container, scrollTop: container.scrollTop };
+}
+
+export function restoreSearchScroll(snapshot) {
+  if (snapshot?.container?.isConnected !== false) snapshot.container.scrollTop = snapshot.scrollTop;
+}
+
 function currentSearchContext(modalEl) {
   const input = modalEl.querySelector(".al-modal-search-row input");
   const buttons = [...modalEl.querySelectorAll(".al-modal-type")];
@@ -74,7 +87,7 @@ function resetState(state, signature) {
   state.pages.clear();
   state.exhausted = false;
   state.loading = false;
-  state.restoreScrollTop = null;
+  state.restoreScroll = null;
   state.restoreScheduled = false;
   state.loadMoreRequested = false;
 }
@@ -184,14 +197,14 @@ function queueEnhance(plugin, state) {
 }
 
 function scheduleScrollRestore(state) {
-  if (state.restoreScrollTop === null || state.restoreScheduled) return;
+  if (state.restoreScroll === null || state.restoreScheduled) return;
   state.restoreScheduled = true;
-  const scrollTop = state.restoreScrollTop;
+  const snapshot = state.restoreScroll;
   window.setTimeout(() => {
     window.requestAnimationFrame(() => {
       state.restoreScheduled = false;
-      state.restoreScrollTop = null;
-      if (state.modalEl.isConnected) state.modalEl.scrollTop = scrollTop;
+      state.restoreScroll = null;
+      restoreSearchScroll(snapshot);
     });
   }, 0);
 }
@@ -227,7 +240,7 @@ function enhanceModal(plugin, state) {
     state.requestedLoads += 1;
     state.loadMoreRequested = true;
     state.loading = true;
-    state.restoreScrollTop = state.modalEl.scrollTop;
+    state.restoreScroll = captureSearchScroll(state.modalEl);
     button.disabled = true;
     button.textContent = uiText("add.loadingMore");
     searchButton.click();
@@ -273,7 +286,7 @@ function installPagination(plugin, modalEl) {
   state = {
     modalEl, observer, originalSearch, wrappedSearch,
     signature: "", requestedLoads: 0, initial: null, pages: new Map(), exhausted: false,
-    loading: false, restoreScrollTop: null, restoreScheduled: false, loadMoreRequested: false, enhanceQueued: false,
+    loading: false, restoreScroll: null, restoreScheduled: false, loadMoreRequested: false, enhanceQueued: false,
   };
   plugin.searchExternal = wrappedSearch;
   observer.observe(modalEl.parentElement || document.body, { childList: true, subtree: true });
