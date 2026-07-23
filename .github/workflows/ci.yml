@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Rebuild clean feature branch
+      - name: Rebuild and validate clean branch
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +43,7 @@ jobs:
           }
 
           export interface ProgressDisplay {
-            ratio: number;
+            ratio: number | null;
             percentageLabel: string | null;
           }
 
@@ -59,7 +59,7 @@ jobs:
             if (input.mediaType === "anime") {
               const ratio = progressRatio(input.progress, input.total, input.unit);
               return {
-                ratio: ratio ?? 0,
+                ratio,
                 percentageLabel: ratio == null ? null : `${Math.round(ratio * 100)}%`,
               };
             }
@@ -76,80 +76,127 @@ jobs:
 
           python <<'PY'
           from pathlib import Path
-          path = Path('src/legacy.ts')
+          import re
+
+          path = Path("src/legacy.ts")
           text = path.read_text()
-          text = text.replace(
-              'import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";\n',
-              'import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";\nimport { progressDisplay } from "./progress-display";\n',
+
+          media_import = 'import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";'
+          if media_import not in text:
+              raise SystemExit("media-status import not found")
+          text = text.replace(media_import, media_import + '\nimport { progressDisplay } from "./progress-display";', 1)
+
+          text, count = re.subn(
+              r'^  const ratio = \(item\) => item\.mediaType === "anime" \? progressRatio\(item\.progress, item\.total, item\.unit\) : null;$',
+              '  const displayProgress = (item) => progressDisplay(item);\n  const ratio = (item) => displayProgress(item).ratio;',
+              text,
+              count=1,
+              flags=re.MULTILINE,
           )
-          text = text.replace(
-              '  const ratio = (item) => item.mediaType === "anime" ? progressRatio(item.progress, item.total, item.unit) : null;\n',
-              '  const displayProgress = (item) => progressDisplay(item);\n  const ratio = (item) => displayProgress(item).ratio;\n',
+          if count != 1:
+              raise SystemExit(f"ratio helper replacements: {count}")
+
+          card_pattern = re.compile(
+              r'''      const progress = makeEl\("div", "al-progress"\);\n'''
+              r'''      const itemRatio = ratio\(item\);\n'''
+              r'''      if \(itemRatio !== null\) \{\n'''
+              r'''        const bar = makeEl\("div", "al-progress-track"\);\n'''
+              r'''        const fill = makeEl\("div", "al-progress-fill"\);\n'''
+              r'''        fill\.style\.width = `\$\{Math\.round\(itemRatio \* 100\)\}%`;\n'''
+              r'''        bar\.appendChild\(fill\);\n'''
+              r'''        progress\.appendChild\(bar\);\n'''
+              r'''      \}\n'''
+              r'''      const progressRow = makeEl\("div", "al-progress-row"\);\n'''
+              r'''      progressRow\.appendChild\(makeEl\("span", "", progressText\(item\)\)\);\n'''
+              r'''      if \(itemRatio !== null\) progressRow\.appendChild\(makeEl\("span", "", `\$\{Math\.round\(itemRatio \* 100\)\}%`\)\);\n'''
+              r'''      else if \(item\.mediaType !== "anime"\) progressRow\.appendChild\(makeEl\("span", "al-release-label", LABEL\.releaseStatus\[item\.releaseStatus\] \|\| uiText\("media\.release\.unknown"\)\)\);'''
           )
-          old = '''      const progress = makeEl("div", "al-progress");
-                const itemRatio = ratio(item);
-                if (itemRatio !== null) {
+          card_replacement = '''      const progress = makeEl("div", "al-progress");
+                const itemProgress = displayProgress(item);
+                if (itemProgress.ratio !== null) {
                   const bar = makeEl("div", "al-progress-track");
                   const fill = makeEl("div", "al-progress-fill");
-                  fill.style.width = `${Math.round(itemRatio * 100)}%`;
+                  fill.style.width = `${Math.round(itemProgress.ratio * 100)}%`;
                   bar.appendChild(fill);
                   progress.appendChild(bar);
                 }
                 const progressRow = makeEl("div", "al-progress-row");
                 progressRow.appendChild(makeEl("span", "", progressText(item)));
-                if (itemRatio !== null) progressRow.appendChild(makeEl("span", "", `${Math.round(itemRatio * 100)}%`));
-                else if (item.mediaType !== "anime") progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));
-          '''
-          new = '''      const progress = makeEl("div", "al-progress");
-                const itemProgress = displayProgress(item);
-                const bar = makeEl("div", "al-progress-track");
-                const fill = makeEl("div", "al-progress-fill");
-                fill.style.width = `${Math.round(itemProgress.ratio * 100)}%`;
-                bar.appendChild(fill);
-                progress.appendChild(bar);
-                const progressRow = makeEl("div", "al-progress-row");
-                progressRow.appendChild(makeEl("span", "", progressText(item)));
                 if (itemProgress.percentageLabel) progressRow.appendChild(makeEl("span", "", itemProgress.percentageLabel));
-                else if (item.mediaType !== "anime") progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));
-          '''
-          if old not in text:
-              raise SystemExit('library progress renderer not found')
-          text = text.replace(old, new)
-          old = '''    const progress = makeEl("span", "", hasTotal
-                ? `${progressDisplayValue(detailItem.progress)} / ${progressDisplayValue(detailItem.total)} ${unitLabel}`
-                : detailItem.progress !== 0 ? uiText(detailItem.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", { progress: progressDisplayValue(detailItem.progress), unit: unitLabel }) : uiText("detail.noProgress"));
-              summary.append(status, progress);
-          '''
-          new = '''    const progressText = hasTotal
+                else if (item.mediaType !== "anime") progressRow.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[item.releaseStatus] || uiText("media.release.unknown")));'''
+          text, count = card_pattern.subn(card_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f"card renderer replacements: {count}")
+
+          detail_pattern = re.compile(
+              r'''    const progress = makeEl\("span", "", hasTotal\n'''
+              r'''      \? `\$\{progressDisplayValue\(detailItem\.progress\)\} / \$\{progressDisplayValue\(detailItem\.total\)\} \$\{unitLabel\}`\n'''
+              r'''      : detailItem\.progress !== 0 \? uiText\(detailItem\.mediaType === "anime" \? "library\.watchedProgress" : "library\.readProgress", \{ progress: progressDisplayValue\(detailItem\.progress\), unit: unitLabel \}\) : uiText\("detail\.noProgress"\)\);\n'''
+              r'''    summary\.append\(status, progress\);'''
+          )
+          detail_replacement = '''    const progressText = hasTotal
                 ? `${progressDisplayValue(detailItem.progress)} / ${progressDisplayValue(detailItem.total)} ${unitLabel}`
                 : detailItem.progress !== 0 ? uiText(detailItem.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", { progress: progressDisplayValue(detailItem.progress), unit: unitLabel }) : uiText("detail.noProgress");
               const detailProgress = progressDisplay(detailItem);
               const progress = makeEl("div", "al-progress al-detail-progress");
-              const track = makeEl("div", "al-progress-track");
-              const fill = makeEl("div", "al-progress-fill");
-              fill.style.width = `${Math.round(detailProgress.ratio * 100)}%`;
-              track.appendChild(fill);
+              if (detailProgress.ratio !== null) {
+                const track = makeEl("div", "al-progress-track");
+                const fill = makeEl("div", "al-progress-fill");
+                fill.style.width = `${Math.round(detailProgress.ratio * 100)}%`;
+                track.appendChild(fill);
+                progress.appendChild(track);
+              }
               const row = makeEl("div", "al-progress-row");
               row.appendChild(makeEl("span", "", progressText));
               if (detailProgress.percentageLabel) row.appendChild(makeEl("span", "", detailProgress.percentageLabel));
               else if (detailItem.mediaType !== "anime") row.appendChild(makeEl("span", "al-release-label", LABEL.releaseStatus[detailItem.releaseStatus] || uiText("media.release.unknown")));
-              progress.append(track, row);
-              summary.append(status, progress);
-          '''
-          if old not in text:
-              raise SystemExit('detail progress renderer not found')
-          text = text.replace(old, new)
+              progress.appendChild(row);
+              summary.append(status, progress);'''
+          text, count = detail_pattern.subn(detail_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f"detail renderer replacements: {count}")
+
+          text = text.replace('  progressRatio,\n', '', 1)
           path.write_text(text)
           PY
 
           python <<'PY'
           from pathlib import Path
-          path = Path('styles.serial-reading.css')
+          path = Path("styles.serial-reading.css")
           text = path.read_text()
-          start = text.index('/* Manga and novel totals are frequently unknown.')
-          end = text.index('@media (max-width: 900px)', start)
+          start_marker = "/* Manga and novel totals are frequently unknown."
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit("legacy serial progress CSS not found")
+          end = text.find("@media (max-width: 900px)", start)
+          if end < 0:
+              raise SystemExit("serial progress CSS end not found")
           text = text[:start] + text[end:]
-          text += '''\n\n/* Unified progress presentation. */\n.al-grid.is-list .al-progress { width: 100%; max-width: none; }\n.al-detail-summary .al-detail-progress { min-width: min(320px, 42vw); margin-top: 0; padding-top: 0; }\n.al-detail-summary .al-detail-progress .al-progress-row { margin-top: 5px; }\n@media (max-width: 780px) {\n  .al-detail-summary .al-detail-progress { width: 100%; min-width: 0; }\n}\n'''
+          text += '''
+
+/* Shared progress layout for library cards and detail blocks. */
+.al-grid.is-list .al-progress {
+  width: 100%;
+  max-width: none;
+}
+
+.al-detail-summary .al-detail-progress {
+  min-width: min(320px, 42vw);
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.al-detail-summary .al-detail-progress .al-progress-row {
+  margin-top: 5px;
+}
+
+@media (max-width: 780px) {
+  .al-detail-summary .al-detail-progress {
+    width: 100%;
+    min-width: 0;
+  }
+}
+'''
           path.write_text(text)
           PY
 
@@ -159,14 +206,18 @@ jobs:
           import { progressDisplay } from "../src/progress-display";
 
           describe("progress display", () => {
-            it("uses numeric anime progress when a total is known", () => {
+            it("preserves numeric anime progress semantics", () => {
               assert.deepEqual(progressDisplay({ mediaType: "anime", status: "ongoing", progress: 3, total: 12, unit: "episode" }), {
                 ratio: 0.25,
                 percentageLabel: "25%",
               });
+              assert.deepEqual(progressDisplay({ mediaType: "anime", status: "ongoing", progress: 3, total: 0, unit: "episode" }), {
+                ratio: null,
+                percentageLabel: null,
+              });
             });
 
-            it("maps serial media states without inventing a percentage label", () => {
+            it("maps serial media state to a track without a fake percentage label", () => {
               assert.deepEqual(progressDisplay({ mediaType: "manga", status: "completed", progress: 0, total: 0, unit: "chapter" }), { ratio: 1, percentageLabel: null });
               assert.deepEqual(progressDisplay({ mediaType: "manga", status: "ongoing", progress: 4, total: 0, unit: "chapter" }), { ratio: 0.5, percentageLabel: null });
               assert.deepEqual(progressDisplay({ mediaType: "novel", status: "dropped", progress: "EX", total: 0, unit: "volume" }), { ratio: 0.5, percentageLabel: null });
@@ -178,10 +229,12 @@ jobs:
 
           python <<'PY'
           from pathlib import Path
-          path = Path('scripts/run-tests.mjs')
+          path = Path("scripts/run-tests.mjs")
           text = path.read_text()
           marker = '  \'import "../../tests/media-status.test.ts";\',\n'
-          text = text.replace(marker, marker + '  \'import "../../tests/progress-display.test.ts";\',\n')
+          if marker not in text:
+              raise SystemExit("test entry marker not found")
+          text = text.replace(marker, marker + '  \'import "../../tests/progress-display.test.ts";\',\n', 1)
           path.write_text(text)
           PY
 
