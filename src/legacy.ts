@@ -23,6 +23,16 @@ import {
   progressRatio,
   serializeVolumeLog,
 } from "./novel-progress";
+import {
+  MAX_TIMELINE_DAY_SPACING,
+  MAX_TIMELINE_VIEW_SCALE,
+  MIN_TIMELINE_DAY_SPACING,
+  MIN_TIMELINE_VIEW_SCALE,
+  calculateDefaultTimelineView,
+  centerTimelinePoint,
+  normalizeTimelineMaxStackDepth,
+  preserveTimelineAxisScreenY,
+} from "./timeline-scale";
 
 const PLUGIN_VERSION = "1.1.2";
 const MEDIA_ROOT = "Media";
@@ -861,10 +871,10 @@ function filterTimelineEntries(items, mediaType) {
 
 export const TimelineUI = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const MIN_DAY_SPACING = 0.18;
-  const MAX_DAY_SPACING = 96;
-  const MIN_VIEW_SCALE = 0.55;
-  const MAX_VIEW_SCALE = 1.6;
+  const MIN_DAY_SPACING = MIN_TIMELINE_DAY_SPACING;
+  const MAX_DAY_SPACING = MAX_TIMELINE_DAY_SPACING;
+  const MIN_VIEW_SCALE = MIN_TIMELINE_VIEW_SCALE;
+  const MAX_VIEW_SCALE = MAX_TIMELINE_VIEW_SCALE;
   const CARD_WIDTH = 120;
   const CARD_HEIGHT = 146;
   const CARD_GAP_X = 16;
@@ -880,15 +890,6 @@ export const TimelineUI = (() => {
   const formatDate = (time) => {
     const date = new Date(time);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  };
-  const initialDaySpacing = (rangeDays) => {
-    if (rangeDays <= 21) return 34;
-    if (rangeDays <= 60) return 18;
-    if (rangeDays <= 120) return 11;
-    if (rangeDays <= 365) return 6;
-    if (rangeDays <= 730) return 3.5;
-    if (rangeDays <= 1825) return 2;
-    return 1.15;
   };
   const tickStepForSpacing = (spacing) => {
     const candidates = [1, 2, 3, 7, 14, 30, 60, 90, 180, 365, 730];
@@ -930,8 +931,23 @@ export const TimelineUI = (() => {
     const minTime = dates[0] || 0;
     const maxTime = dates[dates.length - 1] || minTime;
     const rangeDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS));
-    const baseSpacing = initialDaySpacing(rangeDays);
-    const state = { x: 0, y: 0, daySpacing: baseSpacing, viewScale: 1, sceneWidth: 0, sceneHeight: 0 };
+    const defaultView = calculateDefaultTimelineView(
+      items.map((item) => item.completedTime),
+      rangeDays,
+      adapters.maxStackDepth,
+    );
+    const baseSpacing = defaultView.daySpacing;
+    const state = {
+      x: 0,
+      y: 0,
+      daySpacing: defaultView.daySpacing,
+      viewScale: defaultView.viewScale,
+      sceneWidth: 0,
+      sceneHeight: 0,
+      axisY: 0,
+      latestItemCenterX: 0,
+      latestItemCenterY: 0,
+    };
 
     const root = makeEl("div", "al-timeline-root");
     const toolbar = makeEl("div", "al-timeline-toolbar");
@@ -982,9 +998,11 @@ export const TimelineUI = (() => {
     scaleIn.type = "button"; scaleIn.title = uiText("timeline.scaleIn"); scaleIn.setAttribute("aria-label", scaleIn.title); setAnimeListIcon(scaleIn, "plus");
     scaleControls.append(scaleOut, scaleLabel, scaleIn);
 
+    const reset = makeEl("button", "", "");
+    reset.type = "button"; reset.title = uiText("timeline.reset"); reset.setAttribute("aria-label", reset.title); setAnimeListIcon(reset, "rotate-ccw");
     const fit = makeEl("button", "", "");
     fit.type = "button"; fit.title = uiText("timeline.fit"); fit.setAttribute("aria-label", fit.title); setAnimeListIcon(fit, "fit");
-    controls.append(spacingControls, scaleControls, fit);
+    controls.append(spacingControls, scaleControls, reset, fit);
     controls.hidden = !items.length;
     toolbar.append(copy, typeFilters, controls);
     root.appendChild(toolbar);
@@ -1030,6 +1048,7 @@ export const TimelineUI = (() => {
       const belowLaneCount = Math.floor(laneCount / 2);
       const axisY = SCENE_PADDING_Y + STEM_GAP
         + aboveLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y;
+      state.axisY = axisY;
       state.sceneHeight = axisY + SCENE_PADDING_Y
         + (belowLaneCount > 0
           ? STEM_GAP + belowLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y
@@ -1068,7 +1087,7 @@ export const TimelineUI = (() => {
         scene.appendChild(dayMarker);
       });
 
-      laidOutItems.forEach(({ item, time, x, lane }) => {
+      laidOutItems.forEach(({ item, time, x, lane }, index) => {
         const level = Math.floor(lane / 2);
         const aboveAxis = lane % 2 === 0;
         const cardY = aboveAxis
@@ -1105,6 +1124,10 @@ export const TimelineUI = (() => {
         if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
         card.addEventListener("click", () => openFile(item.filePath));
         scene.appendChild(card);
+        if (index === laidOutItems.length - 1) {
+          state.latestItemCenterX = x;
+          state.latestItemCenterY = cardY + CARD_HEIGHT / 2;
+        }
       });
       applyPan();
     };
@@ -1116,9 +1139,16 @@ export const TimelineUI = (() => {
       const next = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, nextSpacing));
       if (Math.abs(next - previous) < 1e-6) return;
       const dayAtCursor = (((localX - state.x) / state.viewScale) - sidePadding) / previous;
+      const previousAxisY = state.axisY;
       state.daySpacing = next;
       renderGeometry();
       state.x = localX - (sidePadding + dayAtCursor * next) * state.viewScale;
+      state.y = preserveTimelineAxisScreenY(
+        state.y,
+        previousAxisY,
+        state.axisY,
+        state.viewScale,
+      );
       applyPan();
     };
 
@@ -1138,13 +1168,37 @@ export const TimelineUI = (() => {
       applyPan();
     };
 
+    const centerScene = () => {
+      state.x = (viewport.clientWidth - state.sceneWidth * state.viewScale) / 2;
+      state.y = (viewport.clientHeight - state.sceneHeight * state.viewScale) / 2;
+      applyPan();
+    };
+
+    const centerLatestItem = () => {
+      const pan = centerTimelinePoint(
+        viewport.clientWidth,
+        viewport.clientHeight,
+        state.latestItemCenterX,
+        state.latestItemCenterY,
+        state.viewScale,
+      );
+      state.x = pan.x;
+      state.y = pan.y;
+      applyPan();
+    };
+
+    const resetView = () => {
+      state.daySpacing = defaultView.daySpacing;
+      state.viewScale = defaultView.viewScale;
+      renderGeometry();
+      centerLatestItem();
+    };
+
     const fitScene = () => {
       const availableWidth = Math.max(260, viewport.clientWidth / state.viewScale - sidePadding * 2);
       state.daySpacing = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, availableWidth / rangeDays));
       renderGeometry();
-      state.x = (viewport.clientWidth - state.sceneWidth * state.viewScale) / 2;
-      state.y = (viewport.clientHeight - state.sceneHeight * state.viewScale) / 2;
-      applyPan();
+      centerScene();
     };
 
     const viewportCenter = () => {
@@ -1155,6 +1209,7 @@ export const TimelineUI = (() => {
     zoomOut.addEventListener("click", () => { const center = viewportCenter(); setDaySpacingAt(state.daySpacing / 1.25, center.x); });
     scaleIn.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale * 1.15, center.x, center.y); });
     scaleOut.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale / 1.15, center.x, center.y); });
+    reset.addEventListener("click", resetView);
     fit.addEventListener("click", fitScene);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
@@ -1188,12 +1243,13 @@ export const TimelineUI = (() => {
     viewport.addEventListener("pointercancel", stopDrag);
 
     renderGeometry();
-    window.setTimeout(fitScene, 0);
+    window.setTimeout(resetView, 0);
     return {
       items: items.length,
       totalItems: allItems.length,
       type: selectedType,
       fitScene,
+      resetView,
       getDaySpacing: () => state.daySpacing,
       getViewScale: () => state.viewScale,
       getSceneWidth: () => state.sceneWidth,
@@ -1949,6 +2005,9 @@ export class TimelineModal extends Modal {
     this.modalEl.classList.add("animelist-timeline-modal");
     this.contentEl.replaceChildren();
     TimelineUI.render(this.contentEl, this.items, {
+      maxStackDepth: normalizeTimelineMaxStackDepth(
+        this.plugin.settings?.timelineMaxStackDepth,
+      ),
       openFile: async (path) => {
         this.close();
         await this.plugin.app.workspace.openLinkText(path, "", false);

@@ -18,6 +18,10 @@ import {
 } from "../src/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
 import { rankSearchResults, searchQueryVariants } from "../src/search";
+import {
+  MIN_TIMELINE_VIEW_SCALE,
+  calculateDefaultTimelineView,
+} from "../src/timeline-scale";
 
 const PathExists = existsSync;
 
@@ -566,18 +570,12 @@ describe("timeline media filters", () => {
     assert.match(stylesheet, /\.al-timeline-type-filter\.is-active/);
   });
 
-  it("keeps date spacing and overall scene scale independent", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+  it("keeps date spacing and overall scene scale as independent state", () => {
+    const defaultView = calculateDefaultTimelineView([0, 24 * 60 * 60 * 1000], 1, 3);
 
-    assert.match(legacySource, /daySpacing: baseSpacing, viewScale: 1/);
-    assert.match(legacySource, /translate\(\$\{state\.x\}px, \$\{state\.y\}px\) scale\(\$\{state\.viewScale\}\)/);
-    assert.match(legacySource, /const setDaySpacingAt =/);
-    assert.match(legacySource, /const setViewScaleAt =/);
-    assert.match(legacySource, /getViewScale: \(\) => state\.viewScale/);
-    assert.match(legacySource, /uiText\("timeline\.scaleOut"\)/);
-    assert.match(legacySource, /uiText\("timeline\.scaleIn"\)/);
-    assert.match(stylesheet, /\.al-timeline-control-group/);
+    assert.equal(defaultView.viewScale, 1);
+    assert.equal(MIN_TIMELINE_VIEW_SCALE, 0.1);
+    assert.ok(defaultView.daySpacing > defaultView.viewScale);
   });
 });
 
@@ -765,7 +763,7 @@ describe("repository defaults", () => {
     };
     const tab = new AnimeListSettingTab(new App(), host);
     const definitions = tab.getSettingDefinitions();
-    assert.equal(definitions.length, 11);
+    assert.equal(definitions.length, 12);
     assert.deepEqual(
       definitions.map((definition) => definition.name),
       [
@@ -775,6 +773,7 @@ describe("repository defaults", () => {
         UI_TEXT["settings.additionalFolders.name"],
         UI_TEXT["settings.coverFolder.name"],
         UI_TEXT["settings.templateFolder.name"],
+        UI_TEXT["settings.timelineMaxStackDepth.name"],
         UI_TEXT["media.provider.bangumi"],
         UI_TEXT["media.provider.anilist"],
         UI_TEXT["media.provider.openlibrary"],
@@ -889,7 +888,7 @@ describe("Obsidian community review compliance", () => {
   it("uses native setting headings", () => {
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
     assert.doesNotMatch(settingsSource, /createEl\("h[23]"/);
-    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 2);
+    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 3);
   });
 
   it("attests release assets", () => {

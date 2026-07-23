@@ -20,7 +20,6 @@ export interface LibraryUiState {
   view: LibraryViewMode;
 }
 
-
 export interface AnimeListSettings {
   storageMode: StorageMode;
   libraryRoot: string;
@@ -28,6 +27,7 @@ export interface AnimeListSettings {
   additionalScanFolders: string[];
   coverFolder: string;
   templateFolder: string;
+  timelineMaxStackDepth: number;
   providers: ProviderSettings;
   uiState: LibraryUiState;
 }
@@ -42,7 +42,6 @@ export interface NovelVolumeEntry {
   startedAt: string;
   completedAt: string;
 }
-
 
 export interface MediaItem {
   title: string;

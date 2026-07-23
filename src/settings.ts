@@ -1,6 +1,12 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
 import type { AnimeListSettings, StorageMode } from "./types";
+import {
+  DEFAULT_TIMELINE_MAX_STACK_DEPTH,
+  MAX_TIMELINE_MAX_STACK_DEPTH,
+  MIN_TIMELINE_MAX_STACK_DEPTH,
+  normalizeTimelineMaxStackDepth,
+} from "./timeline-scale";
 import { uiText } from "./ui-text";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
@@ -15,6 +21,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   additionalScanFolders: [],
   coverFolder: "AnimeList/Covers",
   templateFolder: "AnimeList/Templates",
+  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,
   providers: {
     bangumi: true,
     anilist: true,
@@ -88,6 +95,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderTemplateFolder(setting),
       },
       {
+        name: uiText("settings.timelineMaxStackDepth.name"),
+        desc: uiText("settings.timelineMaxStackDepth.desc"),
+        render: (setting) => this.renderTimelineMaxStackDepth(setting),
+      },
+      {
         name: uiText("media.provider.bangumi"),
         desc: uiText("settings.provider.bangumi.desc"),
         render: (setting) => this.renderProvider(setting, "bangumi"),
@@ -117,6 +129,9 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   display(): void {
+    this.plugin.settings.timelineMaxStackDepth = normalizeTimelineMaxStackDepth(
+      this.plugin.settings.timelineMaxStackDepth,
+    );
     this.renderImperativeSettings();
   }
 
@@ -128,13 +143,23 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
 
     const definitions = this.getSettingDefinitions();
-    definitions.forEach((definition, index) => {
+    definitions.forEach((definition) => {
       if (definition.visible && !definition.visible()) return;
+      if (definition.name === uiText("settings.timelineMaxStackDepth.name")) {
+        new Setting(containerEl)
+          .setName(uiText("settings.timeline.heading"))
+          .setDesc(uiText("settings.timeline.desc"))
+          .setHeading();
+      }
       if (definition.name === uiText("media.provider.bangumi")) {
-        new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
+        new Setting(containerEl)
+          .setName(uiText("settings.providers.heading"))
+          .setHeading();
       }
       if (definition.name === uiText("settings.createFolders.name")) {
-        new Setting(containerEl).setName(uiText("settings.setup.heading")).setHeading();
+        new Setting(containerEl)
+          .setName(uiText("settings.setup.heading"))
+          .setHeading();
       }
       const setting = new Setting(containerEl).setName(definition.name);
       if (definition.desc) setting.setDesc(definition.desc);
@@ -171,7 +196,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
         .setValue(this.plugin.settings.libraryRoot)
         .onChange(async (value) => {
-          this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
+          this.plugin.settings.libraryRoot = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList";
           await this.plugin.saveSettings();
         });
     });
@@ -183,7 +209,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder("Media")
         .setValue(this.plugin.settings.flatMediaFolder)
         .onChange(async (value) => {
-          this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
+          this.plugin.settings.flatMediaFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "");
           await this.plugin.saveSettings();
         });
     });
@@ -208,7 +235,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_COVER_FOLDER)
         .setValue(this.plugin.settings.coverFolder)
         .onChange(async (value) => {
-          this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
+          this.plugin.settings.coverFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
           await this.plugin.saveSettings();
         });
     });
@@ -220,15 +248,38 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
         .setValue(this.plugin.settings.templateFolder)
         .onChange(async (value) => {
-          this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
+          this.plugin.settings.templateFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
           await this.plugin.saveSettings();
         });
     });
   }
 
+  private renderTimelineMaxStackDepth(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      for (
+        let depth = MIN_TIMELINE_MAX_STACK_DEPTH;
+        depth <= MAX_TIMELINE_MAX_STACK_DEPTH;
+        depth += 1
+      ) {
+        dropdown.addOption(String(depth), String(depth));
+      }
+      dropdown
+        .setValue(String(normalizeTimelineMaxStackDepth(
+          this.plugin.settings.timelineMaxStackDepth,
+        )))
+        .onChange(async (value) => {
+          this.plugin.settings.timelineMaxStackDepth =
+            normalizeTimelineMaxStackDepth(value);
+          await this.plugin.saveSettings();
+        });
+    });
+  }
 
-
-  private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
+  private renderProvider(
+    setting: Setting,
+    key: keyof AnimeListSettings["providers"],
+  ): void {
     setting.addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
         this.plugin.settings.providers[key] = value;
