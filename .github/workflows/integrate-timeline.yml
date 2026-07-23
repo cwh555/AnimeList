@@ -33,4 +33,22 @@ jobs:
             done
             exit 1
           fi
-          git status --short
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Validate integration
+        run: |
+          npm ci
+          npm run check
+          npm run release:check
+      - name: Commit integrated feature
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/integrate-timeline.yml
+          git add -A
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "feat: optimize timeline scaling"
+          git push origin HEAD:integration/timeline-scale-preview
