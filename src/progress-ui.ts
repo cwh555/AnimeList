@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return -- This module is the typed boundary around the legacy renderer and runtime-validated Obsidian frontmatter. */
 import { AnimeListUI, DetailActionsRenderChild } from "./legacy";
 import { normalizeMediaStatus } from "./media-status";
 import { normalizeProgressValue, progressDisplayValue } from "./novel-progress";
@@ -110,14 +111,13 @@ DetailActionsRenderChild.prototype.render = function renderUnifiedDetailProgress
   const progress = normalizeProgressValue(frontmatter.progress);
   const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
   const unit = String(frontmatter.progress_unit || "");
-  const unitLabel = this.plugin ? String((frontmatter.progress_unit && unit) || "") : unit;
   const summary = this.containerEl.querySelector<HTMLElement>(".al-detail-summary");
   const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
   const text = summaryProgress?.textContent?.trim()
     || (progress !== 0
       ? uiText(mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", {
         progress: progressDisplayValue(progress),
-        unit: unitLabel,
+        unit,
       })
       : uiText("detail.noProgress"));
   summaryProgress?.remove();
