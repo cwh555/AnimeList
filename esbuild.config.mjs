@@ -5,17 +5,21 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const production = process.argv[2] === "production";
 const outfile = process.env.ANIMELIST_BUILD_OUTFILE || "main.js";
-const SERIAL_STYLE_START = "/* BEGIN GENERATED SERIAL READING UI */";
-const SERIAL_STYLE_END = "/* END GENERATED SERIAL READING UI */";
+const GENERATED_STYLE_START = "/* BEGIN GENERATED FEATURE STYLES */";
+const GENERATED_STYLE_END = "/* END GENERATED FEATURE STYLES */";
 
 async function buildStyles() {
-  const [currentStyles, serialStyles] = await Promise.all([
+  const [currentStyles, serialStyles, progressStyles] = await Promise.all([
     readFile("styles.css", "utf8"),
     readFile("styles.serial-reading.css", "utf8"),
+    readFile("styles.progress.css", "utf8"),
   ]);
-  const generatedStart = currentStyles.indexOf(SERIAL_STYLE_START);
-  const baseStyles = (generatedStart >= 0 ? currentStyles.slice(0, generatedStart) : currentStyles).trimEnd();
-  const outputStyles = `${baseStyles}\n\n${SERIAL_STYLE_START}\n${serialStyles.trim()}\n${SERIAL_STYLE_END}\n`;
+  const generatedStart = currentStyles.indexOf(GENERATED_STYLE_START);
+  const legacyGeneratedStart = currentStyles.indexOf("/* BEGIN GENERATED SERIAL READING UI */");
+  const cutIndex = generatedStart >= 0 ? generatedStart : legacyGeneratedStart;
+  const baseStyles = (cutIndex >= 0 ? currentStyles.slice(0, cutIndex) : currentStyles).trimEnd();
+  const generatedStyles = [serialStyles.trim(), progressStyles.trim()].join("\n\n");
+  const outputStyles = `${baseStyles}\n\n${GENERATED_STYLE_START}\n${generatedStyles}\n${GENERATED_STYLE_END}\n`;
   await writeFile("styles.css", outputStyles, "utf8");
 }
 
