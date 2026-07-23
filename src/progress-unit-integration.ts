@@ -1,6 +1,7 @@
 import { Notice, type App, type TFile } from "obsidian";
 import {
   normalizeProgressUnit,
+  PROGRESS_UNIT_UI_TEXT,
   progressUnitLabel,
   progressUnitOptions,
   validateProgressForUnit,
@@ -8,8 +9,6 @@ import {
 import type { MediaType } from "./types";
 
 const UNIT_VALUES = new Set(["episode", "chapter", "season", "volume"]);
-const UNIT_FIELD_LABEL = "進度單位";
-const INTEGER_PROGRESS_ERROR = "以話或季記錄時，進度必須是 0 或正整數。";
 
 interface ProgressUnitPluginHost {
   app: App;
@@ -33,8 +32,8 @@ function replaceSelectOptions(select: HTMLSelectElement, mediaType: MediaType, c
 }
 
 function existingUnitSelect(root: ParentNode): HTMLSelectElement | null {
-  for (const select of root.querySelectorAll<HTMLSelectElement>("select")) {
-    const values = [...select.options].map((option) => option.value);
+  for (const select of Array.from(root.querySelectorAll<HTMLSelectElement>("select"))) {
+    const values = Array.from(select.options).map((option) => option.value);
     if (values.length > 0 && values.every((value) => UNIT_VALUES.has(value))) return select;
   }
   return null;
@@ -55,7 +54,7 @@ function validateReadingProgress(unitField: Element, select: HTMLSelectElement):
   if (!input) return true;
   const result = validateProgressForUnit(input.value, select.value);
   if (result.valid) return true;
-  new Notice(INTEGER_PROGRESS_ERROR);
+  new Notice(PROGRESS_UNIT_UI_TEXT.integerProgressError);
   input.focus();
   input.select();
   return false;
@@ -66,7 +65,7 @@ function translateSeasonProgress(root: ParentNode): void {
     ".al-progress-on-cover",
     ".al-progress-row > span:first-child",
   ];
-  for (const element of root.querySelectorAll<HTMLElement>(selectors.join(","))) {
+  for (const element of Array.from(root.querySelectorAll<HTMLElement>(selectors.join(",")))) {
     const text = element.textContent ?? "";
     if (!/(^|\s)season($|\s)/.test(text)) continue;
     element.textContent = text.replace(/(^|\s)season(?=$|\s)/g, `$1${progressUnitLabel("season")}`);
@@ -123,17 +122,14 @@ export class ProgressUnitIntegration {
     wrapper.className = "al-form-field";
     const label = document.createElement("span");
     label.className = "al-form-label";
-    label.textContent = UNIT_FIELD_LABEL;
+    label.textContent = PROGRESS_UNIT_UI_TEXT.fieldLabel;
     const select = document.createElement("select");
     replaceSelectOptions(select, mediaType, currentUnit);
     wrapper.append(label, select);
 
-    const progressFields = [...form.querySelectorAll<HTMLElement>(".al-form-field")]
-      .filter((field) => field.querySelector("input")?.type !== "date");
-    const progressField = progressFields.find((field) => {
-      const input = field.querySelector<HTMLInputElement>("input");
-      return input?.type === "text" || input?.type === "number";
-    });
+    const progressField = Array.from(form.querySelectorAll<HTMLElement>(".al-form-field"))
+      .find((field) => field.querySelector<HTMLElement>(".al-form-label")?.textContent
+        ?.startsWith(PROGRESS_UNIT_UI_TEXT.readingProgressLabelPrefix));
     if (progressField?.nextSibling) form.insertBefore(wrapper, progressField.nextSibling);
     else form.appendChild(wrapper);
 
