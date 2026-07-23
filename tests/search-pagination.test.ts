@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { setRequestUrlMock } from "./mocks/obsidian";
 import {
   SEARCH_PAGINATION_LIMITS,
-  captureSearchScroll,
+  appendNextSearchPage,
+  appendSearchResultRows,
   mergeSearchPages,
-  restoreSearchScroll,
-  searchScrollContainer,
 } from "../src/search-pagination";
 import type { ExternalMediaResult } from "../src/types";
 
@@ -35,6 +33,35 @@ function result(id: number): ExternalMediaResult {
   };
 }
 
+function aniListPayload(id: number, hasNextPage: boolean): unknown {
+  return {
+    data: {
+      Page: {
+        pageInfo: { hasNextPage },
+        media: [{
+          id,
+          siteUrl: `https://anilist.co/anime/${id}`,
+          type: "ANIME",
+          format: "TV",
+          status: "FINISHED",
+          episodes: 12,
+          chapters: null,
+          volumes: null,
+          averageScore: 80,
+          description: "",
+          genres: [],
+          synonyms: [],
+          startDate: { year: 2026, month: 1, day: 1 },
+          title: { romaji: `Title ${id}`, english: `Title ${id}`, native: `Title ${id}` },
+          coverImage: { extraLarge: "", large: "", medium: "" },
+          studios: { nodes: [] },
+          staff: { edges: [] },
+        }],
+      },
+    },
+  };
+}
+
 describe("search pagination", () => {
   it("keeps bounded product limits", () => {
     assert.deepEqual(SEARCH_PAGINATION_LIMITS, { pageSize: 24, maxLoads: 2, maxResults: 72 });
@@ -54,55 +81,105 @@ describe("search pagination", () => {
     assert.equal(merged[71]?.sourceId, "71");
   });
 
-  it("updates pagination idempotently instead of deleting and recreating it", () => {
-    const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
-    assert.match(source, /if \(existing\) return;/);
-    assert.doesNotMatch(source, /querySelector\("\.al-search-pagination"\)\?\.remove\(\);/);
-    assert.match(source, /enhanceQueued/);
-    assert.match(source, /PATCH_MARKER/);
+  it("appends rows in place without replacing the result container", () => {
+    const target = {
+      scrollTop: 640,
+      children: ["existing"],
+      appendChild(node: string) { this.children.push(node); },
+    };
+    const appended = appendSearchResultRows(target, [result(2), result(3)], (item) => item.sourceId);
+    assert.equal(appended, 2);
+    assert.equal(target.scrollTop, 640);
+    assert.deepEqual(target.children, ["existing", "2", "3"]);
   });
 
-  it("captures and restores the actual Obsidian modal-content scroll position", () => {
-    const modalContent = { scrollTop: 640, isConnected: true };
+  it("loads page two into the live modal without rerendering or changing scroll", async () => {
+    let requestedPage = 0;
+    setRequestUrlMock((options: { body?: string }) => {
+      const body = JSON.parse(options.body ?? "{}") as { variables?: { page?: number } };
+      requestedPage = body.variables?.page ?? 0;
+      return { json: aniListPayload(2, true), text: "", headers: {} };
+    });
+
+    const contentEl = { scrollTop: 640 };
+    const rows = {
+      children: ["1"],
+      appendChild(node: string) { this.children.push(node); },
+    };
+    let renderCalls = 0;
     const modal = {
-      scrollTop: 0,
-      querySelector(selector: string) {
-        return selector === ".modal-content" ? modalContent : null;
+      plugin: {
+        settings: { providers: { bangumi: false, anilist: true, openlibrary: false } },
       },
+      mediaType: "anime",
+      query: "Title",
+      results: [result(1)],
+      warnings: [],
+      contentEl,
+      renderSearch() { renderCalls += 1; },
+      async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title",
+      results: [result(1)],
+      warnings: [],
+      loads: 0,
+      hasMore: true,
+      loading: false,
+      initialSearchPending: false,
     };
 
-    assert.equal(searchScrollContainer(modal), modalContent);
-    const snapshot = captureSearchScroll(modal);
-    assert.deepEqual(snapshot, { container: modalContent, scrollTop: 640 });
-
-    modalContent.scrollTop = 0;
-    restoreSearchScroll(snapshot);
-    assert.equal(modalContent.scrollTop, 640);
-    assert.equal(modal.scrollTop, 0);
+    try {
+      const appended = await appendNextSearchPage(
+        modal as never,
+        state,
+        rows as never,
+      );
+      assert.equal(appended, 1);
+      assert.equal(requestedPage, 2);
+      assert.equal(renderCalls, 0);
+      assert.equal(contentEl.scrollTop, 640);
+      assert.deepEqual(rows.children, ["1", "2"]);
+      assert.deepEqual(modal.results.map((item) => item.sourceId), ["1", "2"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
   });
 
-  it("falls back to the modal element when modal-content is unavailable", () => {
-    const modal = { scrollTop: 320, isConnected: true, querySelector: () => null };
-    assert.equal(searchScrollContainer(modal), modal);
-    const snapshot = captureSearchScroll(modal);
-    modal.scrollTop = 0;
-    restoreSearchScroll(snapshot);
-    assert.equal(modal.scrollTop, 320);
-  });
+  it("stops requesting after two additional pages", async () => {
+    let requests = 0;
+    setRequestUrlMock(() => {
+      requests += 1;
+      return { json: aniListPayload(3, true), text: "", headers: {} };
+    });
+    const modal = {
+      plugin: { settings: { providers: { bangumi: false, anilist: true, openlibrary: false } } },
+      mediaType: "anime",
+      query: "Title",
+      results: [result(1)],
+      warnings: [],
+      contentEl: { scrollTop: 0 },
+      renderSearch() {},
+      async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title",
+      results: [result(1)],
+      warnings: [],
+      loads: SEARCH_PAGINATION_LIMITS.maxLoads,
+      hasMore: true,
+      loading: false,
+      initialSearchPending: false,
+    };
+    const rows = { appendChild() {} };
 
-  it("restores after the legacy search input focus timer", () => {
-    const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
-    assert.match(source, /function scheduleScrollRestore\(state\)/);
-    assert.match(source, /window\.setTimeout\(\(\) => \{\s*window\.requestAnimationFrame/s);
-    assert.match(source, /restoreSearchScroll\(snapshot\)/);
-    assert.match(source, /state\.restoreScroll = captureSearchScroll\(state\.modalEl\)/);
-  });
-
-  it("uses provider-native pages for additional requests", () => {
-    const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
-    assert.match(source, /offset = \(page - 1\) \* limit/);
-    assert.match(source, /Page\(page: \$page, perPage: 20\)/);
-    assert.match(source, /pageInfo \{ hasNextPage \}/);
-    assert.match(source, /limit=\$\{limit\}&page=\$\{page\}/);
+    try {
+      assert.equal(await appendNextSearchPage(modal as never, state, rows as never), 0);
+      assert.equal(requests, 0);
+    } finally {
+      setRequestUrlMock(null);
+    }
   });
 });

@@ -22,7 +22,7 @@ async function buildStyles() {
 await buildStyles();
 
 const context = await esbuild.context({
-  entryPoints: ["src/main.ts"],
+  entryPoints: ["src/plugin-entry.ts"],
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/*", "@lezer/*", ...builtinModules],
   format: "cjs",
