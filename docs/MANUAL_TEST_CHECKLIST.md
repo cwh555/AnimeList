@@ -62,6 +62,18 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Duplicate novel volume labels are rejected after normalization (`01` and `1` are the same).
 - [ ] Adding a novel volume pre-fills its completion date with today; clearing the field and saving restores today.
 
+### Manga reading history
+
+- [ ] With a manga note active, the command palette exposes **新增漫畫閱讀紀錄**; anime and novel notes do not expose it.
+- [ ] Right-clicking a manga Markdown file exposes the same action; folders and non-manga notes do not.
+- [ ] Each manga reading-history row can independently select **話**, **季**, or **卷**.
+- [ ] **話** and **季** accept only non-negative whole numbers; **卷** accepts integers, `.5`, and `EX`.
+- [ ] Adding a row chooses the next value for its unit and pre-fills the completion date with today.
+- [ ] The same numeric value may be saved once per different unit, while duplicate unit/value pairs are rejected.
+- [ ] Saving writes `value`, `unit`, optional `started_at`, and a non-empty `completed_at` under `reading_log`.
+- [ ] Completed history raises the main `progress` only when the row unit matches the note's current `progress_unit`.
+- [ ] Removing all rows removes `reading_log` without changing unrelated frontmatter or the Markdown body.
+
 ### Novel volume history and series cover
 
 - [ ] Creating a novel from Bangumi or AniList downloads the normal series cover and shows it on the library card.
