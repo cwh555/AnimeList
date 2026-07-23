@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Runtime adapter around the legacy add modal. */
 import type { TFile } from "obsidian";
-import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
+import LegacyAnimeListPlugin from "./legacy";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import {
   DEFAULT_SEARCH_LANGUAGES,
@@ -15,7 +14,6 @@ import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.search-enhancements.installed");
 const INSTANCE_STATES = new WeakMap<object, EnhancementState>();
-const { dedupeSearchResults } = legacyTest;
 
 interface EnhancementState {
   results: ExternalMediaResult[];
@@ -159,7 +157,6 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementS
       query,
       providers: providersFor(plugin, mediaType),
       languages: plugin.settings.searchLanguages ?? DEFAULT_SEARCH_LANGUAGES,
-      dedupe: (results) => dedupeSearchResults(results) as ExternalMediaResult[],
       maxResults: 24,
     });
     state.results = response.results;
@@ -265,5 +262,3 @@ if (markerHost[PATCH_MARKER] !== true) {
   };
   Object.defineProperty(prototype, PATCH_MARKER, { value: true });
 }
-
-/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- End runtime adapter scope. */
