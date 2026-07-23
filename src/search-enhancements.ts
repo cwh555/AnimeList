@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Runtime adapter around the legacy add modal. */
-import { TFile } from "obsidian";
+import type { TFile } from "obsidian";
 import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import {
@@ -23,18 +23,25 @@ interface EnhancementState {
   languageHydration: Promise<void> | null;
 }
 
-interface SearchEnhancedPlugin extends LegacyAnimeListPlugin {
+type SearchEnhancedPlugin = LegacyAnimeListPlugin & {
   settings: AnimeListSettings;
+  getScanFolders?(): string[];
+};
+
+interface SearchRuntimeMethods {
   searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }>;
   searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
-  getScanFolders?(): string[];
 }
 
-interface SearchEnhancedPrototype extends SearchEnhancedPlugin {
+interface AddModalPrototype {
   openAddModal(initialType?: MediaType): void;
+}
+
+function runtimeMethods(plugin: SearchEnhancedPlugin): SearchRuntimeMethods {
+  return plugin as unknown as SearchRuntimeMethods;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,22 +107,23 @@ function collectStoredMedia(plugin: SearchEnhancedPlugin): StoredMediaIdentity[]
 
 function providersFor(plugin: SearchEnhancedPlugin, mediaType: MediaType): SearchProviderAdapter[] {
   const providers: SearchProviderAdapter[] = [];
+  const methods = runtimeMethods(plugin);
   if (plugin.settings.providers.bangumi) {
     providers.push({
       label: "Bangumi",
-      search: (query) => plugin.searchBangumi(mediaType, query),
+      search: (query) => methods.searchBangumi(mediaType, query),
     });
   }
   if (plugin.settings.providers.anilist) {
     providers.push({
       label: "AniList",
-      search: (query) => plugin.searchAniList(mediaType, query),
+      search: (query) => methods.searchAniList(mediaType, query),
     });
   }
   if (mediaType === "novel" && plugin.settings.providers.openlibrary) {
     providers.push({
       label: "Open Library",
-      search: (query) => plugin.searchOpenLibrary(query),
+      search: (query) => methods.searchOpenLibrary(query),
     });
   }
   return providers;
@@ -143,8 +151,9 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementS
     languageHydration: null,
   };
   INSTANCE_STATES.set(plugin, state);
+  const methods = runtimeMethods(plugin);
 
-  plugin.searchExternal = async (mediaType, query) => {
+  methods.searchExternal = async (mediaType, query) => {
     await hydrateSearchLanguages(plugin, state);
     const response = await searchMultilingualProviders({
       query,
@@ -157,8 +166,8 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementS
     return { results: response.results, warnings: response.warnings };
   };
 
-  const originalCreateMediaNote = plugin.createMediaNote.bind(plugin);
-  plugin.createMediaNote = async (result, form) => {
+  const originalCreateMediaNote = methods.createMediaNote.bind(plugin);
+  methods.createMediaNote = async (result, form) => {
     const file = await originalCreateMediaNote(result, form);
     const aliases = aliasesFor(result);
     if (aliases.length) {
@@ -235,15 +244,18 @@ function installDuplicateWarning(
   render();
 }
 
-const prototype = LegacyAnimeListPlugin.prototype as unknown as SearchEnhancedPrototype;
+const prototype = LegacyAnimeListPlugin.prototype as unknown as AddModalPrototype;
 const markerHost = prototype as unknown as Record<symbol, unknown>;
 if (markerHost[PATCH_MARKER] !== true) {
   const originalOpenAddModal = prototype.openAddModal;
-  prototype.openAddModal = function openAddModalWithSearchEnhancements(initialType = "anime") {
+  prototype.openAddModal = function openAddModalWithSearchEnhancements(
+    this: SearchEnhancedPlugin,
+    initialType = "anime",
+  ) {
     const state = installInstanceEnhancements(this);
     originalOpenAddModal.call(this, initialType);
     window.queueMicrotask(() => {
-      const modals = [...document.querySelectorAll<HTMLElement>(".animelist-modal")];
+      const modals = Array.from(document.querySelectorAll<HTMLElement>(".animelist-modal"));
       const modalEl = modals.at(-1);
       if (modalEl) installDuplicateWarning(this, modalEl, state);
     });
