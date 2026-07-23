@@ -45,3 +45,4 @@ describe("search language settings", () => {
     ]);
   });
 });
+
