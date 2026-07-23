@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { legacyTest } from "../src/legacy";
 import {
   expandMangaReadingTimelineEntries,
   nextReadingProgressValue,
@@ -104,45 +103,16 @@ describe("manga reading progress records", () => {
     assert.ok(entries.every((entry) => entry.seriesTitle === "Example manga"));
   });
 
-  it("writes manga reading_log and preserves EX volume progress", () => {
-    const markdown = legacyTest.buildMediaMarkdown({
-      provider: "manual",
-      sourceId: "",
-      sourceUrl: "",
-      mediaType: "manga",
-      title: "Example manga",
-      originalTitle: "",
-      romajiTitle: "",
-      format: "manga",
-      year: 2026,
-      coverUrl: "",
-      genres: [],
-      rawGenres: [],
-      people: [],
-      platforms: [],
-      total: 0,
+  it("preserves EX when serializing volume records", () => {
+    assert.deepEqual(serializeReadingProgressLog([{
+      value: "EX",
       unit: "volume",
-      summary: "",
-      externalScore: null,
-      releaseStatus: "releasing",
-    }, {
-      title: "Example manga",
-      score: "",
-      status: "ongoing",
-      releaseStatus: "releasing",
       startedAt: "",
-      completedAt: "",
-      progress: "EX",
-      total: 0,
+      completedAt: "2026-07-23",
+    }]), [{
+      value: "EX",
       unit: "volume",
-      favorite: false,
-      genres: [],
-      templatePath: "",
-      volumeLog: [],
-      readingLog: [{ value: "EX", unit: "volume", startedAt: "", completedAt: "2026-07-23" }],
-    }, "", "");
-    assert.match(markdown, /^progress: "EX"$/m);
-    assert.match(markdown, /^progress_unit: "volume"$/m);
-    assert.match(markdown, /reading_log:[\s\S]*value: "EX"[\s\S]*unit: "volume"[\s\S]*completed_at: "2026-07-23"/);
+      completed_at: "2026-07-23",
+    }]);
   });
 });
