@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: feature/unified-progress-final
+          ref: feature/unified-progress-diagnostic
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
@@ -21,5 +21,12 @@ jobs:
       - name: Rebuild and validate clean branch
         shell: bash
         run: |
-          sed -i 's/feature\/unified-progress-display/feature\/unified-progress-final/g' scripts/rebuild-progress-branch.sh
-          bash scripts/rebuild-progress-branch.sh
+          set -o pipefail
+          sed -i 's/feature\/unified-progress-display/feature\/unified-progress-diagnostic/g' scripts/rebuild-progress-branch.sh
+          bash scripts/rebuild-progress-branch.sh 2>&1 | tee rebuild.log
+      - name: Upload rebuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progress-rebuild-log
+          path: rebuild.log
