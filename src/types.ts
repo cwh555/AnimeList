@@ -58,6 +58,13 @@ export interface NovelVolumeEntry {
   completedAt: string;
 }
 
+export interface ReadingProgressEntry {
+  value: ProgressValue;
+  unit: string;
+  startedAt: string;
+  completedAt: string;
+}
+
 export interface CoverSources {
   src: string;
   srcset: string;
@@ -89,11 +96,14 @@ export interface MediaItem {
   startedAt: string;
   completedAt: string;
   volumeLog: NovelVolumeEntry[];
+  readingLog?: ReadingProgressEntry[];
 }
 
 export interface TimelineMediaEntry extends MediaItem {
   seriesTitle?: string;
   volumeLabel?: string;
+  progressValue?: ProgressValue;
+  progressUnit?: string;
 }
 
 export interface ExternalMediaResult {
@@ -133,4 +143,5 @@ export interface MediaNoteForm {
   genres: string[];
   templatePath: string;
   volumeLog: NovelVolumeEntry[];
+  readingLog?: ReadingProgressEntry[];
 }
