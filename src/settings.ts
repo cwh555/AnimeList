@@ -1,6 +1,17 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
-import type { AnimeListSettings, StorageMode } from "./types";
+import "./search-enhancements";
+import {
+  DEFAULT_SEARCH_LANGUAGES,
+  normalizeSearchLanguageSettings,
+} from "./multilingual-search";
+import { searchFeatureText } from "./search-feature-text";
+import type {
+  AnimeListSettings,
+  SearchLanguage,
+  SearchLanguageSettings,
+  StorageMode,
+} from "./types";
 import { uiText } from "./ui-text";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
@@ -20,6 +31,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     anilist: true,
     openlibrary: true,
   },
+  searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
   uiState: {
     section: "library",
     type: "all",
@@ -33,6 +45,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
 export interface AnimeListSettingsHost {
   app: App;
   settings: AnimeListSettings;
+  loadData(): Promise<unknown>;
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
@@ -45,8 +58,15 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
+function rawSearchLanguages(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>).searchLanguages;
+}
+
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private searchLanguagesHydrated = false;
+  private searchLanguagesHydration: Promise<void> | null = null;
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
@@ -116,8 +136,47 @@ export class AnimeListSettingTab extends PluginSettingTab {
     return definitions;
   }
 
+  getSearchLanguageDefinitions(): SettingDefinition[] {
+    return [
+      {
+        name: searchFeatureText("settings.languages.chinese.name"),
+        desc: searchFeatureText("settings.languages.chinese.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "chinese"),
+      },
+      {
+        name: searchFeatureText("settings.languages.english.name"),
+        desc: searchFeatureText("settings.languages.english.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "english"),
+      },
+      {
+        name: searchFeatureText("settings.languages.original.name"),
+        desc: searchFeatureText("settings.languages.original.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "original"),
+      },
+    ];
+  }
+
   display(): void {
     this.renderImperativeSettings();
+    void this.hydrateSearchLanguages();
+  }
+
+  private async hydrateSearchLanguages(): Promise<void> {
+    if (this.searchLanguagesHydrated) return;
+    if (this.searchLanguagesHydration === null) {
+      this.searchLanguagesHydration = (async () => {
+        const loaded = await this.plugin.loadData();
+        this.plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawSearchLanguages(loaded));
+        this.searchLanguagesHydrated = true;
+        this.renderImperativeSettings();
+      })().catch((error) => {
+        console.warn("AnimeList could not restore search language settings", error);
+        this.searchLanguagesHydrated = true;
+      }).finally(() => {
+        this.searchLanguagesHydration = null;
+      });
+    }
+    await this.searchLanguagesHydration;
   }
 
   private renderImperativeSettings(): void {
@@ -127,8 +186,13 @@ export class AnimeListSettingTab extends PluginSettingTab {
       text: uiText("settings.intro"),
     });
 
-    const definitions = this.getSettingDefinitions();
-    definitions.forEach((definition, index) => {
+    const baseDefinitions = this.getSettingDefinitions();
+    const definitions = [
+      ...baseDefinitions.slice(0, 6),
+      ...this.getSearchLanguageDefinitions(),
+      ...baseDefinitions.slice(6),
+    ];
+    definitions.forEach((definition) => {
       if (definition.visible && !definition.visible()) return;
       if (definition.name === uiText("media.provider.bangumi")) {
         new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
@@ -226,7 +290,21 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
   }
 
+  private searchLanguages(): SearchLanguageSettings {
+    if (!this.plugin.settings.searchLanguages) {
+      this.plugin.settings.searchLanguages = { ...DEFAULT_SEARCH_LANGUAGES };
+    }
+    return this.plugin.settings.searchLanguages;
+  }
 
+  private renderSearchLanguage(setting: Setting, language: SearchLanguage): void {
+    setting.addToggle((toggle) => {
+      toggle.setValue(this.searchLanguages()[language]).onChange(async (value) => {
+        this.searchLanguages()[language] = value;
+        await this.plugin.saveSettings();
+      });
+    });
+  }
 
   private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
     setting.addToggle((toggle) => {
