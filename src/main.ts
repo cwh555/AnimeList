@@ -19,6 +19,7 @@ import { CoverThumbnailCache } from "./cover-cache";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { completedRequirementMessage, uiText } from "./ui-text";
 import { rankSearchResults, searchQueryVariants } from "./search";
+import { normalizeTimelineMaxStackDepth } from "./timeline-scale";
 import type {
   AnimeListSettings,
   ExternalMediaResult,
@@ -216,6 +217,9 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         : [],
       coverFolder: typeof loaded.coverFolder === "string" ? loaded.coverFolder : DEFAULT_SETTINGS.coverFolder,
       templateFolder: typeof loaded.templateFolder === "string" ? loaded.templateFolder : DEFAULT_SETTINGS.templateFolder,
+      timelineMaxStackDepth: normalizeTimelineMaxStackDepth(
+        loaded.timelineMaxStackDepth,
+      ),
       providers: {
         bangumi: typeof providers.bangumi === "boolean" ? providers.bangumi : DEFAULT_SETTINGS.providers.bangumi,
         anilist: typeof providers.anilist === "boolean" ? providers.anilist : DEFAULT_SETTINGS.providers.anilist,

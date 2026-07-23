@@ -34,6 +34,7 @@ export interface AnimeListSettings {
   additionalScanFolders: string[];
   coverFolder: string;
   templateFolder: string;
+  timelineMaxStackDepth: number;
   providers: ProviderSettings;
   searchLanguages?: SearchLanguageSettings;
   uiState: LibraryUiState;

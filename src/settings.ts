@@ -8,6 +8,12 @@ import {
   normalizeSearchLanguageSettings,
 } from "./multilingual-search";
 import { searchFeatureText } from "./search-feature-text";
+import {
+  DEFAULT_TIMELINE_MAX_STACK_DEPTH,
+  MAX_TIMELINE_MAX_STACK_DEPTH,
+  MIN_TIMELINE_MAX_STACK_DEPTH,
+  normalizeTimelineMaxStackDepth,
+} from "./timeline-scale";
 import type {
   AnimeListSettings,
   SearchLanguage,
@@ -28,6 +34,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   additionalScanFolders: [],
   coverFolder: "AnimeList/Covers",
   templateFolder: "AnimeList/Templates",
+  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,
   providers: {
     bangumi: true,
     anilist: true,
@@ -55,6 +62,7 @@ export interface AnimeListSettingsHost {
 
 export interface SettingsSection {
   heading?: string;
+  description?: string;
   definitions: SettingDefinition[];
 }
 
@@ -116,6 +124,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderTemplateFolder(setting),
       },
       {
+        name: uiText("settings.timelineMaxStackDepth.name"),
+        desc: uiText("settings.timelineMaxStackDepth.desc"),
+        render: (setting) => this.renderTimelineMaxStackDepth(setting),
+      },
+      {
         name: uiText("media.provider.bangumi"),
         desc: uiText("settings.provider.bangumi.desc"),
         render: (setting) => this.renderProvider(setting, "bangumi"),
@@ -168,21 +181,29 @@ export class AnimeListSettingTab extends PluginSettingTab {
     return [
       { definitions: base.slice(0, 6) },
       {
+        heading: uiText("settings.timeline.heading"),
+        description: uiText("settings.timeline.desc"),
+        definitions: base.slice(6, 7),
+      },
+      {
         heading: searchFeatureText("settings.languages.heading"),
         definitions: this.getSearchLanguageDefinitions(),
       },
       {
         heading: uiText("settings.providers.heading"),
-        definitions: base.slice(6, 9),
+        definitions: base.slice(7, 10),
       },
       {
         heading: uiText("settings.setup.heading"),
-        definitions: base.slice(9),
+        definitions: base.slice(10),
       },
     ];
   }
 
   display(): void {
+    this.plugin.settings.timelineMaxStackDepth = normalizeTimelineMaxStackDepth(
+      this.plugin.settings.timelineMaxStackDepth,
+    );
     this.renderImperativeSettings();
     void this.hydrateSearchLanguages();
   }
@@ -213,10 +234,9 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
 
     for (const section of this.getSettingSections()) {
-      if (section.heading === searchFeatureText("settings.languages.heading")) {
-        new Setting(containerEl).setName(section.heading).setHeading();
-      } else if (section.heading) {
-        new Setting(containerEl).setName(section.heading).setHeading();
+      if (section.heading) {
+        const heading = new Setting(containerEl).setName(section.heading).setHeading();
+        if (section.description) heading.setDesc(section.description);
       }
       for (const definition of section.definitions) {
         if (definition.visible && !definition.visible()) continue;
@@ -256,7 +276,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
         .setValue(this.plugin.settings.libraryRoot)
         .onChange(async (value) => {
-          this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
+          this.plugin.settings.libraryRoot = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList";
           await this.plugin.saveSettings();
         });
     });
@@ -268,7 +289,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder("Media")
         .setValue(this.plugin.settings.flatMediaFolder)
         .onChange(async (value) => {
-          this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
+          this.plugin.settings.flatMediaFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "");
           await this.plugin.saveSettings();
         });
     });
@@ -293,7 +315,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_COVER_FOLDER)
         .setValue(this.plugin.settings.coverFolder)
         .onChange(async (value) => {
-          this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
+          this.plugin.settings.coverFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
           await this.plugin.saveSettings();
         });
     });
@@ -305,7 +328,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
         .setValue(this.plugin.settings.templateFolder)
         .onChange(async (value) => {
-          this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
+          this.plugin.settings.templateFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
           await this.plugin.saveSettings();
         });
     });
@@ -324,6 +348,27 @@ export class AnimeListSettingTab extends PluginSettingTab {
         this.searchLanguages()[language] = value;
         await this.plugin.saveSettings();
       });
+    });
+  }
+
+  private renderTimelineMaxStackDepth(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      for (
+        let depth = MIN_TIMELINE_MAX_STACK_DEPTH;
+        depth <= MAX_TIMELINE_MAX_STACK_DEPTH;
+        depth += 1
+      ) {
+        dropdown.addOption(String(depth), String(depth));
+      }
+      dropdown
+        .setValue(String(normalizeTimelineMaxStackDepth(
+          this.plugin.settings.timelineMaxStackDepth,
+        )))
+        .onChange(async (value) => {
+          this.plugin.settings.timelineMaxStackDepth =
+            normalizeTimelineMaxStackDepth(value);
+          await this.plugin.saveSettings();
+        });
     });
   }
 

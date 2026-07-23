@@ -39,6 +39,7 @@ describe("search language settings", () => {
 
     assert.deepEqual(sections.map((section) => section.heading ?? ""), [
       "",
+      "Timeline",
       "Search languages",
       "Metadata providers",
       "Library setup",
