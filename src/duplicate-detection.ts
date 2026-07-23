@@ -89,7 +89,7 @@ function installmentProfile(titles: string[]): InstallmentProfile {
   return profile;
 }
 
-function setValuesMatch(left: Set<number | string>, right: Set<number | string>): boolean {
+function setValuesMatch<T>(left: Set<T>, right: Set<T>): boolean {
   if (left.size === 0 && right.size === 0) return true;
   if (left.size === 0 || right.size === 0) return false;
   return [...left].some((value) => right.has(value));
