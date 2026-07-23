@@ -56,6 +56,15 @@ describe("search pagination", () => {
     assert.match(source, /PATCH_MARKER/);
   });
 
+  it("restores the outer modal position after the search input focus timer", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
+    assert.match(source, /state\.restoreScrollTop = state\.modalEl\.scrollTop/);
+    assert.match(source, /function scheduleScrollRestore\(state\)/);
+    assert.match(source, /window\.setTimeout\(\(\) => \{\s*window\.requestAnimationFrame/s);
+    assert.match(source, /state\.modalEl\.scrollTop = scrollTop/);
+    assert.match(source, /restoreScheduled: false/);
+  });
+
   it("uses provider-native pages for additional requests", () => {
     const source = readFileSync(path.join(process.cwd(), "src/search-pagination.ts"), "utf8");
     assert.match(source, /offset = \(page - 1\) \* limit/);
