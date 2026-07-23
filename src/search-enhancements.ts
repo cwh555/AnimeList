@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Runtime adapter around the legacy add modal. */
+import { TFile } from "obsidian";
 import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import {
   DEFAULT_SEARCH_LANGUAGES,
+  normalizeSearchLanguageSettings,
   searchMultilingualProviders,
   type SearchProviderAdapter,
 } from "./multilingual-search";
@@ -12,11 +14,13 @@ import { mediaProviderLabel } from "./ui-text";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.search-enhancements.installed");
-const INSTANCE_MARKER = Symbol.for("animelist.search-enhancements.instance");
+const INSTANCE_STATES = new WeakMap<object, EnhancementState>();
 const { dedupeSearchResults } = legacyTest;
 
 interface EnhancementState {
   results: ExternalMediaResult[];
+  languagesHydrated: boolean;
+  languageHydration: Promise<void> | null;
 }
 
 interface SearchEnhancedPlugin extends LegacyAnimeListPlugin {
@@ -25,9 +29,16 @@ interface SearchEnhancedPlugin extends LegacyAnimeListPlugin {
   searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
-  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<unknown>;
+  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   getScanFolders?(): string[];
-  [INSTANCE_MARKER]?: EnhancementState;
+}
+
+interface SearchEnhancedPrototype extends SearchEnhancedPlugin {
+  openAddModal(initialType?: MediaType): void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string {
@@ -44,6 +55,24 @@ function stringArray(value: unknown): string[] {
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function hydrateSearchLanguages(
+  plugin: SearchEnhancedPlugin,
+  state: EnhancementState,
+): Promise<void> {
+  if (state.languagesHydrated) return;
+  if (!state.languageHydration) {
+    state.languageHydration = (async () => {
+      const loaded = await plugin.loadData();
+      const rawLanguages = isRecord(loaded) ? loaded.searchLanguages : undefined;
+      plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawLanguages);
+      state.languagesHydrated = true;
+    })().finally(() => {
+      state.languageHydration = null;
+    });
+  }
+  await state.languageHydration;
 }
 
 function collectStoredMedia(plugin: SearchEnhancedPlugin): StoredMediaIdentity[] {
@@ -106,12 +135,17 @@ function aliasesFor(result: ExternalMediaResult): string[] {
 }
 
 function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementState {
-  const installed = plugin[INSTANCE_MARKER];
+  const installed = INSTANCE_STATES.get(plugin);
   if (installed) return installed;
-  const state: EnhancementState = { results: [] };
-  Object.defineProperty(plugin, INSTANCE_MARKER, { value: state });
+  const state: EnhancementState = {
+    results: [],
+    languagesHydrated: false,
+    languageHydration: null,
+  };
+  INSTANCE_STATES.set(plugin, state);
 
   plugin.searchExternal = async (mediaType, query) => {
+    await hydrateSearchLanguages(plugin, state);
     const response = await searchMultilingualProviders({
       query,
       providers: providersFor(plugin, mediaType),
@@ -127,9 +161,9 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): EnhancementS
   plugin.createMediaNote = async (result, form) => {
     const file = await originalCreateMediaNote(result, form);
     const aliases = aliasesFor(result);
-    if (aliases.length && file && typeof file === "object" && "path" in file) {
+    if (aliases.length) {
       try {
-        await plugin.app.fileManager.processFrontMatter(file as never, (frontmatter) => {
+        await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
           const existing = stringArray(frontmatter.title_aliases);
           frontmatter.title_aliases = [...new Set([...existing, ...aliases])];
         });
@@ -201,8 +235,9 @@ function installDuplicateWarning(
   render();
 }
 
-const prototype = LegacyAnimeListPlugin.prototype as SearchEnhancedPlugin;
-if (prototype[PATCH_MARKER] !== true) {
+const prototype = LegacyAnimeListPlugin.prototype as unknown as SearchEnhancedPrototype;
+const markerHost = prototype as unknown as Record<symbol, unknown>;
+if (markerHost[PATCH_MARKER] !== true) {
   const originalOpenAddModal = prototype.openAddModal;
   prototype.openAddModal = function openAddModalWithSearchEnhancements(initialType = "anime") {
     const state = installInstanceEnhancements(this);
