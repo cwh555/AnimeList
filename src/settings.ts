@@ -1,7 +1,15 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
+import "./search-enhancements";
 import "./search-pagination";
-import type { AnimeListSettings, StorageMode } from "./types";
+import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
+import { searchFeatureText } from "./search-feature-text";
+import type {
+  AnimeListSettings,
+  SearchLanguage,
+  SearchLanguageSettings,
+  StorageMode,
+} from "./types";
 import { uiText } from "./ui-text";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
@@ -21,6 +29,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     anilist: true,
     openlibrary: true,
   },
+  searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
   uiState: {
     section: "library",
     type: "all",
@@ -89,6 +98,21 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderTemplateFolder(setting),
       },
       {
+        name: searchFeatureText("settings.languages.chinese.name"),
+        desc: searchFeatureText("settings.languages.chinese.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "chinese"),
+      },
+      {
+        name: searchFeatureText("settings.languages.english.name"),
+        desc: searchFeatureText("settings.languages.english.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "english"),
+      },
+      {
+        name: searchFeatureText("settings.languages.original.name"),
+        desc: searchFeatureText("settings.languages.original.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "original"),
+      },
+      {
         name: uiText("media.provider.bangumi"),
         desc: uiText("settings.provider.bangumi.desc"),
         render: (setting) => this.renderProvider(setting, "bangumi"),
@@ -131,6 +155,9 @@ export class AnimeListSettingTab extends PluginSettingTab {
     const definitions = this.getSettingDefinitions();
     definitions.forEach((definition) => {
       if (definition.visible && !definition.visible()) return;
+      if (definition.name === searchFeatureText("settings.languages.chinese.name")) {
+        new Setting(containerEl).setName(searchFeatureText("settings.languages.heading")).setHeading();
+      }
       if (definition.name === uiText("media.provider.bangumi")) {
         new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
       }
@@ -224,6 +251,22 @@ export class AnimeListSettingTab extends PluginSettingTab {
           this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
           await this.plugin.saveSettings();
         });
+    });
+  }
+
+  private searchLanguages(): SearchLanguageSettings {
+    if (!this.plugin.settings.searchLanguages) {
+      this.plugin.settings.searchLanguages = { ...DEFAULT_SEARCH_LANGUAGES };
+    }
+    return this.plugin.settings.searchLanguages;
+  }
+
+  private renderSearchLanguage(setting: Setting, language: SearchLanguage): void {
+    setting.addToggle((toggle) => {
+      toggle.setValue(this.searchLanguages()[language]).onChange(async (value) => {
+        this.searchLanguages()[language] = value;
+        await this.plugin.saveSettings();
+      });
     });
   }
 
