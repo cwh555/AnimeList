@@ -61,6 +61,7 @@ jobs:
           git clean -fdx
           python /tmp/apply-interface.py
           git log --oneline --decorate -4
+          git format-patch --stdout "$BASE_SHA"..HEAD > /tmp/interface-terminology.patch
 
       - name: Set up Node.js
         if: steps.staged.outputs.present == 'true'
@@ -75,7 +76,29 @@ jobs:
 
       - name: Run full repository check
         if: steps.staged.outputs.present == 'true'
-        run: npm run check
+        id: check
+        shell: bash
+        run: |
+          set +e
+          npm run check > /tmp/check.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/check.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Upload validation diagnostics
+        if: steps.staged.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-terminology-diagnostics
+          path: |
+            /tmp/check.log
+            /tmp/interface-terminology.patch
+          if-no-files-found: error
+
+      - name: Fail when repository check fails
+        if: steps.staged.outputs.present == 'true' && steps.check.outputs.status != '0'
+        run: exit 1
 
       - name: Run release validation
         if: steps.staged.outputs.present == 'true'
