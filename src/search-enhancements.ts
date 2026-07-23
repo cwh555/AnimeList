@@ -110,6 +110,7 @@ function providersFor(plugin: SearchEnhancedPlugin, mediaType: MediaType): Searc
   if (plugin.settings.providers.bangumi) {
     providers.push({
       label: "Bangumi",
+      supportsChineseDiscovery: true,
       search: (query) => methods.searchBangumi(mediaType, query),
     });
   }

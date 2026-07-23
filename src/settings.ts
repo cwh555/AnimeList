@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
+import { installReliableLibraryNavigation } from "./library-navigation";
 import "./search-enhancements";
 import {
   DEFAULT_SEARCH_LANGUAGES,
@@ -51,6 +52,11 @@ export interface AnimeListSettingsHost {
   refreshViews(): void;
 }
 
+export interface SettingsSection {
+  heading?: string;
+  definitions: SettingDefinition[];
+}
+
 function splitFolders(value: string): string[] {
   return value
     .split(/[\n,]/)
@@ -71,10 +77,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
+    installReliableLibraryNavigation(plugin);
   }
 
   getSettingDefinitions(): SettingDefinition[] {
-    const definitions: SettingDefinition[] = [
+    return [
       {
         name: uiText("settings.storageLayout.name"),
         desc: uiText("settings.storageLayout.desc"),
@@ -133,7 +140,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderCopyTemplates(setting),
       },
     ];
-    return definitions;
   }
 
   getSearchLanguageDefinitions(): SettingDefinition[] {
@@ -152,6 +158,25 @@ export class AnimeListSettingTab extends PluginSettingTab {
         name: searchFeatureText("settings.languages.original.name"),
         desc: searchFeatureText("settings.languages.original.desc"),
         render: (setting) => this.renderSearchLanguage(setting, "original"),
+      },
+    ];
+  }
+
+  getSettingSections(): SettingsSection[] {
+    const base = this.getSettingDefinitions();
+    return [
+      { definitions: base.slice(0, 6) },
+      {
+        heading: searchFeatureText("settings.languages.heading"),
+        definitions: this.getSearchLanguageDefinitions(),
+      },
+      {
+        heading: uiText("settings.providers.heading"),
+        definitions: base.slice(6, 9),
+      },
+      {
+        heading: uiText("settings.setup.heading"),
+        definitions: base.slice(9),
       },
     ];
   }
@@ -186,24 +211,19 @@ export class AnimeListSettingTab extends PluginSettingTab {
       text: uiText("settings.intro"),
     });
 
-    const baseDefinitions = this.getSettingDefinitions();
-    const definitions = [
-      ...baseDefinitions.slice(0, 6),
-      ...this.getSearchLanguageDefinitions(),
-      ...baseDefinitions.slice(6),
-    ];
-    definitions.forEach((definition) => {
-      if (definition.visible && !definition.visible()) return;
-      if (definition.name === uiText("media.provider.bangumi")) {
-        new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
+    for (const section of this.getSettingSections()) {
+      if (section.heading === searchFeatureText("settings.languages.heading")) {
+        new Setting(containerEl).setName(section.heading).setHeading();
+      } else if (section.heading) {
+        new Setting(containerEl).setName(section.heading).setHeading();
       }
-      if (definition.name === uiText("settings.createFolders.name")) {
-        new Setting(containerEl).setName(uiText("settings.setup.heading")).setHeading();
+      for (const definition of section.definitions) {
+        if (definition.visible && !definition.visible()) continue;
+        const setting = new Setting(containerEl).setName(definition.name);
+        if (definition.desc) setting.setDesc(definition.desc);
+        definition.render?.(setting);
       }
-      const setting = new Setting(containerEl).setName(definition.name);
-      if (definition.desc) setting.setDesc(definition.desc);
-      definition.render?.(setting);
-    });
+    }
   }
 
   private refreshSettingsTab(): void {
