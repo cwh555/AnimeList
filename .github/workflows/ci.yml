@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: feature/unified-progress-diagnostic
+          ref: feature/unified-progress-ready
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
@@ -22,7 +22,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          sed -i 's/feature\/unified-progress-display/feature\/unified-progress-diagnostic/g' scripts/rebuild-progress-branch.sh
+          sed -i 's/feature\/unified-progress-display/feature\/unified-progress-ready/g' scripts/rebuild-progress-branch.sh
+          sed -i 's/status: MediaStatus | string;/status: unknown;/' scripts/rebuild-progress-branch.sh
           bash scripts/rebuild-progress-branch.sh 2>&1 | tee rebuild.log
       - name: Upload rebuild log
         if: always()
