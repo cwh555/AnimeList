@@ -31,26 +31,35 @@ export interface ProgressUnitValidationResult {
   reason?: "non-negative-integer";
 }
 
+function scalarString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
 export function defaultProgressUnit(mediaType: MediaType): ProgressUnit {
   if (mediaType === "anime") return "episode";
   return mediaType === "novel" ? "volume" : "chapter";
 }
 
 export function progressUnitLabel(unit: unknown): string {
-  const normalized = String(unit ?? "").trim().toLowerCase() as ProgressUnit;
-  return PROGRESS_UNIT_LABELS[normalized] ?? String(unit ?? "").trim();
+  const raw = scalarString(unit).trim();
+  const normalized = raw.toLowerCase() as ProgressUnit;
+  return PROGRESS_UNIT_LABELS[normalized] ?? raw;
 }
 
 export function progressUnitOptions(
   mediaType: MediaType,
   currentUnit?: unknown,
 ): ProgressUnitOption[] {
-  const supported = mediaType === "anime" ? ANIME_PROGRESS_UNITS : READING_PROGRESS_UNITS;
+  const supported: readonly ProgressUnit[] = mediaType === "anime"
+    ? ANIME_PROGRESS_UNITS
+    : READING_PROGRESS_UNITS;
   const options: ProgressUnitOption[] = supported.map((value) => ({
     value,
     label: PROGRESS_UNIT_LABELS[value],
   }));
-  const current = String(currentUnit ?? "").trim();
+  const current = scalarString(currentUnit).trim();
   if (current && !options.some((option) => option.value === current)) {
     options.push({ value: current, label: current });
   }
@@ -58,7 +67,7 @@ export function progressUnitOptions(
 }
 
 export function normalizeProgressUnit(value: unknown, mediaType: MediaType): string {
-  const normalized = String(value ?? "").trim();
+  const normalized = scalarString(value).trim();
   return normalized || defaultProgressUnit(mediaType);
 }
 
@@ -66,11 +75,11 @@ export function validateProgressForUnit(
   value: unknown,
   unit: unknown,
 ): ProgressUnitValidationResult {
-  const normalizedUnit = String(unit ?? "").trim().toLowerCase();
+  const normalizedUnit = scalarString(unit).trim().toLowerCase();
   if (normalizedUnit === "volume") {
-    return { valid: true, value: typeof value === "number" ? value : String(value ?? "").trim() };
+    return { valid: true, value: typeof value === "number" ? value : scalarString(value).trim() };
   }
-  const text = String(value ?? "").normalize("NFKC").trim();
+  const text = scalarString(value).normalize("NFKC").trim();
   const numericValue = text === "" ? 0 : Number(text);
   if (!Number.isInteger(numericValue) || numericValue < 0) {
     return { valid: false, value: 0, reason: "non-negative-integer" };
