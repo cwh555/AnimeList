@@ -4,6 +4,7 @@ import AnimeListPlugin from "./main";
 import { installAdditionalProgressUnitsUi } from "./additional-progress-units-ui";
 import { installRatingUi } from "./rating-ui";
 import { installClassificationUi } from "./classification-ui";
+import { installClassificationSearchRuntime } from "./classification-search-runtime";
 import { installClassificationMigration } from "./classification-migration";
 import { installClassificationSettings } from "./classification-settings";
 
@@ -13,6 +14,7 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     installRatingUi(this);
     installAdditionalProgressUnitsUi(this);
     installClassificationUi(this);
+    installClassificationSearchRuntime(this);
     installClassificationMigration(this);
     installClassificationSettings(this);
   }
