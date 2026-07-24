@@ -1,4 +1,4 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, type Plugin } from "obsidian";
 import { ratingFeatureText } from "./rating-feature-text";
 import {
   MAX_RATING,
@@ -60,10 +60,17 @@ export function installRatingUi(plugin: Plugin): void {
       }
     }
   });
+  const handleFocus = (event: FocusEvent): void => configureFocusedScoreInput(event.target);
+  const handleClick = (event: MouseEvent): void => normalizeScoreBeforeAction(event.target);
+
   observer.observe(document.documentElement, { childList: true, subtree: true });
   configureScoreInputs(document);
+  document.addEventListener("focusin", handleFocus, true);
+  document.addEventListener("click", handleClick, true);
 
-  plugin.register(() => observer.disconnect());
-  plugin.registerDomEvent(document, "focusin", (event) => configureFocusedScoreInput(event.target), true);
-  plugin.registerDomEvent(document, "click", (event) => normalizeScoreBeforeAction(event.target), true);
+  plugin.register(() => {
+    observer.disconnect();
+    document.removeEventListener("focusin", handleFocus, true);
+    document.removeEventListener("click", handleClick, true);
+  });
 }
