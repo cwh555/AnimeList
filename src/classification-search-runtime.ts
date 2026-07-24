@@ -5,7 +5,11 @@ import {
   type SearchProviderAdapter,
 } from "./multilingual-search";
 import { preferAniListSearchResults } from "./classification-search";
-import type { AnimeListSettings, ExternalMediaResult, MediaType } from "./types";
+import type {
+  AnimeListSettings,
+  ExternalMediaResult,
+  MediaType,
+} from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.classification-search-runtime");
 
@@ -21,10 +25,16 @@ interface ClassificationSearchRuntime extends Plugin {
   searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
 }
 
-function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType): SearchProviderAdapter[] {
+function providersFor(
+  plugin: ClassificationSearchRuntime,
+  mediaType: MediaType,
+): SearchProviderAdapter[] {
   const providers: SearchProviderAdapter[] = [];
   if (plugin.settings.providers.anilist) {
-    providers.push({ label: "AniList", search: (query) => plugin.searchAniList(mediaType, query) });
+    providers.push({
+      label: "AniList",
+      search: (query) => plugin.searchAniList(mediaType, query),
+    });
   }
   if (plugin.settings.providers.bangumi) {
     providers.push({
@@ -34,7 +44,10 @@ function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType)
     });
   }
   if (mediaType === "novel" && plugin.settings.providers.openlibrary) {
-    providers.push({ label: "Open Library", search: (query) => plugin.searchOpenLibrary(query) });
+    providers.push({
+      label: "Open Library",
+      search: (query) => plugin.searchOpenLibrary(query),
+    });
   }
   return providers;
 }
@@ -62,6 +75,8 @@ export function installClassificationSearchRuntime(plugin: Plugin): void {
   const originalOpenAddModal = runtime.openAddModal;
   runtime.openAddModal = (initialType = "anime") => {
     originalOpenAddModal.call(runtime, initialType);
+    // Search enhancements install their instance method lazily inside openAddModal.
+    // Reinstall the canonical search after that initialization and before the user searches.
     installCanonicalSearch(runtime);
   };
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });

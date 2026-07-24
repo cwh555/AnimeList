@@ -36,6 +36,8 @@ export function installClassificationSettings(plugin: Plugin): void {
                 new Notice(classificationText("settings.migrate.notice", {
                   scanned: summary.scanned,
                   changed: summary.changed,
+                  resolved: summary.resolved,
+                  unresolved: summary.unresolved,
                   removed: summary.removed,
                   moved: summary.moved,
                 }));

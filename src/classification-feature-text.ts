@@ -10,10 +10,10 @@ export const CLASSIFICATION_TEXT = {
   creators: "作者／創作者",
   "settings.heading": "Media classification",
   "settings.migrate.name": "Clean up legacy classification data",
-  "settings.migrate.desc": "Scan the library only when you run this action. Existing genres and media tags are backed up before clearly invalid metadata is removed and misplaced built-in values are corrected.",
+  "settings.migrate.desc": "Rebuild work classifications from AniList only when you run this action. Existing genres and media tags are backed up first. Resolved notes receive canonical broad classifications; existing media tags are preserved unless they are clearly metadata.",
   "settings.migrate.button": "Clean up legacy data",
   "settings.migrate.running": "Cleaning…",
-  "settings.migrate.notice": "Scanned {scanned} notes. Updated {changed}, removed {removed} invalid values, and moved {moved} misplaced classifications.",
+  "settings.migrate.notice": "Scanned {scanned} notes. Resolved {resolved}, unresolved {unresolved}, updated {changed}, removed {removed} legacy values, and moved {moved} misplaced values.",
   "settings.migrate.failed": "Legacy classification cleanup failed. Check the developer console for details.",
 } as const;
 

@@ -7,7 +7,7 @@ import {
 } from "./media-classification";
 import type { ExternalMediaResult } from "./types";
 
-export const CLASSIFICATION_VERSION = 3;
+export const CLASSIFICATION_VERSION = 4;
 
 export interface ClassificationCleanupResult extends ClassificationSelection {
   removed: string[];
@@ -143,6 +143,45 @@ export function sanitizeStoredClassification(
   process(frontmatter.media_tags, "tag", true);
   if (frontmatter.media_tags == null) process(frontmatter.tags, "tag", false);
   return output;
+}
+
+export function rebuildClassificationFrontmatter(
+  frontmatter: Record<string, unknown>,
+  canonical: ClassificationSelection,
+  sourceId: string,
+  fileBasename = "",
+): ClassificationCleanupResult {
+  const beforeGenres = classificationValues(frontmatter.genres);
+  const beforeTags = classificationValues(frontmatter.media_tags);
+  const cleanExisting = sanitizeStoredClassification(frontmatter, fileBasename);
+  const normalizedCanonical = createAutomaticSelection(canonical.genres, []);
+  const result: ClassificationCleanupResult = {
+    genres: [...normalizedCanonical.genres],
+    tags: [...cleanExisting.tags],
+    removed: [],
+    moved: [],
+  };
+
+  for (const value of beforeGenres) {
+    if (!result.genres.some((entry) => comparisonKey(entry) === comparisonKey(value))) {
+      appendUnique(result.removed, value);
+    }
+  }
+  for (const value of cleanExisting.removed) appendUnique(result.removed, value);
+  for (const value of cleanExisting.moved) appendUnique(result.moved, value);
+
+  if (frontmatter.classification_legacy_genres == null) {
+    frontmatter.classification_legacy_genres = [...beforeGenres];
+  }
+  if (beforeTags.length && frontmatter.classification_legacy_media_tags == null) {
+    frontmatter.classification_legacy_media_tags = [...beforeTags];
+  }
+
+  writeClassificationSelection(frontmatter, result);
+  frontmatter.classification_version = CLASSIFICATION_VERSION;
+  frontmatter.classification_source_provider = "anilist";
+  frontmatter.classification_source_id = sourceId;
+  return result;
 }
 
 export function migrateClassificationFrontmatter(

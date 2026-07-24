@@ -1,6 +1,6 @@
 import { Modal, TFile, type Plugin } from "obsidian";
-import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
 import { classificationText } from "./classification-feature-text";
+import { resolveClassifiedMediaResult } from "./classification-resolution";
 import {
   automaticClassificationForResult,
   isLegacyGenreFieldLabel,
@@ -16,10 +16,8 @@ import {
 import type { ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.media-classification");
-const USER_AGENT = "AnimeList-Obsidian/1.1.2 (local personal media library)";
 const pendingEditClassification = new Map<string, ClassificationSelection>();
 const pendingCreateClassification = new WeakMap<ExternalMediaResult, ClassificationSelection>();
-const enrichedAniListResults = new WeakSet<ExternalMediaResult>();
 
 interface RuntimePlugin extends Plugin {
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
@@ -195,24 +193,6 @@ function captureModal(openModal: () => void): ClassificationModal | null {
   return captured;
 }
 
-function installAniListSource(plugin: RuntimePlugin): void {
-  const original = plugin.searchAniList.bind(plugin);
-  plugin.searchAniList = async (mediaType, query) => {
-    const results = await original(mediaType, query);
-    try {
-      const classifications = await fetchAniListClassifications(results, USER_AGENT);
-      const enriched = mergeAniListClassifications(results, classifications);
-      for (const result of enriched) {
-        if (result.provider.toLocaleLowerCase() === "anilist") enrichedAniListResults.add(result);
-      }
-      return enriched;
-    } catch (error) {
-      console.warn("AnimeList could not enrich AniList classification metadata", error);
-      return mergeAniListClassifications(results, new Map());
-    }
-  };
-}
-
 function installCreatePersistence(plugin: RuntimePlugin): void {
   const original = plugin.createMediaNote.bind(plugin);
   plugin.createMediaNote = async (result, form) => {
@@ -257,20 +237,9 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const modal = captureModal(() => originalAdd(initialType));
     if (!modal?.renderDetails) return;
     const originalRenderDetails = modal.renderDetails.bind(modal);
-    modal.renderDetails = async (result) => {
+    modal.renderDetails = async (selectedResult) => {
+      const result = await resolveClassifiedMediaResult(plugin, selectedResult);
       await originalRenderDetails(result);
-      if (result.provider.toLocaleLowerCase() === "anilist" && !enrichedAniListResults.has(result)) {
-        try {
-          const classifications = await fetchAniListClassifications([result], USER_AGENT);
-          const [enriched] = mergeAniListClassifications([result], classifications);
-          if (enriched) Object.assign(result, enriched);
-        } catch (error) {
-          console.warn("AnimeList could not enrich the selected AniList result", error);
-          const [strictFallback] = mergeAniListClassifications([result], new Map());
-          if (strictFallback) Object.assign(result, strictFallback);
-        }
-        enrichedAniListResults.add(result);
-      }
       const automatic = automaticClassificationForResult(result);
       pendingCreateClassification.set(result, automatic);
       const form = modal.contentEl.querySelector(".al-media-form");
@@ -304,7 +273,6 @@ function installModalIntegration(plugin: RuntimePlugin): void {
 export function installClassificationUi(plugin: Plugin): void {
   const runtime = plugin as RuntimePlugin;
   if (Reflect.get(runtime, PATCH_MARKER) === true) return;
-  installAniListSource(runtime);
   installCreatePersistence(runtime);
   installEditPersistence(runtime);
   installLibraryClassification(runtime);
