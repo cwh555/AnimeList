@@ -54,6 +54,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isMediaItem(value: unknown): value is MediaItem {
+  return isRecord(value)
+    && typeof value.filePath === "string"
+    && typeof value.title === "string";
+}
+
 function modeOf(plugin: MasterpiecePlugin): SpecialLabelMode {
   return normalizeSpecialLabelMode(plugin.settings.specialLabelMode);
 }
@@ -333,7 +339,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
 
   AnimeListUI.renderLibrary = (container, inputItems, adapters = {}): void => {
     const active = activeFilters.get(container) === true;
-    const items = filterBySpecialLabel(inputItems, active);
+    const items = filterBySpecialLabel(inputItems, active).filter(isMediaItem);
     const upstreamStateChange = Reflect.get(adapters, "onStateChange");
     const forwardedAdapters = {
       ...adapters,
