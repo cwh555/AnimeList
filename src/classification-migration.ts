@@ -35,8 +35,8 @@ function needsMigration(frontmatter: Record<string, unknown>, basename: string):
     || clean.removed.length > 0
     || clean.moved.length > 0
     || (frontmatter.media_tags == null && clean.tags.length > 0)
-    || Number(frontmatter.classification_version ?? 0) > 0
-      && Number(frontmatter.classification_version) < CLASSIFICATION_VERSION;
+    || (Number(frontmatter.classification_version ?? 0) > 0
+      && Number(frontmatter.classification_version) < CLASSIFICATION_VERSION);
 }
 
 export async function migrateMediaClassification(

@@ -8,13 +8,13 @@ export const CLASSIFICATION_TEXT = {
   year: "年份",
   studios: "製作公司",
   creators: "作者／創作者",
-  "settings.heading": "作品分類",
-  "settings.migrate.name": "整理舊分類資料",
-  "settings.migrate.desc": "只在按下按鈕時掃描收藏庫。原始 genres 與 media_tags 會先備份，再移除明確的年份、標題等污染值，並修正放錯欄位的內建分類。",
-  "settings.migrate.button": "整理舊資料",
-  "settings.migrate.running": "整理中…",
-  "settings.migrate.notice": "已掃描 {scanned} 份筆記，更新 {changed} 份，移除 {removed} 個污染值，修正 {moved} 個錯置分類。",
-  "settings.migrate.failed": "舊分類資料整理失敗，請查看開發者主控台。",
+  "settings.heading": "Media classification",
+  "settings.migrate.name": "Clean up legacy classification data",
+  "settings.migrate.desc": "Scan the library only when you run this action. Existing genres and media tags are backed up before clearly invalid metadata is removed and misplaced built-in values are corrected.",
+  "settings.migrate.button": "Clean up legacy data",
+  "settings.migrate.running": "Cleaning…",
+  "settings.migrate.notice": "Scanned {scanned} notes. Updated {changed}, removed {removed} invalid values, and moved {moved} misplaced classifications.",
+  "settings.migrate.failed": "Legacy classification cleanup failed. Check the developer console for details.",
 } as const;
 
 export function classificationText(
