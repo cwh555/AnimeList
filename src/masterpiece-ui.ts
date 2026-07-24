@@ -355,12 +355,8 @@ function installRenderer(plugin: MasterpiecePlugin): void {
     original(container, items, forwardedAdapters);
 
     const statusBar = container.querySelector(".al-status-bar") as HTMLElement | null;
-    if (statusBar?.parentElement) {
-      const filterBar = statusBar.parentElement.createDiv({
-        cls: "al-status-bar al-special-filter-bar",
-      });
-      statusBar.after(filterBar);
-      const button = filterBar.createEl("button", {
+    if (statusBar) {
+      const button = statusBar.createEl("button", {
         cls: `al-status-chip al-special-filter-chip${active ? " is-active" : ""}`,
         text: specialLabelName(modeOf(plugin)),
       });
