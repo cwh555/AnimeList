@@ -82,14 +82,11 @@ export class MangaReadingLogModal extends Modal {
   }
 
   onOpen(): void {
+    this.setTitle(TEXT.title);
     this.modalEl.addClass("animelist-modal", "animelist-edit-modal");
     this.contentEl.empty();
 
-    const heading = createEl("div", { cls: "al-modal-heading" });
-    const title = createEl("h2", { text: TEXT.title });
-    const description = createEl("p", { text: TEXT.description });
-    heading.append(title, description);
-
+    const description = createEl("p", { cls: "al-modal-description", text: TEXT.description });
     const editor = createEl("section", { cls: "al-volume-editor al-reading-log-editor" });
     const header = createEl("div", { cls: "al-volume-editor-header" });
     const headerCopy = createEl("div");
@@ -112,7 +109,7 @@ export class MangaReadingLogModal extends Modal {
     save.addEventListener("click", () => void this.save(save));
     actions.append(cancel, save);
 
-    this.contentEl.append(heading, editor, actions);
+    this.contentEl.append(description, editor, actions);
     this.renderRows();
   }
 
