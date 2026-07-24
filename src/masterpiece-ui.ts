@@ -342,7 +342,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
         candidate.title === card.querySelector(".al-card-title")?.textContent
       ));
       if (!item) return;
-      const favoriteButton = card.querySelector(".al-favorite-button") as HTMLElement | null;
+      const favoriteButton = card.querySelector<HTMLElement>(".al-favorite-button");
       if (favoriteButton && modeOf(plugin) === "masterpiece") {
         favoriteButton.title = item.favorite
           ? masterpieceFeatureText("library.editMasterpiece")
@@ -351,7 +351,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
       }
       if (modeOf(plugin) !== "masterpiece" || !item.favorite) return;
       const labels = labelsForMasterpieceEnable(labelsOf(item));
-      let tags = card.querySelector(".al-tags") as HTMLElement | null;
+      let tags = card.querySelector<HTMLElement>(".al-tags");
       if (!tags) {
         tags = card.createDiv({ cls: "al-tags" });
         card.querySelector(".al-progress")?.before(tags);
