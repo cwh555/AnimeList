@@ -27,6 +27,15 @@ interface MediaItemWithMasterpiece extends MediaItem {
   masterpieceLabels?: string[];
 }
 
+interface LibraryRenderState {
+  type?: string;
+  status?: string;
+  genre?: string;
+  query?: string;
+  sort?: string;
+  view?: string;
+}
+
 type MasterpiecePlugin = AnimeListPlugin & {
   settings: AnimeListPlugin["settings"] & MasterpieceSettings;
 };
@@ -37,6 +46,7 @@ const installedPlugins = new WeakSet<object>();
 const installedSettings = new WeakSet<object>();
 const installedRenderers = new WeakSet<object>();
 const activeFilters = new WeakMap<HTMLElement, boolean>();
+const libraryStates = new WeakMap<HTMLElement, LibraryRenderState>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -322,18 +332,34 @@ function installRenderer(plugin: MasterpiecePlugin): void {
   AnimeListUI.renderLibrary = (container, inputItems, adapters = {}): void => {
     const active = activeFilters.get(container) === true;
     const items = active ? inputItems.filter((item) => item.favorite) : inputItems;
-    original(container, items, adapters);
+    const upstreamStateChange = Reflect.get(adapters, "onStateChange");
+    const forwardedAdapters = {
+      ...adapters,
+      initialState: libraryStates.get(container) ?? Reflect.get(adapters, "initialState"),
+      onStateChange: (state: LibraryRenderState): void => {
+        libraryStates.set(container, state);
+        if (typeof upstreamStateChange === "function") upstreamStateChange(state);
+      },
+    };
+    original(container, items, forwardedAdapters);
 
     const statusBar = container.querySelector(".al-status-bar") as HTMLElement | null;
-    if (statusBar) {
-      const button = statusBar.createEl("button", {
-        cls: `al-status-chip${active ? " is-active" : ""}`,
+    if (statusBar?.parentElement) {
+      const filterBar = statusBar.parentElement.createDiv({
+        cls: "al-status-bar al-special-filter-bar",
+      });
+      statusBar.after(filterBar);
+      const button = filterBar.createEl("button", {
+        cls: `al-status-chip al-special-filter-chip${active ? " is-active" : ""}`,
         text: specialLabelName(modeOf(plugin)),
       });
       button.type = "button";
-      button.addEventListener("click", () => {
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         activeFilters.set(container, !active);
-        AnimeListUI.renderLibrary(container, inputItems, adapters);
+        AnimeListUI.renderLibrary(container, inputItems, forwardedAdapters);
       });
     }
 
