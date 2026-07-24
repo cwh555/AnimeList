@@ -29,28 +29,25 @@ function todayString(): string {
 }
 
 function field(labelText: string, input: HTMLInputElement | HTMLSelectElement): HTMLLabelElement {
-  const label = document.createElement("label");
-  label.className = "al-form-field";
-  const text = document.createElement("span");
-  text.textContent = labelText;
+  const label = createEl("label", { cls: "al-form-field" });
+  const text = createEl("span", { text: labelText });
   label.append(text, input);
   return label;
 }
 
 function textInput(type: string, value: unknown): HTMLInputElement {
-  const input = document.createElement("input");
+  const input = createEl("input");
   input.type = type;
   input.value = String(value ?? "");
   return input;
 }
 
 function unitSelect(value: unknown): HTMLSelectElement {
-  const select = document.createElement("select");
+  const select = createEl("select");
   const selected = normalizeReadingProgressUnit(value) ?? "chapter";
   for (const [unit, label] of UNIT_OPTIONS) {
-    const option = document.createElement("option");
+    const option = createEl("option", { text: label });
     option.value = unit;
-    option.textContent = label;
     option.selected = unit === selected;
     select.appendChild(option);
   }
@@ -89,43 +86,30 @@ export class MangaReadingLogModal extends Modal {
     this.modalEl.addClass("animelist-modal", "animelist-edit-modal");
     this.contentEl.empty();
 
-    const heading = document.createElement("div");
-    heading.className = "al-modal-heading";
-    const title = document.createElement("h2");
-    title.textContent = TEXT.title;
-    const description = document.createElement("p");
-    description.textContent = TEXT.description;
+    const heading = createEl("div", { cls: "al-modal-heading" });
+    const title = createEl("h2", { text: TEXT.title });
+    const description = createEl("p", { text: TEXT.description });
     heading.append(title, description);
 
-    const editor = document.createElement("section");
-    editor.className = "al-volume-editor al-reading-log-editor";
-    const header = document.createElement("div");
-    header.className = "al-volume-editor-header";
-    const headerCopy = document.createElement("div");
-    const strong = document.createElement("strong");
-    strong.textContent = TEXT.title;
+    const editor = createEl("section", { cls: "al-volume-editor al-reading-log-editor" });
+    const header = createEl("div", { cls: "al-volume-editor-header" });
+    const headerCopy = createEl("div");
+    const strong = createEl("strong", { text: TEXT.title });
     headerCopy.appendChild(strong);
-    const add = document.createElement("button");
+    const add = createEl("button", { cls: "al-secondary-button", text: TEXT.add });
     add.type = "button";
-    add.className = "al-secondary-button";
-    add.textContent = TEXT.add;
     add.addEventListener("click", () => this.addEntry());
     header.append(headerCopy, add);
 
-    this.rows = document.createElement("div");
-    this.rows.className = "al-volume-editor-rows";
+    this.rows = createEl("div", { cls: "al-volume-editor-rows" });
     editor.append(header, this.rows);
 
-    const actions = document.createElement("div");
-    actions.className = "al-modal-actions al-edit-actions";
-    const cancel = document.createElement("button");
+    const actions = createEl("div", { cls: "al-modal-actions al-edit-actions" });
+    const cancel = createEl("button", { text: TEXT.cancel });
     cancel.type = "button";
-    cancel.textContent = TEXT.cancel;
     cancel.addEventListener("click", () => this.close());
-    const save = document.createElement("button");
+    const save = createEl("button", { cls: "mod-cta", text: TEXT.save });
     save.type = "button";
-    save.className = "mod-cta";
-    save.textContent = TEXT.save;
     save.addEventListener("click", () => void this.save(save));
     actions.append(cancel, save);
 
@@ -147,18 +131,13 @@ export class MangaReadingLogModal extends Modal {
   private renderRows(focusIndex = -1): void {
     this.rows.replaceChildren();
     if (!this.entries.length) {
-      const empty = document.createElement("p");
-      empty.className = "al-volume-editor-empty";
-      empty.textContent = TEXT.empty;
-      this.rows.appendChild(empty);
+      this.rows.appendChild(createEl("p", { cls: "al-volume-editor-empty", text: TEXT.empty }));
       return;
     }
 
     this.entries.forEach((entry, index) => {
-      const row = document.createElement("div");
-      row.className = "al-volume-row is-unit-selectable";
-      const fields = document.createElement("div");
-      fields.className = "al-volume-row-fields";
+      const row = createEl("div", { cls: "al-volume-row is-unit-selectable" });
+      const fields = createEl("div", { cls: "al-volume-row-fields" });
 
       const value = textInput("text", entry.value);
       const unit = unitSelect(entry.unit);
@@ -186,12 +165,9 @@ export class MangaReadingLogModal extends Modal {
         field(TEXT.completedAt, completedAt),
       );
 
-      const rowActions = document.createElement("div");
-      rowActions.className = "al-volume-row-actions";
-      const remove = document.createElement("button");
+      const rowActions = createEl("div", { cls: "al-volume-row-actions" });
+      const remove = createEl("button", { cls: "al-delete-button", text: TEXT.remove });
       remove.type = "button";
-      remove.className = "al-delete-button";
-      remove.textContent = TEXT.remove;
       remove.addEventListener("click", () => {
         this.entries.splice(index, 1);
         this.renderRows();
