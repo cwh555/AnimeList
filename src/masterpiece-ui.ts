@@ -333,7 +333,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
 
   AnimeListUI.renderLibrary = (container, inputItems, adapters = {}): void => {
     const active = activeFilters.get(container) === true;
-    const items = filterBySpecialLabel(inputItems, active) as MediaItem[];
+    const items = filterBySpecialLabel(inputItems, active);
     const upstreamStateChange = Reflect.get(adapters, "onStateChange");
     const forwardedAdapters = {
       ...adapters,
