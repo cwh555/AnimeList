@@ -4,10 +4,12 @@ import {
   DEFAULT_MASTERPIECE_LABEL,
   collectMasterpieceLabels,
   deleteMasterpieceLabel,
+  filterBySpecialLabel,
   labelsForMasterpieceEnable,
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
   renameMasterpieceLabel,
+  resolveIndependentFilterState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "../src/masterpiece-labels";
@@ -53,6 +55,19 @@ describe("masterpiece label domain", () => {
       favorite: true,
       masterpieceLabels: ["動作番 masterpiece"],
     });
+  });
+
+  it("filters favorites without replacing the current library status", () => {
+    const currentState = { type: "anime", status: "completed", genre: "all" };
+    const staleInitialState = { type: "all", status: "planned", genre: "all" };
+    assert.deepEqual(
+      resolveIndependentFilterState(currentState, staleInitialState),
+      currentState,
+    );
+    assert.deepEqual(filterBySpecialLabel([
+      { title: "A", favorite: true },
+      { title: "B", favorite: false },
+    ], true), [{ title: "A", favorite: true }]);
   });
 
   it("normalizes, renames, deletes, and collects categories without duplicates", () => {
