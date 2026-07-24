@@ -22,6 +22,11 @@ export interface ClassificationSelection {
   tags: string[];
 }
 
+export interface BuiltinClassification {
+  kind: ClassificationKind;
+  label: string;
+}
+
 function stringValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
@@ -52,6 +57,14 @@ function catalogLookup(kind: ClassificationKind): Map<string, ClassificationCata
 
 const GENRE_LOOKUP = catalogLookup("genre");
 const TAG_LOOKUP = catalogLookup("tag");
+
+export function builtinClassification(value: unknown): BuiltinClassification | null {
+  const key = comparisonKey(value);
+  const genre = GENRE_LOOKUP.get(key);
+  if (genre) return { kind: "genre", label: genre.label };
+  const tag = TAG_LOOKUP.get(key);
+  return tag ? { kind: "tag", label: tag.label } : null;
+}
 
 export function normalizeClassificationValues(values: unknown, kind: ClassificationKind): string[] {
   const source = Array.isArray(values) ? values : values == null ? [] : [values];

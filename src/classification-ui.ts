@@ -2,12 +2,18 @@ import { Modal, TFile, type Plugin } from "obsidian";
 import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
 import { classificationText } from "./classification-feature-text";
 import {
+  applySanitizedClassification,
+  automaticClassificationForResult,
+  isLegacyGenreFieldLabel,
+  sanitizeStoredClassification,
+} from "./classification-compatibility";
+import {
   classificationSuggestions,
   createClassificationSelection,
   normalizeClassificationValues,
   type ClassificationSelection,
 } from "./media-classification";
-import type { ExternalMediaResult, MediaNoteForm, MediaType } from "./types";
+import type { ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "./types";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.media-classification");
@@ -19,6 +25,7 @@ interface RuntimePlugin extends Plugin {
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   openAddModal(initialType?: MediaType): void;
   openEditModal(path: string): void;
+  collectMediaItems(source?: string): MediaItem[];
 }
 
 interface ClassificationModal extends Modal {
@@ -29,15 +36,9 @@ interface ClassificationModal extends Modal {
 export function applyClassificationFrontmatter(
   frontmatter: Record<string, unknown>,
   selection: ClassificationSelection,
+  fileBasename = "",
 ): void {
-  frontmatter.genres = [...selection.genres];
-  if (selection.tags.length) frontmatter.tags = [...selection.tags];
-  else delete frontmatter.tags;
-}
-
-function stringArray(value: unknown): string[] {
-  const source = Array.isArray(value) ? value : value == null ? [] : [value];
-  return source.map((entry) => String(entry ?? "").trim()).filter(Boolean);
+  applySanitizedClassification(frontmatter, selection, fileBasename);
 }
 
 function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
@@ -46,7 +47,8 @@ function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
   for (const file of getScopedMarkdownFiles(plugin.app, [""])) {
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     if (!frontmatter?.media_type) continue;
-    for (const value of stringArray(frontmatter[key])) {
+    const clean = sanitizeStoredClassification(frontmatter, file.basename);
+    for (const value of clean[key]) {
       const normalized = value.normalize("NFKC").trim();
       const comparison = normalized.toLocaleLowerCase();
       if (!normalized || seen.has(comparison)) continue;
@@ -60,7 +62,7 @@ function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
 function findLegacyGenreField(form: Element): HTMLElement | null {
   return Array.from(form.querySelectorAll<HTMLElement>(".al-form-field")).find((field) => {
     const label = field.querySelector(".al-form-label")?.textContent?.trim() ?? "";
-    return label === "分類" || label === "作品類型" || /genre/i.test(label);
+    return isLegacyGenreFieldLabel(label);
   }) ?? null;
 }
 
@@ -200,10 +202,14 @@ function installAniListSource(plugin: RuntimePlugin): void {
 function installCreatePersistence(plugin: RuntimePlugin): void {
   const original = plugin.createMediaNote.bind(plugin);
   plugin.createMediaNote = async (result, form) => {
-    const selection = createClassificationSelection(form.genres ?? result.genres, form.tags ?? result.tags);
+    const automatic = automaticClassificationForResult(result);
+    const selection = createClassificationSelection(
+      form.genres ?? automatic.genres,
+      form.tags ?? automatic.tags,
+    );
     const file = await original(result, { ...form, genres: selection.genres, tags: selection.tags });
     await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyClassificationFrontmatter(frontmatter, selection);
+      applyClassificationFrontmatter(frontmatter, selection, file.basename);
     });
     return file;
   };
@@ -214,13 +220,25 @@ function installEditPersistence(plugin: RuntimePlugin): void {
   const original = manager.processFrontMatter.bind(manager);
   manager.processFrontMatter = async (file, process) => original(file, (frontmatter) => {
     process(frontmatter);
-    const tags = pendingEditTags.get(file.path);
-    if (!tags) return;
-    applyClassificationFrontmatter(frontmatter, {
-      genres: normalizeClassificationValues(frontmatter.genres, "genre"),
-      tags,
-    });
+    if (!frontmatter.media_type) return;
+    const pendingTags = pendingEditTags.get(file.path);
+    const selection = pendingTags
+      ? createClassificationSelection(frontmatter.genres, pendingTags)
+      : sanitizeStoredClassification(frontmatter, file.basename);
+    applyClassificationFrontmatter(frontmatter, selection, file.basename);
     pendingEditTags.delete(file.path);
+  });
+}
+
+function installLibraryCompatibility(plugin: RuntimePlugin): void {
+  const original = plugin.collectMediaItems.bind(plugin);
+  plugin.collectMediaItems = (source) => original(source).map((item) => {
+    const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
+    if (!(file instanceof TFile)) return item;
+    const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+    if (!frontmatter?.media_type) return item;
+    const clean = sanitizeStoredClassification(frontmatter, file.basename);
+    return { ...item, genres: clean.genres, tags: clean.tags };
   });
 }
 
@@ -232,7 +250,7 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const originalRenderDetails = modal.renderDetails.bind(modal);
     modal.renderDetails = async (result) => {
       await originalRenderDetails(result);
-      installPickers(plugin, modal, createClassificationSelection(result.genres, result.tags), (next) => {
+      installPickers(plugin, modal, automaticClassificationForResult(result), (next) => {
         result.genres = next.genres;
         result.tags = next.tags;
       });
@@ -245,7 +263,7 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const file = modal?.file ?? plugin.app.vault.getAbstractFileByPath(path);
     if (!modal || !(file instanceof TFile)) return;
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
-    let selection = createClassificationSelection(frontmatter?.genres, frontmatter?.tags);
+    let selection = frontmatter ? sanitizeStoredClassification(frontmatter, file.basename) : { genres: [], tags: [] };
     installPickers(plugin, modal, selection, (next) => { selection = next; });
     const save = Array.from(modal.contentEl.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "儲存");
@@ -262,6 +280,7 @@ export function installClassificationUi(plugin: Plugin): void {
   installAniListSource(runtime);
   installCreatePersistence(runtime);
   installEditPersistence(runtime);
+  installLibraryCompatibility(runtime);
   installModalIntegration(runtime);
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
