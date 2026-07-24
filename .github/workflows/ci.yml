@@ -13,14 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Export source checkout
+        run: tar --exclude=.git --exclude=node_modules -czf /tmp/animelist-preview-source.tar.gz .
+      - name: Upload source checkout
+        uses: actions/upload-artifact@v4
+        with:
+          name: animelist-preview-source
+          path: /tmp/animelist-preview-source.tar.gz
+          retention-days: 1
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - name: Export npm dependencies
-        run: |
-          tar -czf /tmp/animelist-npm-dependencies.tar.gz node_modules -C "$HOME" .npm
+        run: tar -czf /tmp/animelist-npm-dependencies.tar.gz node_modules -C "$HOME" .npm
       - name: Upload npm dependencies
         uses: actions/upload-artifact@v4
         with:
