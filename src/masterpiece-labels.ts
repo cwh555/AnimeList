@@ -53,6 +53,20 @@ export function stateAfterMasterpieceSelection(selectedLabels: unknown): Special
   return { favorite: labels.length > 0, masterpieceLabels: labels };
 }
 
+export function filterBySpecialLabel<T extends { favorite?: boolean }>(
+  items: readonly T[],
+  active: boolean,
+): T[] {
+  return active ? items.filter((item) => item.favorite === true) : [...items];
+}
+
+export function resolveIndependentFilterState<T>(
+  currentState: T | undefined,
+  initialState: T | undefined,
+): T | undefined {
+  return currentState ?? initialState;
+}
+
 export function collectMasterpieceLabels(items: Array<{
   favorite?: boolean;
   masterpieceLabels?: unknown;
