@@ -8,11 +8,13 @@ import { getScopedMarkdownFiles } from "./vault-scope";
 import {
   collectMasterpieceLabels,
   deleteMasterpieceLabel,
+  filterBySpecialLabel,
   labelsForMasterpieceEnable,
   normalizeMasterpieceLabel,
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
   renameMasterpieceLabel,
+  resolveIndependentFilterState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "./masterpiece-labels";
@@ -331,11 +333,14 @@ function installRenderer(plugin: MasterpiecePlugin): void {
 
   AnimeListUI.renderLibrary = (container, inputItems, adapters = {}): void => {
     const active = activeFilters.get(container) === true;
-    const items = active ? inputItems.filter((item) => item.favorite) : inputItems;
+    const items = filterBySpecialLabel(inputItems, active);
     const upstreamStateChange = Reflect.get(adapters, "onStateChange");
     const forwardedAdapters = {
       ...adapters,
-      initialState: libraryStates.get(container) ?? Reflect.get(adapters, "initialState"),
+      initialState: resolveIndependentFilterState(
+        libraryStates.get(container),
+        Reflect.get(adapters, "initialState") as LibraryRenderState | undefined,
+      ),
       onStateChange: (state: LibraryRenderState): void => {
         libraryStates.set(container, state);
         if (typeof upstreamStateChange === "function") upstreamStateChange(state);
