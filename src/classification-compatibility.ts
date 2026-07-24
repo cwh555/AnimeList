@@ -6,7 +6,7 @@ import {
 } from "./media-classification";
 import type { ExternalMediaResult } from "./types";
 
-export const CLASSIFICATION_VERSION = 1;
+export const CLASSIFICATION_VERSION = 2;
 
 export interface ClassificationCleanupResult extends ClassificationSelection {
   removed: string[];
@@ -22,9 +22,12 @@ function stringValue(value: unknown): string {
   return "";
 }
 
-function values(value: unknown): string[] {
+export function classificationValues(value: unknown): string[] {
   const source = Array.isArray(value) ? value : value == null ? [] : [value];
-  return source.map(stringValue).map((entry) => entry.normalize("NFKC").trim().replace(/^#/, "")).filter(Boolean);
+  return source
+    .map(stringValue)
+    .map((entry) => entry.normalize("NFKC").trim().replace(/^#/, ""))
+    .filter(Boolean);
 }
 
 function comparisonKey(value: unknown): string {
@@ -46,7 +49,7 @@ const STRUCTURAL_VALUES = new Set([
 function metadataKeys(frontmatter: Record<string, unknown>, fileBasename = ""): Set<string> {
   const keys = new Set<string>();
   const add = (value: unknown): void => {
-    for (const entry of values(value)) {
+    for (const entry of classificationValues(value)) {
       const key = comparisonKey(entry);
       if (key) keys.add(key);
     }
@@ -77,16 +80,8 @@ function appendUnique(output: string[], value: string): void {
   output.push(value);
 }
 
-function classificationVersion(frontmatter: Record<string, unknown>): number {
-  const value = Number(frontmatter.classification_version ?? 0);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function isLegacyNonAniList(frontmatter: Record<string, unknown>): boolean {
-  const provider = comparisonKey(frontmatter.source_provider);
-  return classificationVersion(frontmatter) < CLASSIFICATION_VERSION
-    && Boolean(provider)
-    && provider !== "anilist";
+function arraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function isLegacyGenreFieldLabel(value: unknown): boolean {
@@ -99,20 +94,34 @@ export function automaticClassificationForResult(result: ExternalMediaResult): C
   return createClassificationSelection(result.genres, result.tags);
 }
 
+export function storedClassificationSelection(frontmatter: Record<string, unknown>): ClassificationSelection {
+  return createClassificationSelection(frontmatter.genres, frontmatter.media_tags);
+}
+
+export function writeClassificationSelection(
+  frontmatter: Record<string, unknown>,
+  selection: ClassificationSelection,
+): ClassificationSelection {
+  const normalized = createClassificationSelection(selection.genres, selection.tags);
+  frontmatter.genres = [...normalized.genres];
+  if (normalized.tags.length) frontmatter.media_tags = [...normalized.tags];
+  else delete frontmatter.media_tags;
+  return normalized;
+}
+
+/**
+ * Conservative cleanup used only by the explicit settings action. Unknown text is
+ * preserved as a possible user-defined value; only clear note metadata is removed.
+ */
 export function sanitizeStoredClassification(
   frontmatter: Record<string, unknown>,
   fileBasename = "",
 ): ClassificationCleanupResult {
   const output: ClassificationCleanupResult = { genres: [], tags: [], removed: [], moved: [] };
   const metadata = metadataKeys(frontmatter, fileBasename);
-  const suppressLegacyGenres = isLegacyNonAniList(frontmatter);
 
   const process = (rawValues: unknown, originalKind: "genre" | "tag", allowCustom: boolean): void => {
-    for (const raw of values(rawValues)) {
-      if (originalKind === "genre" && suppressLegacyGenres) {
-        appendUnique(output.removed, raw);
-        continue;
-      }
+    for (const raw of classificationValues(rawValues)) {
       const builtin = builtinClassification(raw);
       if (builtin) {
         appendUnique(builtin.kind === "genre" ? output.genres : output.tags, builtin.label);
@@ -131,35 +140,29 @@ export function sanitizeStoredClassification(
   process(frontmatter.genres, "genre", true);
   process(frontmatter.media_tags, "tag", true);
 
-  // Obsidian already uses the generic `tags` key. Legacy notes may contain years,
-  // titles, project tags, or other note metadata there, so only recognized catalog
-  // values are copied into media classification and the original field is untouched.
-  if (classificationVersion(frontmatter) < CLASSIFICATION_VERSION && frontmatter.media_tags == null) {
-    process(frontmatter.tags, "tag", false);
-  }
+  // The generic `tags` key belongs to Obsidian. It is never changed; before a
+  // dedicated media_tags field existed, only catalog-confirmed values are copied.
+  if (frontmatter.media_tags == null) process(frontmatter.tags, "tag", false);
   return output;
 }
 
-export function applySanitizedClassification(
+export function migrateClassificationFrontmatter(
   frontmatter: Record<string, unknown>,
-  selection: ClassificationSelection,
   fileBasename = "",
 ): ClassificationCleanupResult {
-  if (isLegacyNonAniList(frontmatter)) {
-    const legacyGenres = values(frontmatter.genres);
-    if (legacyGenres.length && frontmatter.classification_legacy_genres == null) {
-      frontmatter.classification_legacy_genres = legacyGenres;
-    }
+  const beforeGenres = classificationValues(frontmatter.genres);
+  const beforeTags = classificationValues(frontmatter.media_tags);
+  const result = sanitizeStoredClassification(frontmatter, fileBasename);
+
+  if (!arraysEqual(beforeGenres, result.genres) && frontmatter.classification_legacy_genres == null) {
+    frontmatter.classification_legacy_genres = [...beforeGenres];
   }
-  const result = sanitizeStoredClassification({
-    ...frontmatter,
-    classification_version: CLASSIFICATION_VERSION,
-    genres: selection.genres,
-    media_tags: selection.tags,
-  }, fileBasename);
+  if (!arraysEqual(beforeTags, result.tags) && beforeTags.length
+    && frontmatter.classification_legacy_media_tags == null) {
+    frontmatter.classification_legacy_media_tags = [...beforeTags];
+  }
+
+  writeClassificationSelection(frontmatter, result);
   frontmatter.classification_version = CLASSIFICATION_VERSION;
-  frontmatter.genres = [...result.genres];
-  if (result.tags.length) frontmatter.media_tags = [...result.tags];
-  else delete frontmatter.media_tags;
   return result;
 }
