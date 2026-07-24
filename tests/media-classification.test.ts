@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { fetchAniListClassifications, mergeAniListClassifications } from "../src/anilist-classification";
 import {
-  applySanitizedClassification,
   automaticClassificationForResult,
   isLegacyGenreFieldLabel,
+  migrateClassificationFrontmatter,
   sanitizeStoredClassification,
+  storedClassificationSelection,
+  writeClassificationSelection,
 } from "../src/classification-compatibility";
+import { CLASSIFICATION_TEXT } from "../src/classification-feature-text";
+import { classificationMetadataForResult } from "../src/classification-ui";
+import { setRequestUrlMock } from "obsidian";
 import {
   attachAniListGenres,
   attachAniListTags,
@@ -43,6 +49,65 @@ function result(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResu
 }
 
 describe("media classification", () => {
+  it("queries exact AniList result ids and restores default classification metadata", async () => {
+    const first = result({ sourceId: "101921", genres: [], tags: [], people: [], year: "" });
+    const second = result({ sourceId: "110277", genres: [], tags: [], people: [], year: "" });
+    let requestBody: Record<string, unknown> | null = null;
+    setRequestUrlMock((options) => {
+      requestBody = JSON.parse(String(options.body)) as Record<string, unknown>;
+      return {
+        json: {
+          data: {
+            Page: {
+              media: [{
+                id: 101921,
+                genres: ["Comedy", "Psychological", "Romance", "Slice of Life"],
+                tags: [
+                  { name: "School", rank: 93 },
+                  { name: "Revenge", rank: 58 },
+                  { name: "Dungeon", rank: 90, isMediaSpoiler: true },
+                ],
+                startDate: { year: 2019 },
+                studios: { nodes: [{ name: "A-1 Pictures" }] },
+              }, {
+                id: 110277,
+                genres: ["Action", "Drama"],
+                tags: [{ name: "Military", rank: 88 }],
+                startDate: { year: 2020 },
+                studios: { nodes: [{ name: "MAPPA" }] },
+              }],
+            },
+          },
+        },
+      };
+    });
+    try {
+      const classifications = await fetchAniListClassifications([first, second], "AnimeList test");
+      const body = requestBody as { query?: string; variables?: { ids?: number[] } };
+      assert.deepEqual(body.variables?.ids, [101921, 110277]);
+      assert.match(body.query ?? "", /media\(id_in:\s*\$ids/);
+      assert.match(body.query ?? "", /tags\s*\{/);
+      assert.match(body.query ?? "", /studios\(isMain:\s*true\)/);
+
+      const merged = mergeAniListClassifications([first, second], classifications);
+      assert.deepEqual(merged[0]?.genres, ["喜劇", "心理", "戀愛", "日常"]);
+      assert.deepEqual(merged[0]?.tags, ["校園"]);
+      assert.equal(merged[0]?.year, 2019);
+      assert.deepEqual(merged[0]?.people, ["A-1 Pictures"]);
+      assert.deepEqual(merged[1]?.genres, ["動作", "劇情"]);
+      assert.deepEqual(merged[1]?.tags, ["軍事"]);
+      assert.equal(merged[1]?.year, 2020);
+      assert.deepEqual(merged[1]?.people, ["MAPPA"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("keeps existing search results when AniList enrichment has no matching record", () => {
+    const existing = result({ genres: ["喜劇"], tags: ["校園"], people: ["A-1 Pictures"], year: 2019 });
+    assert.deepEqual(mergeAniListClassifications([existing], new Map()), [existing]);
+  });
+
   it("maps only fixed AniList genres into Traditional Chinese labels", () => {
     assert.deepEqual(
       attachAniListGenres(["Comedy", "Romance", "Unknown Genre", "Sci-Fi"]),
@@ -59,45 +124,6 @@ describe("media classification", () => {
       { name: "Unknown Tag", rank: 100 },
       { name: "Military", rank: 80, isAdult: true },
     ]), ["異世界", "校園"]);
-  });
-
-  it("matches representative AniList records without leaking titles or years", () => {
-    assert.deepEqual(
-      attachAniListGenres(["Comedy", "Psychological", "Romance", "Slice of Life"]),
-      ["喜劇", "心理", "戀愛", "日常"],
-    );
-    assert.deepEqual(attachAniListTags([
-      { name: "School", rank: 93 },
-      { name: "Heterosexual", rank: 89 },
-      { name: "Tsundere", rank: 88 },
-      { name: "School Club", rank: 86 },
-      { name: "Archery", rank: 20 },
-    ]), ["校園"]);
-
-    assert.deepEqual(
-      attachAniListGenres(["Action", "Drama", "Fantasy", "Mystery"]),
-      ["動作", "劇情", "奇幻", "懸疑"],
-    );
-    assert.deepEqual(attachAniListTags([
-      { name: "Revenge", rank: 93 },
-      { name: "Military", rank: 88 },
-      { name: "Survival", rank: 80 },
-      { name: "Vore", rank: 79 },
-    ]), ["復仇", "軍事", "生存"]);
-
-    assert.deepEqual(
-      attachAniListGenres(["Action", "Adventure", "Drama", "Fantasy", "Horror", "Psychological"]),
-      ["動作", "冒險", "劇情", "奇幻", "恐怖", "心理"],
-    );
-    assert.deepEqual(attachAniListTags([
-      { name: "Revenge", rank: 94 },
-      { name: "Anti-Hero", rank: 83 },
-      { name: "Survival", rank: 82 },
-      { name: "Military", rank: 72 },
-      { name: "Time Skip", rank: 71 },
-      { name: "Coming of Age", rank: 68 },
-      { name: "Dungeon", rank: 57 },
-    ]), ["復仇", "反英雄", "生存", "軍事", "時間跳躍", "成長"]);
   });
 
   it("uses AniList as the only automatic classification source", () => {
@@ -120,8 +146,47 @@ describe("media classification", () => {
     })), { genres: [], tags: [] });
   });
 
-  it("cleans legacy title, year, and metadata pollution while preserving custom values", () => {
-    const clean = sanitizeStoredClassification({
+  it("keeps year and production company outside classification values", () => {
+    assert.deepEqual(classificationMetadataForResult(result({
+      year: 2019,
+      people: ["A-1 Pictures"],
+      genres: ["喜劇"],
+      tags: ["校園"],
+    })), [
+      { label: "年份", value: "2019" },
+      { label: "製作公司", value: "A-1 Pictures" },
+    ]);
+  });
+
+  it("uses compact labels without provider explanations or empty-state copy", () => {
+    assert.equal(CLASSIFICATION_TEXT.genres, "作品分類");
+    assert.equal(CLASSIFICATION_TEXT.tags, "作品標籤");
+    assert.ok(!Object.values(CLASSIFICATION_TEXT).some((value) => value.includes("AniList 預先附加")));
+    assert.ok(!Object.values(CLASSIFICATION_TEXT).some((value) => value.includes("尚未附加")));
+  });
+
+  it("does not clean stored values during ordinary reads and writes", () => {
+    const frontmatter: Record<string, unknown> = {
+      genres: ["2019", "Example", "Comedy", "我的分類"],
+      media_tags: ["School", "我的標籤"],
+    };
+    assert.deepEqual(storedClassificationSelection(frontmatter), {
+      genres: ["2019", "Example", "喜劇", "我的分類"],
+      tags: ["校園", "我的標籤"],
+    });
+
+    writeClassificationSelection(frontmatter, {
+      genres: ["2019", "Example", "Comedy", "我的分類"],
+      tags: ["School", "我的標籤"],
+    });
+    assert.deepEqual(frontmatter.genres, ["2019", "Example", "喜劇", "我的分類"]);
+    assert.deepEqual(frontmatter.media_tags, ["校園", "我的標籤"]);
+    assert.equal(frontmatter.classification_version, undefined);
+    assert.equal(frontmatter.classification_legacy_genres, undefined);
+  });
+
+  it("cleans only clear metadata when the explicit migration is run", () => {
+    const frontmatter: Record<string, unknown> = {
       title: "輝夜大小姐想讓我告白",
       title_original: "かぐや様は告らせたい",
       media_type: "anime",
@@ -131,50 +196,31 @@ describe("media classification", () => {
       source_provider: "anilist",
       genres: [2019, "輝夜大小姐想讓我告白", "Romance", "Isekai", "青春戀愛喜劇"],
       media_tags: ["Comedy", "2019", "かぐや様は告らせたい", "自訂標籤"],
-    }, "輝夜大小姐想讓我告白");
+      tags: ["project/anime"],
+    };
 
+    const clean = migrateClassificationFrontmatter(frontmatter, "輝夜大小姐想讓我告白");
     assert.deepEqual(clean.genres, ["戀愛", "青春戀愛喜劇", "喜劇"]);
     assert.deepEqual(clean.tags, ["異世界", "自訂標籤"]);
     assert.deepEqual(clean.removed, ["2019", "輝夜大小姐想讓我告白", "かぐや様は告らせたい"]);
     assert.deepEqual(clean.moved, ["Isekai", "Comedy"]);
+    assert.deepEqual(frontmatter.classification_legacy_genres, ["2019", "輝夜大小姐想讓我告白", "Romance", "Isekai", "青春戀愛喜劇"]);
+    assert.deepEqual(frontmatter.classification_legacy_media_tags, ["Comedy", "2019", "かぐや様は告らせたい", "自訂標籤"]);
+    assert.deepEqual(frontmatter.tags, ["project/anime"]);
   });
 
-  it("removes old non-AniList provider classifications but retains user additions", () => {
+  it("preserves ambiguous custom values during manual migration", () => {
     const clean = sanitizeStoredClassification({
       title: "Some Book",
       media_type: "novel",
       source_provider: "openlibrary",
-      source_genres: ["Fiction", "1998", "Some Book"],
       genres: ["Fiction", "1998", "Some Book", "我的書架分類"],
       media_tags: ["自訂標籤"],
     }, "Some Book");
 
-    assert.deepEqual(clean.genres, []);
+    assert.deepEqual(clean.genres, ["Fiction", "我的書架分類"]);
     assert.deepEqual(clean.tags, ["自訂標籤"]);
-    assert.deepEqual(clean.removed, ["Fiction", "1998", "Some Book", "我的書架分類"]);
-  });
-
-  it("writes cleaned compatibility values without touching unrelated frontmatter", () => {
-    const frontmatter: Record<string, unknown> = {
-      title: "Attack on Titan",
-      media_type: "anime",
-      year: 2013,
-      keep: { nested: true },
-      genres: ["Attack on Titan", "Action"],
-      tags: ["project/anime", "2013"],
-      media_tags: [2013, "Military"],
-    };
-    const result = applySanitizedClassification(frontmatter, {
-      genres: ["Attack on Titan", "Action", "自訂分類"],
-      tags: [2013, "Military", "自訂標籤"],
-    }, "Attack on Titan");
-
-    assert.deepEqual(result.genres, ["動作", "自訂分類"]);
-    assert.deepEqual(result.tags, ["軍事", "自訂標籤"]);
-    assert.deepEqual(frontmatter.genres, ["動作", "自訂分類"]);
-    assert.deepEqual(frontmatter.media_tags, ["軍事", "自訂標籤"]);
-    assert.deepEqual(frontmatter.tags, ["project/anime", "2013"]);
-    assert.deepEqual(frontmatter.keep, { nested: true });
+    assert.deepEqual(clean.removed, ["1998", "Some Book"]);
   });
 
   it("keeps Obsidian note tags separate from media tags", () => {
@@ -188,22 +234,9 @@ describe("media classification", () => {
     const clean = sanitizeStoredClassification(frontmatter, "Example");
     assert.deepEqual(clean.tags, ["校園"]);
 
-    applySanitizedClassification(frontmatter, { genres: [], tags: ["校園", "自訂媒體標籤"] }, "Example");
+    migrateClassificationFrontmatter(frontmatter, "Example");
     assert.deepEqual(frontmatter.tags, ["2026", "Example", "project/anime", "School"]);
-    assert.deepEqual(frontmatter.media_tags, ["校園", "自訂媒體標籤"]);
-  });
-
-  it("backs up ambiguous legacy provider genres before replacing them", () => {
-    const frontmatter: Record<string, unknown> = {
-      title: "Some Book",
-      media_type: "novel",
-      source_provider: "openlibrary",
-      genres: ["Fiction", "1998", "我的書架分類"],
-    };
-    applySanitizedClassification(frontmatter, { genres: [], tags: [] }, "Some Book");
-    assert.deepEqual(frontmatter.genres, []);
-    assert.deepEqual(frontmatter.classification_legacy_genres, ["Fiction", "1998", "我的書架分類"]);
-    assert.equal(frontmatter.classification_version, 1);
+    assert.deepEqual(frontmatter.media_tags, ["校園"]);
   });
 
   it("does not confuse the media type label with the legacy genre field", () => {
@@ -224,17 +257,9 @@ describe("media classification", () => {
     );
   });
 
-  it("combines built-in and cleaned vault suggestions without duplicates", () => {
-    const clean = sanitizeStoredClassification({
-      title: "Example",
-      media_type: "anime",
-      year: 2026,
-      media_tags: ["異世界", "自訂標籤", "Example", 2026],
-    }, "Example");
-    const suggestions = classificationSuggestions("tag", clean.tags);
+  it("combines built-in and stored custom suggestions without duplicates", () => {
+    const suggestions = classificationSuggestions("tag", ["異世界", "自訂標籤"]);
     assert.equal(suggestions.filter((value) => value === "異世界").length, 1);
     assert.ok(suggestions.includes("自訂標籤"));
-    assert.ok(!suggestions.includes("Example"));
-    assert.ok(!suggestions.includes("2026"));
   });
 });
