@@ -24,6 +24,10 @@ function configureScoreInput(input: HTMLInputElement): void {
   input.step = String(RATING_INCREMENT);
 }
 
+function configureScoreInputs(root: ParentNode): void {
+  root.querySelectorAll<HTMLInputElement>(SCORE_INPUT_SELECTOR).forEach(configureScoreInput);
+}
+
 function normalizeScoreBeforeAction(target: EventTarget | null): void {
   if (!(target instanceof Element)) return;
   const action = target.closest<HTMLButtonElement>("button.mod-cta");
@@ -47,6 +51,16 @@ function configureFocusedScoreInput(target: EventTarget | null): void {
   if (!(target instanceof HTMLInputElement) || !target.matches(SCORE_INPUT_SELECTOR)) return;
   configureScoreInput(target);
 }
+
+const observer = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    for (const node of mutation.addedNodes) {
+      if (node instanceof Element) configureScoreInputs(node);
+    }
+  }
+});
+observer.observe(document.documentElement, { childList: true, subtree: true });
+configureScoreInputs(document);
 
 document.addEventListener("focusin", (event) => configureFocusedScoreInput(event.target), true);
 document.addEventListener("click", (event) => normalizeScoreBeforeAction(event.target), true);
