@@ -51,7 +51,10 @@ function labelsOf(item: MediaItem): string[] {
 }
 
 function labelsFromFrontmatter(frontmatter: Record<string, unknown> | undefined): string[] {
-  return normalizeMasterpieceLabels(frontmatter?.masterpiece_labels);
+  const labels = normalizeMasterpieceLabels(frontmatter?.masterpiece_labels);
+  return frontmatter?.favorite === true && labels.length === 0
+    ? labelsForMasterpieceEnable(labels)
+    : labels;
 }
 
 function runUiAction(action: Promise<void>): void {
