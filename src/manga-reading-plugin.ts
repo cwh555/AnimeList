@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- Obsidian frontmatter, workspace, and menu callbacks cross the typed plugin boundary here. */
 import { Modal, Notice, TFile } from "obsidian";
 import { AnimeListPlugin } from "./main";
 import {
@@ -267,5 +266,3 @@ export default class AnimeListWithMangaReading extends AnimeListPlugin {
     }));
   }
 }
-
-/* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises */
