@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-misused-promises -- Obsidian frontmatter and menu callbacks cross the typed plugin boundary here. */
 import { Modal, Notice, TFile } from "obsidian";
 import { AnimeListPlugin } from "./main";
 import {
@@ -10,7 +11,7 @@ import {
   synchronizeProgressWithReadingLog,
 } from "./reading-progress";
 import { READING_PROGRESS_TEXT as TEXT } from "./reading-progress-text";
-import type { ReadingProgressEntry } from "./types";
+import type { MediaItem, ReadingProgressEntry } from "./types";
 
 const UNIT_OPTIONS = [
   ["chapter", TEXT.unitChapter],
@@ -253,6 +254,19 @@ export class MangaReadingLogModal extends Modal {
 }
 
 export default class AnimeListWithMangaReading extends AnimeListPlugin {
+  collectMediaItems(source?: string): MediaItem[] {
+    return super.collectMediaItems(source).map((item) => {
+      if (item.mediaType !== "manga") return item;
+      const file = this.app.vault.getAbstractFileByPath(item.filePath);
+      if (!(file instanceof TFile)) return item;
+      const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      return {
+        ...item,
+        readingLog: normalizeReadingProgressLog(frontmatter?.reading_log),
+      };
+    });
+  }
+
   async onload(): Promise<void> {
     await super.onload();
     this.addCommand({
@@ -277,3 +291,5 @@ export default class AnimeListWithMangaReading extends AnimeListPlugin {
     }));
   }
 }
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-misused-promises */
