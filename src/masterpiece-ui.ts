@@ -339,7 +339,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
       ...adapters,
       initialState: resolveIndependentFilterState(
         libraryStates.get(container),
-        Reflect.get(adapters, "initialState") as LibraryRenderState | undefined,
+        Reflect.get(adapters, "initialState"),
       ),
       onStateChange: (state: LibraryRenderState): void => {
         libraryStates.set(container, state);
