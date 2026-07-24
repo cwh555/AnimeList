@@ -91,16 +91,22 @@ export function isLegacyGenreFieldLabel(value: unknown): boolean {
   return label === "分類" || /^genres?$/i.test(label);
 }
 
+// Automatic provider data is always strict catalog-only. Unknown values are never
+// treated as custom user data, even when AniList enrichment temporarily fails.
 export function automaticClassificationForResult(result: ExternalMediaResult): ClassificationSelection {
   if (result.provider.toLocaleLowerCase() !== "anilist") return { genres: [], tags: [] };
   return createAutomaticSelection(result.genres, result.tags);
 }
 
+// Existing frontmatter is not cleaned automatically. User-created values are preserved.
 export function storedClassificationSelection(frontmatter: Record<string, unknown>): ClassificationSelection {
   return createClassificationSelection(frontmatter.genres, frontmatter.media_tags);
 }
 
-export function writeClassificationSelection(frontmatter: Record<string, unknown>, selection: ClassificationSelection): ClassificationSelection {
+export function writeClassificationSelection(
+  frontmatter: Record<string, unknown>,
+  selection: ClassificationSelection,
+): ClassificationSelection {
   const normalized = createClassificationSelection(selection.genres, selection.tags);
   frontmatter.genres = [...normalized.genres];
   if (normalized.tags.length) frontmatter.media_tags = [...normalized.tags];
@@ -108,9 +114,14 @@ export function writeClassificationSelection(frontmatter: Record<string, unknown
   return normalized;
 }
 
-export function sanitizeStoredClassification(frontmatter: Record<string, unknown>, fileBasename = ""): ClassificationCleanupResult {
+/** Conservative cleanup used only by the explicit settings action. */
+export function sanitizeStoredClassification(
+  frontmatter: Record<string, unknown>,
+  fileBasename = "",
+): ClassificationCleanupResult {
   const output: ClassificationCleanupResult = { genres: [], tags: [], removed: [], moved: [] };
   const metadata = metadataKeys(frontmatter, fileBasename);
+
   const process = (rawValues: unknown, originalKind: "genre" | "tag", allowCustom: boolean): void => {
     for (const raw of classificationValues(rawValues)) {
       const builtin = builtinClassification(raw);
@@ -127,18 +138,29 @@ export function sanitizeStoredClassification(frontmatter: Record<string, unknown
       if (normalized) appendUnique(originalKind === "genre" ? output.genres : output.tags, normalized);
     }
   };
+
   process(frontmatter.genres, "genre", true);
   process(frontmatter.media_tags, "tag", true);
   if (frontmatter.media_tags == null) process(frontmatter.tags, "tag", false);
   return output;
 }
 
-export function migrateClassificationFrontmatter(frontmatter: Record<string, unknown>, fileBasename = ""): ClassificationCleanupResult {
+export function migrateClassificationFrontmatter(
+  frontmatter: Record<string, unknown>,
+  fileBasename = "",
+): ClassificationCleanupResult {
   const beforeGenres = classificationValues(frontmatter.genres);
   const beforeTags = classificationValues(frontmatter.media_tags);
   const result = sanitizeStoredClassification(frontmatter, fileBasename);
-  if (!arraysEqual(beforeGenres, result.genres) && frontmatter.classification_legacy_genres == null) frontmatter.classification_legacy_genres = [...beforeGenres];
-  if (!arraysEqual(beforeTags, result.tags) && beforeTags.length && frontmatter.classification_legacy_media_tags == null) frontmatter.classification_legacy_media_tags = [...beforeTags];
+
+  if (!arraysEqual(beforeGenres, result.genres) && frontmatter.classification_legacy_genres == null) {
+    frontmatter.classification_legacy_genres = [...beforeGenres];
+  }
+  if (!arraysEqual(beforeTags, result.tags) && beforeTags.length
+    && frontmatter.classification_legacy_media_tags == null) {
+    frontmatter.classification_legacy_media_tags = [...beforeTags];
+  }
+
   writeClassificationSelection(frontmatter, result);
   frontmatter.classification_version = CLASSIFICATION_VERSION;
   return result;
