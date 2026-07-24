@@ -18,5 +18,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run checks
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee masterpiece-check.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: masterpiece-filter-check-log-final
+          path: masterpiece-check.log
       - run: npm run release:check
