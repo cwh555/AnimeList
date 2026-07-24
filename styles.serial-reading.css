@@ -49,52 +49,6 @@
   max-width: none;
 }
 
-/* Manga and novel totals are frequently unknown. When no numeric track was
- * rendered, show a state-based track instead: completed=full, active/paused/
- * dropped=half, planned=empty. This deliberately avoids presenting a fake
- * percentage value. */
-.al-progress:not(:has(.al-progress-track)) {
-  position: relative;
-  padding-top: 18px;
-}
-
-.al-progress:not(:has(.al-progress-track))::before,
-.al-progress:not(:has(.al-progress-track))::after {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 0;
-  height: 4px;
-  border-radius: 99px;
-}
-
-.al-progress:not(:has(.al-progress-track))::before {
-  width: 100%;
-  background: var(--background-modifier-border, #383840);
-}
-
-.al-progress:not(:has(.al-progress-track))::after {
-  width: 0;
-  background: var(--al-accent);
-}
-
-.al-card.status-completed .al-progress:not(:has(.al-progress-track))::after {
-  width: 100%;
-}
-
-.al-card.status-watching .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-reading .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-on_hold .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-dropped .al-progress:not(:has(.al-progress-track))::after {
-  width: 50%;
-}
-
-/* Planned/wishlist cards keep the empty track but do not repeat a
- * "not started" sentence below it. */
-.al-card.status-planned .al-progress-row > span:first-child {
-  display: none;
-}
-
 @media (max-width: 900px) {
   .animelist-modal .al-volume-row-fields {
     grid-template-columns: minmax(90px, 0.55fr) minmax(0, 1fr);
