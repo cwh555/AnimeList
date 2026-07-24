@@ -321,7 +321,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
     const items = active ? inputItems.filter((item) => item.favorite) : inputItems;
     original(container, items, adapters);
 
-    const statusBar = container.querySelector<HTMLElement>(".al-status-bar");
+    const statusBar = container.querySelector(".al-status-bar") as HTMLElement | null;
     if (statusBar) {
       const button = statusBar.createEl("button", {
         cls: `al-status-chip${active ? " is-active" : ""}`,
@@ -335,13 +335,14 @@ function installRenderer(plugin: MasterpiecePlugin): void {
     }
 
     const byPath = new Map(items.map((item) => [item.filePath, item]));
-    container.querySelectorAll<HTMLElement>(".al-card").forEach((card) => {
+    const cards = container.querySelectorAll(".al-card") as NodeListOf<HTMLElement>;
+    cards.forEach((card) => {
       const path = card.dataset.path ?? card.getAttribute("data-path") ?? "";
       const item = byPath.get(path) ?? items.find((candidate) => (
         candidate.title === card.querySelector(".al-card-title")?.textContent
       ));
       if (!item) return;
-      const favoriteButton = card.querySelector<HTMLElement>(".al-favorite-button");
+      const favoriteButton = card.querySelector(".al-favorite-button") as HTMLElement | null;
       if (favoriteButton && modeOf(plugin) === "masterpiece") {
         favoriteButton.title = item.favorite
           ? masterpieceFeatureText("library.editMasterpiece")
@@ -350,7 +351,7 @@ function installRenderer(plugin: MasterpiecePlugin): void {
       }
       if (modeOf(plugin) !== "masterpiece" || !item.favorite) return;
       const labels = labelsForMasterpieceEnable(labelsOf(item));
-      let tags = card.querySelector<HTMLElement>(".al-tags");
+      let tags = card.querySelector(".al-tags") as HTMLElement | null;
       if (!tags) {
         tags = card.createDiv({ cls: "al-tags" });
         card.querySelector(".al-progress")?.before(tags);
