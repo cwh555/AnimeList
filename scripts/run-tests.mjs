@@ -28,6 +28,7 @@ await writeFile(entryFile, [
   'import "../../tests/timeline-scale-work-items.test.ts";',
   'import "../../tests/rating.test.ts";',
   'import "../../tests/progress-units.test.ts";',
+  'import "../../tests/media-classification.test.ts";',
   "",
 ].join("\n"));
 
