@@ -54,11 +54,11 @@ function configureFocusedScoreInput(target: EventTarget | null): void {
 
 export function installRatingUi(plugin: Plugin): void {
   const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
         if (node instanceof Element) configureScoreInputs(node);
-      }
-    }
+      });
+    });
   });
   const handleFocus = (event: FocusEvent): void => configureFocusedScoreInput(event.target);
   const handleClick = (event: MouseEvent): void => normalizeScoreBeforeAction(event.target);
