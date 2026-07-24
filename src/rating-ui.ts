@@ -14,8 +14,27 @@ const SCORE_INPUT_SELECTOR = [
   `[max="${MAX_RATING}"]`,
 ].join("");
 
+interface CrossWindowInstance {
+  instanceOf<T>(type: { prototype: T }): this is T;
+}
+
+function supportsCrossWindowInstance(value: unknown): value is CrossWindowInstance {
+  return typeof value === "object"
+    && value !== null
+    && "instanceOf" in value
+    && typeof Reflect.get(value, "instanceOf") === "function";
+}
+
+function isElement(value: unknown): value is Element {
+  return supportsCrossWindowInstance(value) && value.instanceOf(Element);
+}
+
+function isInputElement(value: unknown): value is HTMLInputElement {
+  return supportsCrossWindowInstance(value) && value.instanceOf(HTMLInputElement);
+}
+
 function scoreInputWithin(target: EventTarget | null): HTMLInputElement | null {
-  if (!(target instanceof Element)) return null;
+  if (!isElement(target)) return null;
   const modal = target.closest(".animelist-modal");
   return modal?.querySelector<HTMLInputElement>(SCORE_INPUT_SELECTOR) ?? null;
 }
@@ -29,7 +48,7 @@ function configureScoreInputs(root: ParentNode): void {
 }
 
 function normalizeScoreBeforeAction(target: EventTarget | null): void {
-  if (!(target instanceof Element)) return;
+  if (!isElement(target)) return;
   const action = target.closest<HTMLButtonElement>("button.mod-cta");
   if (!action) return;
 
@@ -48,7 +67,7 @@ function normalizeScoreBeforeAction(target: EventTarget | null): void {
 }
 
 function configureFocusedScoreInput(target: EventTarget | null): void {
-  if (!(target instanceof HTMLInputElement) || !target.matches(SCORE_INPUT_SELECTOR)) return;
+  if (!isInputElement(target) || !target.matches(SCORE_INPUT_SELECTOR)) return;
   configureScoreInput(target);
 }
 
@@ -56,7 +75,7 @@ export function installRatingUi(plugin: Plugin): void {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
-        if (node instanceof Element) configureScoreInputs(node);
+        if (isElement(node)) configureScoreInputs(node);
       });
     });
   });
