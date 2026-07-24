@@ -17,6 +17,7 @@ await writeFile(entryFile, [
   'import "../../tests/core.test.ts";',
   'import "../../tests/media-status.test.ts";',
   'import "../../tests/schema-migration.test.ts";',
+  'import "../../tests/progress-display.test.ts";',
   'import "../../tests/search-pagination.test.ts";',
   'import "../../tests/cover-cache.test.ts";',
   'import "../../tests/multilingual-search.test.ts";',
