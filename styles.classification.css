@@ -1,0 +1,120 @@
+/* Media classification controls use the same compact form language as the existing modal. */
+.animelist-modal .al-classification-metadata,
+.animelist-modal .al-classification-field {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.animelist-modal .al-classification-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.animelist-modal .al-classification-meta-value {
+  min-height: 38px;
+  padding: 9px 10px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius);
+  color: var(--text-normal);
+  background: var(--background-secondary-alt);
+  font-size: var(--font-ui-small);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.animelist-modal .al-classification-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.animelist-modal .al-classification-header {
+  color: var(--text-muted);
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+.animelist-modal .al-classification-chips,
+.animelist-modal .al-classification-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.animelist-modal .al-classification-chips:empty,
+.animelist-modal .al-classification-suggestions:empty {
+  display: none;
+}
+
+.animelist-modal .al-classification-chip,
+.animelist-modal .al-classification-option {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: .68rem;
+  line-height: 1;
+}
+
+.animelist-modal .al-classification-chip {
+  gap: 5px;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+}
+
+.animelist-modal .al-classification-chip button {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-faint);
+  background: transparent;
+  font-size: .85rem;
+  line-height: 1;
+}
+
+.animelist-modal .al-classification-chip button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.animelist-modal .al-classification-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.animelist-modal .al-classification-input-row input,
+.animelist-modal .al-classification-input-row button {
+  min-height: 38px;
+}
+
+.animelist-modal .al-classification-input-row button {
+  padding: 0 13px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.animelist-modal .al-classification-option {
+  cursor: pointer;
+}
+
+.animelist-modal .al-classification-option:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+@media (max-width: 620px) {
+  .animelist-modal .al-classification-metadata {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,10 +2,10 @@ import { Modal, TFile, type Plugin } from "obsidian";
 import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
 import { classificationText } from "./classification-feature-text";
 import {
-  applySanitizedClassification,
   automaticClassificationForResult,
   isLegacyGenreFieldLabel,
-  sanitizeStoredClassification,
+  storedClassificationSelection,
+  writeClassificationSelection,
 } from "./classification-compatibility";
 import {
   classificationSuggestions,
@@ -18,7 +18,7 @@ import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.media-classification");
 const USER_AGENT = "AnimeList-Obsidian/1.1.2 (local personal media library)";
-const pendingEditTags = new Map<string, string[]>();
+const pendingEditClassification = new Map<string, ClassificationSelection>();
 
 interface RuntimePlugin extends Plugin {
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
@@ -33,12 +33,31 @@ interface ClassificationModal extends Modal {
   file?: TFile;
 }
 
+export interface ClassificationMetadataItem {
+  label: string;
+  value: string;
+}
+
+export function classificationMetadataForResult(result: ExternalMediaResult): ClassificationMetadataItem[] {
+  const output: ClassificationMetadataItem[] = [];
+  if (result.year !== "" && result.year != null) {
+    output.push({ label: classificationText("year"), value: String(result.year) });
+  }
+  const people = result.people.map((value) => value.trim()).filter(Boolean);
+  if (people.length) {
+    output.push({
+      label: classificationText(result.mediaType === "anime" ? "studios" : "creators"),
+      value: people.join("、"),
+    });
+  }
+  return output;
+}
+
 export function applyClassificationFrontmatter(
   frontmatter: Record<string, unknown>,
   selection: ClassificationSelection,
-  fileBasename = "",
 ): void {
-  applySanitizedClassification(frontmatter, selection, fileBasename);
+  writeClassificationSelection(frontmatter, selection);
 }
 
 function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
@@ -47,8 +66,8 @@ function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
   for (const file of getScopedMarkdownFiles(plugin.app, [""])) {
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     if (!frontmatter?.media_type) continue;
-    const clean = sanitizeStoredClassification(frontmatter, file.basename);
-    for (const value of clean[key]) {
+    const selection = storedClassificationSelection(frontmatter);
+    for (const value of selection[key]) {
       const normalized = value.normalize("NFKC").trim();
       const comparison = normalized.toLocaleLowerCase();
       if (!normalized || seen.has(comparison)) continue;
@@ -75,13 +94,12 @@ function createPicker(
   let values = normalizeClassificationValues(initialValues, kind);
   const root = createEl("section", { cls: "al-classification-field" });
   const header = root.createDiv({ cls: "al-classification-header" });
-  header.createEl("strong", { text: classificationText(kind === "genre" ? "genres" : "tags") });
-  header.createEl("small", { text: classificationText(kind === "genre" ? "genresHint" : "tagsHint") });
+  header.setText(classificationText(kind === "genre" ? "genres" : "tags"));
   const chips = root.createDiv({ cls: "al-classification-chips" });
   const inputRow = root.createDiv({ cls: "al-classification-input-row" });
   const input = inputRow.createEl("input", { type: "search" });
   input.placeholder = classificationText("inputPlaceholder");
-  const add = inputRow.createEl("button", { text: "新增" });
+  const add = inputRow.createEl("button", { text: classificationText("add") });
   add.type = "button";
   const options = root.createDiv({ cls: "al-classification-suggestions" });
 
@@ -101,11 +119,13 @@ function createPicker(
   };
   const render = (): void => {
     chips.replaceChildren();
-    if (!values.length) chips.createEl("span", { cls: "al-classification-empty", text: classificationText("empty") });
     for (const value of values) {
       const chip = chips.createEl("span", { cls: "al-classification-chip" });
       chip.append(value);
-      const remove = chip.createEl("button", { text: "×", attr: { "aria-label": classificationText("remove", { value }) } });
+      const remove = chip.createEl("button", {
+        text: "×",
+        attr: { "aria-label": classificationText("remove", { value }) },
+      });
       remove.type = "button";
       remove.addEventListener("click", () => removeValue(value));
     }
@@ -123,7 +143,7 @@ function createPicker(
     }
     add.textContent = input.value.trim()
       ? classificationText("addCustom", { value: input.value.trim() })
-      : "新增";
+      : classificationText("add");
     add.disabled = !input.value.trim();
   };
   input.addEventListener("input", render);
@@ -136,6 +156,20 @@ function createPicker(
   render();
   emit();
   return root;
+}
+
+function installMetadata(form: Element, result: ExternalMediaResult): void {
+  const items = classificationMetadataForResult(result);
+  if (!items.length) return;
+  const root = createEl("section", { cls: "al-classification-metadata" });
+  for (const item of items) {
+    const field = root.createDiv({ cls: "al-form-field" });
+    field.createSpan({ cls: "al-form-label", text: item.label });
+    field.createDiv({ cls: "al-classification-meta-value", text: item.value });
+  }
+  const legacyField = findLegacyGenreField(form);
+  if (legacyField) legacyField.insertAdjacentElement("beforebegin", root);
+  else form.appendChild(root);
 }
 
 function installPickers(
@@ -191,11 +225,14 @@ function captureModal(openModal: () => void): ClassificationModal | null {
 function installAniListSource(plugin: RuntimePlugin): void {
   const original = plugin.searchAniList.bind(plugin);
   plugin.searchAniList = async (mediaType, query) => {
-    const [results, classifications] = await Promise.all([
-      original(mediaType, query),
-      fetchAniListClassifications(mediaType, query, USER_AGENT),
-    ]);
-    return mergeAniListClassifications(results, classifications);
+    const results = await original(mediaType, query);
+    try {
+      const classifications = await fetchAniListClassifications(results, USER_AGENT);
+      return mergeAniListClassifications(results, classifications);
+    } catch (error) {
+      console.warn("AnimeList could not enrich AniList classification metadata", error);
+      return results;
+    }
   };
 }
 
@@ -209,7 +246,7 @@ function installCreatePersistence(plugin: RuntimePlugin): void {
     );
     const file = await original(result, { ...form, genres: selection.genres, tags: selection.tags });
     await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyClassificationFrontmatter(frontmatter, selection, file.basename);
+      applyClassificationFrontmatter(frontmatter, selection);
     });
     return file;
   };
@@ -220,25 +257,22 @@ function installEditPersistence(plugin: RuntimePlugin): void {
   const original = manager.processFrontMatter.bind(manager);
   manager.processFrontMatter = async (file, process) => original(file, (frontmatter) => {
     process(frontmatter);
-    if (!frontmatter.media_type) return;
-    const pendingTags = pendingEditTags.get(file.path);
-    const selection = pendingTags
-      ? createClassificationSelection(frontmatter.genres, pendingTags)
-      : sanitizeStoredClassification(frontmatter, file.basename);
-    applyClassificationFrontmatter(frontmatter, selection, file.basename);
-    pendingEditTags.delete(file.path);
+    const pending = pendingEditClassification.get(file.path);
+    if (!pending) return;
+    writeClassificationSelection(frontmatter, pending);
+    pendingEditClassification.delete(file.path);
   });
 }
 
-function installLibraryCompatibility(plugin: RuntimePlugin): void {
+function installLibraryClassification(plugin: RuntimePlugin): void {
   const original = plugin.collectMediaItems.bind(plugin);
   plugin.collectMediaItems = (source) => original(source).map((item) => {
     const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
     if (!(file instanceof TFile)) return item;
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     if (!frontmatter?.media_type) return item;
-    const clean = sanitizeStoredClassification(frontmatter, file.basename);
-    return { ...item, genres: clean.genres, tags: clean.tags };
+    const selection = storedClassificationSelection(frontmatter);
+    return { ...item, genres: selection.genres, tags: selection.tags };
   });
 }
 
@@ -250,6 +284,8 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const originalRenderDetails = modal.renderDetails.bind(modal);
     modal.renderDetails = async (result) => {
       await originalRenderDetails(result);
+      const form = modal.contentEl.querySelector(".al-media-form");
+      if (form) installMetadata(form, result);
       installPickers(plugin, modal, automaticClassificationForResult(result), (next) => {
         result.genres = next.genres;
         result.tags = next.tags;
@@ -263,13 +299,16 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const file = modal?.file ?? plugin.app.vault.getAbstractFileByPath(path);
     if (!modal || !(file instanceof TFile)) return;
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
-    let selection = frontmatter ? sanitizeStoredClassification(frontmatter, file.basename) : { genres: [], tags: [] };
+    let selection = frontmatter ? storedClassificationSelection(frontmatter) : { genres: [], tags: [] };
     installPickers(plugin, modal, selection, (next) => { selection = next; });
     const save = Array.from(modal.contentEl.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "儲存");
     save?.addEventListener("click", () => {
-      pendingEditTags.set(file.path, [...selection.tags]);
-      window.setTimeout(() => pendingEditTags.delete(file.path), 10_000);
+      pendingEditClassification.set(file.path, {
+        genres: [...selection.genres],
+        tags: [...selection.tags],
+      });
+      window.setTimeout(() => pendingEditClassification.delete(file.path), 10_000);
     }, { capture: true });
   };
 }
@@ -280,7 +319,7 @@ export function installClassificationUi(plugin: Plugin): void {
   installAniListSource(runtime);
   installCreatePersistence(runtime);
   installEditPersistence(runtime);
-  installLibraryCompatibility(runtime);
+  installLibraryClassification(runtime);
   installModalIntegration(runtime);
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
