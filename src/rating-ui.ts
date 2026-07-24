@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, Plugin } from "obsidian";
 import { ratingFeatureText } from "./rating-feature-text";
 import {
   MAX_RATING,
@@ -52,15 +52,18 @@ function configureFocusedScoreInput(target: EventTarget | null): void {
   configureScoreInput(target);
 }
 
-const observer = new MutationObserver((mutations) => {
-  for (const mutation of mutations) {
-    for (const node of mutation.addedNodes) {
-      if (node instanceof Element) configureScoreInputs(node);
+export function installRatingUi(plugin: Plugin): void {
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof Element) configureScoreInputs(node);
+      }
     }
-  }
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
-configureScoreInputs(document);
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  configureScoreInputs(document);
 
-document.addEventListener("focusin", (event) => configureFocusedScoreInput(event.target), true);
-document.addEventListener("click", (event) => normalizeScoreBeforeAction(event.target), true);
+  plugin.register(() => observer.disconnect());
+  plugin.registerDomEvent(document, "focusin", (event) => configureFocusedScoreInput(event.target), true);
+  plugin.registerDomEvent(document, "click", (event) => normalizeScoreBeforeAction(event.target), true);
+}
