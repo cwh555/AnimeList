@@ -1,6 +1,10 @@
 import {
+  ALL_CLASSIFICATIONS,
   BUILTIN_GENRES,
   BUILTIN_TAGS,
+  DESCRIPTIVE_TAG_CATALOG,
+  OFFICIAL_GENRE_CATALOG,
+  PROMOTED_TAG_CATALOG,
   type ClassificationCatalogEntry,
   type ClassificationKind,
 } from "./classification-catalog";
@@ -41,61 +45,92 @@ function comparisonKey(value: unknown): string {
     .replace(/[\s_-]+/g, " ");
 }
 
-function catalogFor(kind: ClassificationKind): readonly ClassificationCatalogEntry[] {
-  return kind === "genre" ? BUILTIN_GENRES : BUILTIN_TAGS;
-}
-
-function catalogLookup(kind: ClassificationKind): Map<string, ClassificationCatalogEntry> {
-  const lookup = new Map<string, ClassificationCatalogEntry>();
-  for (const entry of catalogFor(kind)) {
+function lookup(entries: readonly ClassificationCatalogEntry[]): Map<string, ClassificationCatalogEntry> {
+  const output = new Map<string, ClassificationCatalogEntry>();
+  for (const entry of entries) {
     for (const value of [entry.id, entry.anilistName, entry.label, ...(entry.aliases ?? [])]) {
-      lookup.set(comparisonKey(value), entry);
+      output.set(comparisonKey(value), entry);
     }
   }
-  return lookup;
+  return output;
 }
 
-const GENRE_LOOKUP = catalogLookup("genre");
-const TAG_LOOKUP = catalogLookup("tag");
+const ALL_LOOKUP = lookup(ALL_CLASSIFICATIONS);
+const GENRE_LOOKUP = lookup(BUILTIN_GENRES);
+const TAG_LOOKUP = lookup(BUILTIN_TAGS);
+const OFFICIAL_GENRE_LOOKUP = lookup(OFFICIAL_GENRE_CATALOG);
+const PROMOTED_TAG_LOOKUP = lookup(PROMOTED_TAG_CATALOG);
+const DESCRIPTIVE_TAG_LOOKUP = lookup(DESCRIPTIVE_TAG_CATALOG);
+
+function appendUnique(output: string[], value: string): void {
+  const key = comparisonKey(value);
+  if (!key || output.some((entry) => comparisonKey(entry) === key)) return;
+  output.push(value);
+}
+
+function eligibleAniListTags(
+  values: readonly AniListTagInput[] | null | undefined,
+  rankThreshold: number,
+): AniListTagInput[] {
+  return [...(values ?? [])]
+    .filter((tag) => (
+      !tag.isAdult
+      && !tag.isGeneralSpoiler
+      && !tag.isMediaSpoiler
+      && Number(tag.rank ?? 0) >= rankThreshold
+    ))
+    .sort((left, right) => Number(right.rank ?? 0) - Number(left.rank ?? 0));
+}
 
 export function builtinClassification(value: unknown): BuiltinClassification | null {
-  const key = comparisonKey(value);
-  const genre = GENRE_LOOKUP.get(key);
-  if (genre) return { kind: "genre", label: genre.label };
-  const tag = TAG_LOOKUP.get(key);
-  return tag ? { kind: "tag", label: tag.label } : null;
+  const entry = ALL_LOOKUP.get(comparisonKey(value));
+  return entry ? { kind: entry.kind, label: entry.label } : null;
 }
 
+// User-authored values are preserved here. Do not use this function for provider data.
 export function normalizeClassificationValues(values: unknown, kind: ClassificationKind): string[] {
   const source = Array.isArray(values) ? values : values == null ? [] : [values];
-  const lookup = kind === "genre" ? GENRE_LOOKUP : TAG_LOOKUP;
+  const catalog = kind === "genre" ? GENRE_LOOKUP : TAG_LOOKUP;
   const output: string[] = [];
-  const seen = new Set<string>();
   for (const raw of source) {
     const text = typeof raw === "object" && raw !== null && "name" in raw
       ? stringValue((raw as { name?: unknown }).name)
       : stringValue(raw);
     const clean = text.normalize("NFKC").trim().replace(/^#/, "");
     if (!clean) continue;
-    const builtin = lookup.get(comparisonKey(clean));
-    const value = builtin?.label ?? clean;
-    const key = comparisonKey(value);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    output.push(value);
+    appendUnique(output, catalog.get(comparisonKey(clean))?.label ?? clean);
   }
   return output;
 }
 
-export function attachAniListGenres(values: unknown): string[] {
-  const source = Array.isArray(values) ? values : [];
+// Provider data is strict: values outside the fixed catalog are discarded.
+export function normalizeAutomaticValues(values: unknown, kind: ClassificationKind): string[] {
+  const source = Array.isArray(values) ? values : values == null ? [] : [values];
+  const catalog = kind === "genre" ? GENRE_LOOKUP : TAG_LOOKUP;
   const output: string[] = [];
-  const seen = new Set<string>();
   for (const raw of source) {
-    const entry = GENRE_LOOKUP.get(comparisonKey(raw));
-    if (!entry || seen.has(entry.id)) continue;
-    seen.add(entry.id);
-    output.push(entry.label);
+    const text = typeof raw === "object" && raw !== null && "name" in raw
+      ? stringValue((raw as { name?: unknown }).name)
+      : stringValue(raw);
+    const entry = catalog.get(comparisonKey(text));
+    if (entry) appendUnique(output, entry.label);
+  }
+  return output;
+}
+
+export function attachAniListGenres(
+  genres: unknown,
+  tags: readonly AniListTagInput[] | null | undefined = [],
+  rankThreshold = DEFAULT_TAG_RANK,
+): string[] {
+  const output: string[] = [];
+  for (const raw of Array.isArray(genres) ? genres : []) {
+    const entry = OFFICIAL_GENRE_LOOKUP.get(comparisonKey(raw));
+    if (entry) appendUnique(output, entry.label);
+  }
+  for (const tag of eligibleAniListTags(tags, rankThreshold)) {
+    const entry = PROMOTED_TAG_LOOKUP.get(comparisonKey(tag.name));
+    if (entry) appendUnique(output, entry.label);
   }
   return output;
 }
@@ -106,20 +141,10 @@ export function attachAniListTags(
   limit = DEFAULT_TAG_LIMIT,
 ): string[] {
   const output: string[] = [];
-  const seen = new Set<string>();
-  const candidates = [...(values ?? [])]
-    .filter((tag) => (
-      !tag.isAdult
-      && !tag.isGeneralSpoiler
-      && !tag.isMediaSpoiler
-      && Number(tag.rank ?? 0) >= rankThreshold
-    ))
-    .sort((left, right) => Number(right.rank ?? 0) - Number(left.rank ?? 0));
-  for (const tag of candidates) {
-    const entry = TAG_LOOKUP.get(comparisonKey(tag.name));
-    if (!entry || seen.has(entry.id)) continue;
-    seen.add(entry.id);
-    output.push(entry.label);
+  for (const tag of eligibleAniListTags(values, rankThreshold)) {
+    const entry = DESCRIPTIVE_TAG_LOOKUP.get(comparisonKey(tag.name));
+    if (!entry) continue;
+    appendUnique(output, entry.label);
     if (output.length >= limit) break;
   }
   return output;
@@ -132,9 +157,15 @@ export function createClassificationSelection(genres: unknown, tags: unknown): C
   };
 }
 
-export function classificationSuggestions(kind: ClassificationKind, customValues: unknown = []): string[] {
-  return normalizeClassificationValues([
-    ...catalogFor(kind).map((entry) => entry.label),
-    ...normalizeClassificationValues(customValues, kind),
-  ], kind).sort((left, right) => left.localeCompare(right, "zh-Hant"));
+export function createAutomaticSelection(genres: unknown, tags: unknown): ClassificationSelection {
+  return {
+    genres: normalizeAutomaticValues(genres, "genre"),
+    tags: normalizeAutomaticValues(tags, "tag"),
+  };
+}
+
+// Suggestions deliberately exclude vault-derived values so legacy pollution cannot spread.
+export function classificationSuggestions(kind: ClassificationKind): string[] {
+  const values = (kind === "genre" ? BUILTIN_GENRES : BUILTIN_TAGS).map((entry) => entry.label);
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right, "zh-Hant"));
 }

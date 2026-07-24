@@ -1,15 +1,18 @@
 export type ClassificationKind = "genre" | "tag";
+export type AniListClassificationSource = "genre" | "tag";
 
 export interface ClassificationCatalogEntry {
   id: string;
   anilistName: string;
   label: string;
+  kind: ClassificationKind;
+  source: AniListClassificationSource;
   aliases?: readonly string[];
 }
 
 type CatalogRow = readonly [string, string, string, (readonly string[])?];
 
-export const GENRE_CATALOG = [
+const OFFICIAL_GENRES = [
   ["action", "Action", "å‹•ä½œ", ["åŠ¨ä½œ"]],
   ["adventure", "Adventure", "å†’éšª", ["å†’é™©"]],
   ["comedy", "Comedy", "å–œåŠ‡", ["å–œå‰§"]],
@@ -17,61 +20,7 @@ export const GENRE_CATALOG = [
   ["ecchi", "Ecchi", "æƒ…è‰²"],
   ["fantasy", "Fantasy", "å¥‡å¹»"],
   ["horror", "Horror", "ææ€–"],
-  ["mahou-shoujo", "Mahou Shoujo", "é­”æ³•å°‘å¥³"],
-  ["mecha", "Mecha", "æ©Ÿå™¨äºº", ["æœºå™¨äºº"]],
-  ["music", "Music", "éŸ³æ¨‚", ["éŸ³ä¹"]],
-  ["mystery", "Mystery", "æ‡¸ç–‘", ["æ‚¬ç–‘"]],
-  ["psychological", "Psychological", "å¿ƒç†"],
-  ["romance", "Romance", "æˆ€æ„›", ["æ‹çˆ±"]],
-  ["sci-fi", "Sci-Fi", "ç§‘å¹»", ["Science Fiction"]],
-  ["slice-of-life", "Slice of Life", "æ—¥å¸¸", ["Slice-of-Life"]],
-  ["sports", "Sports", "é‹å‹•", ["è¿åŠ¨"]],
-  ["supernatural", "Supernatural", "è¶…è‡ªç„¶"],
-  ["thriller", "Thriller", "é©šæ‚š", ["æƒŠæ‚š"]],
-] as const satisfies readonly CatalogRow[];
-
-// Reviewed, versioned subset of AniList MediaTagCollection. Unknown API values
-// are ignored; users can still create their own local tags in the picker.
-export const TAG_CATALOG = [
-  ["age-regression", "Age Regression", "å¹´é½¡å›žæ­¸", ["å¹´é¾„å›žå½’"]],
-  ["aliens", "Aliens", "å¤–æ˜Ÿäºº"],
-  ["anti-hero", "Anti-Hero", "åè‹±é›„"],
-  ["bullying", "Bullying", "éœ¸å‡Œ"],
-  ["coming-of-age", "Coming of Age", "æˆé•·", ["æˆé•¿"]],
-  ["cultivation", "Cultivation", "ä¿®ä»™"],
-  ["dungeon", "Dungeon", "è¿·å®®", ["è¿·å®«"]],
-  ["family-life", "Family Life", "å®¶åº­ç”Ÿæ´»"],
-  ["female-harem", "Female Harem", "å¾Œå®®", ["åŽå®«"]],
-  ["food", "Food", "ç¾Žé£Ÿ"],
-  ["gender-bending", "Gender Bending", "æ€§åˆ¥è½‰æ›", ["æ€§åˆ«è½¬æ¢"]],
-  ["isekai", "Isekai", "ç•°ä¸–ç•Œ", ["å¼‚ä¸–ç•Œ"]],
-  ["magic", "Magic", "é­”æ³•"],
-  ["martial-arts", "Martial Arts", "æ­¦è¡“", ["æ­¦æœ¯"]],
-  ["military", "Military", "è»äº‹", ["å†›äº‹"]],
-  ["otaku-culture", "Otaku Culture", "å¾¡å®…æ–‡åŒ–"],
-  ["reincarnation", "Reincarnation", "è½‰ç”Ÿ", ["è½¬ç”Ÿ"]],
-  ["revenge", "Revenge", "å¾©ä»‡"],
-  ["school", "School", "æ ¡åœ’", ["æ ¡å›­"]],
-  ["super-power", "Super Power", "è¶…èƒ½åŠ›"],
-  ["survival", "Survival", "ç”Ÿå­˜"],
-  ["time-loop", "Time Loop", "æ™‚é–“å¾ªç’°", ["æ—¶é—´å¾ªçŽ¯"]],
-  ["time-manipulation", "Time Manipulation", "æ™‚é–“æ“æŽ§", ["æ—¶é—´æ“æŽ§"]],
-  ["time-skip", "Time Skip", "æ™‚é–“è·³èº", ["æ—¶é—´è·³è·ƒ"]],
-  ["time-travel", "Time Travel", "æ™‚é–“æ—…è¡Œ", ["æ—¶é—´æ—…è¡Œ"]],
-  ["urban-fantasy", "Urban Fantasy", "éƒ½å¸‚å¥‡å¹»"],
-  ["video-games", "Video Games", "é›»å­éŠæˆ²", ["ç”µå­æ¸¸æˆ"]],
-  ["virtual-world", "Virtual World", "è™›æ“¬ä¸–ç•Œ", ["è™šæ‹Ÿä¸–ç•Œ"]],
-  ["work", "Work", "è·å ´", ["èŒåœº", "Workplace"]],
-] as const satisfies readonly CatalogRow[];
-
-function toEntries(kind: ClassificationKind, rows: readonly CatalogRow[]): readonly ClassificationCatalogEntry[] {
-  return rows.map(([id, anilistName, label, aliases]) => ({
-    id: `${kind}:${id}`,
-    anilistName,
-    label,
-    aliases,
-  }));
-}
-
-export const BUILTIN_GENRES = toEntries("genre", GENRE_CATALOG);
-export const BUILTIN_TAGS = toEntries("tag", TAG_CATALOG);
+  ["mahou-shoujo", "Mahou Shoujo", "é­”æ³•å°‘å¢–Ä‰t°(€l‰µ•¡„ˆ°€‰5•¡„ˆ°€‹š¦–f£’êèˆ°l‹šrë–f£’êè‰ut°(€l‰µÕÍ¥Œˆ°€‰5ÕÍ¥Œˆ°€‹¦~Ïš¢ˆ°l‹¦~Ï’æ@‰ut°(€l‰µåÍÑ•Éäˆ°€‰5åÍÑ•Éäˆ°€‹šãžZDˆ°l‹š
+³žZD‰ut°(€l‰ÁÍå¡½±½¥…°ˆ°€‰AÍå¡½±½¥…°ˆ°€‹–þžB‰t°(€l‰É½µ…¹”ˆ°€‰I½µ…¹”ˆ°€‹š"šlˆ°l‹š/ž"Ä‰ut°(€l‰Í¤µ™¤ˆ°€‰M¤µ¤ˆ°€‹žžG–æìˆ°l‰M¥•¹”¥Ñ¥½¸‰ut°(€l‰Í±¥”µ½˜µ±¥™”ˆ°€‰M±¥”½˜1¥™”ˆ°€‹š^—–âàˆ°l‰M±¥”µ½˜µ1¥™”‰ut°(€l‰ÍÁ½ÉÑÌˆ°€‰MÁ½ÉÑÌˆ°€‹¦/–.Tˆ°l‹¢þC–* ‰ut°(€l‰ÍÕÁ•É¹…ÑÕÉ…°ˆ°€‰MÕÁ•É¹…ÑÕÉ…°ˆ°€‹¢Ú¢«žØ‰t°(€l‰Ñ¡É¥±±•Èˆ°€‰Q¡É¥±±•Èˆ°€‹¦¦kš
+hˆ°l‹š+š
+h‰ut°)t…Ì½¹ÍÐÍ…Ñ¥Í™¥•ÌÉ•…‘½¹±ä…Ñ…±½I½Ýmtì()½¹ÍÐAI=5=Q}1MM%%Q%=9}QL€ôl(€l‰Í¡½½°ˆ°€‰M¡½½°ˆ°€‹š‚‡–rHˆ°l‹š‚‡–n´ˆ°€‰M¡½½°1¥™”‰ut°(€l‰¥Í•­…¤ˆ°€‰%Í•­…¤ˆ°€‹žVÃ’â[žV0ˆ°l‹–ò’â[žV0‰ut°(€l‰µ…¥Œˆ°€‰5…¥Œˆ°€‹¦¶SšÎT‰t°(€l‰µ…ÉÑ¥…°µ…ÉÑÌˆ°€‰5…ÉÑ¥…°ÉÑÌˆ°€‹š¶›¢†Lˆ°l‹š¶›šr¼‰ut°(€l‰µ¥±¥Ñ…Éäˆ°€‰5¥±¥Ñ…Éäˆ°€‹¢î7’ê,ˆ°l‹–o’ê,‰ut°(€l‰™½½ˆ°€‰½½ˆ°€‹žú;¦Ž|‰t°(€l‰™…µ¥±äµ±¥™”ˆ°€‰…µ¥±ä1¥™”ˆ°€‹–ºÛ–ê·žRšÒì‰t°(€l‰¥å…Í¡¥­•¤ˆ°€‰%å…Í¡¥­•¤ˆ°€‹žfžfHˆ°l‹šÊïžfHˆ°€‹šÊïš ‰ut°(€l‰Õ±Ñ¥Ù…Ñ¥½¸ˆ°€‰Õ±Ñ¥Ù…Ñ¥½¸ˆ°€‹’þ»’îd‰t°(€l‰‘Õ¹•½¸ˆ°€‰Õ¹•½¸ˆ°€‹¢þß–º¸ˆ°l‹¢þß–º¬‰ut°(€l‰É•¥¹…É¹…Ñ¥½¸ˆ°€‰I•¥¹…É¹…Ñ¥½¸ˆ°€‹¢ö'žR|ˆ°l‹¢ö³žR|‰ut°(€l‰ÕÉ‰…¸µ™…¹Ñ…Íäˆ°€‰UÉ‰…¸…¹Ñ…Íäˆ°€‹¦÷–â–––æì‰t°(€l‰Ù¥‘•¼µ…µ•Ìˆ°€‰Y¥‘•¼…µ•Ìˆ°€‹¦nï–¶C¦+š"Èˆ°l‹žR×–¶Cšâãš"<‰ut°(€l‰Ù¥ÉÑÕ…°µÝ½É±ˆ°€‰Y¥ÉÑÕ…°]½É±ˆ°€‹¢fošN³’â[žV0ˆ°l‹¢fkš.’â[žV0‰ut°(€l‰Ý½É¬ˆ°€‰]½É¬ˆ°€‹¢ß–‚Ðˆ°l‹¢3–rèˆ°€‰]½É­Á±…”‰ut°(€l‰Ñ¥µ”µ±½½Àˆ°€‰Q¥µ”1½½Àˆ°€‹šf¦ZO–ú«žJÀˆ°l‹š^Û¦^Ó–ú«ž:¼‰ut°(€l‰Ñ¥µ”µµ…¹¥ÁÕ±…Ñ¥½¸ˆ°€‰Q¥µ”5…¹¥ÁÕ±…Ñ¥½¸ˆ°€‹šf¦ZOšN7š:œˆ°l‹š^Û¦^ÓšN7š:œ‰ut°(€l‰Ñ¥µ”µÍ­¥Àˆ°€‰Q¥µ”M­¥Àˆ°€‹šf¦ZO¢ÞÏ¢ê4ˆ°l‹š^Û¦^Ó¢ÞÏ¢Þ‰ut°(€l‰Ñ¥µ”µÑÉ…Ù•°ˆ°€‰Q¥µ”QÉ…Ù•°ˆ°€‹šf¦ZOš^¢†0ˆ°l‹š^Û¦^Óš^¢†0‰ut°(€l‰ÍÕÁ•ÈµÁ½Ý•Èˆ°€‰MÕÁ•ÈA½Ý•Èˆ°€‹¢Ú¢÷–*l‰t°)t…Ì½¹ÍÐÍ…Ñ¥Í™¥•ÌÉ•…‘½¹±ä…Ñ…±½I½Ýmtì()½¹ÍÐMI%AQ%Y}QL€ôl(€l‰Í±…ÁÍÑ¥¬ˆ°€‰M±…ÁÍÑ¥¬ˆ°€‹¦²–*ˆ‰t°(€l‰•¹Í•µ‰±”µ…ÍÐˆ°€‰¹Í•µ‰±”…ÍÐˆ°€‹žú“’ö<‰t°(€l‰•Á¥Í½‘¥Œˆ°€‰Á¥Í½‘¥Œˆ°€‹–Z»––*ˆ‰t°(€l‰½µ¥¹œµ½˜µ…”ˆ°€‰½µ¥¹œ½˜”ˆ°€‹š"C¦VÜˆ°l‹š"C¦Vü‰ut°(€l‰…¹Ñ¤µ¡•É¼ˆ°€‰¹Ñ¤µ!•É¼ˆ°€‹–>7¢.Ç¦n‰t°(€l‰‰Õ±±å¥¹œˆ°€‰	Õ±±å¥¹œˆ°€‹¦rã–0‰t°(€l‰É•Ù•¹”ˆ°€‰I•Ù•¹”ˆ°€‹–ú§’î‰t°(€l‰ÍÕÉÙ¥Ù…°ˆ°€‰MÕÉÙ¥Ù…°ˆ°€‹žR–¶`‰t°(€l‰•¹‘•Èµ‰•¹‘¥¹œˆ°€‰•¹‘•È	•¹‘¥¹œˆ°€‹šŸ–"—¢ö'š>lˆ°l‹šŸ–"¯¢ö³š6ˆ‰ut°(€l‰…”µÉ•É•ÍÍ¥½¸ˆ°€‰”I•É•ÍÍ¥½¸ˆ°€‹–æÓ¦ö‡–n{š¶àˆ°l‹–æÓ¦ú–n{–öH‰ut°(€l‰…±¥•¹Ìˆ°€‰±¥•¹Ìˆ°€‹–’[šb’êè‰t°)t…Ì½¹ÍÐÍ…Ñ¥Í™¥•ÌÉ•…‘½¹±ä…Ñ…±½I½Ýmtì()™Õ¹Ñ¥½¸•¹ÑÉ¥•Ì¡­¥¹è±…ÍÍ¥™¥…Ñ¥½¹-¥¹°Í½ÕÉ”è¹¥1¥ÍÑ±…ÍÍ¥™¥…Ñ¥½¹M½ÕÉ”°É½ÝÌèÉ•…‘½¹±ä…Ñ…±½I½Ýmt¤èÉ•…‘½¹±ä±…ÍÍ¥™¥…Ñ¥½¹…Ñ…±½¹ÑÉåmtì(€É•ÑÕÉ¸É½ÝÌ¹µ…À ¡m¥°…¹¥±¥ÍÑ9…µ”°±…‰•°°…±¥…Í•Ít¤€ôø€¡ì¥è€‘í­¥¹‘ôè‘í¥‘õ€°…¹¥±¥ÍÑ9…µ”°±…‰•°°…±¥…Í•Ì°­¥¹°Í½ÕÉ”ô¤¤ì)ô()•áÁ½ÉÐ½¹ÍÐ=%%1}9I}Q1=€ô•¹ÑÉ¥•Ì ‰•¹É”ˆ°€‰•¹É”ˆ°=%%1}9IL¤ì)•áÁ½ÉÐ½¹ÍÐAI=5=Q}Q}Q1=€ô•¹ÑÉ¥•Ì ‰•¹É”ˆ°€‰Ñ…œˆ°AI=5=Q}1MM%%Q%=9}QL¤ì)•áÁ½ÉÐ½¹ÍÐMI%AQ%Y}Q}Q1=€ô•¹ÑÉ¥•Ì ‰Ñ…œˆ°€‰Ñ…œˆ°MI%AQ%Y}QL¤ì)•áÁ½ÉÐ½¹ÍÐ	U%1Q%9}9IL€ôl¸¸¹=%%1}9I}Q1=°€¸¸¹AI=5=Q}Q}Q1=t…Ì½¹ÍÐì)•áÁ½ÉÐ½¹ÍÐ	U%1Q%9}QL€ôMI%AQ%Y}Q}Q1=ì)•áÁ½ÉÐ½¹ÍÐ11}1MM%%Q%=9L€ôl¸¸¹	U%1Q%9}9IL°€¸¸¹	U%1Q%9}QMt…Ì½¹ÍÐì
