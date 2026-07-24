@@ -29,6 +29,7 @@ export interface LibraryUiState {
   type: "all" | MediaType;
   status: MediaStatusFilter;
   genre: string;
+  tag?: string;
   sort: string;
   view: LibraryViewMode;
 }
@@ -78,6 +79,7 @@ export interface MediaItem {
   favorite: boolean;
   year: number | string;
   genres: string[];
+  tags?: string[];
   people: string[];
   platforms: string[];
   sourceUrls: string[];
@@ -108,7 +110,9 @@ export interface ExternalMediaResult {
   unit: string;
   year: number | string;
   genres: string[];
+  tags?: string[];
   rawGenres: string[];
+  rawTags?: string[];
   people: string[];
   platforms: string[];
   sourceUrl: string;
@@ -131,6 +135,7 @@ export interface MediaNoteForm {
   startedAt: string;
   completedAt: string;
   genres: string[];
+  tags?: string[];
   templatePath: string;
   volumeLog: NovelVolumeEntry[];
 }
