@@ -53,11 +53,16 @@ export function stateAfterMasterpieceSelection(selectedLabels: unknown): Special
   return { favorite: labels.length > 0, masterpieceLabels: labels };
 }
 
-export function filterBySpecialLabel<T extends { favorite?: boolean }>(
+export function filterBySpecialLabel<T>(
   items: readonly T[],
   active: boolean,
 ): T[] {
-  return active ? items.filter((item) => item.favorite === true) : [...items];
+  if (!active) return [...items];
+  return items.filter((item) => (
+    typeof item === "object"
+    && item !== null
+    && Reflect.get(item, "favorite") === true
+  ));
 }
 
 export function resolveIndependentFilterState<T>(
