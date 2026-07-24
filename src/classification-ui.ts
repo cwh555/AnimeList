@@ -14,11 +14,12 @@ import {
   type ClassificationSelection,
 } from "./media-classification";
 import type { ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "./types";
-import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.media-classification");
 const USER_AGENT = "AnimeList-Obsidian/1.1.2 (local personal media library)";
 const pendingEditClassification = new Map<string, ClassificationSelection>();
+const pendingCreateClassification = new WeakMap<ExternalMediaResult, ClassificationSelection>();
+const enrichedAniListResults = new WeakSet<ExternalMediaResult>();
 
 interface RuntimePlugin extends Plugin {
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
@@ -60,24 +61,6 @@ export function applyClassificationFrontmatter(
   writeClassificationSelection(frontmatter, selection);
 }
 
-function vaultValues(plugin: RuntimePlugin, key: "genres" | "tags"): string[] {
-  const output: string[] = [];
-  const seen = new Set<string>();
-  for (const file of getScopedMarkdownFiles(plugin.app, [""])) {
-    const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
-    if (!frontmatter?.media_type) continue;
-    const selection = storedClassificationSelection(frontmatter);
-    for (const value of selection[key]) {
-      const normalized = value.normalize("NFKC").trim();
-      const comparison = normalized.toLocaleLowerCase();
-      if (!normalized || seen.has(comparison)) continue;
-      seen.add(comparison);
-      output.push(normalized);
-    }
-  }
-  return output;
-}
-
 function findLegacyGenreField(form: Element): HTMLElement | null {
   return Array.from(form.querySelectorAll<HTMLElement>(".al-form-field")).find((field) => {
     const label = field.querySelector(".al-form-label")?.textContent?.trim() ?? "";
@@ -88,10 +71,10 @@ function findLegacyGenreField(form: Element): HTMLElement | null {
 function createPicker(
   kind: "genre" | "tag",
   initialValues: unknown,
-  suggestions: string[],
   onChange: (values: string[]) => void,
 ): HTMLElement {
   let values = normalizeClassificationValues(initialValues, kind);
+  const suggestions = classificationSuggestions(kind);
   const root = createEl("section", { cls: "al-classification-field" });
   const header = root.createDiv({ cls: "al-classification-header" });
   header.setText(classificationText(kind === "genre" ? "genres" : "tags"));
@@ -159,6 +142,7 @@ function createPicker(
 }
 
 function installMetadata(form: Element, result: ExternalMediaResult): void {
+  form.querySelector(".al-classification-metadata")?.remove();
   const items = classificationMetadataForResult(result);
   if (!items.length) return;
   const root = createEl("section", { cls: "al-classification-metadata" });
@@ -173,7 +157,6 @@ function installMetadata(form: Element, result: ExternalMediaResult): void {
 }
 
 function installPickers(
-  plugin: RuntimePlugin,
   modal: ClassificationModal,
   initial: ClassificationSelection,
   onChange: (selection: ClassificationSelection) => void,
@@ -187,18 +170,8 @@ function installPickers(
     if (legacyInput) legacyInput.value = state.genres.join("、");
     onChange({ genres: [...state.genres], tags: [...state.tags] });
   };
-  const genres = createPicker(
-    "genre",
-    state.genres,
-    classificationSuggestions("genre", vaultValues(plugin, "genres")),
-    (values) => { state.genres = values; sync(); },
-  );
-  const tags = createPicker(
-    "tag",
-    state.tags,
-    classificationSuggestions("tag", vaultValues(plugin, "tags")),
-    (values) => { state.tags = values; sync(); },
-  );
+  const genres = createPicker("genre", state.genres, (values) => { state.genres = values; sync(); });
+  const tags = createPicker("tag", state.tags, (values) => { state.tags = values; sync(); });
   if (legacyField) {
     legacyField.replaceWith(genres, tags);
     if (legacyInput) {
@@ -228,10 +201,14 @@ function installAniListSource(plugin: RuntimePlugin): void {
     const results = await original(mediaType, query);
     try {
       const classifications = await fetchAniListClassifications(results, USER_AGENT);
-      return mergeAniListClassifications(results, classifications);
+      const enriched = mergeAniListClassifications(results, classifications);
+      for (const result of enriched) {
+        if (result.provider.toLocaleLowerCase() === "anilist") enrichedAniListResults.add(result);
+      }
+      return enriched;
     } catch (error) {
       console.warn("AnimeList could not enrich AniList classification metadata", error);
-      return results;
+      return mergeAniListClassifications(results, new Map());
     }
   };
 }
@@ -239,14 +216,12 @@ function installAniListSource(plugin: RuntimePlugin): void {
 function installCreatePersistence(plugin: RuntimePlugin): void {
   const original = plugin.createMediaNote.bind(plugin);
   plugin.createMediaNote = async (result, form) => {
-    const automatic = automaticClassificationForResult(result);
-    const selection = createClassificationSelection(
-      form.genres ?? automatic.genres,
-      form.tags ?? automatic.tags,
-    );
-    const file = await original(result, { ...form, genres: selection.genres, tags: selection.tags });
+    const selection = pendingCreateClassification.get(result) ?? automaticClassificationForResult(result);
+    pendingCreateClassification.delete(result);
+    const normalized = createClassificationSelection(selection.genres, selection.tags);
+    const file = await original(result, { ...form, genres: normalized.genres, tags: normalized.tags });
     await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyClassificationFrontmatter(frontmatter, selection);
+      applyClassificationFrontmatter(frontmatter, normalized);
     });
     return file;
   };
@@ -284,11 +259,24 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     const originalRenderDetails = modal.renderDetails.bind(modal);
     modal.renderDetails = async (result) => {
       await originalRenderDetails(result);
+      if (result.provider.toLocaleLowerCase() === "anilist" && !enrichedAniListResults.has(result)) {
+        try {
+          const classifications = await fetchAniListClassifications([result], USER_AGENT);
+          const [enriched] = mergeAniListClassifications([result], classifications);
+          if (enriched) Object.assign(result, enriched);
+        } catch (error) {
+          console.warn("AnimeList could not enrich the selected AniList result", error);
+          const [strictFallback] = mergeAniListClassifications([result], new Map());
+          if (strictFallback) Object.assign(result, strictFallback);
+        }
+        enrichedAniListResults.add(result);
+      }
+      const automatic = automaticClassificationForResult(result);
+      pendingCreateClassification.set(result, automatic);
       const form = modal.contentEl.querySelector(".al-media-form");
       if (form) installMetadata(form, result);
-      installPickers(plugin, modal, automaticClassificationForResult(result), (next) => {
-        result.genres = next.genres;
-        result.tags = next.tags;
+      installPickers(modal, automatic, (next) => {
+        pendingCreateClassification.set(result, next);
       });
     };
   };
@@ -300,7 +288,7 @@ function installModalIntegration(plugin: RuntimePlugin): void {
     if (!modal || !(file instanceof TFile)) return;
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     let selection = frontmatter ? storedClassificationSelection(frontmatter) : { genres: [], tags: [] };
-    installPickers(plugin, modal, selection, (next) => { selection = next; });
+    installPickers(modal, selection, (next) => { selection = next; });
     const save = Array.from(modal.contentEl.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "儲存");
     save?.addEventListener("click", () => {
