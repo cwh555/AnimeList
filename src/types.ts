@@ -8,129 +8,43 @@ export type ReleaseStatus = "releasing" | "finished" | "hiatus" | "cancelled" | 
 export type ProgressValue = number | string;
 export type SearchLanguage = "chinese" | "english" | "original";
 
-export interface ProviderSettings {
-  bangumi: boolean;
-  anilist: boolean;
-  openlibrary: boolean;
-}
-
-export interface SearchLanguageSettings {
-  chinese: boolean;
-  english: boolean;
-  original: boolean;
-}
-
-export interface MigrationSettings {
-  mediaStatus: number;
-}
-
-export interface LibraryUiState {
-  section: LibrarySection;
-  type: "all" | MediaType;
-  status: MediaStatusFilter;
-  genre: string;
-  sort: string;
-  view: LibraryViewMode;
-}
-
+export interface ProviderSettings { bangumi: boolean; anilist: boolean; openlibrary: boolean; }
+export interface SearchLanguageSettings { chinese: boolean; english: boolean; original: boolean; }
+export interface MigrationSettings { mediaStatus: number; }
+export interface LibraryUiState { section: LibrarySection; type: "all" | MediaType; status: MediaStatusFilter; genre: string; sort: string; view: LibraryViewMode; }
 export interface AnimeListSettings {
-  storageMode: StorageMode;
-  libraryRoot: string;
-  flatMediaFolder: string;
-  additionalScanFolders: string[];
-  coverFolder: string;
-  templateFolder: string;
-  timelineMaxStackDepth: number;
-  providers: ProviderSettings;
-  searchLanguages?: SearchLanguageSettings;
-  migrations: MigrationSettings;
-  uiState: LibraryUiState;
+  storageMode: StorageMode; libraryRoot: string; flatMediaFolder: string; additionalScanFolders: string[];
+  coverFolder: string; templateFolder: string; timelineMaxStackDepth: number; providers: ProviderSettings;
+  searchLanguages?: SearchLanguageSettings; migrations: MigrationSettings; uiState: LibraryUiState;
 }
-
-export interface TemplateOption {
-  path: string;
-  name: string;
-}
-
+export interface TemplateOption { path: string; name: string; }
 export interface NovelVolumeEntry {
   label: string;
   startedAt: string;
   completedAt: string;
+  cover?: string;
+  coverProvider?: string;
+  coverSourceId?: string;
+  coverManual?: boolean;
+  extra?: Record<string, unknown>;
 }
-
-export interface CoverSources {
-  src: string;
-  srcset: string;
-  placeholder: string;
-}
-
+export interface CoverSources { src: string; srcset: string; placeholder: string; }
 export interface MediaItem {
-  title: string;
-  originalTitle: string;
-  mediaType: MediaType;
-  format: string;
-  status: MediaStatus;
-  releaseStatus: ReleaseStatus;
-  progress: ProgressValue;
-  total: ProgressValue;
-  unit: string;
-  score: number | null;
-  favorite: boolean;
-  year: number | string;
-  genres: string[];
-  people: string[];
-  platforms: string[];
-  sourceUrls: string[];
-  cover: string;
-  coverSources?: CoverSources;
-  filePath: string;
-  updated: number;
-  updatedLabel: string;
-  startedAt: string;
-  completedAt: string;
-  volumeLog: NovelVolumeEntry[];
+  title: string; originalTitle: string; mediaType: MediaType; format: string; status: MediaStatus;
+  releaseStatus: ReleaseStatus; progress: ProgressValue; total: ProgressValue; unit: string; score: number | null;
+  favorite: boolean; year: number | string; genres: string[]; people: string[]; platforms: string[];
+  sourceUrls: string[]; cover: string; coverSources?: CoverSources; filePath: string; updated: number;
+  updatedLabel: string; startedAt: string; completedAt: string; volumeLog: NovelVolumeEntry[];
 }
-
-export interface TimelineMediaEntry extends MediaItem {
-  seriesTitle?: string;
-  volumeLabel?: string;
-}
-
+export interface TimelineMediaEntry extends MediaItem { seriesTitle?: string; volumeLabel?: string; }
 export interface ExternalMediaResult {
-  provider: string;
-  sourceId: string;
-  title: string;
-  originalTitle: string;
-  romajiTitle: string;
-  mediaType: MediaType;
-  format: string;
-  total: number;
-  unit: string;
-  year: number | string;
-  genres: string[];
-  rawGenres: string[];
-  people: string[];
-  platforms: string[];
-  sourceUrl: string;
-  coverUrl: string;
-  summary: string;
-  externalScore: number | null;
-  releaseStatus: ReleaseStatus;
-  searchTitles?: string[];
+  provider: string; sourceId: string; title: string; originalTitle: string; romajiTitle: string; mediaType: MediaType;
+  format: string; total: number; unit: string; year: number | string; genres: string[]; rawGenres: string[];
+  people: string[]; platforms: string[]; sourceUrl: string; coverUrl: string; summary: string;
+  externalScore: number | null; releaseStatus: ReleaseStatus; searchTitles?: string[];
 }
-
 export interface MediaNoteForm {
-  title: string;
-  status: MediaStatus;
-  releaseStatus: ReleaseStatus;
-  progress: ProgressValue;
-  total: ProgressValue;
-  unit: string;
-  score: number | string | null;
-  favorite: boolean;
-  startedAt: string;
-  completedAt: string;
-  genres: string[];
-  templatePath: string;
-  volumeLog: NovelVolumeEntry[];
+  title: string; status: MediaStatus; releaseStatus: ReleaseStatus; progress: ProgressValue; total: ProgressValue;
+  unit: string; score: number | string | null; favorite: boolean; startedAt: string; completedAt: string;
+  genres: string[]; templatePath: string; volumeLog: NovelVolumeEntry[];
 }
