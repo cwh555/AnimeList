@@ -89,7 +89,7 @@ try {
   assert.doesNotMatch(cowboy, /animelist_test_fixture:/);
   assert.match(cowboy, /source_provider: "anilist"/);
   assert.match(cowboy, /source_id: "1"/);
-  assert.match(cowboy, /- TV/);
+  assert.match(cowboy, /- "TV"/);
   assert.match(cowboy, /> PRESERVE BODY: classification-cowboy-bebop/);
 
   const takagi = readFixture(path.join("Classification", "02-takagi-san-legacy.md"));
