@@ -14,107 +14,24 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Probe Bangumi serial covers
+      - name: Probe Bangumi duplicate subject metadata
         run: |
           python - <<'PY'
-          import json
-          import random
-          import re
-          import time
-          import urllib.error
-          import urllib.parse
-          import urllib.request
+          import json, time, urllib.request
           from pathlib import Path
-
-          works = {
-              "KonoSuba": "この素晴らしい世界に祝福を！",
-              "Mushoku Tensei": "無職転生 ～異世界行ったら本気だす～",
-              "Invaders of the Rokujouma": "六畳間の侵略者！？",
-              "That Time I Got Reincarnated as a Slime": "転生したらスライムだった件",
-          }
-          user_agent = "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)"
-          digit = re.compile(r"(?<!\d)(\d{1,3})(?!\d)")
-
-          def request_json(url, payload=None, attempts=5):
-              delay = 2.0
-              for attempt in range(attempts):
-                  try:
-                      body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
-                      request = urllib.request.Request(url, data=body, headers={"Accept": "application/json", "Content-Type": "application/json", "User-Agent": user_agent})
-                      with urllib.request.urlopen(request, timeout=45) as response:
-                          return response.status, json.loads(response.read().decode("utf-8"))
-                  except urllib.error.HTTPError as error:
-                      if error.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
-                          raise
-                      retry_after = error.headers.get("Retry-After", "")
-                      wait = float(retry_after) if retry_after.isdigit() else delay + random.random()
-                      time.sleep(wait)
-                      delay = min(30.0, delay * 2)
-
-          def normalize(value):
-              return re.sub(r"[\W_]+", "", str(value or "").casefold())
-
-          def volume_match(title, volume):
-              values = {int(value) for value in digit.findall(str(title or ""))}
-              return volume in values
-
-          def image_ok(url):
-              if not url:
-                  return False
-              request = urllib.request.Request(url.replace("http:", "https:"), headers={"User-Agent": user_agent, "Range": "bytes=0-255"})
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  return response.status in (200, 206) and bool(response.read(256))
-
-          report = []
-          for display, original in works.items():
-              original_key = normalize(original)
-              for volume in range(1, 11):
-                  query = f"{original} {volume}"
-                  row = {"work": display, "volume": volume, "query": query, "status": None, "candidates": [], "valid": []}
-                  try:
-                      url = "https://api.bgm.tv/v0/search/subjects?" + urllib.parse.urlencode({"limit": 50, "offset": 0})
-                      status, payload = request_json(url, {"keyword": query, "sort": "match", "filter": {"type": [1]}})
-                      row["status"] = status
-                      for subject in payload.get("data", []):
-                          images = subject.get("images") or {}
-                          title = subject.get("name") or ""
-                          chinese = subject.get("name_cn") or ""
-                          image = images.get("large") or images.get("common") or images.get("medium") or images.get("small") or images.get("grid") or ""
-                          score = 0
-                          combined_key = normalize(title + chinese)
-                          if original_key and original_key in combined_key:
-                              score += 100
-                          if volume_match(title + " " + chinese, volume):
-                              score += 60
-                          if re.search(r"漫画|コミック|comic|manga", title + " " + chinese, re.I):
-                              score -= 30
-                          candidate = {"id": subject.get("id"), "title": title, "nameCn": chinese, "image": image, "score": score}
-                          row["candidates"].append(candidate)
-                      row["candidates"].sort(key=lambda item: (-item["score"], item["title"]))
-                      for candidate in row["candidates"][:10]:
-                          try:
-                              if candidate["score"] >= 120 and image_ok(candidate["image"]):
-                                  row["valid"].append(candidate)
-                          except Exception as error:
-                              candidate["imageError"] = f"{type(error).__name__}: {error}"
-                  except Exception as error:
-                      row["error"] = f"{type(error).__name__}: {error}"
-                  report.append(row)
-                  print(json.dumps({"work": display, "volume": volume, "status": row.get("status"), "candidates": len(row["candidates"]), "valid": len(row["valid"]), "best": row["valid"][0] if row["valid"] else (row["candidates"][0] if row["candidates"] else None), "error": row.get("error")}, ensure_ascii=False), flush=True)
-                  time.sleep(1.0)
-
-          Path("serial-cover-bangumi-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-          summary = {}
-          for display in works:
-              rows = [row for row in report if row["work"] == display]
-              summary[display] = {"successful": sum(bool(row["valid"]) for row in rows), "total": len(rows)}
-          print("SUMMARY", json.dumps(summary, ensure_ascii=False), flush=True)
-          if any(value["successful"] != value["total"] for value in summary.values()):
-              raise SystemExit(1)
+          ids = [120888,151881,124786,176844,124787,206986,134677,222647,134678,231816,177985,231817,177984,239823]
+          output=[]
+          for subject_id in ids:
+              req=urllib.request.Request(f'https://api.bgm.tv/v0/subjects/{subject_id}',headers={'Accept':'application/json','User-Agent':'AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)'})
+              with urllib.request.urlopen(req,timeout=30) as response:
+                  data=json.loads(response.read().decode('utf-8'))
+              output.append({k:data.get(k) for k in ['id','name','name_cn','type','platform','meta_tags','infobox','images']})
+              print(json.dumps(output[-1],ensure_ascii=False),flush=True)
+              time.sleep(0.7)
+          Path('bangumi-subject-details.json').write_text(json.dumps(output,ensure_ascii=False,indent=2),encoding='utf-8')
           PY
       - uses: actions/upload-artifact@v6
-        if: always()
         with:
-          name: serial-cover-bangumi-report
-          path: serial-cover-bangumi-report.json
+          name: bangumi-subject-details
+          path: bangumi-subject-details.json
           retention-days: 1
