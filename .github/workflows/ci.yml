@@ -18,13 +18,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - name: Capture classification persistence lint
-        run: npx eslint src/classification-create-persistence.ts --format json > classification-lint.json || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: classification-lint-report
-          path: classification-lint.json
-          retention-days: 1
-      - name: Lint classification create persistence
-        run: npx eslint src/classification-create-persistence.ts --max-warnings 0
+      - run: npm run check
+      - run: npm run release:check
