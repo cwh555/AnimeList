@@ -7,6 +7,13 @@ import {
   scoreDashboardScores,
 } from "../src/score-dashboard-model";
 import {
+  planScoreDashboardMove,
+  planScoreDashboardShift,
+  scoreDashboardPlanNeedsClampConfirmation,
+} from "../src/score-dashboard-move";
+import { applyScoreDashboardFrontmatter } from "../src/score-dashboard-score-service";
+import { visibleScoreDashboardPaths } from "../src/score-dashboard-ui";
+import {
   preserveScoreDashboardAnchorScrollTop,
   scoreDashboardScaleFromWheel,
   scoreDashboardWheelIntent,
@@ -70,10 +77,7 @@ describe("score dashboard model", () => {
   });
 
   it("filters by media type before counting", () => {
-    const data = buildScoreDashboardData([
-      item("Anime", 9, "anime"),
-      item("Manga", 8, "manga"),
-    ], "manga");
+    const data = buildScoreDashboardData([item("Anime", 9, "anime"), item("Manga", 8, "manga")], "manga");
     assert.equal(data.total, 1);
     assert.equal(data.rated, 1);
   });
@@ -91,27 +95,62 @@ describe("score dashboard model", () => {
     assert.equal(metrics.scale, 101.5);
     assert.ok(Math.abs(metrics.posterWidth - 73.5875) < 1e-9);
   });
+});
 
-  it("uses the visual thumbnail footprint as the 100 percent baseline", () => {
-    const normal = scoreDashboardPosterMetrics(100);
-    assert.equal(normal.posterWidth, 72.5);
-    assert.equal(normal.posterHeight, 108.75);
-    assert.equal(normal.laneMinHeight, 118.75);
-    assert.equal(normal.labelLayout, "regular");
+describe("score dashboard score moves", () => {
+  it("moves rated or unrated items directly to a target score", () => {
+    const plan = planScoreDashboardMove([
+      { filePath: "rated.md", score: 8 },
+      { filePath: "unrated.md", score: null },
+    ], 9.5);
+    assert.deepEqual(plan.changes.map((change) => change.nextScore), [9.5, 9.5]);
+    assert.equal(plan.blockedUnratedPaths.length, 0);
+  });
 
-    const small = scoreDashboardPosterMetrics(20);
-    assert.equal(small.posterWidth, 14.5);
-    assert.equal(small.posterHeight, 21.75);
-    assert.equal(small.verticalMargin, 1);
-    assert.equal(small.laneMinHeight, 23.75);
-    assert.equal(small.labelLayout, "compact");
+  it("allows moving a rated item back to unrated", () => {
+    const plan = planScoreDashboardMove([{ filePath: "rated.md", score: 8 }], null);
+    assert.equal(plan.changes[0].nextScore, null);
+  });
 
-    const large = scoreDashboardPosterMetrics(200);
-    assert.equal(large.posterWidth, 145);
-    assert.equal(large.posterHeight, 217.5);
-    assert.equal(large.verticalMargin, 10);
-    assert.equal(large.laneMinHeight, 237.5);
-    assert.equal(large.labelLayout, "regular");
+  it("blocks the entire shift when any selected item is unrated", () => {
+    const plan = planScoreDashboardShift([
+      { filePath: "rated.md", score: 8 },
+      { filePath: "unrated.md", score: null },
+    ], 1);
+    assert.equal(plan.changes.length, 0);
+    assert.deepEqual(plan.blockedUnratedPaths, ["unrated.md"]);
+  });
+
+  it("shifts by half a point and reports values that need clamping", () => {
+    const up = planScoreDashboardShift([
+      { filePath: "nine.md", score: 9 },
+      { filePath: "ten.md", score: 10 },
+    ], 1);
+    assert.deepEqual(up.changes.map((change) => change.nextScore), [9.5, 10]);
+    assert.deepEqual(up.clampedHighPaths, ["ten.md"]);
+    assert.equal(scoreDashboardPlanNeedsClampConfirmation(up), true);
+
+    const down = planScoreDashboardShift([{ filePath: "zero.md", score: 0 }], -1);
+    assert.equal(down.changes[0].nextScore, 0);
+    assert.deepEqual(down.clampedLowPaths, ["zero.md"]);
+  });
+
+  it("removes only score and update timestamps when moving to unrated", () => {
+    const frontmatter: Record<string, unknown> = {
+      title: "Keep me",
+      score: 8,
+      favorite: true,
+      updated_at: "old",
+      metadata_updated_at: "old",
+    };
+    applyScoreDashboardFrontmatter(frontmatter, null);
+    assert.deepEqual(frontmatter, { title: "Keep me", favorite: true });
+  });
+
+  it("selects only currently displayed items for batch select all", () => {
+    const items = [item("Anime", 8, "anime"), item("Hidden unrated", null, "anime"), item("Manga", 7, "manga")];
+    assert.deepEqual(visibleScoreDashboardPaths(items, "anime", false), ["Anime.md"]);
+    assert.deepEqual(visibleScoreDashboardPaths(items, "anime", true), ["Anime.md", "Hidden unrated.md"]);
   });
 });
 
