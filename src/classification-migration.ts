@@ -1,5 +1,9 @@
 import { type Plugin } from "obsidian";
-import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
+import {
+  fetchAniListClassifications,
+  mergeAniListClassifications,
+  type AniListClassification,
+} from "./anilist-classification";
 import { classificationValues, rebuildClassificationFrontmatter } from "./classification-compatibility";
 import { resolveClassifiedMediaResult } from "./classification-resolution";
 import type { ExternalMediaResult, MediaType, ReleaseStatus } from "./types";
@@ -154,7 +158,6 @@ export async function migrateMediaClassification(
   const pending: Array<{
     file: ReturnType<typeof getScopedMarkdownFiles>[number];
     lookup: ExternalMediaResult;
-    frontmatter: Record<string, unknown>;
   }> = [];
 
   for (const file of getScopedMarkdownFiles(plugin.app, plugin.getScanFolders())) {
@@ -162,7 +165,7 @@ export async function migrateMediaClassification(
     if (!frontmatter.media_type) continue;
     summary.scanned += 1;
     const lookup = migrationLookupResult(frontmatter, file.basename);
-    if (lookup) pending.push({ file, lookup, frontmatter });
+    if (lookup) pending.push({ file, lookup });
     else {
       summary.unresolved += 1;
       summary.unresolvedEntries.push({ path: file.path, title: stringValue(frontmatter.title) || file.basename });
@@ -170,20 +173,16 @@ export async function migrateMediaClassification(
   }
 
   const direct = pending.filter(({ lookup }) => lookup.provider.toLocaleLowerCase() === "anilist" && /^\d+$/.test(lookup.sourceId));
-  let directMap = new Map<string, ReturnType<typeof mergeAniListClassifications>[number]>();
+  let directMap = new Map<string, AniListClassification>();
   try {
-    const fetched = await fetchAniListClassifications(direct.map(({ lookup }) => lookup), USER_AGENT);
-    directMap = new Map([...fetched].map(([key, value]) => [key, value as unknown as ReturnType<typeof mergeAniListClassifications>[number]]));
+    directMap = await fetchAniListClassifications(direct.map(({ lookup }) => lookup), USER_AGENT);
   } catch (error) {
     console.warn("AnimeList direct classification batch lookup failed", error);
   }
 
   const canonicalByPath = new Map<string, ExternalMediaResult>();
   for (const entry of direct) {
-    const [canonical] = mergeAniListClassifications(
-      [entry.lookup],
-      directMap as unknown as Parameters<typeof mergeAniListClassifications>[1],
-    );
+    const [canonical] = mergeAniListClassifications([entry.lookup], directMap);
     if (canonical?.genres.length) canonicalByPath.set(entry.file.path, canonical);
   }
 
