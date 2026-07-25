@@ -26,6 +26,9 @@ try {
   assert.match(checklist, /Ongoing: \*\*1\*\* title/);
   assert.match(checklist, /exactly one list button must be active/);
   assert.match(checklist, /Masterpiece → Favorite → Masterpiece/);
+  assert.match(checklist, /must not show category inventory, rename, delete, or add controls/);
+  assert.match(checklist, /must not contain a separate \*\*移除 masterpiece\*\* button/);
+  assert.match(checklist, /uncheck every category, and save/);
   assert.match(checklist, /fixture_preservation_marker/);
   assert.match(checklist, /add volume/i);
 
@@ -50,20 +53,21 @@ try {
   assert.match(multiLabel, /status: "ongoing"/);
   assert.match(multiLabel, /favorite: true/);
   assert.match(multiLabel, /masterpiece_labels:/);
-  assert.match(multiLabel, /- "戀愛 masterpiece"/);
-  assert.match(multiLabel, /- "年度 masterpiece"/);
+  assert.match(multiLabel, /- "戀愛"/);
+  assert.match(multiLabel, /- "年度"/);
+  assert.doesNotMatch(multiLabel, /戀愛 masterpiece/);
   assert.match(multiLabel, /fixture_preservation_marker: "multi-label-ongoing"/);
   assert.match(multiLabel, /> PRESERVE BODY: multi-label-ongoing/);
 
   const sharedLabel = readFixture(path.join("Special", "16-special-shared-label-planned.md"));
   assert.match(sharedLabel, /status: "planned"/);
   assert.match(sharedLabel, /favorite: true/);
-  assert.match(sharedLabel, /- "戀愛 masterpiece"/);
+  assert.match(sharedLabel, /- "戀愛"/);
 
   const retainedLabel = readFixture(path.join("Special", "17-special-retained-label-completed.md"));
   assert.match(retainedLabel, /status: "completed"/);
   assert.match(retainedLabel, /favorite: false/);
-  assert.match(retainedLabel, /- "保留分類 masterpiece"/);
+  assert.match(retainedLabel, /- "保留分類"/);
   assert.match(retainedLabel, /fixture_preservation_marker: "retained-label-completed"/);
   assert.match(retainedLabel, /> PRESERVE BODY: retained-label-completed/);
 
