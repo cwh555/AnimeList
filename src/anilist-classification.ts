@@ -5,7 +5,7 @@ import {
   createAutomaticSelection,
   type AniListTagInput,
 } from "./media-classification";
-import { releaseDateMetadata } from "./release-season";
+import { releaseDateMetadata, type ReleaseSeasonMonth } from "./release-season";
 import type { ExternalMediaResult } from "./types";
 
 export interface AniListClassificationMedia {
@@ -16,7 +16,13 @@ export interface AniListClassificationMedia {
   studios?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
 }
 
-export type AniListClassification = Pick<ExternalMediaResult, "genres" | "tags" | "year" | "season" | "people">;
+export interface AniListClassification {
+  genres: string[];
+  tags: string[];
+  year: number | string;
+  season: ReleaseSeasonMonth | "";
+  people: string[];
+}
 
 const CLASSIFICATION_CACHE = new Map<string, AniListClassification>();
 const QUERY = `
