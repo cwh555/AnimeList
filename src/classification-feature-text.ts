@@ -6,6 +6,7 @@ export const CLASSIFICATION_TEXT = {
   addCustom: "新增「{value}」",
   remove: "移除 {value}",
   year: "年份",
+  season: "季度",
   studios: "製作公司",
   creators: "作者／創作者",
   "settings.heading": "Media classification",
