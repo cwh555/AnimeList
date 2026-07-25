@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { TFile, TFolder, setRequestUrlMock } from "obsidian";
 import { aniListClassificationTest } from "../src/anilist-classification";
+import { bangumiSubjectTest } from "../src/bangumi-subject";
 import { installClassificationCreatePersistence } from "../src/classification-create-persistence";
 import { setClassificationCreateDraft } from "../src/classification-create-state";
 import { migrateMediaClassification } from "../src/classification-migration";
+import { preferAniListSearchResults } from "../src/classification-search";
+import { searchMultilingualProviders } from "../src/multilingual-search";
 import type { ExternalMediaResult, MediaNoteForm } from "../src/types";
 
 function media(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResult {
@@ -31,6 +34,7 @@ function media(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResul
     summary: "",
     externalScore: null,
     releaseStatus: "finished",
+    searchTitles: ["Teasing Master Takagi-san"],
     ...overrides,
   };
 }
@@ -55,6 +59,41 @@ function form(): MediaNoteForm {
 }
 
 describe("classification runtime integration", () => {
+  it("uses a Bangumi alias to obtain canonical AniList classifications before selection", async () => {
+    const bangumi = media({
+      provider: "bangumi",
+      sourceId: "218712",
+      genres: [],
+      title: "擅長捉弄人的高木同學",
+      searchTitles: ["擅長捉弄人的高木同學", "からかい上手の高木さん"],
+    });
+    const canonical = media();
+    const aniListQueries: string[] = [];
+    const response = await searchMultilingualProviders({
+      query: "擅長捉弄人的高木同學",
+      providers: [
+        {
+          label: "AniList",
+          singleQueryOnly: true,
+          async search(query) {
+            aniListQueries.push(query);
+            return query === "からかい上手の高木さん" ? [canonical] : [];
+          },
+        },
+        {
+          label: "Bangumi",
+          supportsChineseDiscovery: true,
+          async search(query) { return query === "擅長捉弄人的高木同學" ? [bangumi] : []; },
+        },
+      ],
+      dedupe: preferAniListSearchResults,
+    });
+    const results = preferAniListSearchResults(response.results);
+    assert.ok(aniListQueries.includes("からかい上手の高木さん"));
+    assert.equal(results[0]?.provider, "anilist");
+    assert.deepEqual(results[0]?.genres, ["喜劇", "戀愛", "日常", "校園"]);
+  });
+
   it("carries automatic classification across cloned modal result objects", async () => {
     const selected = media();
     const clonedByModal = { ...selected, genres: [...selected.genres], tags: [] };
@@ -89,44 +128,48 @@ describe("classification runtime integration", () => {
     assert.equal(frontmatter.classification_source_id, "99468");
   });
 
-  it("reads live frontmatter and reports changed, unchanged, unresolved, and progress", async () => {
+  it("resolves a legacy Bangumi note through subject aliases and reports progress", async () => {
     aniListClassificationTest.reset();
+    bangumiSubjectTest.reset();
     const root = new TFolder();
     root.path = "AnimeList";
     const changed = new TFile();
-    changed.path = "AnimeList/changed.md";
-    changed.basename = "changed";
-    const unchanged = new TFile();
-    unchanged.path = "AnimeList/unchanged.md";
-    unchanged.basename = "unchanged";
+    changed.path = "AnimeList/高木同學.md";
+    changed.basename = "高木同學";
     const unresolved = new TFile();
     unresolved.path = "AnimeList/unresolved.md";
     unresolved.basename = "unresolved";
-    root.children = [changed, unchanged, unresolved];
+    root.children = [changed, unresolved];
 
     const records = new Map<TFile, Record<string, unknown>>([
-      [changed, { media_type: "anime", title: "Changed", source_provider: "anilist", source_id: "1", genres: ["TV", "2018"] }],
-      [unchanged, {
-        media_type: "anime", title: "Unchanged", source_provider: "anilist", source_id: "2",
-        genres: ["喜劇"], classification_version: 4, classification_source_provider: "anilist",
-        classification_source_id: "2", classification_legacy_genres: ["喜劇"], year: 2020, season: 4,
+      [changed, {
+        media_type: "anime",
+        title: "擅長捉弄人的高木同學",
+        format: "TV",
+        year: 2018,
+        source_provider: "bangumi",
+        source_id: "218712",
+        genres: ["TV", "2018", "搞笑"],
       }],
       [unresolved, { media_type: "game", title: "Unresolved" }],
     ]);
 
-    setRequestUrlMock(() => ({
-      json: {
-        data: {
-          Page: {
-            media: [
-              { id: 1, genres: ["Comedy"], tags: [], startDate: { year: 2018, month: 1 }, studios: { nodes: [] } },
-              { id: 2, genres: ["Comedy"], tags: [], startDate: { year: 2020, month: 4 }, studios: { nodes: [] } },
-            ],
+    const requestedUrls: string[] = [];
+    setRequestUrlMock((options: { url?: string }) => {
+      requestedUrls.push(options.url ?? "");
+      if (options.url === "https://api.bgm.tv/v0/subjects/218712") {
+        return {
+          status: 200,
+          json: {
+            name: "からかい上手の高木さん",
+            name_cn: "擅长捉弄的高木同学",
+            infobox: [{ key: "別名", value: [{ v: "Karakai Jouzu no Takagi-san" }] }],
           },
-        },
-      },
-      text: "",
-    }));
+          text: "",
+        };
+      }
+      throw new Error(`Unexpected request: ${options.url ?? ""}`);
+    });
 
     const progress: string[] = [];
     const host = {
@@ -140,22 +183,27 @@ describe("classification runtime integration", () => {
       },
       getScanFolders: () => ["AnimeList"],
       refreshViews() {},
-      async searchAniList() { return []; },
+      async searchAniList(_mediaType: string, query: string) {
+        return query === "からかい上手の高木さん" ? [media()] : [];
+      },
     };
 
     try {
       const summary = await migrateMediaClassification(host as never, (state) => {
         progress.push(`${state.processed}/${state.total}:${state.title}`);
       });
-      assert.equal(summary.scanned, 3);
-      assert.deepEqual(summary.changedEntries.map((entry) => entry.title), ["Changed"]);
-      assert.deepEqual(summary.unchangedEntries.map((entry) => entry.title), ["Unchanged"]);
+      assert.ok(requestedUrls.includes("https://api.bgm.tv/v0/subjects/218712"));
+      assert.equal(summary.scanned, 2);
+      assert.deepEqual(summary.changedEntries.map((entry) => entry.title), ["擅長捉弄人的高木同學"]);
       assert.deepEqual(summary.unresolvedEntries.map((entry) => entry.title), ["Unresolved"]);
-      assert.deepEqual(progress, ["1/3:Changed", "2/3:Unchanged", "3/3:Unresolved"]);
-      assert.deepEqual(records.get(changed)?.genres, ["喜劇"]);
+      assert.deepEqual(progress, ["1/2:擅長捉弄人的高木同學", "2/2:Unresolved"]);
+      assert.deepEqual(records.get(changed)?.genres, ["喜劇", "戀愛", "日常", "校園"]);
+      assert.equal(records.get(changed)?.classification_source_provider, "anilist");
+      assert.equal(records.get(changed)?.classification_source_id, "99468");
     } finally {
       setRequestUrlMock(null);
       aniListClassificationTest.reset();
+      bangumiSubjectTest.reset();
     }
   });
 });
