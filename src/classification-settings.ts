@@ -8,6 +8,7 @@ import type {
 } from "./classification-migration";
 
 const SETTINGS_MARKER = Symbol.for("animelist.media-classification-settings");
+export const CLASSIFICATION_RUNTIME_REVISION = "classification-v2-20260725-2";
 
 interface ClassificationSettingsHost extends Plugin {
   migrateMediaClassification?: (
@@ -33,7 +34,8 @@ function renderEntryGroup(
   const visible = entries.length ? entries : [{ title: classificationText("settings.migrate.empty"), path: "" }];
   for (const entry of visible) {
     const item = document.createElement("li");
-    item.textContent = entry.path ? `${entry.title} — ${entry.path}` : entry.title;
+    const location = entry.path ? `${entry.title} — ${entry.path}` : entry.title;
+    item.textContent = entry.reason ? `${location} — ${entry.reason}` : location;
     list.appendChild(item);
   }
   details.appendChild(list);
@@ -64,22 +66,17 @@ class ClassificationMigrationModal extends Modal {
   onOpen(): void {
     this.modalEl.classList.add("animelist-modal", "al-classification-migration-modal");
     this.contentEl.replaceChildren();
-
     const heading = document.createElement("h2");
     heading.textContent = classificationText("settings.migrate.modal.title");
     const description = document.createElement("p");
-    description.textContent = classificationText("settings.migrate.modal.desc");
+    description.textContent = `${classificationText("settings.migrate.modal.desc")} Runtime: ${CLASSIFICATION_RUNTIME_REVISION}`;
     const progress = document.createElement("progress");
     progress.className = "al-classification-migration-progress";
     progress.max = 1;
     progress.value = 0;
     const progressText = document.createElement("p");
     progressText.className = "al-classification-migration-progress-text";
-    progressText.textContent = classificationText("settings.migrate.progress", {
-      processed: 0,
-      total: 0,
-      title: "",
-    });
+    progressText.textContent = classificationText("settings.migrate.progress", { processed: 0, total: 0, title: "" });
     const results = document.createElement("div");
     results.className = "al-classification-migration-results";
     const actions = document.createElement("div");
@@ -91,40 +88,26 @@ class ClassificationMigrationModal extends Modal {
     close.addEventListener("click", () => this.close());
     actions.appendChild(close);
     this.contentEl.append(heading, description, progress, progressText, results, actions);
-
     void this.run(progress, progressText, results, close);
   }
 
-  private async run(
-    progress: HTMLProgressElement,
-    progressText: HTMLElement,
-    results: HTMLElement,
-    close: HTMLButtonElement,
-  ): Promise<void> {
+  private async run(progress: HTMLProgressElement, progressText: HTMLElement, results: HTMLElement, close: HTMLButtonElement): Promise<void> {
     try {
       if (!this.plugin.migrateMediaClassification) throw new Error("Classification cleanup is unavailable.");
       const summary = await this.plugin.migrateMediaClassification((state) => {
         progress.max = Math.max(1, state.total);
         progress.value = state.processed;
-        progressText.textContent = classificationText("settings.migrate.progress", {
-          processed: state.processed,
-          total: state.total,
-          title: state.title,
-        });
+        progressText.textContent = classificationText("settings.migrate.progress", { processed: state.processed, total: state.total, title: state.title });
       });
       progress.max = Math.max(1, summary.scanned);
       progress.value = summary.scanned;
-      progressText.textContent = classificationText("settings.migrate.notice", {
-        scanned: summary.scanned,
-        changed: summary.changed,
-        unchanged: summary.unchangedEntries.length,
-        unresolved: summary.unresolved,
-      });
+      progressText.textContent = classificationText("settings.migrate.notice", { scanned: summary.scanned, changed: summary.changed, unchanged: summary.unchangedEntries.length, unresolved: summary.unresolved });
       renderMigrationResult(results, summary);
     } catch (error) {
       console.error("AnimeList classification migration failed", error);
-      results.textContent = classificationText("settings.migrate.failed");
-      new Notice(classificationText("settings.migrate.failed"));
+      const message = error instanceof Error ? error.message : String(error);
+      results.textContent = `${classificationText("settings.migrate.failed")} ${message}`;
+      new Notice(`${classificationText("settings.migrate.failed")} ${message}`);
     } finally {
       close.disabled = false;
     }
@@ -139,6 +122,7 @@ export function installClassificationSettings(plugin: Plugin): void {
     const sections = original.call(this);
     const migration: SettingsSection = {
       heading: classificationText("settings.heading"),
+      description: `Runtime: ${CLASSIFICATION_RUNTIME_REVISION}`,
       definitions: [{
         name: classificationText("settings.migrate.name"),
         desc: classificationText("settings.migrate.desc"),
