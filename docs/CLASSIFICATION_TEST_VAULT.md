@@ -7,7 +7,7 @@ npm ci
 npm run test-vault
 ```
 
-The automated checks already validate mapping, persistence, migration compatibility, AniList throttling, and multiple representative classification combinations. This checklist covers the remaining live-provider and Obsidian UI behavior.
+The automated checks validate mapping, persistence, migration compatibility, AniList throttling, and four representative classification combinations. This checklist covers the remaining live-provider and Obsidian UI behavior.
 
 ## 1. Canonical classification on creation
 
