@@ -130,12 +130,12 @@ function renderGroupedCards(
     const section = createEl("section", { cls: "al-masterpiece-group" });
     section.dataset.groupKey = group.key;
 
-    const heading = createDiv({ cls: "al-masterpiece-group-heading" });
+    const heading = createEl("div", { cls: "al-masterpiece-group-heading" });
     const title = createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
-    const count = createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
+    const count = createEl("span", { cls: "al-masterpiece-group-count", text: String(group.items.length) });
     heading.append(title, count);
 
-    const grid = createDiv({ cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid` });
+    const grid = createEl("div", { cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid` });
     group.items.forEach((entry) => {
       let card = entry.card;
       if (usedPaths.has(entry.filePath)) {
