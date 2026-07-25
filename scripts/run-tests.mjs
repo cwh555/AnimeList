@@ -31,6 +31,7 @@ await writeFile(entryFile, [
   'import "../../tests/masterpiece-labels.test.ts";',
   'import "../../tests/score-dashboard.test.ts";',
   'import "../../tests/score-dashboard-selection.test.ts";',
+  'import "../../tests/score-dashboard-drag-scroll.test.ts";',
   "",
 ].join("\n"));
 

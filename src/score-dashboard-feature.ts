@@ -1,5 +1,6 @@
 import { Notice, TFile, setIcon, type Plugin, type WorkspaceLeaf } from "obsidian";
 import { AnimeListUI } from "./legacy";
+import { ScoreDashboardDragAutoScroller } from "./score-dashboard-drag-scroll";
 import { applyScoreDashboardChanges } from "./score-dashboard-score-service";
 import { confirmScoreDashboardClamp } from "./score-dashboard-operation-ui";
 import { ScoreDashboardRefreshGuard } from "./score-dashboard-refresh";
@@ -11,10 +12,25 @@ interface ScoreDashboardPluginMethods {
   openMediaFile(path: string): Promise<void>;
 }
 
+interface ScoreDashboardDomEventRegistrar {
+  registerDomEvent?<K extends keyof DocumentEventMap>(
+    element: Document,
+    type: K,
+    callback: (event: DocumentEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  registerDomEvent?<K extends keyof WindowEventMap>(
+    element: Window,
+    type: K,
+    callback: (event: WindowEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+}
+
 type ScoreDashboardPlugin = ScoreDashboardPluginMethods & Pick<
   Plugin,
   "app" | "registerView" | "addCommand" | "registerEvent"
->;
+> & ScoreDashboardDomEventRegistrar;
 
 let libraryUiInstalled = false;
 let openDashboard: (() => void) | null = null;
@@ -65,8 +81,33 @@ function createHost(
   };
 }
 
+function installDragAutoScroll(plugin: ScoreDashboardPlugin): void {
+  if (!plugin.registerDomEvent) return;
+  let scroller: ScoreDashboardDragAutoScroller | null = null;
+  const stop = (): void => {
+    scroller?.stop();
+    scroller = null;
+  };
+
+  plugin.registerDomEvent(document, "dragstart", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const poster = target.closest<HTMLButtonElement>(".al-score-poster");
+    const scrollContainer = poster?.closest<HTMLElement>(".animelist-score-dashboard-view");
+    if (!poster || !scrollContainer || !poster.draggable) return;
+    stop();
+    scroller = new ScoreDashboardDragAutoScroller(scrollContainer);
+    scroller.start();
+  });
+  plugin.registerDomEvent(document, "dragover", (event) => scroller?.update(event.clientY));
+  plugin.registerDomEvent(document, "drop", stop);
+  plugin.registerDomEvent(document, "dragend", stop);
+  plugin.registerDomEvent(window, "blur", stop);
+}
+
 export function installScoreDashboard(plugin: ScoreDashboardPlugin): void {
   installLibraryButton();
+  installDragAutoScroll(plugin);
   const refreshGuard = new ScoreDashboardRefreshGuard();
   const host = createHost(plugin, refreshGuard);
   openDashboard = () => void openScoreDashboard(plugin);
