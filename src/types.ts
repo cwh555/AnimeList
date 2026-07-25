@@ -15,6 +15,7 @@ export interface LibraryUiState { section: LibrarySection; type: "all" | MediaTy
 export interface AnimeListSettings {
   storageMode: StorageMode; libraryRoot: string; flatMediaFolder: string; additionalScanFolders: string[];
   coverFolder: string; templateFolder: string; timelineMaxStackDepth: number; providers: ProviderSettings;
+  googleBooksApiKey?: string;
   searchLanguages?: SearchLanguageSettings; migrations: MigrationSettings; uiState: LibraryUiState;
 }
 export interface TemplateOption { path: string; name: string; }

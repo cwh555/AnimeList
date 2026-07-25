@@ -15,6 +15,7 @@ let queueTail: Promise<void> = Promise.resolve();
 let nextRequestAt = 0;
 let sleep = (milliseconds: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 let random = (): number => Math.random();
+let apiKey = "";
 
 function asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
 function record(value: unknown): Record<string, unknown> | null {
@@ -40,6 +41,9 @@ function googleBookCandidate(value: unknown): SerialCoverCandidate | null {
     title,
     coverUrl: coverUrl.replace(/^http:/, "https:"),
     infoUrl: text(info?.infoLink),
+    categories: asArray(info?.categories).map(text).filter(Boolean),
+    authors: asArray(info?.authors).map(text).filter(Boolean),
+    publisher: text(info?.publisher),
   };
 }
 
@@ -106,6 +110,7 @@ async function requestSerialCovers(
   query: string,
   originalTitle: string,
   label: string,
+  mediaType: "manga" | "novel",
 ): Promise<RankedSerialCoverCandidate[]> {
   const parameters = new URLSearchParams({
     q: query,
@@ -113,27 +118,29 @@ async function requestSerialCovers(
     printType: "books",
     langRestrict: "ja",
     projection: "lite",
-    fields: "items(id,volumeInfo(title,subtitle,infoLink,imageLinks))",
+    fields: "items(id,volumeInfo(title,subtitle,authors,publisher,categories,infoLink,imageLinks))",
   });
+  if (apiKey) parameters.set("key", apiKey);
   const payload = record(await requestWithBackoff(`https://www.googleapis.com/books/v1/volumes?${parameters.toString()}`));
   const candidates = asArray(payload?.items)
     .map(googleBookCandidate)
     .filter((candidate): candidate is SerialCoverCandidate => candidate !== null);
-  return rankSerialCoverCandidates(candidates, originalTitle, label);
+  return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
 }
 
 export async function searchSerialCovers(
   query: string,
   originalTitle: string,
   label: string,
+  mediaType: "manga" | "novel",
 ): Promise<RankedSerialCoverCandidate[]> {
-  const key = query.normalize("NFKC").trim();
+  const key = `${mediaType}:${query.normalize("NFKC").trim()}`;
   const cached = resultCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   const pending = inFlight.get(key);
   if (pending !== undefined) return pending;
 
-  const request = enqueue(() => requestSerialCovers(query, originalTitle, label))
+  const request = enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType))
     .then((value) => {
       resultCache.set(key, {
         expiresAt: Date.now() + (value.length ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS),
@@ -159,4 +166,16 @@ export function configureSerialCoverProviderForTests(options: {
 }): void {
   if (options.sleep) sleep = options.sleep;
   if (options.random) random = options.random;
+}
+
+
+export function configureSerialCoverProvider(options: { apiKey?: string }): void {
+  const nextKey = options.apiKey?.trim() ?? "";
+  if (nextKey === apiKey) return;
+  apiKey = nextKey;
+  clearSerialCoverProviderCache();
+}
+
+export function hasSerialCoverApiKey(): boolean {
+  return Boolean(apiKey);
 }

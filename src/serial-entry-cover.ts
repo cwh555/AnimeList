@@ -1,4 +1,4 @@
-import type { NovelVolumeEntry } from "./types";
+import type { MediaType, NovelVolumeEntry } from "./types";
 
 export interface SerialCoverCandidate {
   provider: string;
@@ -6,6 +6,9 @@ export interface SerialCoverCandidate {
   title: string;
   coverUrl: string;
   infoUrl: string;
+  categories?: string[];
+  authors?: string[];
+  publisher?: string;
 }
 
 export interface RankedSerialCoverCandidate extends SerialCoverCandidate {
@@ -67,6 +70,7 @@ export function scoreSerialCoverCandidate(
   candidate: SerialCoverCandidate,
   originalTitle: string,
   label: string,
+  mediaType?: Extract<MediaType, "manga" | "novel">,
 ): number {
   if (!candidate.coverUrl) return Number.NEGATIVE_INFINITY;
   const titleKey = comparable(originalTitle);
@@ -79,6 +83,17 @@ export function scoreSerialCoverCandidate(
   if (labelPattern(label).test(clean(candidate.title))) score += 35;
   else score -= 45;
   if (/限定|特装|特裝|special|limited|box|セット|合本|合訂/i.test(candidate.title)) score -= 18;
+  const categories = (candidate.categories ?? []).join(" ").toLocaleLowerCase();
+  const metadata = [categories, candidate.publisher ?? "", ...(candidate.authors ?? [])].join(" ").toLocaleLowerCase();
+  const lightNovel = /light\s*novel|ライトノベル|文庫/.test(metadata);
+  const comics = /manga|comics|graphic novels|コミック|漫画/.test(metadata);
+  if (mediaType === "novel") {
+    if (lightNovel) score += 22;
+    else if (comics) score -= 28;
+  } else if (mediaType === "manga") {
+    if (comics && !lightNovel) score += 18;
+    else if (lightNovel) score -= 18;
+  }
   return score;
 }
 
@@ -86,11 +101,12 @@ export function rankSerialCoverCandidates(
   candidates: SerialCoverCandidate[],
   originalTitle: string,
   label: string,
+  mediaType?: Extract<MediaType, "manga" | "novel">,
 ): RankedSerialCoverCandidate[] {
   return candidates
     .map((candidate) => ({
       ...candidate,
-      score: scoreSerialCoverCandidate(candidate, originalTitle, label),
+      score: scoreSerialCoverCandidate(candidate, originalTitle, label, mediaType),
     }))
     .filter((candidate) => Number.isFinite(candidate.score))
     .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title));

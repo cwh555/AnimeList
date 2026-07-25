@@ -12,7 +12,7 @@ import {
   missingSerialCoverEntryCount,
   type MissingSerialCoverRecord,
 } from "./serial-cover-migration";
-import { searchSerialCovers } from "./serial-cover-provider";
+import { hasSerialCoverApiKey, searchSerialCovers } from "./serial-cover-provider";
 import { serialCoverText } from "./serial-cover-text";
 import type { ExternalMediaResult, MediaType } from "./types";
 
@@ -154,7 +154,7 @@ export async function findSerialCoverCandidates(
   label: string,
 ): Promise<RankedSerialCoverCandidate[]> {
   const query = serialCoverQuery(context.originalTitle, label);
-  return query ? searchSerialCovers(query, context.originalTitle, label) : [];
+  return query ? searchSerialCovers(query, context.originalTitle, label, context.mediaType) : [];
 }
 
 export async function downloadSelectedSerialCover(
@@ -214,6 +214,7 @@ export async function loadMissingSerialCovers(
   onProgress?: (progress: SerialCoverMigrationProgress) => void,
   signal?: AbortSignal,
 ): Promise<SerialCoverMigrationSummary> {
+  if (!hasSerialCoverApiKey()) throw new Error(serialCoverText("settings.apiKeyRequired"));
   const records: MissingSerialCoverRecord[] = [];
   const files = new Map<string, TFile>();
   const details: SerialCoverMigrationDetail[] = [];

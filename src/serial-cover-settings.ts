@@ -4,11 +4,14 @@ import type {
   SerialCoverMigrationProgress,
   SerialCoverMigrationSummary,
 } from "./serial-cover-service";
+import { configureSerialCoverProvider } from "./serial-cover-provider";
 import { serialCoverText } from "./serial-cover-text";
 
 const SETTINGS_MARKER = Symbol.for("animelist.serial-cover-settings");
 
 interface SerialCoverSettingsHost extends Plugin {
+  settings: { googleBooksApiKey?: string };
+  saveSettings(): Promise<void>;
   loadMissingSerialCovers?: (
     onProgress?: (progress: SerialCoverMigrationProgress) => void,
     signal?: AbortSignal,
@@ -40,6 +43,20 @@ export function installSerialCoverSettings(plugin: Plugin): void {
     const migration: SettingsSection = {
       heading: serialCoverText("settings.heading"),
       definitions: [{
+        name: serialCoverText("settings.apiKeyName"),
+        desc: serialCoverText("settings.apiKeyDesc"),
+        render: (setting: Setting) => {
+setting.addText((input) => {
+  input.setPlaceholder(serialCoverText("settings.apiKeyPlaceholder"));
+  input.setValue(this.plugin.settings.googleBooksApiKey ?? "");
+  input.onChange(async (value) => {
+    this.plugin.settings.googleBooksApiKey = value.trim();
+    configureSerialCoverProvider({ apiKey: this.plugin.settings.googleBooksApiKey });
+    await this.plugin.saveSettings();
+  });
+});
+        },
+      }, {
         name: serialCoverText("settings.name"),
         desc: serialCoverText("settings.desc"),
         render: (setting: Setting) => {
