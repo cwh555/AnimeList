@@ -7,6 +7,12 @@ export interface SpecialLabelState {
   masterpieceLabels: string[];
 }
 
+export interface MasterpieceGroup<T> {
+  key: string;
+  label: string;
+  items: T[];
+}
+
 export function normalizeSpecialLabelMode(value: unknown): SpecialLabelMode {
   return value === "masterpiece" ? "masterpiece" : "favorite";
 }
@@ -63,6 +69,25 @@ export function matchesSpecialLabelFilter(
   return typeof item === "object"
     && item !== null
     && Reflect.get(item, "favorite") === true;
+}
+
+export function groupMasterpieceItems<T extends {
+  favorite?: boolean;
+  masterpieceLabels?: unknown;
+}>(items: T[]): MasterpieceGroup<T>[] {
+  const groups = new Map<string, MasterpieceGroup<T>>();
+  for (const item of items) {
+    if (item.favorite !== true) continue;
+    for (const label of labelsForMasterpieceEnable(item.masterpieceLabels)) {
+      const key = label.toLocaleLowerCase();
+      const group = groups.get(key) ?? { key, label, items: [] };
+      group.items.push(item);
+      groups.set(key, group);
+    }
+  }
+  return [...groups.values()].sort((left, right) => (
+    left.label.localeCompare(right.label, "zh-Hant", { numeric: true, sensitivity: "base" })
+  ));
 }
 
 export function collectMasterpieceLabels(items: Array<{
