@@ -98,9 +98,9 @@ const FIXTURES = [
   { folder: "Novel", file: "13-novel-completed.md", title: "TEST 小說－已完成全滿進度條", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 6, unit: "volume", score: 9.5, startedAt: "2026-01-01", completedAt: "2026-03-01", volumeLog: completedVolumes(6) },
 
   { folder: "Special", file: "14-special-legacy-favorite-completed.md", title: "SPECIAL 01－舊版最愛／已完成", mediaType: "anime", format: "tv", status: "completed", releaseStatus: "finished", progress: 12, total: 12, unit: "episode", score: 9, favorite: true, completedAt: "2026-07-01", genre: "SPECIAL 驗證", preservationMarker: "legacy-favorite-completed" },
-  { folder: "Special", file: "15-special-multi-label-ongoing.md", title: "SPECIAL 02－多分類最愛／進行中", mediaType: "anime", format: "tv", status: "ongoing", releaseStatus: "releasing", progress: 4, total: 12, unit: "episode", favorite: true, masterpieceLabels: ["戀愛 masterpiece", "年度 masterpiece"], genre: "SPECIAL 驗證", preservationMarker: "multi-label-ongoing" },
-  { folder: "Special", file: "16-special-shared-label-planned.md", title: "SPECIAL 03－共享分類最愛／願望清單", mediaType: "manga", format: "manga", status: "planned", releaseStatus: "releasing", progress: 0, unit: "chapter", favorite: true, masterpieceLabels: ["戀愛 masterpiece"], genre: "SPECIAL 驗證", preservationMarker: "shared-label-planned" },
-  { folder: "Special", file: "17-special-retained-label-completed.md", title: "SPECIAL 04－非最愛保留分類／已完成", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 3, unit: "volume", favorite: false, masterpieceLabels: ["保留分類 masterpiece"], score: 8, completedAt: "2026-07-02", genre: "SPECIAL 驗證", preservationMarker: "retained-label-completed" },
+  { folder: "Special", file: "15-special-multi-label-ongoing.md", title: "SPECIAL 02－多分類最愛／進行中", mediaType: "anime", format: "tv", status: "ongoing", releaseStatus: "releasing", progress: 4, total: 12, unit: "episode", favorite: true, masterpieceLabels: ["戀愛", "年度"], genre: "SPECIAL 驗證", preservationMarker: "multi-label-ongoing" },
+  { folder: "Special", file: "16-special-shared-label-planned.md", title: "SPECIAL 03－共享分類最愛／願望清單", mediaType: "manga", format: "manga", status: "planned", releaseStatus: "releasing", progress: 0, unit: "chapter", favorite: true, masterpieceLabels: ["戀愛"], genre: "SPECIAL 驗證", preservationMarker: "shared-label-planned" },
+  { folder: "Special", file: "17-special-retained-label-completed.md", title: "SPECIAL 04－非最愛保留分類／已完成", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 3, unit: "volume", favorite: false, masterpieceLabels: ["保留分類"], score: 8, completedAt: "2026-07-02", genre: "SPECIAL 驗證", preservationMarker: "retained-label-completed" },
   { folder: "Special", file: "18-special-control-planned.md", title: "SPECIAL 05－一般作品／願望清單", mediaType: "anime", format: "tv", status: "planned", releaseStatus: "finished", progress: 0, total: 12, unit: "episode", favorite: false, genre: "SPECIAL 驗證", preservationMarker: "control-planned" },
 ];
 
@@ -142,37 +142,34 @@ Keep **Special label mode = Favorite** in AnimeList settings.
 - Toggle the star on SPECIAL 05 on, then off. Favorite count must change **3 → 4 → 3**.
 - Open SPECIAL 04 and confirm it is not favorite even though its custom \`masterpiece_labels\` value exists.
 
-## 3. Masterpiece mode and reusable categories
+## 3. Masterpiece mode operation UI
 
 Switch **Special label mode = Masterpiece** in AnimeList settings.
 
+- Settings must show only the Favorite/Masterpiece mode selector. It must not show category inventory, rename, delete, or add controls.
 - The list button changes to **masterpiece** but remains in the same row and remains mutually exclusive.
-- SPECIAL 01 remains included and behaves as the virtual default \`masterpiece\` category.
-- SPECIAL 02 shows both **戀愛 masterpiece** and **年度 masterpiece**.
-- SPECIAL 03 reuses **戀愛 masterpiece**.
-- Click SPECIAL 05's star, select two existing categories, save, and confirm both labels appear. Remove it afterward; the list returns to 3 titles.
+- SPECIAL 01 remains included under the virtual default \`masterpiece\` category.
+- SPECIAL 02 appears in both **戀愛** and **年度**; SPECIAL 03 reuses **戀愛**.
+- Click SPECIAL 05's star. The category modal must show existing categories and the new-category input on the same operation surface.
+- The **新增類別** label must sit directly above its full-width input without a large horizontal gap.
+- The modal must not contain a separate **移除 masterpiece** button.
+- Select two categories and save. Confirm SPECIAL 05 appears in both sections.
+- Open the same modal again, uncheck every category, and save. SPECIAL 05 must be removed from masterpiece and the unique count must return to 3.
 - Switch Masterpiece → Favorite → Masterpiece. SPECIAL 02 and SPECIAL 03 must retain their categories.
 
-## 4. Rename/delete propagation and content preservation
+## 4. Edit modal consistency
 
-Before editing categories, open these notes in source mode and note the marker in frontmatter and body:
+- Open SPECIAL 05 and click **Edit** while Masterpiece mode is active.
+- The edit modal must show **加入 masterpiece** or **編輯 masterpiece**, not the Favorite checkbox.
+- Clicking that control must open the same category modal described above.
+- After changing categories, save an unrelated edit field and confirm the category selection is not overwritten.
 
-- [[${TEST_FIXTURE_ROOT}/Special/15-special-multi-label-ongoing|SPECIAL 02]]
-- [[${TEST_FIXTURE_ROOT}/Special/16-special-shared-label-planned|SPECIAL 03]]
-- [[${TEST_FIXTURE_ROOT}/Special/17-special-retained-label-completed|SPECIAL 04]]
+## 5. Content preservation and existing regressions
 
-Then in settings:
-
-1. Rename **戀愛 masterpiece** to **戀愛精選 masterpiece**. SPECIAL 02 and SPECIAL 03 must both update.
-2. Delete **年度 masterpiece**. It must disappear from SPECIAL 02 only.
-3. Confirm SPECIAL 04's non-favorite retained category still exists.
-4. Confirm every \`fixture_preservation_marker\` and every \`PRESERVE BODY\` line is unchanged.
-5. Run \`npm run test-vault:fixtures\` afterward to restore all generated notes.
-
-## 5. Existing progress/layout regression checks
-
+- Confirm every \`fixture_preservation_marker\` and every \`PRESERVE BODY\` line remains unchanged after category operations.
 - Switch the library to list view once and verify progress tracks still use the available card width.
 - Open [[${TEST_FIXTURE_ROOT}/Novel/10-novel-add-volume|TEST 小說－新增卷數與日期排版]], click **Edit**, add volume 15, and verify the row remains visible and uses the modal width.
+- Run \`npm run test-vault:fixtures\` afterward to restore all generated notes.
 `;
 }
 
