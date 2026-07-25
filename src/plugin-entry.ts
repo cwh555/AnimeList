@@ -7,6 +7,7 @@ import { installMasterpieceGroupedView } from "./masterpiece-grouped-view";
 import { installMasterpieceOperationUi } from "./masterpiece-operation-ui";
 import { installMasterpieceLabels } from "./masterpiece-ui";
 import { installRatingUi } from "./rating-ui";
+import { installScoreDashboard } from "./score-dashboard-feature";
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
   async onload(): Promise<void> {
@@ -17,5 +18,6 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     installMasterpieceOperationUi(this);
     installMasterpieceEditUi(this);
     installMasterpieceGroupedView(this);
+    installScoreDashboard(this);
   }
 }
