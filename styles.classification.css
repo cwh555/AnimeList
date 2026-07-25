@@ -92,14 +92,17 @@
   overflow-wrap: anywhere;
 }
 
-.al-classification-migration-status {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  width: 100%;
+.al-classification-migration-modal {
+  width: min(760px, calc(100vw - 40px));
 }
 
-.al-classification-migration-status progress {
+.al-classification-migration-modal .modal-content {
+  display: grid;
+  gap: 12px;
+}
+
+.al-classification-migration-progress {
+  height: 8px;
   width: 100%;
 }
 
@@ -110,9 +113,21 @@
   font-size: var(--font-ui-small);
 }
 
+.al-classification-migration-results {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  max-height: min(52vh, 520px);
+  overflow: auto;
+  padding: 0 12px;
+}
+
 .al-classification-migration-group {
   border-top: 1px solid var(--background-modifier-border);
-  padding: 8px 0;
+  padding: 10px 0;
+}
+
+.al-classification-migration-group:first-of-type {
+  border-top: 0;
 }
 
 .al-classification-migration-group summary {
@@ -123,7 +138,7 @@
 
 .al-classification-migration-group ul {
   margin-bottom: 0;
-  max-height: 180px;
+  max-height: 220px;
   overflow: auto;
   padding-inline-start: 22px;
 }
