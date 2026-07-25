@@ -15,6 +15,7 @@ const MIGRATION_MARKER = Symbol.for("animelist.media-classification-migration");
 export interface ClassificationMigrationEntry {
   path: string;
   title: string;
+  reason?: string;
 }
 
 export interface ClassificationMigrationProgress {
@@ -66,6 +67,9 @@ function mediaTypeValue(value: unknown): MediaType | null {
 function releaseStatusValue(value: unknown): ReleaseStatus {
   return value === "releasing" || value === "finished" || value === "hiatus" || value === "cancelled" ? value : "unknown";
 }
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : stringValue(value) || "Unknown error";
+}
 
 async function readCurrentFrontmatter(
   plugin: ClassificationMigrationHost,
@@ -96,10 +100,7 @@ export function migrationLookupResult(frontmatter: Record<string, unknown>, base
     season: Number(frontmatter.season ?? 0) === 1 || Number(frontmatter.season ?? 0) === 4
       || Number(frontmatter.season ?? 0) === 7 || Number(frontmatter.season ?? 0) === 10
       ? Number(frontmatter.season) as 1 | 4 | 7 | 10 : "",
-    genres: [],
-    tags: [],
-    rawGenres: stringArray(frontmatter.source_genres),
-    rawTags: [],
+    genres: [], tags: [], rawGenres: stringArray(frontmatter.source_genres), rawTags: [],
     people: stringArray(frontmatter.studios ?? frontmatter.authors ?? frontmatter.creators ?? frontmatter.people),
     platforms: stringArray(frontmatter.platforms),
     sourceUrl: stringArray(frontmatter.source_urls)[0] ?? "",
@@ -112,20 +113,11 @@ export function migrationLookupResult(frontmatter: Record<string, unknown>, base
 }
 
 export function applyCanonicalMigrationMetadata(
-  frontmatter: Record<string, unknown>,
-  canonical: ExternalMediaResult,
-  fileBasename = "",
+  frontmatter: Record<string, unknown>, canonical: ExternalMediaResult, fileBasename = "",
 ): ReturnType<typeof rebuildClassificationFrontmatter> {
   const legacyTags = classificationValues(frontmatter.tags);
-  if (legacyTags.length && frontmatter.classification_legacy_tags == null) {
-    frontmatter.classification_legacy_tags = [...legacyTags];
-  }
-  const result = rebuildClassificationFrontmatter(
-    frontmatter,
-    { genres: canonical.genres, tags: [] },
-    canonical.sourceId,
-    fileBasename,
-  );
+  if (legacyTags.length && frontmatter.classification_legacy_tags == null) frontmatter.classification_legacy_tags = [...legacyTags];
+  const result = rebuildClassificationFrontmatter(frontmatter, { genres: canonical.genres, tags: [] }, canonical.sourceId, fileBasename);
   delete frontmatter.tags;
   if (canonical.year !== "" && canonical.year != null) frontmatter.year = canonical.year;
   if (canonical.season !== "" && canonical.season != null) frontmatter.season = canonical.season;
@@ -134,26 +126,21 @@ export function applyCanonicalMigrationMetadata(
 }
 
 function emptySummary(): ClassificationMigrationSummary {
-  return {
-    scanned: 0,
-    changed: 0,
-    resolved: 0,
-    unresolved: 0,
-    removed: 0,
-    moved: 0,
-    changedEntries: [],
-    unchangedEntries: [],
-    unresolvedEntries: [],
-  };
+  return { scanned: 0, changed: 0, resolved: 0, unresolved: 0, removed: 0, moved: 0, changedEntries: [], unchangedEntries: [], unresolvedEntries: [] };
 }
 
 function changedByMigration(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
-  const tracked = [
-    "genres", "media_tags", "tags", "classification_version", "classification_source_provider",
-    "classification_source_id", "classification_legacy_genres", "classification_legacy_media_tags",
-    "classification_legacy_tags", "year", "season",
-  ];
+  const tracked = ["genres", "media_tags", "tags", "classification_version", "classification_source_provider", "classification_source_id", "classification_legacy_genres", "classification_legacy_media_tags", "classification_legacy_tags", "year", "season"];
   return tracked.some((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
+}
+
+function healthProbe(): ExternalMediaResult {
+  return { provider: "anilist", sourceId: "1", title: "Cowboy Bebop", originalTitle: "カウボーイビバップ", romajiTitle: "Cowboy Bebop", mediaType: "anime", format: "tv", total: 26, unit: "episode", year: 1998, season: 4, genres: [], tags: [], rawGenres: [], rawTags: [], people: [], platforms: [], sourceUrl: "https://anilist.co/anime/1", coverUrl: "", summary: "", externalScore: null, releaseStatus: "finished" };
+}
+
+async function assertAniListAvailable(): Promise<void> {
+  const result = await fetchAniListClassifications([healthProbe()], USER_AGENT);
+  if (!result.get("1")?.genres.length) throw new Error("AniList health check returned no classifications for media ID 1.");
 }
 
 export async function migrateMediaClassification(
@@ -162,7 +149,6 @@ export async function migrateMediaClassification(
 ): Promise<ClassificationMigrationSummary> {
   const summary = emptySummary();
   const work: MigrationWork[] = [];
-
   for (const file of getScopedMarkdownFiles(plugin.app, plugin.getScanFolders())) {
     const frontmatter = await readCurrentFrontmatter(plugin, file);
     if (!frontmatter.media_type || frontmatter.animelist_test_fixture === true) continue;
@@ -170,17 +156,15 @@ export async function migrateMediaClassification(
     work.push({ file, item, lookup: migrationLookupResult(frontmatter, file.basename) });
   }
   summary.scanned = work.length;
+  if (!work.length) return summary;
+  await assertAniListAvailable();
 
-  const direct = work.filter((entry): entry is MigrationWork & { lookup: ExternalMediaResult } => (
-    entry.lookup !== null
-    && entry.lookup.provider.toLocaleLowerCase() === "anilist"
-    && /^\d+$/.test(entry.lookup.sourceId)
-  ));
+  const direct = work.filter((entry): entry is MigrationWork & { lookup: ExternalMediaResult } => entry.lookup !== null && entry.lookup.provider.toLocaleLowerCase() === "anilist" && /^\d+$/.test(entry.lookup.sourceId));
   let directMap = new Map<string, AniListClassification>();
   try {
     directMap = await fetchAniListClassifications(direct.map(({ lookup }) => lookup), USER_AGENT);
   } catch (error) {
-    console.warn("AnimeList direct classification batch lookup failed", error);
+    throw new Error(`AniList direct classification lookup failed: ${errorMessage(error)}`);
   }
 
   const canonicalByPath = new Map<string, ExternalMediaResult>();
@@ -192,41 +176,37 @@ export async function migrateMediaClassification(
   let processed = 0;
   for (const entry of work) {
     let canonical = canonicalByPath.get(entry.file.path);
+    let reason = "No reliable AniList match was found.";
     if (entry.lookup && !canonical) {
       try {
         const resolved = await resolveClassifiedMediaResult(plugin, entry.lookup);
-        if (resolved.provider.toLocaleLowerCase() === "anilist" && resolved.genres.length) canonical = resolved;
+        if (resolved.provider.toLocaleLowerCase() !== "anilist") reason = "No reliable AniList work matched the saved title and metadata.";
+        else if (!resolved.genres.length) reason = `AniList ID ${resolved.sourceId || "unknown"} returned no supported classifications.`;
+        else canonical = resolved;
       } catch (error) {
-        console.warn(`AnimeList classification cleanup failed to resolve ${entry.file.path}`, error);
+        reason = `AniList lookup failed: ${errorMessage(error)}`;
       }
     }
 
     if (!entry.lookup || !canonical) {
       summary.unresolved += 1;
-      summary.unresolvedEntries.push(entry.item);
+      summary.unresolvedEntries.push({ ...entry.item, reason: entry.lookup ? reason : "The note has an unsupported or missing media_type." });
     } else {
-      const resolvedCanonical = canonical;
       summary.resolved += 1;
       let didChange = false;
       await plugin.app.fileManager.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
         const before = structuredClone(frontmatter);
-        const result = applyCanonicalMigrationMetadata(frontmatter, resolvedCanonical, entry.file.basename);
+        const result = applyCanonicalMigrationMetadata(frontmatter, canonical, entry.file.basename);
         didChange = changedByMigration(before, frontmatter);
         summary.removed += result.removed.length + classificationValues(before.tags).length;
         summary.moved += result.moved.length;
       });
-      if (didChange) {
-        summary.changed += 1;
-        summary.changedEntries.push(entry.item);
-      } else {
-        summary.unchangedEntries.push(entry.item);
-      }
+      if (didChange) { summary.changed += 1; summary.changedEntries.push(entry.item); }
+      else summary.unchangedEntries.push(entry.item);
     }
-
     processed += 1;
     onProgress({ processed, total: work.length, title: entry.item.title });
   }
-
   if (summary.changed) plugin.refreshViews();
   return summary;
 }
