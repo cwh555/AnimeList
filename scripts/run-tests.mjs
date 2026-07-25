@@ -33,6 +33,7 @@ await writeFile(entryFile, [
   'import "../../tests/anilist-rate-limit.test.ts";',
   'import "../../tests/classification-persistence.test.ts";',
   'import "../../tests/classification-integration.test.ts";',
+  'import "../../tests/classification-search-runtime.test.ts";',
   "",
 ].join("\n"));
 
