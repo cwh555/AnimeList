@@ -19,6 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npx eslint src/classification-ui.ts --max-warnings 0
+      - run: npx eslint src/classification-resolution.ts --max-warnings 0
+      - run: npx eslint src/classification-search-runtime.ts --max-warnings 0
+      - run: npx eslint src/classification-migration.ts --max-warnings 0
+      - run: npx eslint src/classification-settings.ts --max-warnings 0
+      - run: npx eslint tests/classification-integration.test.ts --max-warnings 0
       - run: npm run lint
       - run: node scripts/run-tests.mjs
       - run: node scripts/check-serial-reading-ui.mjs
