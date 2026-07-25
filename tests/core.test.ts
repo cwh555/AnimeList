@@ -330,23 +330,33 @@ describe("serial progress and novel volume records", () => {
     assert.equal(progressRatio(6, 12, "episode"), 0.5);
   });
 
-  it("stores only volume labels and reading dates", () => {
+  it("preserves optional cover metadata and unrelated serial-entry fields", () => {
     const entries = normalizeVolumeLog([{
       label: "1",
       started_at: "2026-01-01",
       completed_at: "2026-01-02",
-      cover: "unpublished-test-value.jpg",
+      cover: "volume-1.jpg",
+      cover_provider: "Google Books",
+      cover_source_id: "book-1",
       isbn: "9780000000000",
     }]);
     assert.deepEqual(entries, [{
       label: "1",
       startedAt: "2026-01-01",
       completedAt: "2026-01-02",
+      cover: "volume-1.jpg",
+      coverProvider: "Google Books",
+      coverSourceId: "book-1",
+      extra: { isbn: "9780000000000" },
     }]);
     assert.deepEqual(serializeVolumeLog(entries), [{
+      isbn: "9780000000000",
       label: "1",
       started_at: "2026-01-01",
       completed_at: "2026-01-02",
+      cover: "volume-1.jpg",
+      cover_provider: "Google Books",
+      cover_source_id: "book-1",
     }]);
   });
 
@@ -387,10 +397,14 @@ describe("serial progress and novel volume records", () => {
     assert.doesNotMatch(markdown, /^completed_at:/m);
   });
 
-  it("uses the series cover and includes the volume number in timeline text", () => {
+  it("prefers the serial-entry cover and falls back to the series cover", () => {
     const volumeLog = normalizeVolumeLog([{
       label: "14",
       completed_at: "2026-07-20",
+      cover: "volume-14.jpg",
+    }, {
+      label: "15",
+      completed_at: "2026-07-21",
     }]);
     const entries = expandTimelineEntries([{
       title: "藥屋少女的呢喃",
@@ -423,7 +437,8 @@ describe("serial progress and novel volume records", () => {
     );
     assert.equal(entries[0].seriesTitle, "藥屋少女的呢喃");
     assert.equal(entries[0].volumeLabel, "14");
-    assert.equal(entries[0].cover, "series.jpg");
+    assert.equal(entries[0].cover, "volume-14.jpg");
+    assert.equal(entries[1].cover, "series.jpg");
   });
 
 
@@ -484,23 +499,21 @@ describe("serial progress and novel volume records", () => {
 });
 
 
-describe("novel volume editor UI", () => {
-  it("keeps volume-number sorting and navigation without any volume-cover controls", () => {
+describe("serial-entry cover UI", () => {
+  it("keeps cover logic outside legacy and places the thumbnail on the row right side", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.serial-cover.css"), "utf8");
 
-    assert.match(legacySource, /entries\.sort\(\(left, right\) => compareVolumeLabels/);
-    assert.match(legacySource, /scrollIntoView\(\{ behavior: "smooth", block: "center", inline: "nearest" \}\)/);
-    assert.match(legacySource, /labelInput\.focus\(\{ preventScroll: true \}\)/);
-    assert.match(legacySource, /completedAt: todayString\(\)/);
-    assert.match(legacySource, /entry\.completedAt \|\| todayString\(\)/);
-    assert.doesNotMatch(legacySource, /搜尋封面候選|更換封面候選|searchNovelVolumeCovers|VolumeCoverSearchModal/);
-    assert.doesNotMatch(stylesheet, /al-volume-cover|animelist-volume-cover-modal/);
+    assert.doesNotMatch(legacySource, /searchSerialCovers|SerialCover/);
+    assert.match(featureSource, /serialCoverQuery\(context\.originalTitle, label\)/);
+    assert.match(stylesheet, /\.animelist-modal \.al-volume-row \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
+    assert.match(stylesheet, /\.al-serial-cover-panel/);
   });
 
-  it("does not ship a per-volume cover provider module or credentials", () => {
-    assert.equal(PathExists(path.join(process.cwd(), "src/volume-covers.ts")), false);
-    assert.equal("novelCovers" in DEFAULT_SETTINGS, false);
+  it("does not store provider credentials in settings", () => {
+    assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
+    assert.equal("serialCoverApiKey" in DEFAULT_SETTINGS, false);
   });
 });
 

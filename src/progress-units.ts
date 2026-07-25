@@ -1,3 +1,4 @@
+import { normalizeSerialEntryRecord, serializeSerialEntryRecord } from "./serial-entry-record";
 import type { MediaType, NovelVolumeEntry, ProgressValue } from "./types";
 
 export type ReadingProgressUnit = "chapter" | "season" | "volume";
@@ -9,15 +10,7 @@ const INTEGER_LABEL_PATTERN = /^\d+$/;
 const VOLUME_LABEL_PATTERN = /^(?:\d+(?:\.5)?|\.5)$/;
 
 function primitiveText(value: unknown): string {
-  return typeof value === "string" || typeof value === "number"
-    ? String(value)
-    : "";
-}
-
-function recordValue(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
 export function isReadingProgressUnit(value: unknown): value is ReadingProgressUnit {
@@ -82,16 +75,10 @@ export function normalizeSerialLog(
   const entries: NovelVolumeEntry[] = [];
   const seen = new Set<string>();
   for (const raw of value) {
-    const record = recordValue(raw);
-    if (!record) continue;
-    const label = normalizeSerialLabel(record.label ?? record.volume, unit);
-    if (!label || seen.has(label)) continue;
-    seen.add(label);
-    entries.push({
-      label,
-      startedAt: primitiveText(record.started_at ?? record.startedAt),
-      completedAt: primitiveText(record.completed_at ?? record.completedAt),
-    });
+    const entry = normalizeSerialEntryRecord(raw, (label) => normalizeSerialLabel(label, unit));
+    if (!entry || seen.has(entry.label)) continue;
+    seen.add(entry.label);
+    entries.push(entry);
   }
   return entries.sort((left, right) => compareSerialLabels(left.label, right.label, unit));
 }
@@ -99,20 +86,14 @@ export function normalizeSerialLog(
 export function serializeSerialLog(
   entries: NovelVolumeEntry[],
   unit: ReadingProgressUnit,
-): Array<Record<string, string>> {
-  return normalizeSerialLog(entries, unit).map((entry) => {
-    const serialized: Record<string, string> = { label: entry.label };
-    if (entry.startedAt) serialized.started_at = entry.startedAt;
-    if (entry.completedAt) serialized.completed_at = entry.completedAt;
-    return serialized;
-  });
+): Array<Record<string, unknown>> {
+  return normalizeSerialLog(entries, unit).map(serializeSerialEntryRecord);
 }
 
 export function highestCompletedSerialLabel(
   entries: NovelVolumeEntry[],
   unit: ReadingProgressUnit,
 ): string | null {
-  const completed = normalizeSerialLog(entries, unit)
-    .filter((entry) => Boolean(entry.completedAt));
+  const completed = normalizeSerialLog(entries, unit).filter((entry) => Boolean(entry.completedAt));
   return completed.length ? completed[completed.length - 1].label : null;
 }
