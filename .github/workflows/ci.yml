@@ -18,19 +18,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Node tests
-        run: node scripts/run-tests.mjs
-      - name: Serial reading UI check
-        run: node scripts/check-serial-reading-ui.mjs
-      - name: Test Vault fixture check
-        run: node scripts/check-test-vault-fixtures.mjs
-      - name: Community check
-        run: npm run community:check
-      - name: Production build
-        run: npm run build
-      - name: Release check
-        run: npm run release:check
+      - run: npm run check
+      - run: npm run release:check
