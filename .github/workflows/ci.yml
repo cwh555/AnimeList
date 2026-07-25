@@ -29,7 +29,7 @@ jobs:
         if: steps.test.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file test.log
+        run: tail -n 100 test.log > test-tail.log && gh pr comment ${{ github.event.pull_request.number }} --body-file test-tail.log
       - name: Fail after test diagnostics
         if: steps.test.outcome == 'failure'
         run: exit 1
