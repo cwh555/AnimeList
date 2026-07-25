@@ -22,13 +22,13 @@ const pendingEditClassification = new Map<string, ClassificationSelection>();
 
 interface RuntimePlugin extends Plugin {
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
+  openAddModal(initialType?: MediaType): void;
   openEditModal(path: string): void;
   collectMediaItems(source?: string): MediaItem[];
-  prepareClassificationCreate?(result: ExternalMediaResult): Promise<ExternalMediaResult>;
-  installClassificationCreateFields?(modal: ClassificationModal, result: ExternalMediaResult): void;
 }
 
 interface ClassificationModal extends Modal {
+  renderDetails?: (result: ExternalMediaResult) => Promise<void>;
   file?: TFile;
 }
 
@@ -230,12 +230,19 @@ function installLibraryClassification(plugin: RuntimePlugin): void {
 }
 
 function installAddIntegration(plugin: RuntimePlugin): void {
-  plugin.prepareClassificationCreate = (result) => prepareClassificationCreate(plugin, result);
-  plugin.installClassificationCreateFields = (modal, result) => {
-    const automatic = automaticClassificationForResult(result);
-    const form = modal.contentEl.querySelector(".al-media-form");
-    if (form) installMetadata(form, result);
-    installPickers(modal, automatic, (next) => setClassificationCreateDraft(result, next));
+  const originalAdd = plugin.openAddModal.bind(plugin);
+  plugin.openAddModal = (initialType = "anime") => {
+    const modal = captureModal(() => originalAdd(initialType));
+    if (!modal?.renderDetails) return;
+    const originalRenderDetails = modal.renderDetails.bind(modal);
+    modal.renderDetails = async (selectedResult) => {
+      const result = await prepareClassificationCreate(plugin, selectedResult);
+      await originalRenderDetails(result);
+      const automatic = automaticClassificationForResult(result);
+      const form = modal.contentEl.querySelector(".al-media-form");
+      if (form) installMetadata(form, result);
+      installPickers(modal, automatic, (next) => setClassificationCreateDraft(result, next));
+    };
   };
 }
 
