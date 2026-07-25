@@ -64,13 +64,11 @@ function decorateEditModal(plugin: MasterpiecePlugin, path: string): void {
       });
   });
 
-  const file = plugin.app.vault.getAbstractFileByPath(path);
-  const eventRef = plugin.app.metadataCache.on("changed", (changedFile) => {
-    if (changedFile.path === file?.path) sync();
-  });
+  const view = modal.ownerDocument.defaultView;
+  const syncTimer = view?.setInterval(sync, 120);
   const observer = new MutationObserver(() => {
     if (modal.isConnected) return;
-    plugin.app.metadataCache.offref(eventRef);
+    if (syncTimer !== undefined) view?.clearInterval(syncTimer);
     observer.disconnect();
   });
   observer.observe(document.body, { childList: true, subtree: true });
