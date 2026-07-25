@@ -1,0 +1,172 @@
+name: Publish serial cover API reliability fix
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify and check out feature head
+        env:
+          EXPECTED_HEAD: cdffd614425b0aabee735cbf5313e18d0b0fb2e6
+        run: |
+          git fetch origin feature/serial-entry-covers
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
+          git checkout -B feature/serial-entry-covers origin/feature/serial-entry-covers
+      - name: Apply validated API reliability changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"missing anchor in {path}: {old[:80]!r}")
+              file.write_text(text.replace(old, new, count), encoding="utf-8")
+
+          replace("src/types.ts",
+              '  coverFolder: string; templateFolder: string; timelineMaxStackDepth: number; providers: ProviderSettings;\n',
+              '  coverFolder: string; templateFolder: string; timelineMaxStackDepth: number; providers: ProviderSettings;\n  googleBooksApiKey?: string;\n')
+          replace("src/settings.ts",
+              '  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,\n',
+              '  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,\n  googleBooksApiKey: "",\n')
+          replace("src/main.ts",
+              '      timelineMaxStackDepth: normalizeTimelineMaxStackDepth(\n        loaded.timelineMaxStackDepth,\n      ),\n',
+              '      timelineMaxStackDepth: normalizeTimelineMaxStackDepth(\n        loaded.timelineMaxStackDepth,\n      ),\n      googleBooksApiKey: typeof loaded.googleBooksApiKey === "string" ? loaded.googleBooksApiKey.trim() : "",\n')
+
+          replace("src/serial-entry-cover.ts", 'import type { NovelVolumeEntry } from "./types";', 'import type { MediaType, NovelVolumeEntry } from "./types";')
+          replace("src/serial-entry-cover.ts", '  infoUrl: string;\n}', '  infoUrl: string;\n  categories?: string[];\n  authors?: string[];\n  publisher?: string;\n}')
+          replace("src/serial-entry-cover.ts", '  label: string,\n): number {', '  label: string,\n  mediaType?: Extract<MediaType, "manga" | "novel">,\n): number {')
+          replace("src/serial-entry-cover.ts",
+              '  if (/限定|特装|特裝|special|limited|box|セット|合本|合訂/i.test(candidate.title)) score -= 18;\n  return score;',
+              '''  if (/限定|特装|特裝|special|limited|box|セット|合本|合訂/i.test(candidate.title)) score -= 18;
+  const categories = (candidate.categories ?? []).join(" ").toLocaleLowerCase();
+  const metadata = [categories, candidate.publisher ?? "", ...(candidate.authors ?? [])].join(" ").toLocaleLowerCase();
+  const lightNovel = /light\\s*novel|ライトノベル|文庫/.test(metadata);
+  const comics = /manga|comics|graphic novels|コミック|漫画/.test(metadata);
+  if (mediaType === "novel") {
+    if (lightNovel) score += 22;
+    else if (comics) score -= 28;
+  } else if (mediaType === "manga") {
+    if (comics && !lightNovel) score += 18;
+    else if (lightNovel) score -= 18;
+  }
+  return score;''')
+          replace("src/serial-entry-cover.ts", '  label: string,\n): RankedSerialCoverCandidate[] {', '  label: string,\n  mediaType?: Extract<MediaType, "manga" | "novel">,\n): RankedSerialCoverCandidate[] {')
+          replace("src/serial-entry-cover.ts", '      score: scoreSerialCoverCandidate(candidate, originalTitle, label),', '      score: scoreSerialCoverCandidate(candidate, originalTitle, label, mediaType),')
+
+          replace("src/serial-cover-provider.ts", 'let random = (): number => Math.random();', 'let random = (): number => Math.random();\nlet apiKey = "";')
+          replace("src/serial-cover-provider.ts", '    infoUrl: text(info?.infoLink),\n  };', '    infoUrl: text(info?.infoLink),\n    categories: asArray(info?.categories).map(text).filter(Boolean),\n    authors: asArray(info?.authors).map(text).filter(Boolean),\n    publisher: text(info?.publisher),\n  };')
+          replace("src/serial-cover-provider.ts", '  label: string,\n): Promise<RankedSerialCoverCandidate[]> {', '  label: string,\n  mediaType: "manga" | "novel",\n): Promise<RankedSerialCoverCandidate[]> {')
+          replace("src/serial-cover-provider.ts", '    fields: "items(id,volumeInfo(title,subtitle,infoLink,imageLinks))",\n  });', '    fields: "items(id,volumeInfo(title,subtitle,authors,publisher,categories,infoLink,imageLinks))",\n  });\n  if (apiKey) parameters.set("key", apiKey);')
+          replace("src/serial-cover-provider.ts", '  return rankSerialCoverCandidates(candidates, originalTitle, label);', '  return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);')
+          replace("src/serial-cover-provider.ts", '  label: string,\n): Promise<RankedSerialCoverCandidate[]> {', '  label: string,\n  mediaType: "manga" | "novel",\n): Promise<RankedSerialCoverCandidate[]> {')
+          replace("src/serial-cover-provider.ts", '  const key = query.normalize("NFKC").trim();', '  const key = `${mediaType}:${query.normalize("NFKC").trim()}`;')
+          replace("src/serial-cover-provider.ts", '  const request = enqueue(() => requestSerialCovers(query, originalTitle, label))', '  const request = enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType))')
+          with Path("src/serial-cover-provider.ts").open("a", encoding="utf-8") as file:
+              file.write('''
+
+export function configureSerialCoverProvider(options: { apiKey?: string }): void {
+  const nextKey = options.apiKey?.trim() ?? "";
+  if (nextKey === apiKey) return;
+  apiKey = nextKey;
+  clearSerialCoverProviderCache();
+}
+
+export function hasSerialCoverApiKey(): boolean {
+  return Boolean(apiKey);
+}
+''')
+
+          replace("src/serial-cover-service.ts", 'import { searchSerialCovers } from "./serial-cover-provider";', 'import { hasSerialCoverApiKey, searchSerialCovers } from "./serial-cover-provider";')
+          replace("src/serial-cover-service.ts", '  return query ? searchSerialCovers(query, context.originalTitle, label) : [];', '  return query ? searchSerialCovers(query, context.originalTitle, label, context.mediaType) : [];')
+          replace("src/serial-cover-service.ts", '): Promise<SerialCoverMigrationSummary> {\n  const records:', '): Promise<SerialCoverMigrationSummary> {\n  if (!hasSerialCoverApiKey()) throw new Error(serialCoverText("settings.apiKeyRequired"));\n  const records:')
+
+          replace("src/serial-cover-feature.ts", 'import { Modal, Notice, TFile, setIcon } from "obsidian";', 'import { Modal, Notice, TFile, setIcon } from "obsidian";\nimport { configureSerialCoverProvider } from "./serial-cover-provider";')
+          replace("src/serial-cover-feature.ts", 'export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {', 'export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {\n  configureSerialCoverProvider({ apiKey: plugin.settings.googleBooksApiKey });')
+
+          replace("src/serial-cover-settings.ts", 'import { serialCoverText } from "./serial-cover-text";', 'import { configureSerialCoverProvider } from "./serial-cover-provider";\nimport { serialCoverText } from "./serial-cover-text";')
+          replace("src/serial-cover-settings.ts", 'interface SerialCoverSettingsHost extends Plugin {', 'interface SerialCoverSettingsHost extends Plugin {\n  settings: { googleBooksApiKey?: string };\n  saveSettings(): Promise<void>;')
+          replace("src/serial-cover-settings.ts", '      definitions: [{\n        name: serialCoverText("settings.name"),', '''      definitions: [{
+        name: serialCoverText("settings.apiKeyName"),
+        desc: serialCoverText("settings.apiKeyDesc"),
+        render: (setting: Setting) => {
+          setting.addText((input) => {
+            input.setPlaceholder(serialCoverText("settings.apiKeyPlaceholder"));
+            input.setValue(this.plugin.settings.googleBooksApiKey ?? "");
+            input.onChange(async (value) => {
+              this.plugin.settings.googleBooksApiKey = value.trim();
+              configureSerialCoverProvider({ apiKey: this.plugin.settings.googleBooksApiKey });
+              await this.plugin.saveSettings();
+            });
+          });
+        },
+      }, {
+        name: serialCoverText("settings.name"),''')
+          replace("src/serial-cover-text.ts", '  "settings.heading": "Legacy data compatibility",', '  "settings.heading": "Legacy data compatibility",\n  "settings.apiKeyName": "Google Books API key",\n  "settings.apiKeyDesc": "Use a Google Books API key for reliable serial-cover searches and an independent project quota. Batch loading is disabled until a key is configured.",\n  "settings.apiKeyPlaceholder": "Paste API key",\n  "settings.apiKeyRequired": "A Google Books API key is required before loading missing serial covers.",')
+
+          replace("tests/serial-entry-cover.test.ts", '  clearSerialCoverProviderCache,\n  configureSerialCoverProviderForTests,', '  clearSerialCoverProviderCache,\n  configureSerialCoverProvider,\n  configureSerialCoverProviderForTests,')
+          replace("tests/serial-entry-cover.test.ts", 'searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5")', 'searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5", "novel")')
+          replace("tests/serial-entry-cover.test.ts", 'searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1")', 'searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel")', 2)
+          with Path("tests/serial-entry-cover.test.ts").open("a", encoding="utf-8") as file:
+              file.write('''
+
+test("serial cover provider includes configured API key without changing the exact query", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "project-key" });
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  let requested = "";
+  setRequestUrlMock(async (options) => {
+    requested = String(options.url);
+    return { json: { items: [] } };
+  });
+  await searchSerialCovers("転生したらスライムだった件 1", "転生したらスライムだった件", "1", "novel");
+  const url = new URL(requested);
+  assert.equal(url.searchParams.get("q"), "転生したらスライムだった件 1");
+  assert.equal(url.searchParams.get("key"), "project-key");
+  configureSerialCoverProvider({ apiKey: "" });
+});
+
+test("serial cover ranking distinguishes light novels from manga with the same title", () => {
+  const candidates = [
+    { provider: "Google Books", sourceId: "manga", title: "転生したらスライムだった件 1", coverUrl: "manga.jpg", infoUrl: "", categories: ["Comics & Graphic Novels / Manga"] },
+    { provider: "Google Books", sourceId: "novel", title: "転生したらスライムだった件 1", coverUrl: "novel.jpg", infoUrl: "", categories: ["Young Adult Fiction / Light Novel"] },
+  ];
+  assert.equal(rankSerialCoverCandidates(candidates, "転生したらスライムだった件", "1", "novel")[0]?.sourceId, "novel");
+  assert.equal(rankSerialCoverCandidates(candidates, "転生したらスライムだった件", "1", "manga")[0]?.sourceId, "manga");
+});
+''')
+          replace("tests/core.test.ts", '''  it("does not store provider credentials in settings", () => {
+    assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
+    assert.equal("serialCoverApiKey" in DEFAULT_SETTINGS, false);
+  });''', '''  it("stores the user-provided Google Books key in plugin settings, not frontmatter", () => {
+    assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
+    assert.equal(DEFAULT_SETTINGS.googleBooksApiKey, "");
+    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+    assert.doesNotMatch(featureSource, /frontmatter\\.googleBooksApiKey|google_books_api_key/);
+  });''')
+          PY
+      - run: npm ci
+      - run: npm run check
+      - run: npm run release:check
+      - name: Commit and publish only after validation
+        env:
+          EXPECTED_HEAD: cdffd614425b0aabee735cbf5313e18d0b0fb2e6
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/types.ts src/settings.ts src/main.ts src/serial-entry-cover.ts src/serial-cover-provider.ts src/serial-cover-service.ts src/serial-cover-feature.ts src/serial-cover-settings.ts src/serial-cover-text.ts tests/core.test.ts tests/serial-entry-cover.test.ts
+          git commit -m "fix: make serial cover lookup quota-safe"
+          git push --force-with-lease=refs/heads/feature/serial-entry-covers:$EXPECTED_HEAD origin HEAD:feature/serial-entry-covers
