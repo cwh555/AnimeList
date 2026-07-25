@@ -1,0 +1,105 @@
+/* Per-entry cover UI. Kept isolated from shared styles. */
+.animelist-modal .al-volume-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.al-serial-cover-panel {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 72px;
+  gap: 6px;
+  justify-items: stretch;
+  width: 72px;
+}
+
+.al-serial-cover-button {
+  align-items: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  display: flex;
+  height: 102px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  width: 72px;
+}
+
+.al-serial-cover-button img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.al-serial-cover-status {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.al-serial-cover-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.al-serial-cover-actions button {
+  padding: 4px 7px;
+}
+
+.al-serial-cover-results {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  margin-top: 12px;
+}
+
+.al-serial-cover-candidate {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  text-align: left;
+}
+
+.al-serial-cover-candidate.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.al-serial-cover-candidate img {
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-s);
+  object-fit: cover;
+  width: 100%;
+}
+
+.al-serial-cover-migration-progress {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.al-serial-cover-report {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .animelist-modal .al-volume-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .al-serial-cover-panel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .animelist-modal .al-volume-row-actions {
+    grid-column: 1 / -1;
+  }
+}
