@@ -26,6 +26,7 @@ function mediaNote(item) {
   const lines = [
     "---",
     "schema_version: 5",
+    "animelist_test_fixture: true",
     `title: ${yamlScalar(item.title)}`,
     `media_type: ${yamlScalar(item.mediaType)}`,
     `format: ${yamlScalar(item.format)}`,
@@ -68,6 +69,39 @@ function mediaNote(item) {
   return lines.join("\n");
 }
 
+function classificationLegacyNote(item) {
+  return [
+    "---",
+    "schema_version: 5",
+    `title: ${yamlScalar(item.title)}`,
+    `title_original: ${yamlScalar(item.originalTitle)}`,
+    `title_romaji: ${yamlScalar(item.romajiTitle)}`,
+    `media_type: ${yamlScalar(item.mediaType)}`,
+    `format: ${yamlScalar(item.format)}`,
+    "status: planned",
+    "progress: 0",
+    `progress_total: ${yamlScalar(item.total)}`,
+    "progress_unit: episode",
+    "favorite: false",
+    `year: ${yamlScalar(item.year)}`,
+    "genres:",
+    "  - TV",
+    `source_provider: ${yamlScalar("anilist")}`,
+    `source_id: ${yamlScalar(item.sourceId)}`,
+    "source_urls:",
+    `  - ${yamlScalar(item.sourceUrl)}`,
+    `fixture_preservation_marker: ${yamlScalar(item.marker)}`,
+    "---",
+    "",
+    `# ${item.title}`,
+    "",
+    "```animelist-detail",
+    "```",
+    "",
+    `> PRESERVE BODY: ${item.marker}`,
+  ].join("\n");
+}
+
 function completedVolumes(count) {
   return Array.from({ length: count }, (_, index) => {
     const volume = index + 1;
@@ -84,24 +118,26 @@ const FIXTURES = [
   { folder: "Anime", file: "01-anime-planned.md", title: "TEST 動畫－未開始", mediaType: "anime", format: "tv", status: "planned", releaseStatus: "finished", progress: 0, total: 12, unit: "episode" },
   { folder: "Anime", file: "02-anime-watching.md", title: "TEST 動畫－觀看中 5/12", mediaType: "anime", format: "tv", status: "watching", releaseStatus: "finished", progress: 5, total: 12, unit: "episode", startedAt: "2026-07-01" },
   { folder: "Anime", file: "03-anime-completed.md", title: "TEST 動畫－已完成 12/12", mediaType: "anime", format: "tv", status: "completed", releaseStatus: "finished", progress: 12, total: 12, unit: "episode", score: 8.5, startedAt: "2026-06-01", completedAt: "2026-06-12" },
-
   { folder: "Manga", file: "04-manga-planned.md", title: "TEST 漫畫－未開始空進度條", mediaType: "manga", format: "manga", status: "planned", releaseStatus: "releasing", progress: 0, unit: "chapter" },
   { folder: "Manga", file: "05-manga-reading.md", title: "TEST 漫畫－閱讀中半滿進度條", mediaType: "manga", format: "manga", status: "reading", releaseStatus: "releasing", progress: 37, unit: "chapter", startedAt: "2026-07-03" },
   { folder: "Manga", file: "06-manga-on-hold.md", title: "TEST 漫畫－擱置半滿進度條", mediaType: "manga", format: "manga", status: "on_hold", releaseStatus: "hiatus", progress: 12, unit: "chapter", startedAt: "2026-05-01" },
   { folder: "Manga", file: "07-manga-dropped.md", title: "TEST 漫畫－棄置半滿進度條", mediaType: "manga", format: "manga", status: "dropped", releaseStatus: "cancelled", progress: 8, unit: "chapter", startedAt: "2026-04-01" },
   { folder: "Manga", file: "08-manga-completed.md", title: "TEST 漫畫－已完成全滿進度條", mediaType: "manga", format: "manga", status: "completed", releaseStatus: "finished", progress: 88, unit: "chapter", score: 9, startedAt: "2026-01-01", completedAt: "2026-05-30" },
-
   { folder: "Novel", file: "09-novel-planned.md", title: "TEST 小說－未開始空進度條", mediaType: "novel", format: "light_novel", status: "planned", releaseStatus: "releasing", progress: 0, unit: "volume" },
   { folder: "Novel", file: "10-novel-add-volume.md", title: "TEST 小說－新增卷數與日期排版", mediaType: "novel", format: "light_novel", status: "reading", releaseStatus: "releasing", progress: 14, unit: "volume", startedAt: "2026-06-01", volumeLog: completedVolumes(14) },
   { folder: "Novel", file: "11-novel-on-hold.md", title: "TEST 小說－擱置半滿進度條", mediaType: "novel", format: "light_novel", status: "on_hold", releaseStatus: "hiatus", progress: 4, unit: "volume", startedAt: "2026-02-01", volumeLog: completedVolumes(4) },
   { folder: "Novel", file: "12-novel-dropped.md", title: "TEST 小說－棄置半滿進度條", mediaType: "novel", format: "light_novel", status: "dropped", releaseStatus: "cancelled", progress: 2, unit: "volume", startedAt: "2026-01-02", volumeLog: completedVolumes(2) },
   { folder: "Novel", file: "13-novel-completed.md", title: "TEST 小說－已完成全滿進度條", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 6, unit: "volume", score: 9.5, startedAt: "2026-01-01", completedAt: "2026-03-01", volumeLog: completedVolumes(6) },
-
   { folder: "Special", file: "14-special-legacy-favorite-completed.md", title: "SPECIAL 01－舊版最愛／已完成", mediaType: "anime", format: "tv", status: "completed", releaseStatus: "finished", progress: 12, total: 12, unit: "episode", score: 9, favorite: true, completedAt: "2026-07-01", genre: "SPECIAL 驗證", preservationMarker: "legacy-favorite-completed" },
   { folder: "Special", file: "15-special-multi-label-ongoing.md", title: "SPECIAL 02－多分類最愛／進行中", mediaType: "anime", format: "tv", status: "ongoing", releaseStatus: "releasing", progress: 4, total: 12, unit: "episode", favorite: true, masterpieceLabels: ["戀愛", "年度"], genre: "SPECIAL 驗證", preservationMarker: "multi-label-ongoing" },
   { folder: "Special", file: "16-special-shared-label-planned.md", title: "SPECIAL 03－共享分類最愛／願望清單", mediaType: "manga", format: "manga", status: "planned", releaseStatus: "releasing", progress: 0, unit: "chapter", favorite: true, masterpieceLabels: ["戀愛"], genre: "SPECIAL 驗證", preservationMarker: "shared-label-planned" },
   { folder: "Special", file: "17-special-retained-label-completed.md", title: "SPECIAL 04－非最愛保留分類／已完成", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 3, unit: "volume", favorite: false, masterpieceLabels: ["保留分類"], score: 8, completedAt: "2026-07-02", genre: "SPECIAL 驗證", preservationMarker: "retained-label-completed" },
   { folder: "Special", file: "18-special-control-planned.md", title: "SPECIAL 05－一般作品／願望清單", mediaType: "anime", format: "tv", status: "planned", releaseStatus: "finished", progress: 0, total: 12, unit: "episode", favorite: false, genre: "SPECIAL 驗證", preservationMarker: "control-planned" },
+];
+
+const CLASSIFICATION_FIXTURES = [
+  { folder: "Classification", file: "01-cowboy-bebop-legacy.md", title: "Cowboy Bebop", originalTitle: "カウボーイビバップ", romajiTitle: "Cowboy Bebop", mediaType: "anime", format: "TV", total: 26, year: 1998, sourceId: "1", sourceUrl: "https://anilist.co/anime/1", marker: "classification-cowboy-bebop" },
+  { folder: "Classification", file: "02-takagi-san-legacy.md", title: "擅長捉弄人的高木同學", originalTitle: "からかい上手の高木さん", romajiTitle: "Karakai Jouzu no Takagi-san", mediaType: "anime", format: "TV", total: 12, year: 2018, sourceId: "99468", sourceUrl: "https://anilist.co/anime/99468", marker: "classification-takagi-san" },
 ];
 
 function checklistContent() {
@@ -164,7 +200,15 @@ Switch **Special label mode = Masterpiece** in AnimeList settings.
 - Clicking that control must open the same category modal described above.
 - After changing categories, save an unrelated edit field and confirm the category selection is not overwritten.
 
-## 5. Content preservation and existing regressions
+## 5. Media classification cleanup
+
+1. Open Settings → Media classification → Run cleanup.
+2. The synthetic TEST and SPECIAL notes must be excluded from the cleanup total.
+3. The cleanup modal must scan exactly the two real AniList legacy fixtures under \`${TEST_FIXTURE_ROOT}/Classification\`.
+4. Both fixtures must appear under Updated, not Unresolved.
+5. Open both notes and confirm \`genres\` no longer contains \`TV\`, canonical AniList classifications were written, and each \`PRESERVE BODY\` line remains unchanged.
+
+## 6. Content preservation and existing regressions
 
 - Confirm every \`fixture_preservation_marker\` and every \`PRESERVE BODY\` line remains unchanged after category operations.
 - Switch the library to list view once and verify progress tracks still use the available card width.
@@ -179,11 +223,18 @@ export function prepareTestFixtures(vaultRoot) {
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
   fs.mkdirSync(fixtureRoot, { recursive: true });
 
-  const files = FIXTURES.map((fixture) => writeFile(
-    resolvedVault,
-    path.join(TEST_FIXTURE_ROOT, fixture.folder, fixture.file),
-    mediaNote(fixture),
-  ));
+  const files = [
+    ...FIXTURES.map((fixture) => writeFile(
+      resolvedVault,
+      path.join(TEST_FIXTURE_ROOT, fixture.folder, fixture.file),
+      mediaNote(fixture),
+    )),
+    ...CLASSIFICATION_FIXTURES.map((fixture) => writeFile(
+      resolvedVault,
+      path.join(TEST_FIXTURE_ROOT, fixture.folder, fixture.file),
+      classificationLegacyNote(fixture),
+    )),
+  ];
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return { fixtureRoot, checklistPath, files };
 }
