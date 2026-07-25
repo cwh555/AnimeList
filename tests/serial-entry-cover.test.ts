@@ -10,7 +10,12 @@ import {
   groupMissingSerialCoverRecords,
   missingSerialCoverEntryCount,
 } from "../src/serial-cover-migration";
-
+import { setRequestUrlMock } from "./mocks/obsidian";
+import {
+  clearSerialCoverProviderCache,
+  configureSerialCoverProviderForTests,
+  searchSerialCovers,
+} from "../src/serial-cover-provider";
 
 test("serial cover query uses original title and numeric label only", () => {
   assert.equal(serialCoverQuery("寄宿学校のジュリエット", "5"), "寄宿学校のジュリエット 5");
@@ -43,4 +48,43 @@ test("missing-cover migration groups entries by work and filters nonnumeric labe
     { filePath: "Novel/B.md", title: "B", mediaType: "novel", labels: ["2.5"] },
   ]);
   assert.equal(missingSerialCoverEntryCount(works), 3);
+});
+
+test("serial cover provider retries 429 and preserves one exact query", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  const urls: string[] = [];
+  let attempts = 0;
+  setRequestUrlMock(async (options) => {
+    urls.push(String(options.url));
+    attempts += 1;
+    if (attempts === 1) {
+      const error = new Error("Request failed with status 429") as Error & { status: number };
+      error.status = 429;
+      throw error;
+    }
+    return { json: { items: [{ id: "v5", volumeInfo: { title: "寄宿学校のジュリエット 5", imageLinks: { thumbnail: "http://cover/5.jpg" } } }] } };
+  });
+  const result = await searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5");
+  assert.equal(attempts, 2);
+  assert.equal(result[0]?.sourceId, "v5");
+  for (const url of urls) {
+    const parsed = new URL(url);
+    assert.equal(parsed.searchParams.get("q"), "寄宿学校のジュリエット 5");
+  }
+});
+
+test("serial cover provider coalesces duplicate concurrent queries", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  let calls = 0;
+  setRequestUrlMock(async () => {
+    calls += 1;
+    return { json: { items: [] } };
+  });
+  await Promise.all([
+    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1"),
+    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1"),
+  ]);
+  assert.equal(calls, 1);
 });
