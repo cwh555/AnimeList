@@ -1,9 +1,6 @@
 import { TFile, type Plugin } from "obsidian";
 import { automaticClassificationForResult, writeClassificationSelection } from "./classification-compatibility";
-import {
-  clearClassificationCreateDraft,
-  getClassificationCreateDraft,
-} from "./classification-create-state";
+import { takeClassificationCreateDraft } from "./classification-create-state";
 import { resolveClassifiedMediaResult } from "./classification-resolution";
 import type { ClassificationSelection } from "./media-classification";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "./types";
@@ -22,6 +19,11 @@ export function applyResolvedMediaMetadata(
 ): void {
   writeClassificationSelection(frontmatter, selection);
   delete frontmatter.tags;
+  frontmatter.classification_version = 4;
+  if (result.provider.toLocaleLowerCase() === "anilist") {
+    frontmatter.classification_source_provider = "anilist";
+    frontmatter.classification_source_id = result.sourceId;
+  }
   if (result.year !== "" && result.year != null) frontmatter.year = result.year;
   if (result.season !== "" && result.season != null) frontmatter.season = result.season;
   else delete frontmatter.season;
@@ -39,8 +41,7 @@ export function installClassificationCreatePersistence(plugin: Plugin): void {
   if (Reflect.get(runtime, PERSISTENCE_MARKER) === true) return;
   const original = runtime.createMediaNote.bind(runtime);
   runtime.createMediaNote = async (selected, form) => {
-    const draft = getClassificationCreateDraft(selected);
-    clearClassificationCreateDraft(selected);
+    const draft = takeClassificationCreateDraft(selected);
     const resolved = await resolveMediaForCreate(runtime, selected);
     const selection = draft ?? automaticClassificationForResult(resolved);
     const file = await original(resolved, {
