@@ -151,7 +151,7 @@ describe("classification runtime integration", () => {
       assert.deepEqual(summary.changedEntries.map((entry) => entry.title), ["Changed"]);
       assert.deepEqual(summary.unchangedEntries.map((entry) => entry.title), ["Unchanged"]);
       assert.deepEqual(summary.unresolvedEntries.map((entry) => entry.title), ["Unresolved"]);
-      assert.deepEqual(progress, ["1/2:Changed", "2/2:Unchanged"]);
+      assert.deepEqual(progress, ["1/3:Changed", "2/3:Unchanged", "3/3:Unresolved"]);
       assert.deepEqual(records.get(changed)?.genres, ["喜劇"]);
     } finally {
       setRequestUrlMock(null);
