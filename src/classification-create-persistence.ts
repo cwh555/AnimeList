@@ -15,6 +15,7 @@ export function applyResolvedMediaMetadata(
   result: ExternalMediaResult,
 ): void {
   writeClassificationSelection(frontmatter, automaticClassificationForResult(result));
+  delete frontmatter.tags;
   if (result.year !== "" && result.year != null) frontmatter.year = result.year;
   if (result.season !== "" && result.season != null) frontmatter.season = result.season;
   else delete frontmatter.season;
