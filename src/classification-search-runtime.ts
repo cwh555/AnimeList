@@ -6,7 +6,6 @@ import {
 } from "./multilingual-search";
 import { preferAniListSearchResults } from "./classification-search";
 import { searchAniListCanonical } from "./anilist-search";
-import { legacyTest } from "./legacy";
 import type { AnimeListSettings, ExternalMediaResult, MediaType } from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.classification-search-runtime");
@@ -21,15 +20,11 @@ interface ClassificationSearchRuntime extends Plugin {
 }
 
 function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType): SearchProviderAdapter[] {
-  const providers: SearchProviderAdapter[] = [];
-  // Classification is canonicalized exclusively through AniList. Bangumi and
-  // Open Library may supply aliases for discovery, but their raw results are
-  // never exposed as selectable works.
-  providers.push({
+  const providers: SearchProviderAdapter[] = [{
     label: "AniList",
     singleQueryOnly: true,
     search: (query) => plugin.searchAniList(mediaType, query),
-  });
+  }];
   if (plugin.settings.providers.bangumi) {
     providers.push({
       label: "Bangumi",
@@ -69,13 +64,7 @@ function installCanonicalSearch(plugin: ClassificationSearchRuntime): void {
 export function installClassificationSearchRuntime(plugin: Plugin): void {
   const runtime = plugin as ClassificationSearchRuntime;
   if (Reflect.get(runtime, PATCH_MARKER) === true) return;
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Runtime method binding crosses the legacy adapter boundary. */
-  const normalizeAniListMedia = legacyTest.normalizeAniListMedia as unknown as (
-    value: unknown,
-    mediaType: MediaType,
-  ) => ExternalMediaResult;
-  /* eslint-enable @typescript-eslint/no-unsafe-assignment -- Restore strict checks after the legacy adapter read. */
-  runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query, normalizeAniListMedia);
+  runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query);
   installCanonicalSearch(runtime);
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
