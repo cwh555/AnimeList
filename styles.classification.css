@@ -92,6 +92,42 @@
   overflow-wrap: anywhere;
 }
 
+.al-classification-migration-status {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.al-classification-migration-status progress {
+  width: 100%;
+}
+
+.al-classification-migration-progress-text,
+.al-classification-migration-overview,
+.al-classification-migration-results {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.al-classification-migration-group {
+  border-top: 1px solid var(--background-modifier-border);
+  padding: 8px 0;
+}
+
+.al-classification-migration-group summary {
+  color: var(--text-normal);
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+}
+
+.al-classification-migration-group ul {
+  margin-bottom: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding-inline-start: 22px;
+}
+
 @media (max-width: 540px) {
   .al-classification-input-row,
   .al-classification-metadata {
