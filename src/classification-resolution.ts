@@ -101,13 +101,7 @@ export async function resolveClassifiedMediaResult(
     canonical = mergeAniListWithLocalizedResult(match, selected);
   }
   if (canonical.genres.length > 0) return { ...canonical, tags: canonical.tags ?? [] };
-  try {
-    const classifications = await fetchAniListClassifications([canonical], USER_AGENT);
-    const [enriched] = mergeAniListClassifications([canonical], classifications);
-    return enriched ?? canonical;
-  } catch (error) {
-    console.warn("AnimeList could not resolve canonical AniList classification", error);
-    const [fallback] = mergeAniListClassifications([canonical], new Map());
-    return fallback ?? canonical;
-  }
+  const classifications = await fetchAniListClassifications([canonical], USER_AGENT);
+  const [enriched] = mergeAniListClassifications([canonical], classifications);
+  return enriched ?? canonical;
 }
