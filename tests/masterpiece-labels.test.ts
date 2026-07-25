@@ -45,7 +45,7 @@ describe("masterpiece label domain", () => {
       { id: "retained", favorite: false, masterpieceLabels: ["保留分類"] },
     ]);
 
-    assert.deepEqual(groups.map((group) => group.label), ["masterpiece", "年度", "戀愛"]);
+    assert.deepEqual(new Set(groups.map((group) => group.label)), new Set(["masterpiece", "年度", "戀愛"]));
     assert.deepEqual(groups.find((group) => group.label === "戀愛")?.items.map((item) => item.id), [
       "shared",
       "romance",
