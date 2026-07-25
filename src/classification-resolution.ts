@@ -1,6 +1,6 @@
 import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
 import { mergeAniListWithLocalizedResult, sameMediaWork } from "./classification-search";
-import { scoreSearchResult } from "./search-enhancements";
+import { scoreSearchResult } from "./search";
 import type { ExternalMediaResult, MediaType } from "./types";
 
 const USER_AGENT = "AnimeList-Obsidian/1.1.2 (local personal media library)";
