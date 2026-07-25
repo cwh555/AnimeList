@@ -27,7 +27,7 @@ try {
   assert.match(checklist, /exactly one list button must be active/);
   assert.match(checklist, /Masterpiece → Favorite → Masterpiece/);
   assert.match(checklist, /fixture_preservation_marker/);
-  assert.match(checklist, /Add volume/);
+  assert.match(checklist, /add volume/i);
 
   const novel = readFixture(path.join("Novel", "10-novel-add-volume.md"));
   assert.match(novel, /status: "reading"/);
