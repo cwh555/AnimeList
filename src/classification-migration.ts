@@ -46,6 +46,12 @@ export interface ClassificationMigrationHost extends Plugin {
   ) => Promise<ClassificationMigrationSummary>;
 }
 
+type MigrationWork = {
+  file: ReturnType<typeof getScopedMarkdownFiles>[number];
+  item: ClassificationMigrationEntry;
+  lookup: ExternalMediaResult | null;
+};
+
 function stringValue(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -155,24 +161,21 @@ export async function migrateMediaClassification(
   onProgress: ClassificationMigrationProgressHandler = () => {},
 ): Promise<ClassificationMigrationSummary> {
   const summary = emptySummary();
-  const pending: Array<{
-    file: ReturnType<typeof getScopedMarkdownFiles>[number];
-    lookup: ExternalMediaResult;
-  }> = [];
+  const work: MigrationWork[] = [];
 
   for (const file of getScopedMarkdownFiles(plugin.app, plugin.getScanFolders())) {
     const frontmatter = await readCurrentFrontmatter(plugin, file);
     if (!frontmatter.media_type) continue;
-    summary.scanned += 1;
-    const lookup = migrationLookupResult(frontmatter, file.basename);
-    if (lookup) pending.push({ file, lookup });
-    else {
-      summary.unresolved += 1;
-      summary.unresolvedEntries.push({ path: file.path, title: stringValue(frontmatter.title) || file.basename });
-    }
+    const item = { path: file.path, title: stringValue(frontmatter.title) || file.basename };
+    work.push({ file, item, lookup: migrationLookupResult(frontmatter, file.basename) });
   }
+  summary.scanned = work.length;
 
-  const direct = pending.filter(({ lookup }) => lookup.provider.toLocaleLowerCase() === "anilist" && /^\d+$/.test(lookup.sourceId));
+  const direct = work.filter((entry): entry is MigrationWork & { lookup: ExternalMediaResult } => (
+    entry.lookup !== null
+    && entry.lookup.provider.toLocaleLowerCase() === "anilist"
+    && /^\d+$/.test(entry.lookup.sourceId)
+  ));
   let directMap = new Map<string, AniListClassification>();
   try {
     directMap = await fetchAniListClassifications(direct.map(({ lookup }) => lookup), USER_AGENT);
@@ -187,9 +190,9 @@ export async function migrateMediaClassification(
   }
 
   let processed = 0;
-  for (const entry of pending) {
+  for (const entry of work) {
     let canonical = canonicalByPath.get(entry.file.path);
-    if (!canonical) {
+    if (entry.lookup && !canonical) {
       try {
         const resolved = await resolveClassifiedMediaResult(plugin, entry.lookup);
         if (resolved.provider.toLocaleLowerCase() === "anilist" && resolved.genres.length) canonical = resolved;
@@ -198,30 +201,30 @@ export async function migrateMediaClassification(
       }
     }
 
-    const item = { path: entry.file.path, title: entry.lookup.title || entry.file.basename };
-    if (!canonical) {
+    if (!entry.lookup || !canonical) {
       summary.unresolved += 1;
-      summary.unresolvedEntries.push(item);
+      summary.unresolvedEntries.push(entry.item);
     } else {
+      const resolvedCanonical = canonical;
       summary.resolved += 1;
       let didChange = false;
       await plugin.app.fileManager.processFrontMatter(entry.file, (frontmatter: Record<string, unknown>) => {
         const before = structuredClone(frontmatter);
-        const result = applyCanonicalMigrationMetadata(frontmatter, canonical, entry.file.basename);
+        const result = applyCanonicalMigrationMetadata(frontmatter, resolvedCanonical, entry.file.basename);
         didChange = changedByMigration(before, frontmatter);
         summary.removed += result.removed.length + classificationValues(before.tags).length;
         summary.moved += result.moved.length;
       });
       if (didChange) {
         summary.changed += 1;
-        summary.changedEntries.push(item);
+        summary.changedEntries.push(entry.item);
       } else {
-        summary.unchangedEntries.push(item);
+        summary.unchangedEntries.push(entry.item);
       }
     }
 
     processed += 1;
-    onProgress({ processed, total: pending.length, title: item.title });
+    onProgress({ processed, total: work.length, title: entry.item.title });
   }
 
   if (summary.changed) plugin.refreshViews();
