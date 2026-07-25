@@ -13,15 +13,36 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Verify payload chunk 00
+        run: echo "37acee886ae857a849dfcfaa9074e2fb6736d345be85a72adf30b0fcb75526ce  .serial-cover-payload/chunk-00" | sha256sum -c -
+      - name: Verify payload chunk 01
+        run: echo "9becad91c678e5da61042db5ead57f54caffe16c300768c3740e262db9734e96  .serial-cover-payload/chunk-01" | sha256sum -c -
+      - name: Verify payload chunk 02
+        run: echo "af904dbd42984397427c8427350e97aa402cf785bb86851d76ef09a3730c804b  .serial-cover-payload/chunk-02" | sha256sum -c -
+      - name: Verify payload chunk 03
+        run: echo "03333f0d1a7c53edab147b5e70d95e1b9a16d5d87925b3cd98a3de77f45a1437  .serial-cover-payload/chunk-03" | sha256sum -c -
+      - name: Verify payload chunk 04
+        run: echo "a7613c3684e3f0158d1d35644748e66b6aff191110abaebad85f9a377f9cc9f8  .serial-cover-payload/chunk-04" | sha256sum -c -
+      - name: Verify payload chunk 05
+        run: echo "b781acc4fb431031fba16dffbb856e70e7c330ee5d2bd24c192613bd721045c0  .serial-cover-payload/chunk-05" | sha256sum -c -
+      - name: Verify payload chunk 06
+        run: echo "b560da723b05912009ec551ff7ff262b261ef86686e74c2d6aafd32dbecf548b  .serial-cover-payload/chunk-06" | sha256sum -c -
+      - name: Verify payload chunk 07
+        run: echo "9ce295c6eae4488fa47f8d193fb4a1891356901eb183f24bcaa7a8705ee02f14  .serial-cover-payload/chunk-07" | sha256sum -c -
+      - name: Verify payload chunk 08
+        run: echo "fd22cdc1ea628a5ab0e0375650dcf4cdec50edfd11e01e16dc2ee00b0ff0c294  .serial-cover-payload/chunk-08" | sha256sum -c -
+      - name: Reconstruct validated local payload
+        run: |
+          cat .serial-cover-payload/chunk-* > /tmp/serial-cover-final.b64
+          echo "c92b956b85db30a513688e87d67f033944b9c119929ebea616979ad9f6916021  /tmp/serial-cover-final.b64" | sha256sum -c -
+          base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
+          echo "fc402eebd68bd4aec0b0bf5acba9d642742f5e93bfba9ec2cf127b235744265c  /tmp/serial-cover-final.tar.gz" | sha256sum -c -
+          mkdir -p /tmp/serial-cover-final
+          tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - name: Reconstruct validated local payload
-        run: |
-          cat .serial-cover-payload/chunk-* | base64 --decode > /tmp/serial-cover-final.tar.gz
-          mkdir -p /tmp/serial-cover-final
-          tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
       - name: Verify feature branch has not moved
         env:
           EXPECTED_HEAD: 8690dd832c5cafc4ab007f4ea4238cfb25381c3b
