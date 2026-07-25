@@ -30,7 +30,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/masterpiece-ui.ts"],
+    files: ["src/masterpiece-ui.ts", "src/masterpiece-grouped-view.ts"],
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
