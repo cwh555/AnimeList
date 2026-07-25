@@ -1,0 +1,40 @@
+.al-masterpiece-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.al-masterpiece-group {
+  min-width: 0;
+}
+
+.al-masterpiece-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 11px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--al-border);
+}
+
+.al-shell .al-masterpiece-group-title {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.al-masterpiece-group-count {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--al-accent-soft);
+  font-size: .63rem;
+  text-align: center;
+}
+
+.al-masterpiece-group-grid {
+  width: 100%;
+}
