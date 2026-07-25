@@ -18,17 +18,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Run npm run check
-        id: project-check
-        continue-on-error: true
-        run: npm run check > check.log 2>&1
-      - name: Upload check diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: serial-cover-check-log
-          path: check.log
-      - name: Fail when project check failed
-        if: steps.project-check.outcome == 'failure'
-        run: exit 1
+      - run: npm run check
       - run: npm run release:check
