@@ -14,7 +14,7 @@ import {
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
   renameMasterpieceLabel,
-  resolveIndependentFilterState,
+  resolveSpecialListState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "./masterpiece-labels";
@@ -343,9 +343,10 @@ function installRenderer(plugin: MasterpiecePlugin): void {
     const upstreamStateChange = Reflect.get(adapters, "onStateChange");
     const forwardedAdapters = {
       ...adapters,
-      initialState: resolveIndependentFilterState(
+      initialState: resolveSpecialListState(
         libraryStates.get(container),
         Reflect.get(adapters, "initialState"),
+        active,
       ),
       onStateChange: (state: LibraryRenderState): void => {
         libraryStates.set(container, state);
@@ -356,6 +357,18 @@ function installRenderer(plugin: MasterpiecePlugin): void {
 
     const statusBar = container.querySelector(".al-status-bar") as HTMLElement | null;
     if (statusBar) {
+      const statusButtons = statusBar.querySelectorAll<HTMLButtonElement>(
+        ".al-status-chip:not(.al-special-filter-chip)",
+      );
+      statusButtons.forEach((candidate) => {
+        if (active) candidate.classList.remove("is-active");
+        candidate.addEventListener("click", () => {
+          if (!active) return;
+          activeFilters.set(container, false);
+          AnimeListUI.renderLibrary(container, inputItems, forwardedAdapters);
+        });
+      });
+
       const button = statusBar.createEl("button", {
         cls: `al-status-chip al-special-filter-chip${active ? " is-active" : ""}`,
         text: specialLabelName(modeOf(plugin)),
@@ -365,7 +378,8 @@ function installRenderer(plugin: MasterpiecePlugin): void {
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        activeFilters.set(container, !active);
+        if (active) return;
+        activeFilters.set(container, true);
         AnimeListUI.renderLibrary(container, inputItems, forwardedAdapters);
       });
     }
