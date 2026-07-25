@@ -1,9 +1,10 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { renderScoreDashboardWithBatchDrag } from "./score-dashboard-batch-drag";
 import { normalizeScoreDashboardScale, SCORE_DASHBOARD_DEFAULT_SCALE } from "./score-dashboard-model";
 import type { ScoreDashboardScoreChange } from "./score-dashboard-move";
 import type { ScoreDashboardClampSummary } from "./score-dashboard-operation-ui";
 import { scoreDashboardText as text } from "./score-dashboard-text";
-import { renderScoreDashboard, type ScoreDashboardUiState } from "./score-dashboard-ui";
+import type { ScoreDashboardUiState } from "./score-dashboard-ui";
 import type { MediaItem } from "./types";
 
 export const SCORE_DASHBOARD_VIEW_TYPE = "animelist-score-dashboard";
@@ -61,7 +62,7 @@ export class ScoreDashboardView extends ItemView {
   private render(): void {
     const scrollTop = this.contentEl.scrollTop || this.pendingScrollTop;
     this.contentEl.addClass("animelist-score-dashboard-view");
-    renderScoreDashboard(this.contentEl, this.plugin.collectMediaItems(), this.state, {
+    renderScoreDashboardWithBatchDrag(this.contentEl, this.plugin.collectMediaItems(), this.state, {
       openFile: (path) => this.plugin.openMediaFile(path),
       applyChanges: (changes) => this.plugin.applyScoreChanges(changes),
       confirmClamp: (summary) => this.plugin.confirmScoreClamp(summary),

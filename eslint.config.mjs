@@ -47,7 +47,12 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/score-dashboard-ui.ts", "src/score-dashboard-feature.ts"],
+    files: [
+      "src/score-dashboard-ui.ts",
+      "src/score-dashboard-feature.ts",
+      "src/score-dashboard-batch-drag.ts",
+      "src/score-dashboard-drag-preview.ts",
+    ],
     rules: {
       "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
