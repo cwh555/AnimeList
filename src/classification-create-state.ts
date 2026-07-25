@@ -4,7 +4,12 @@ import type { ExternalMediaResult } from "./types";
 const CREATE_DRAFTS = new Map<string, ClassificationSelection>();
 
 function normalizeKeyPart(value: unknown): string {
-  return String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase();
+  const text = typeof value === "string"
+    ? value
+    : typeof value === "number" || typeof value === "boolean" || typeof value === "bigint"
+      ? String(value)
+      : "";
+  return text.normalize("NFKC").trim().toLocaleLowerCase();
 }
 
 export function classificationCreateDraftKey(result: ExternalMediaResult): string {
