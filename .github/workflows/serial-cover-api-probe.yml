@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Probe NDL and openBD serial covers
+      - name: Probe Bangumi serial covers
         run: |
           python - <<'PY'
           import json
@@ -24,7 +24,6 @@ jobs:
           import urllib.error
           import urllib.parse
           import urllib.request
-          import xml.etree.ElementTree as ET
           from pathlib import Path
 
           works = {
@@ -33,17 +32,17 @@ jobs:
               "Invaders of the Rokujouma": "六畳間の侵略者！？",
               "That Time I Got Reincarnated as a Slime": "転生したらスライムだった件",
           }
-          volumes = range(1, 11)
-          user_agent = "AnimeList-serial-cover-probe/1.0 (https://github.com/cwh555/AnimeList)"
-          isbn_pattern = re.compile(r"(?<!\d)(97[89][\d\-]{10,16}|\d[\d\-]{8,15}[\dXx])(?!\d)")
+          user_agent = "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)"
+          digit = re.compile(r"(?<!\d)(\d{1,3})(?!\d)")
 
-          def request_bytes(url, attempts=5):
+          def request_json(url, payload=None, attempts=5):
               delay = 2.0
               for attempt in range(attempts):
                   try:
-                      request = urllib.request.Request(url, headers={"Accept": "application/xml, application/json;q=0.9, */*;q=0.8", "User-Agent": user_agent})
+                      body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                      request = urllib.request.Request(url, data=body, headers={"Accept": "application/json", "Content-Type": "application/json", "User-Agent": user_agent})
                       with urllib.request.urlopen(request, timeout=45) as response:
-                          return response.status, response.headers, response.read()
+                          return response.status, json.loads(response.read().decode("utf-8"))
                   except urllib.error.HTTPError as error:
                       if error.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
                           raise
@@ -52,104 +51,70 @@ jobs:
                       time.sleep(wait)
                       delay = min(30.0, delay * 2)
 
-          def local_name(tag):
-              return tag.rsplit("}", 1)[-1].lower()
+          def normalize(value):
+              return re.sub(r"[\W_]+", "", str(value or "").casefold())
 
-          def normalized_isbn(value):
-              digits = re.sub(r"[^0-9Xx]", "", value)
-              return digits.upper() if len(digits) in (10, 13) else ""
+          def volume_match(title, volume):
+              values = {int(value) for value in digit.findall(str(title or ""))}
+              return volume in values
 
-          def parse_ndl(xml_bytes):
-              root = ET.fromstring(xml_bytes)
-              entries = []
-              for item in root.iter():
-                  if local_name(item.tag) != "item":
-                      continue
-                  texts = []
-                  title = ""
-                  links = []
-                  for node in item.iter():
-                      name = local_name(node.tag)
-                      value = (node.text or "").strip()
-                      if value:
-                          texts.append(value)
-                      if name == "title" and value and not title:
-                          title = value
-                      for key, attr in node.attrib.items():
-                          if key.lower().endswith(("url", "href")) and attr:
-                              links.append(attr)
-                  combined = "\n".join(texts)
-                  isbns = []
-                  for match in isbn_pattern.findall(combined):
-                      isbn = normalized_isbn(match)
-                      if isbn and isbn not in isbns:
-                          isbns.append(isbn)
-                  image_urls = [url for url in links if re.search(r"\.(?:jpe?g|png|webp)(?:\?|$)", url, re.I)]
-                  entries.append({"title": title, "isbns": isbns, "imageUrls": image_urls, "sample": combined[:500]})
-              return entries
-
-          def openbd(isbns):
-              if not isbns:
-                  return []
-              params = urllib.parse.urlencode({"isbn": ",".join(isbns[:100])})
-              status, _, body = request_bytes("https://api.openbd.jp/v1/get?" + params)
-              values = json.loads(body.decode("utf-8"))
-              return [value for value in values if isinstance(value, dict)]
-
-          def openbd_summary(value):
-              summary = value.get("summary") or {}
-              return {
-                  "isbn": str(summary.get("isbn") or ""),
-                  "title": str(summary.get("title") or ""),
-                  "volume": str(summary.get("volume") or ""),
-                  "series": str(summary.get("series") or ""),
-                  "publisher": str(summary.get("publisher") or ""),
-                  "cover": str(summary.get("cover") or ""),
-              }
+          def image_ok(url):
+              if not url:
+                  return False
+              request = urllib.request.Request(url.replace("http:", "https:"), headers={"User-Agent": user_agent, "Range": "bytes=0-255"})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.status in (200, 206) and bool(response.read(256))
 
           report = []
           for display, original in works.items():
-              for volume in volumes:
+              original_key = normalize(original)
+              for volume in range(1, 11):
                   query = f"{original} {volume}"
-                  url = "https://ndlsearch.ndl.go.jp/api/opensearch?" + urllib.parse.urlencode({
-                      "cnt": 30,
-                      "title": query,
-                      "dpid": "iss-ndl-opac-national",
-                  })
-                  row = {"work": display, "volume": volume, "query": query, "ndlStatus": None, "ndlEntries": [], "openbd": [], "covers": []}
+                  row = {"work": display, "volume": volume, "query": query, "status": None, "candidates": [], "valid": []}
                   try:
-                      status, _, body = request_bytes(url)
-                      row["ndlStatus"] = status
-                      entries = parse_ndl(body)
-                      row["ndlEntries"] = entries[:10]
-                      isbns = []
-                      for entry in entries:
-                          for isbn in entry["isbns"]:
-                              if isbn not in isbns:
-                                  isbns.append(isbn)
-                      books = [openbd_summary(value) for value in openbd(isbns)]
-                      row["openbd"] = books
-                      row["covers"] = [book for book in books if book["cover"]]
-                      if not row["covers"]:
-                          row["covers"] = [
-                              {"title": entry["title"], "cover": url, "isbn": "", "volume": "", "series": original, "publisher": "NDL"}
-                              for entry in entries for url in entry["imageUrls"]
-                          ]
+                      url = "https://api.bgm.tv/v0/search/subjects?" + urllib.parse.urlencode({"limit": 50, "offset": 0})
+                      status, payload = request_json(url, {"keyword": query, "sort": "match", "filter": {"type": [1]}})
+                      row["status"] = status
+                      for subject in payload.get("data", []):
+                          images = subject.get("images") or {}
+                          title = subject.get("name") or ""
+                          chinese = subject.get("name_cn") or ""
+                          image = images.get("large") or images.get("common") or images.get("medium") or images.get("small") or images.get("grid") or ""
+                          score = 0
+                          combined_key = normalize(title + chinese)
+                          if original_key and original_key in combined_key:
+                              score += 100
+                          if volume_match(title + " " + chinese, volume):
+                              score += 60
+                          if re.search(r"漫画|コミック|comic|manga", title + " " + chinese, re.I):
+                              score -= 30
+                          candidate = {"id": subject.get("id"), "title": title, "nameCn": chinese, "image": image, "score": score}
+                          row["candidates"].append(candidate)
+                      row["candidates"].sort(key=lambda item: (-item["score"], item["title"]))
+                      for candidate in row["candidates"][:10]:
+                          try:
+                              if candidate["score"] >= 120 and image_ok(candidate["image"]):
+                                  row["valid"].append(candidate)
+                          except Exception as error:
+                              candidate["imageError"] = f"{type(error).__name__}: {error}"
                   except Exception as error:
                       row["error"] = f"{type(error).__name__}: {error}"
                   report.append(row)
-                  print(json.dumps({"work": display, "volume": volume, "ndlStatus": row.get("ndlStatus"), "entries": len(row["ndlEntries"]), "openbd": len(row["openbd"]), "covers": len(row["covers"]), "error": row.get("error")}, ensure_ascii=False), flush=True)
-                  time.sleep(1.5)
+                  print(json.dumps({"work": display, "volume": volume, "status": row.get("status"), "candidates": len(row["candidates"]), "valid": len(row["valid"]), "best": row["valid"][0] if row["valid"] else (row["candidates"][0] if row["candidates"] else None), "error": row.get("error")}, ensure_ascii=False), flush=True)
+                  time.sleep(1.0)
 
-          Path("serial-cover-ndl-openbd-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+          Path("serial-cover-bangumi-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
           summary = {}
           for display in works:
               rows = [row for row in report if row["work"] == display]
-              summary[display] = {"successful": sum(bool(row["covers"]) for row in rows), "total": len(rows)}
+              summary[display] = {"successful": sum(bool(row["valid"]) for row in rows), "total": len(rows)}
           print("SUMMARY", json.dumps(summary, ensure_ascii=False), flush=True)
+          if any(value["successful"] != value["total"] for value in summary.values()):
+              raise SystemExit(1)
           PY
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
-          name: serial-cover-ndl-openbd-report
-          path: serial-cover-ndl-openbd-report.json
+          name: serial-cover-bangumi-report
+          path: serial-cover-bangumi-report.json
           retention-days: 1
