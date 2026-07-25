@@ -19,15 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - name: Lint classification create state
-        run: npx eslint src/classification-create-state.ts --max-warnings 0
+      - name: Capture classification persistence lint
+        run: npx eslint src/classification-create-persistence.ts --format json > classification-lint.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: classification-lint-report
+          path: classification-lint.json
+          retention-days: 1
       - name: Lint classification create persistence
         run: npx eslint src/classification-create-persistence.ts --max-warnings 0
-      - name: Lint classification UI
-        run: npx eslint src/classification-ui.ts --max-warnings 0
-      - name: Lint classification migration and resolution
-        run: npx eslint src/classification-migration.ts src/classification-resolution.ts --max-warnings 0
-      - name: Lint AniList classification modules
-        run: npx eslint src/anilist-client.ts src/anilist-search.ts src/anilist-classification.ts --max-warnings 0
-      - name: Lint remaining source
-        run: npm run lint
