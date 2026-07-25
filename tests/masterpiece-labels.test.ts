@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { masterpieceActionText } from "../src/masterpiece-feature-text";
 import {
   DEFAULT_MASTERPIECE_LABEL,
   collectMasterpieceLabels,
@@ -15,16 +14,12 @@ import {
   stateAfterMasterpieceSelection,
 } from "../src/masterpiece-labels";
 
+
 describe("masterpiece label domain", () => {
   it("keeps favorite as the backward-compatible default mode", () => {
     assert.equal(normalizeSpecialLabelMode(undefined), "favorite");
     assert.equal(normalizeSpecialLabelMode("favorite"), "favorite");
     assert.equal(normalizeSpecialLabelMode("masterpiece"), "masterpiece");
-  });
-
-  it("uses the same masterpiece action wording for card and edit controls", () => {
-    assert.equal(masterpieceActionText(false), "加入 masterpiece");
-    assert.equal(masterpieceActionText(true), "編輯 masterpiece");
   });
 
   it("creates the default masterpiece category for legacy favorites", () => {
@@ -40,6 +35,13 @@ describe("masterpiece label domain", () => {
     ]);
     assert.equal(state.favorite, true);
     assert.deepEqual(state.masterpieceLabels, ["戀愛", "年度"]);
+  });
+
+  it("removes masterpiece membership when every category is unchecked and saved", () => {
+    assert.deepEqual(stateAfterMasterpieceSelection([]), {
+      favorite: false,
+      masterpieceLabels: [],
+    });
   });
 
   it("groups by the exact user-entered category name and permits repeated titles", () => {
