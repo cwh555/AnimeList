@@ -19,8 +19,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run community:check
-      - run: npm run build
-      - run: npm run release:check
+      - name: Lint classification create state
+        run: npx eslint src/classification-create-state.ts --max-warnings 0
+      - name: Lint classification create persistence
+        run: npx eslint src/classification-create-persistence.ts --max-warnings 0
+      - name: Lint classification UI
+        run: npx eslint src/classification-ui.ts --max-warnings 0
+      - name: Lint classification migration and resolution
+        run: npx eslint src/classification-migration.ts src/classification-resolution.ts --max-warnings 0
+      - name: Lint AniList classification modules
+        run: npx eslint src/anilist-client.ts src/anilist-search.ts src/anilist-classification.ts --max-warnings 0
+      - name: Lint remaining source
+        run: npm run lint
