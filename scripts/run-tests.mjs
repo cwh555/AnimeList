@@ -29,6 +29,7 @@ await writeFile(entryFile, [
   'import "../../tests/rating.test.ts";',
   'import "../../tests/progress-units.test.ts";',
   'import "../../tests/masterpiece-labels.test.ts";',
+  'import "../../tests/score-dashboard.test.ts";',
   "",
 ].join("\n"));
 

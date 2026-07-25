@@ -1,0 +1,17 @@
+export const scoreDashboardText = {
+  title: "分數表",
+  kicker: "SCORE DASHBOARD",
+  description: "依個人評分整理作品；每個作品只顯示一張代表封面。",
+  open: "開啟分數表",
+  all: "所有",
+  anime: "動畫",
+  manga: "漫畫",
+  novel: "小說",
+  unrated: "未評分",
+  hideUnrated: "隱藏未評分",
+  zoom: "縮放",
+  emptyLane: "尚無作品",
+  works: "部作品",
+  ratedSummary: (rated: number, total: number) => `已評分 ${rated}／${total}`,
+  coverAlt: (title: string) => `${title} 的封面`,
+} as const;

@@ -1,0 +1,62 @@
+.animelist-score-dashboard-view { padding: 0 24px 48px; }
+.al-score-dashboard {
+  --al-score-poster-width: 72.5px;
+  --al-score-poster-height: 108.75px;
+  --al-score-poster-gap: 5px;
+  --al-score-lane-margin: 5px;
+  --al-score-lane-min-height: 118.75px;
+  width: 100%; color: var(--text-normal);
+}
+.al-score-dashboard * { box-sizing: border-box; }
+.al-score-dashboard-header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding:26px 0 20px; border-bottom:1px solid var(--background-modifier-border); }
+.al-score-dashboard-kicker { margin-bottom:7px; color:var(--interactive-accent); font-size:.68rem; font-weight:800; letter-spacing:.16em; }
+.al-score-dashboard-title { margin:0; font-size:clamp(1.8rem,3vw,2.6rem); line-height:1.08; letter-spacing:-.035em; }
+.al-score-dashboard-description { margin:8px 0 0; color:var(--text-muted); font-size:.82rem; }
+.al-score-dashboard-summary { color:var(--text-muted); font-size:.75rem; white-space:nowrap; }
+.al-score-dashboard-controls { position:sticky; z-index:5; top:0; display:flex; align-items:center; gap:10px; padding:14px 0; background:var(--background-primary); }
+.al-score-dashboard-tabs { display:flex; gap:4px; padding:4px; overflow:auto; border:1px solid var(--background-modifier-border); border-radius:11px; background:var(--background-secondary); }
+.al-score-dashboard-tab,.al-score-dashboard-unrated { min-height:34px; padding:0 12px; border:0; border-radius:8px; color:var(--text-muted); background:transparent; white-space:nowrap; }
+.al-score-dashboard-tab:hover,.al-score-dashboard-unrated:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
+.al-score-dashboard-tab.is-active,.al-score-dashboard-unrated.is-active { color:var(--text-on-accent); background:var(--interactive-accent); }
+.al-score-dashboard-count { margin-left:7px; padding:1px 5px; border-radius:999px; background:color-mix(in srgb,currentColor 13%,transparent); font-size:.62rem; }
+.al-score-dashboard-unrated { border:1px solid var(--background-modifier-border); background:var(--background-secondary); }
+.al-score-dashboard-zoom { display:flex; align-items:center; gap:9px; margin-left:auto; min-height:40px; padding:0 12px; border:1px solid var(--background-modifier-border); border-radius:10px; background:var(--background-secondary); color:var(--text-muted); font-size:.72rem; }
+.al-score-dashboard-zoom input { width:130px; accent-color:var(--interactive-accent); }
+.al-score-dashboard-zoom output { min-width:38px; text-align:right; }
+.al-score-board { overflow:hidden; border:1px solid var(--background-modifier-border); border-radius:14px; background:var(--background-primary-alt); }
+.al-score-group { display:grid; grid-template-columns:82px minmax(0,1fr); border-bottom:1px solid var(--background-modifier-border); }
+.al-score-group:last-child { border-bottom:0; }
+.al-score-major { display:flex; min-height:var(--al-score-lane-min-height); flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:4px; color:#fff; background:var(--al-score-color,var(--background-modifier-border)); text-align:center; overflow:hidden; }
+.al-score-major-number { font-size:clamp(1rem,1.45vw,1.4rem); line-height:1; }
+.al-score-major-count { max-width:100%; font-size:.58rem; font-weight:700; line-height:1.2; overflow-wrap:anywhere; }
+.al-score-group-lanes { min-width:0; }
+.al-score-lane { display:grid; grid-template-columns:54px minmax(0,1fr); min-height:var(--al-score-lane-min-height); border-bottom:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); }
+.al-score-lane:last-child { border-bottom:0; }
+.al-score-lane-label { display:grid; place-items:center; padding:2px; border-right:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); color:var(--al-score-color,var(--text-muted)); font-size:.76rem; font-weight:800; line-height:1; overflow:hidden; }
+.al-score-lane-posters { display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-start; gap:var(--al-score-poster-gap); min-width:0; overflow-x:hidden; padding:var(--al-score-lane-margin) 12px; background:color-mix(in srgb,var(--al-score-color,var(--background-secondary)) 7%,var(--background-primary-alt)); }
+.al-score-poster { position:relative; flex:0 0 var(--al-score-poster-width); width:var(--al-score-poster-width); height:var(--al-score-poster-height); overflow:hidden; padding:0; border:1px solid color-mix(in srgb,var(--text-normal) 16%,transparent); border-radius:5px; background:var(--background-secondary); box-shadow:0 3px 9px rgba(0,0,0,.18); transition:transform .14s ease,border-color .14s ease; }
+.al-score-poster:hover,.al-score-poster:focus-visible { z-index:2; transform:translateY(-2px) scale(1.035); border-color:var(--interactive-accent); outline:none; }
+.al-score-poster-image { display:block; width:100%; height:100%; object-fit:cover; }
+.al-score-poster-missing { display:grid; width:100%; height:100%; place-items:center; color:var(--text-faint); }
+.al-score-poster-missing svg { width:42%; height:42%; fill:none; stroke:currentColor; }
+.al-score-lane-empty { align-self:center; color:var(--text-faint); font-size:.68rem; line-height:1.2; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-group { grid-template-columns:48px minmax(0,1fr); }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane { grid-template-columns:40px minmax(0,1fr); }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major { padding:2px; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major-number { font-size:.78rem; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major-count { display:none; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane-label { font-size:.62rem; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane-empty { font-size:.62rem; }
+.al-score-group.is-unrated .al-score-major { color:var(--text-muted); background:var(--background-secondary); }
+.al-score-group.is-unrated .al-score-lane-posters { background:var(--background-primary-alt); }
+.al-score-dashboard-button { gap:6px; }
+@media (max-width:780px) {
+  .animelist-score-dashboard-view { padding-inline:12px; }
+  .al-score-dashboard-header { align-items:flex-start; flex-direction:column; gap:12px; }
+  .al-score-dashboard-controls { flex-wrap:wrap; }
+  .al-score-dashboard-tabs { width:100%; }
+  .al-score-dashboard-zoom { order:3; width:100%; margin-left:0; }
+  .al-score-dashboard-zoom input { flex:1; }
+  .al-score-group { grid-template-columns:60px minmax(0,1fr); }
+  .al-score-lane { grid-template-columns:44px minmax(0,1fr); }
+}

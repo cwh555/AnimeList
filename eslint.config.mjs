@@ -46,4 +46,16 @@ export default defineConfig([
       "@typescript-eslint/unbound-method": "off",
     },
   },
+  {
+    files: ["src/score-dashboard-ui.ts", "src/score-dashboard-feature.ts"],
+    rules: {
+      "obsidianmd/prefer-create-el": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
 ]);
