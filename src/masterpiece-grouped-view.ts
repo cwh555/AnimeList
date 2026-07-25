@@ -127,22 +127,15 @@ function renderGroupedCards(
   const usedPaths = new Set<string>();
 
   for (const group of groups) {
-    const section = document.createElement("section");
-    section.className = "al-masterpiece-group";
+    const section = createEl("section", { cls: "al-masterpiece-group" });
     section.dataset.groupKey = group.key;
 
-    const heading = document.createElement("div");
-    heading.className = "al-masterpiece-group-heading";
-    const title = document.createElement("h2");
-    title.className = "al-masterpiece-group-title";
-    title.textContent = group.label;
-    const count = document.createElement("span");
-    count.className = "al-masterpiece-group-count";
-    count.textContent = String(group.items.length);
+    const heading = createDiv({ cls: "al-masterpiece-group-heading" });
+    const title = createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
+    const count = createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
     heading.append(title, count);
 
-    const grid = document.createElement("div");
-    grid.className = `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid`;
+    const grid = createDiv({ cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid` });
     group.items.forEach((entry) => {
       let card = entry.card;
       if (usedPaths.has(entry.filePath)) {
