@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+import { requestAniListGraphQL } from "./anilist-client";
 import {
   attachAniListGenres,
   attachAniListTags,
@@ -15,15 +15,9 @@ export interface AniListClassificationMedia {
   studios?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
 }
 
-interface AniListClassificationPayload {
-  data?: { Page?: { media?: AniListClassificationMedia[] | null } | null } | null;
-  errors?: Array<{ message?: string | null }> | null;
-}
-
 export type AniListClassification = Pick<ExternalMediaResult, "genres" | "tags" | "year" | "people">;
 
 const CLASSIFICATION_CACHE = new Map<string, AniListClassification>();
-
 const QUERY = `
   query ($ids: [Int]) {
     Page(page: 1, perPage: 50) {
@@ -57,21 +51,13 @@ export function classificationFromAniListMedia(media: AniListClassificationMedia
 }
 
 async function fetchChunk(ids: number[], userAgent: string): Promise<AniListClassificationMedia[]> {
-  const response = await requestUrl({
-    url: "https://graphql.anilist.co",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": userAgent,
-    },
-    body: JSON.stringify({ query: QUERY, variables: { ids } }),
-  });
-  const payload = (response.json ?? JSON.parse(response.text || "{}")) as AniListClassificationPayload;
-  if (payload.errors?.length) {
-    throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; ") || "AniList classification query failed.");
-  }
-  return payload.data?.Page?.media ?? [];
+  const data = await requestAniListGraphQL<{ Page?: { media?: AniListClassificationMedia[] | null } | null }>(
+    QUERY,
+    { ids },
+    userAgent,
+    { cacheKey: `classification:${ids.join(",")}` },
+  );
+  return data.Page?.media ?? [];
 }
 
 export async function fetchAniListClassifications(
@@ -89,14 +75,14 @@ export async function fetchAniListClassifications(
     if (cached) output.set(String(id), cached);
     else missing.push(id);
   }
-  if (!missing.length) return output;
-
-  const mediaGroups = await Promise.all(chunks(missing, 50).map((group) => fetchChunk(group, userAgent)));
-  for (const media of mediaGroups.flat()) {
-    if (media.id == null) continue;
-    const classification = classificationFromAniListMedia(media);
-    CLASSIFICATION_CACHE.set(String(media.id), classification);
-    output.set(String(media.id), classification);
+  for (const group of chunks(missing, 50)) {
+    const mediaList = await fetchChunk(group, userAgent);
+    for (const media of mediaList) {
+      if (media.id == null) continue;
+      const classification = classificationFromAniListMedia(media);
+      CLASSIFICATION_CACHE.set(String(media.id), classification);
+      output.set(String(media.id), classification);
+    }
   }
   return output;
 }
@@ -123,3 +109,7 @@ export function mergeAniListClassifications(
     };
   });
 }
+
+export const aniListClassificationTest = {
+  reset(): void { CLASSIFICATION_CACHE.clear(); },
+};

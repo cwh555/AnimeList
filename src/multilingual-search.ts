@@ -15,6 +15,8 @@ import type {
 export interface SearchProviderAdapter {
   label: string;
   supportsChineseDiscovery?: boolean;
+  singleQueryOnly?: boolean;
+  initialOnly?: boolean;
   search(query: string): Promise<ExternalMediaResult[]>;
 }
 
@@ -177,14 +179,17 @@ async function runProviderQueries(
   providers: SearchProviderAdapter[],
   queries: string[],
 ): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-  const tasks: Array<Promise<ProviderQueryOutcome>> = providers.flatMap((provider) => queries.map(async (query) => {
+  const tasks: Array<Promise<ProviderQueryOutcome>> = providers.flatMap((provider) => {
+    const providerQueries = provider.singleQueryOnly ? queries.slice(0, 1) : queries;
+    return providerQueries.map(async (query) => {
     try {
       const results = await provider.search(query);
       return { provider: provider.label, results } satisfies ProviderQuerySuccess;
     } catch (error: unknown) {
       return { provider: provider.label, error } satisfies ProviderQueryFailure;
     }
-  }));
+    });
+  });
   const settled = await Promise.all(tasks);
   const warningByProvider = new Map<string, string>();
   const results: ExternalMediaResult[] = [];
@@ -239,8 +244,9 @@ export async function searchMultilingualProviders(
     .filter((result) => scoreSearchResult(result, query, discoveryQueries) >= 36)
     .slice(0, 8);
   const aliasQueries = collectMultilingualSearchQueries(query, seedResults, languages);
+  const expandedProviders = options.providers.filter((provider) => !provider.initialOnly);
   const expanded = aliasQueries.length
-    ? await runProviderQueries(options.providers, aliasQueries)
+    ? await runProviderQueries(expandedProviders, aliasQueries)
     : { results: [], warnings: [] };
 
   const relatedQueries = uniqueQueries([...discoveryQueries, ...aliasQueries]);

@@ -1,11 +1,5 @@
-import {
-  fetchAniListClassifications,
-  mergeAniListClassifications,
-} from "./anilist-classification";
-import {
-  mergeAniListWithLocalizedResult,
-  sameMediaWork,
-} from "./classification-search";
+import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
+import { mergeAniListWithLocalizedResult, sameMediaWork } from "./classification-search";
 import type { ExternalMediaResult, MediaType } from "./types";
 
 const USER_AGENT = "AnimeList-Obsidian/1.1.2 (local personal media library)";
@@ -18,34 +12,19 @@ function cleanText(value: unknown): string {
   return typeof value === "string" ? value.normalize("NFKC").trim() : "";
 }
 
-function candidateQueries(result: ExternalMediaResult): string[] {
-  const output: string[] = [];
-  const seen = new Set<string>();
-  for (const value of [
-    result.originalTitle,
-    result.romajiTitle,
-    result.title,
-    ...(result.searchTitles ?? []),
-  ]) {
-    const clean = cleanText(value);
-    const key = clean.toLocaleLowerCase();
-    if (!clean || seen.has(key)) continue;
-    seen.add(key);
-    output.push(clean);
-  }
-  return output;
+function bestQuery(result: ExternalMediaResult): string {
+  return cleanText(result.originalTitle) || cleanText(result.romajiTitle) || cleanText(result.title)
+    || (result.searchTitles ?? []).map(cleanText).find(Boolean) || "";
 }
 
 async function findAniListEquivalent(
   host: AniListClassificationResolverHost,
   selected: ExternalMediaResult,
 ): Promise<ExternalMediaResult | null> {
-  for (const query of candidateQueries(selected)) {
-    const candidates = await host.searchAniList(selected.mediaType, query);
-    const exact = candidates.find((candidate) => sameMediaWork(candidate, selected));
-    if (exact) return exact;
-  }
-  return null;
+  const query = bestQuery(selected);
+  if (!query) return null;
+  const candidates = await host.searchAniList(selected.mediaType, query);
+  return candidates.find((candidate) => sameMediaWork(candidate, selected)) ?? null;
 }
 
 export async function resolveClassifiedMediaResult(
@@ -58,7 +37,7 @@ export async function resolveClassifiedMediaResult(
     if (!match) return { ...selected, genres: [], tags: [] };
     canonical = mergeAniListWithLocalizedResult(match, selected);
   }
-
+  if (canonical.genres.length > 0) return { ...canonical, tags: canonical.tags ?? [] };
   try {
     const classifications = await fetchAniListClassifications([canonical], USER_AGENT);
     const [enriched] = mergeAniListClassifications([canonical], classifications);

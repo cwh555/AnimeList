@@ -5,34 +5,28 @@ import {
   type SearchProviderAdapter,
 } from "./multilingual-search";
 import { preferAniListSearchResults } from "./classification-search";
-import type {
-  AnimeListSettings,
-  ExternalMediaResult,
-  MediaType,
-} from "./types";
+import { searchAniListCanonical } from "./anilist-search";
+import { legacyTest } from "./legacy";
+import type { AnimeListSettings, ExternalMediaResult, MediaType } from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.classification-search-runtime");
 
 interface ClassificationSearchRuntime extends Plugin {
   settings: AnimeListSettings;
   openAddModal(initialType?: MediaType): void;
-  searchExternal(mediaType: MediaType, query: string): Promise<{
-    results: ExternalMediaResult[];
-    warnings: string[];
-  }>;
+  searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
 }
 
-function providersFor(
-  plugin: ClassificationSearchRuntime,
-  mediaType: MediaType,
-): SearchProviderAdapter[] {
+function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType): SearchProviderAdapter[] {
   const providers: SearchProviderAdapter[] = [];
   if (plugin.settings.providers.anilist) {
     providers.push({
       label: "AniList",
+      singleQueryOnly: true,
+      initialOnly: true,
       search: (query) => plugin.searchAniList(mediaType, query),
     });
   }
@@ -44,10 +38,7 @@ function providersFor(
     });
   }
   if (mediaType === "novel" && plugin.settings.providers.openlibrary) {
-    providers.push({
-      label: "Open Library",
-      search: (query) => plugin.searchOpenLibrary(query),
-    });
+    providers.push({ label: "Open Library", search: (query) => plugin.searchOpenLibrary(query) });
   }
   return providers;
 }
@@ -61,23 +52,24 @@ function installCanonicalSearch(plugin: ClassificationSearchRuntime): void {
       dedupe: preferAniListSearchResults,
       maxResults: 24,
     });
-    return {
-      results: preferAniListSearchResults(response.results),
-      warnings: response.warnings,
-    };
+    return { results: preferAniListSearchResults(response.results), warnings: response.warnings };
   };
 }
 
 export function installClassificationSearchRuntime(plugin: Plugin): void {
   const runtime = plugin as ClassificationSearchRuntime;
   if (Reflect.get(runtime, PATCH_MARKER) === true) return;
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- preserve the pre-patch method for a deliberate call with runtime
-  const originalOpenAddModal = runtime.openAddModal;
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Runtime method binding crosses the Obsidian plugin boundary. */
+  const normalizeAniListMedia = legacyTest.normalizeAniListMedia as unknown as (
+    value: unknown,
+    mediaType: MediaType,
+  ) => ExternalMediaResult;
+  runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query, normalizeAniListMedia);
+  const originalOpenAddModal = runtime.openAddModal.bind(runtime);
   runtime.openAddModal = (initialType = "anime") => {
-    originalOpenAddModal.call(runtime, initialType);
-    // Search enhancements install their instance method lazily inside openAddModal.
-    // Reinstall the canonical search after that initialization and before the user searches.
+    originalOpenAddModal(initialType);
     installCanonicalSearch(runtime);
   };
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Restore strict checks after runtime method binding. */
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
