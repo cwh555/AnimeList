@@ -37,6 +37,8 @@ export async function resolveMediaForCreate(
 export function installClassificationCreatePersistence(plugin: Plugin): void {
   const runtime = plugin as ClassificationPersistenceHost;
   if (Reflect.get(runtime, PERSISTENCE_MARKER) === true) return;
+  // The method is immediately bound before the integration adapter replaces it.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const original = runtime.createMediaNote.bind(runtime);
   runtime.createMediaNote = async (selected, form) => {
     const draft = getClassificationCreateDraft(selected);
