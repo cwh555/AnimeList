@@ -38,3 +38,34 @@
 .al-masterpiece-group-grid {
   width: 100%;
 }
+
+.al-masterpiece-selection-modal .al-media-form {
+  gap: 8px;
+}
+
+.al-masterpiece-new-label-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: stretch;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.al-masterpiece-new-label-setting .setting-item-info {
+  margin: 0;
+}
+
+.al-masterpiece-new-label-setting .setting-item-control {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.al-masterpiece-new-label-setting input[type="text"] {
+  width: 100%;
+  max-width: none;
+}
+
+.al-masterpiece-selection-modal .al-modal-actions {
+  justify-content: flex-end;
+}
