@@ -35,6 +35,8 @@ export default defineConfig([
       "src/masterpiece-grouped-view.ts",
       "src/masterpiece-edit-ui.ts",
       "src/masterpiece-operation-ui.ts",
+      "src/classification-ui.ts",
+      "src/classification-settings.ts",
     ],
     rules: {
       "obsidianmd/prefer-create-el": "off",

@@ -9,17 +9,18 @@ const GENERATED_STYLE_START = "/* BEGIN GENERATED FEATURE STYLES */";
 const GENERATED_STYLE_END = "/* END GENERATED FEATURE STYLES */";
 
 async function buildStyles() {
-  const [currentStyles, serialStyles, progressStyles, masterpieceStyles] = await Promise.all([
+  const [currentStyles, serialStyles, progressStyles, masterpieceStyles, classificationStyles] = await Promise.all([
     readFile("styles.css", "utf8"),
     readFile("styles.serial-reading.css", "utf8"),
     readFile("styles.progress.css", "utf8"),
     readFile("styles.masterpiece.css", "utf8"),
+    readFile("styles.classification.css", "utf8"),
   ]);
   const generatedStart = currentStyles.indexOf(GENERATED_STYLE_START);
   const legacyGeneratedStart = currentStyles.indexOf("/* BEGIN GENERATED SERIAL READING UI */");
   const cutIndex = generatedStart >= 0 ? generatedStart : legacyGeneratedStart;
   const baseStyles = (cutIndex >= 0 ? currentStyles.slice(0, cutIndex) : currentStyles).trimEnd();
-  const generatedStyles = [serialStyles.trim(), progressStyles.trim(), masterpieceStyles.trim()].join("\n\n");
+  const generatedStyles = [serialStyles.trim(), progressStyles.trim(), masterpieceStyles.trim(), classificationStyles.trim()].join("\n\n");
   const outputStyles = `${baseStyles}\n\n${GENERATED_STYLE_START}\n${generatedStyles}\n${GENERATED_STYLE_END}\n`;
   await writeFile("styles.css", outputStyles, "utf8");
 }

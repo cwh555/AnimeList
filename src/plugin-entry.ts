@@ -2,6 +2,11 @@ import "./search-pagination";
 import "./progress-ui";
 import AnimeListPlugin from "./main";
 import { installAdditionalProgressUnitsUi } from "./additional-progress-units-ui";
+import { installClassificationCreatePersistence } from "./classification-create-persistence";
+import { installClassificationUi } from "./classification-ui";
+import { installClassificationSearchRuntime } from "./classification-search-runtime";
+import { installClassificationMigration } from "./classification-migration";
+import { installClassificationSettings } from "./classification-settings";
 import { installMasterpieceEditUi } from "./masterpiece-edit-ui";
 import { installMasterpieceGroupedView } from "./masterpiece-grouped-view";
 import { installMasterpieceOperationUi } from "./masterpiece-operation-ui";
@@ -17,5 +22,10 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     installMasterpieceOperationUi(this);
     installMasterpieceEditUi(this);
     installMasterpieceGroupedView(this);
+    installClassificationUi(this);
+    installClassificationSearchRuntime(this);
+    installClassificationMigration(this);
+    installClassificationCreatePersistence(this);
+    installClassificationSettings(this);
   }
 }

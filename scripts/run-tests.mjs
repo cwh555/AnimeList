@@ -29,6 +29,9 @@ await writeFile(entryFile, [
   'import "../../tests/rating.test.ts";',
   'import "../../tests/progress-units.test.ts";',
   'import "../../tests/masterpiece-labels.test.ts";',
+  'import "../../tests/media-classification.test.ts";',
+  'import "../../tests/anilist-rate-limit.test.ts";',
+  'import "../../tests/classification-persistence.test.ts";',
   "",
 ].join("\n"));
 

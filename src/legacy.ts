@@ -539,12 +539,7 @@ export const AnimeListUI = (() => {
     return uiText("library.notStarted");
   };
 
-  const statusMatch = (item, filter, adapters) => {
-    const customMatch = adapters.matchesStatusFilter?.(item, filter);
-    return typeof customMatch === "boolean"
-      ? customMatch
-      : mediaStatusMatches(item.status, filter);
-  };
+  const statusMatch = (item, filter) => mediaStatusMatches(item.status, filter);
 
   function renderLibrary(container, inputItems, adapters = {}) {
     container.replaceChildren();
@@ -552,16 +547,9 @@ export const AnimeListUI = (() => {
     const genres = [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
     const initialState = adapters.initialState || {};
     const initialView = ["grid", "list", "poster"].includes(initialState.view || adapters.initialView) ? (initialState.view || adapters.initialView) : "grid";
-    const initialType = ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all";
-    const statusOptions = (type) => [
-      ...statusFilterOptions(type),
-      ...asArray(adapters.extraStatusFilters?.(type)),
-    ];
-    const initialStatus = String(initialState.status || "");
-    const initialStatusKeys = new Set(statusOptions(initialType).map(([key]) => key));
     const state = {
-      type: initialType,
-      status: initialStatusKeys.has(initialStatus) ? initialStatus : normalizeStatusFilter(initialStatus),
+      type: ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all",
+      status: normalizeStatusFilter(initialState.status),
       genre: initialState.genre || "all",
       query: initialState.query || "",
       sort: initialState.sort || "completed-desc",
@@ -694,7 +682,7 @@ export const AnimeListUI = (() => {
     const renderStatusButtons = () => {
       statusButtons.clear();
       statusBar.replaceChildren();
-      statusOptions(state.type).forEach(([key, label]) => {
+      statusFilterOptions(state.type).forEach(([key, label]) => {
         const button = makeEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
         button.type = "button";
         button.addEventListener("click", () => {
@@ -849,7 +837,7 @@ export const AnimeListUI = (() => {
       const query = state.query;
       let filtered = items.filter((item) => {
         if (state.type !== "all" && item.mediaType !== state.type) return false;
-        if (!statusMatch(item, state.status, adapters)) return false;
+        if (!statusMatch(item, state.status)) return false;
         if (state.genre !== "all" && !item.genres.includes(state.genre)) return false;
         if (!query) return true;
         return [item.title, item.originalTitle, item.format, ...item.genres, ...item.people, ...item.platforms].join(" ").toLocaleLowerCase().includes(query);
