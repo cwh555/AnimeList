@@ -38,8 +38,13 @@ function mediaNote(item) {
   lines.push(`progress_unit: ${yamlScalar(item.unit)}`);
   if (item.score != null) lines.push(`score: ${yamlScalar(item.score)}`);
   lines.push(`favorite: ${yamlScalar(Boolean(item.favorite))}`);
+  if (item.masterpieceLabels?.length) {
+    lines.push("masterpiece_labels:");
+    for (const label of item.masterpieceLabels) lines.push(`  - ${yamlScalar(label)}`);
+  }
+  if (item.preservationMarker) lines.push(`fixture_preservation_marker: ${yamlScalar(item.preservationMarker)}`);
   lines.push(`year: ${yamlScalar(item.year ?? 2026)}`);
-  lines.push("genres:", "  - 測試資料");
+  lines.push("genres:", `  - ${yamlScalar(item.genre ?? "測試資料")}`);
   if (item.startedAt) lines.push(`started_at: ${yamlScalar(item.startedAt)}`);
   if (item.completedAt) lines.push(`completed_at: ${yamlScalar(item.completedAt)}`);
   if (item.volumeLog?.length) {
@@ -50,7 +55,16 @@ function mediaNote(item) {
       if (volume.completedAt) lines.push(`    completed_at: ${yamlScalar(volume.completedAt)}`);
     }
   }
-  lines.push("---", "", `# ${item.title}`, "", "```animelist-detail", "```", "", "> Generated test fixture. Changes are discarded the next time fixtures are reset.");
+  lines.push(
+    "---",
+    "",
+    `# ${item.title}`,
+    "",
+    "```animelist-detail",
+    "```",
+    "",
+    item.preservationMarker ? `> PRESERVE BODY: ${item.preservationMarker}` : "> Generated test fixture. Changes are discarded the next time fixtures are reset.",
+  );
   return lines.join("\n");
 }
 
@@ -82,6 +96,12 @@ const FIXTURES = [
   { folder: "Novel", file: "11-novel-on-hold.md", title: "TEST 小說－擱置半滿進度條", mediaType: "novel", format: "light_novel", status: "on_hold", releaseStatus: "hiatus", progress: 4, unit: "volume", startedAt: "2026-02-01", volumeLog: completedVolumes(4) },
   { folder: "Novel", file: "12-novel-dropped.md", title: "TEST 小說－棄置半滿進度條", mediaType: "novel", format: "light_novel", status: "dropped", releaseStatus: "cancelled", progress: 2, unit: "volume", startedAt: "2026-01-02", volumeLog: completedVolumes(2) },
   { folder: "Novel", file: "13-novel-completed.md", title: "TEST 小說－已完成全滿進度條", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 6, unit: "volume", score: 9.5, startedAt: "2026-01-01", completedAt: "2026-03-01", volumeLog: completedVolumes(6) },
+
+  { folder: "Special", file: "14-special-legacy-favorite-completed.md", title: "SPECIAL 01－舊版最愛／已完成", mediaType: "anime", format: "tv", status: "completed", releaseStatus: "finished", progress: 12, total: 12, unit: "episode", score: 9, favorite: true, completedAt: "2026-07-01", genre: "SPECIAL 驗證", preservationMarker: "legacy-favorite-completed" },
+  { folder: "Special", file: "15-special-multi-label-ongoing.md", title: "SPECIAL 02－多分類最愛／進行中", mediaType: "anime", format: "tv", status: "ongoing", releaseStatus: "releasing", progress: 4, total: 12, unit: "episode", favorite: true, masterpieceLabels: ["戀愛 masterpiece", "年度 masterpiece"], genre: "SPECIAL 驗證", preservationMarker: "multi-label-ongoing" },
+  { folder: "Special", file: "16-special-shared-label-planned.md", title: "SPECIAL 03－共享分類最愛／願望清單", mediaType: "manga", format: "manga", status: "planned", releaseStatus: "releasing", progress: 0, unit: "chapter", favorite: true, masterpieceLabels: ["戀愛 masterpiece"], genre: "SPECIAL 驗證", preservationMarker: "shared-label-planned" },
+  { folder: "Special", file: "17-special-retained-label-completed.md", title: "SPECIAL 04－非最愛保留分類／已完成", mediaType: "novel", format: "light_novel", status: "completed", releaseStatus: "finished", progress: 3, unit: "volume", favorite: false, masterpieceLabels: ["保留分類 masterpiece"], score: 8, completedAt: "2026-07-02", genre: "SPECIAL 驗證", preservationMarker: "retained-label-completed" },
+  { folder: "Special", file: "18-special-control-planned.md", title: "SPECIAL 05－一般作品／願望清單", mediaType: "anime", format: "tv", status: "planned", releaseStatus: "finished", progress: 0, total: 12, unit: "episode", favorite: false, genre: "SPECIAL 驗證", preservationMarker: "control-planned" },
 ];
 
 function checklistContent() {
@@ -90,47 +110,69 @@ function checklistContent() {
 > [!warning]
 > This file and everything under \`${TEST_FIXTURE_ROOT}\` are generated locally. Run \`npm run test-vault:fixtures\` to restore the baseline fixtures.
 
-## 1. Library and progress bars
+## 1. Favorite list: shared single-selection behavior
 
-The library below already contains every status needed for visual verification. Switch it to **list view once** and verify that every progress track reaches the available card width.
+Use the library below and search for **SPECIAL**. Keep the media type on **All**.
 
 \`\`\`animelist
 source: ${TEST_FIXTURE_ROOT}
 \`\`\`
 
-Expected manga and novel state tracks:
+Expected fixed counts:
 
-- Planned: empty track and no redundant not-started sentence.
-- Reading, on hold, and dropped: half track.
-- Completed: full track.
-- Anime continues to use its numeric progress ratio.
+- All: **5** SPECIAL titles.
+- Favorite: **3** titles.
+- Completed: **2** titles.
+- Wishlist: **2** titles.
+- Ongoing: **1** title.
 
-## 2. Novel add-volume flow and date layout
+Selection check:
 
-Open [[${TEST_FIXTURE_ROOT}/Novel/10-novel-add-volume|TEST 小說－新增卷數與日期排版]], click **Edit**, and verify:
+1. Click **Completed**, then **Favorite**, then **Wishlist**.
+2. After every click, exactly one list button must be active.
+3. The active button must show the expected count above; no previous button may remain active.
+4. Favorite must include SPECIAL 01, 02, and 03 even though their statuses differ.
+5. Type, genre, search, sort, and view controls must continue to work while Favorite is selected.
 
-- The volume editor spans the full modal width.
-- Volume, started date, and completed date use the horizontal space clearly.
-- **Add volume** stays below the existing rows.
-- Adding the next volume creates volume 15 and keeps the new row visible.
+## 2. Favorite mode compatibility
 
-## 3. Direct status fixtures
+Keep **Special label mode = Favorite** in AnimeList settings.
 
-### Manga
+- SPECIAL 01 is a legacy \`favorite: true\` note with no \`masterpiece_labels\`; it must still appear in Favorite.
+- Toggle the star on SPECIAL 05 on, then off. Favorite count must change **3 → 4 → 3**.
+- Open SPECIAL 04 and confirm it is not favorite even though its custom \`masterpiece_labels\` value exists.
 
-- [[${TEST_FIXTURE_ROOT}/Manga/04-manga-planned|Planned]]
-- [[${TEST_FIXTURE_ROOT}/Manga/05-manga-reading|Reading]]
-- [[${TEST_FIXTURE_ROOT}/Manga/06-manga-on-hold|On hold]]
-- [[${TEST_FIXTURE_ROOT}/Manga/07-manga-dropped|Dropped]]
-- [[${TEST_FIXTURE_ROOT}/Manga/08-manga-completed|Completed]]
+## 3. Masterpiece mode and reusable categories
 
-### Novel
+Switch **Special label mode = Masterpiece** in AnimeList settings.
 
-- [[${TEST_FIXTURE_ROOT}/Novel/09-novel-planned|Planned]]
-- [[${TEST_FIXTURE_ROOT}/Novel/10-novel-add-volume|Reading and add-volume target]]
-- [[${TEST_FIXTURE_ROOT}/Novel/11-novel-on-hold|On hold]]
-- [[${TEST_FIXTURE_ROOT}/Novel/12-novel-dropped|Dropped]]
-- [[${TEST_FIXTURE_ROOT}/Novel/13-novel-completed|Completed]]
+- The list button changes to **masterpiece** but remains in the same row and remains mutually exclusive.
+- SPECIAL 01 remains included and behaves as the virtual default \`masterpiece\` category.
+- SPECIAL 02 shows both **戀愛 masterpiece** and **年度 masterpiece**.
+- SPECIAL 03 reuses **戀愛 masterpiece**.
+- Click SPECIAL 05's star, select two existing categories, save, and confirm both labels appear. Remove it afterward; the list returns to 3 titles.
+- Switch Masterpiece → Favorite → Masterpiece. SPECIAL 02 and SPECIAL 03 must retain their categories.
+
+## 4. Rename/delete propagation and content preservation
+
+Before editing categories, open these notes in source mode and note the marker in frontmatter and body:
+
+- [[${TEST_FIXTURE_ROOT}/Special/15-special-multi-label-ongoing|SPECIAL 02]]
+- [[${TEST_FIXTURE_ROOT}/Special/16-special-shared-label-planned|SPECIAL 03]]
+- [[${TEST_FIXTURE_ROOT}/Special/17-special-retained-label-completed|SPECIAL 04]]
+
+Then in settings:
+
+1. Rename **戀愛 masterpiece** to **戀愛精選 masterpiece**. SPECIAL 02 and SPECIAL 03 must both update.
+2. Delete **年度 masterpiece**. It must disappear from SPECIAL 02 only.
+3. Confirm SPECIAL 04's non-favorite retained category still exists.
+4. Confirm every \`fixture_preservation_marker\` and every \`PRESERVE BODY\` line is unchanged.
+5. Run \`npm run test-vault:fixtures\` afterward to restore all generated notes.
+
+## 5. Existing progress/layout regression checks
+
+- Switch the library to list view once and verify progress tracks still use the available card width.
+- Open [[${TEST_FIXTURE_ROOT}/Novel/10-novel-add-volume|TEST 小說－新增卷數與日期排版]], click **Edit**, add volume 15, and verify the row remains visible and uses the modal width.
 `;
 }
 
