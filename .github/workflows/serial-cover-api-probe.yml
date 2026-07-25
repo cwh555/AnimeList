@@ -38,12 +38,9 @@ jobs:
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
           git checkout -B feature/serial-entry-covers origin/feature/serial-entry-covers
           cp -a /tmp/bangumi-cover-payload/. .
-      - name: Run npm ci
-        run: npm ci
-      - name: Run npm run check
-        run: npm run check
-      - name: Run npm run release:check
-        run: npm run release:check
+      - run: npm ci
+      - run: npm run check
+      - run: npm run release:check
       - name: Build production Test Vault
         env:
           ANIMELIST_TEST_VAULT_NO_OPEN: "1"
@@ -52,23 +49,11 @@ jobs:
         run: |
           mkdir -p .tmp
           cat > .tmp/obsidian-live.ts <<'TS'
-          export async function requestUrl(options: {
-            url: string;
-            method?: string;
-            body?: string;
-            headers?: Record<string, string>;
-          }): Promise<{ json: unknown; text: string }> {
-            const response = await fetch(options.url, {
-              method: options.method ?? "GET",
-              body: options.body,
-              headers: options.headers,
-            });
+          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
+            const response = await fetch(options.url, { method: options.method ?? "GET", body: options.body, headers: options.headers });
             const text = await response.text();
             if (!response.ok) {
-              const error = new Error(`Request failed with status ${response.status}`) as Error & {
-                status: number;
-                response: { status: number; headers: Headers };
-              };
+              const error = new Error(`Request failed with status ${response.status}`) as Error & { status: number; response: { status: number; headers: Headers } };
               error.status = response.status;
               error.response = { status: response.status, headers: response.headers };
               throw error;
@@ -78,14 +63,8 @@ jobs:
           TS
           cat > .tmp/serial-cover-live.ts <<'TS'
           import { writeFile } from "node:fs/promises";
-          import {
-            clearSerialCoverProviderCache,
-            configureSerialCoverProvider,
-            configureSerialCoverProviderForTests,
-            searchSerialCovers,
-          } from "../src/serial-cover-provider";
+          import { clearSerialCoverProviderCache, configureSerialCoverProvider, configureSerialCoverProviderForTests, searchSerialCovers } from "../src/serial-cover-provider";
           import { confidentSerialCover } from "../src/serial-entry-cover";
-
           const works = new Map<string, string>([
             ["KonoSuba", "この素晴らしい世界に祝福を！"],
             ["Mushoku Tensei", "無職転生 ～異世界行ったら本気だす～"],
@@ -95,44 +74,48 @@ jobs:
           const comparable = (value: string): string => value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
           const report: Array<Record<string, unknown>> = [];
           configureSerialCoverProvider({ apiKey: "" });
-          configureSerialCoverProviderForTests({
-            sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
-            random: () => 0,
-          });
+          configureSerialCoverProviderForTests({ sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), random: () => 0 });
           clearSerialCoverProviderCache();
-
-          for (const [work, originalTitle] of works) {
-            for (let volume = 1; volume <= 10; volume += 1) {
-              const label = String(volume);
-              const query = `${originalTitle} ${label}`;
-              const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
-              const selected = confidentSerialCover(candidates);
-              if (!selected) throw new Error(`${work} ${volume}: no confident result`);
-              if (selected.provider !== "Bangumi") throw new Error(`${work} ${volume}: unexpected provider ${selected.provider}`);
-              if (comparable(selected.title) !== `${comparable(originalTitle)}${label}`) {
-                throw new Error(`${work} ${volume}: wrong title ${selected.title}`);
+          try {
+            for (const [work, originalTitle] of works) {
+              for (let volume = 1; volume <= 10; volume += 1) {
+                const label = String(volume);
+                const query = `${originalTitle} ${label}`;
+                const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
+                const selected = confidentSerialCover(candidates);
+                if (!selected) throw new Error(`${work} ${volume}: no confident result; top=${JSON.stringify(candidates.slice(0, 3))}`);
+                if (selected.provider !== "Bangumi") throw new Error(`${work} ${volume}: unexpected provider ${selected.provider}`);
+                if (comparable(selected.title) !== `${comparable(originalTitle)}${label}`) throw new Error(`${work} ${volume}: wrong title ${selected.title}`);
+                if (!(selected.categories ?? []).some((category) => /light\s*novel|小说|小説/i.test(category))) throw new Error(`${work} ${volume}: result is not a novel; ${JSON.stringify(selected)}`);
+                const image = await fetch(selected.coverUrl, { headers: { Range: "bytes=0-255" } });
+                if (!image.ok || !(await image.arrayBuffer()).byteLength) throw new Error(`${work} ${volume}: cover is not downloadable`);
+                const row = { work, volume, query, sourceId: selected.sourceId, title: selected.title, provider: selected.provider, score: selected.score };
+                report.push(row);
+                console.log(JSON.stringify(row));
               }
-              if (!(selected.categories ?? []).some((category) => /light\s*novel|小说|小説/i.test(category))) {
-                throw new Error(`${work} ${volume}: result is not a novel`);
-              }
-              const image = await fetch(selected.coverUrl, { headers: { Range: "bytes=0-255" } });
-              if (!image.ok || !(await image.arrayBuffer()).byteLength) {
-                throw new Error(`${work} ${volume}: cover is not downloadable`);
-              }
-              const row = { work, volume, query, sourceId: selected.sourceId, title: selected.title, provider: selected.provider, score: selected.score };
-              report.push(row);
-              console.log(JSON.stringify(row));
             }
+          } finally {
+            await writeFile("serial-cover-live-report.json", JSON.stringify(report, null, 2));
           }
-          await writeFile("serial-cover-live-report.json", JSON.stringify(report, null, 2));
           if (report.length !== 40) throw new Error(`Expected 40 results, received ${report.length}`);
           TS
-          npx esbuild .tmp/serial-cover-live.ts --bundle --platform=node --format=esm --target=node24 --alias:obsidian=./.tmp/obsidian-live.ts --outfile=.tmp/serial-cover-live.mjs
-          node .tmp/serial-cover-live.mjs
+          set +e
+          npx esbuild .tmp/serial-cover-live.ts --bundle --platform=node --format=esm --target=node24 --alias:obsidian=./.tmp/obsidian-live.ts --outfile=.tmp/serial-cover-live.mjs > serial-cover-live.log 2>&1
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            node .tmp/serial-cover-live.mjs >> serial-cover-live.log 2>&1
+            status=$?
+          fi
+          cat serial-cover-live.log
+          exit "$status"
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: serial-cover-live-report
-          path: serial-cover-live-report.json
+          path: |
+            serial-cover-live-report.json
+            serial-cover-live.log
+          if-no-files-found: warn
           retention-days: 1
       - name: Publish validated feature changes
         env:
