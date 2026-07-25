@@ -23,6 +23,7 @@ function result(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResu
     total: 12,
     unit: "episode",
     year: 2018,
+    season: 1,
     genres: ["喜劇", "戀愛", "日常", "校園"],
     tags: [],
     rawGenres: ["Comedy", "Romance", "Slice of Life"],
@@ -78,17 +79,18 @@ describe("media classification", () => {
     assert.deepEqual(classificationSuggestions("tag", ["自訂標籤"]), []);
   });
 
-  it("converts representative AniList data to broad classifications", () => {
+  it("converts representative AniList data to broad classifications and release season", () => {
     assert.deepEqual(classificationFromAniListMedia({
       id: 99468,
       genres: ["Comedy", "Romance", "Slice of Life"],
       tags: [{ name: "School", rank: 82 }, { name: "Slapstick", rank: 80 }],
-      startDate: { year: 2018 },
+      startDate: { year: 2018, month: 1 },
       studios: { nodes: [{ name: "Shin-Ei Animation" }] },
     }), {
       genres: ["喜劇", "戀愛", "日常", "校園"],
       tags: [],
       year: 2018,
+      season: 1,
       people: ["Shin-Ei Animation"],
     });
   });
