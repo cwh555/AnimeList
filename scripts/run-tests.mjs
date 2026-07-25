@@ -28,6 +28,10 @@ await writeFile(entryFile, [
   'import "../../tests/timeline-scale-work-items.test.ts";',
   'import "../../tests/rating.test.ts";',
   'import "../../tests/progress-units.test.ts";',
+  'import "../../tests/masterpiece-labels.test.ts";',
+  'import "../../tests/score-dashboard.test.ts";',
+  'import "../../tests/score-dashboard-selection.test.ts";',
+  'import "../../tests/score-dashboard-drag-scroll.test.ts";',
   "",
 ].join("\n"));
 
