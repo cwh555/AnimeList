@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   check:
@@ -19,20 +18,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - name: Capture lint diagnostics
-        id: lint
-        continue-on-error: true
-        run: npm run lint > lint.log 2>&1
-      - name: Post lint diagnostics
-        if: steps.lint.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file lint.log
-      - name: Fail after lint diagnostics
-        if: steps.lint.outcome == 'failure'
-        run: exit 1
-      - run: npm test
-      - run: npm run community:check
-      - run: npm run build
+      - run: npm run check
       - run: npm run release:check
