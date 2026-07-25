@@ -53,26 +53,16 @@ export function stateAfterMasterpieceSelection(selectedLabels: unknown): Special
   return { favorite: labels.length > 0, masterpieceLabels: labels };
 }
 
-export function filterBySpecialLabel<T>(
-  items: readonly T[],
-  active: boolean,
-): T[] {
-  if (!active) return [...items];
-  return items.filter((item) => (
-    typeof item === "object"
-    && item !== null
-    && Reflect.get(item, "favorite") === true
-  ));
-}
+export const SPECIAL_LABEL_FILTER = "favorite" as const;
 
-export function resolveSpecialListState<T extends { status?: string }>(
-  currentState: T | undefined,
-  initialState: T | undefined,
-  active: boolean,
-): T | undefined {
-  const state = currentState ?? initialState;
-  if (!state || !active) return state;
-  return { ...state, status: "all" };
+export function matchesSpecialLabelFilter(
+  item: unknown,
+  filter: unknown,
+): boolean | undefined {
+  if (filter !== SPECIAL_LABEL_FILTER) return undefined;
+  return typeof item === "object"
+    && item !== null
+    && Reflect.get(item, "favorite") === true;
 }
 
 export function collectMasterpieceLabels(items: Array<{

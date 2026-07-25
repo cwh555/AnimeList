@@ -8,13 +8,12 @@ import { getScopedMarkdownFiles } from "./vault-scope";
 import {
   collectMasterpieceLabels,
   deleteMasterpieceLabel,
-  filterBySpecialLabel,
   labelsForMasterpieceEnable,
   normalizeMasterpieceLabel,
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
+  matchesSpecialLabelFilter,
   renameMasterpieceLabel,
-  resolveSpecialListState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "./masterpiece-labels";
@@ -29,15 +28,6 @@ interface MediaItemWithMasterpiece extends MediaItem {
   masterpieceLabels?: string[];
 }
 
-interface LibraryRenderState {
-  type?: string;
-  status?: string;
-  genre?: string;
-  query?: string;
-  sort?: string;
-  view?: string;
-}
-
 type MasterpiecePlugin = AnimeListPlugin & {
   settings: AnimeListPlugin["settings"] & MasterpieceSettings;
 };
@@ -47,8 +37,6 @@ type SettingSectionsMethod = (this: AnimeListSettingTab) => SettingsSection[];
 const installedPlugins = new WeakSet<object>();
 const installedSettings = new WeakSet<object>();
 const installedRenderers = new WeakSet<object>();
-const activeFilters = new WeakMap<HTMLElement, boolean>();
-const libraryStates = new WeakMap<HTMLElement, LibraryRenderState>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -338,52 +326,25 @@ function installRenderer(plugin: MasterpiecePlugin): void {
   const original = AnimeListUI.renderLibrary.bind(AnimeListUI);
 
   AnimeListUI.renderLibrary = (container, inputItems, adapters = {}): void => {
-    const active = activeFilters.get(container) === true;
-    const items = filterBySpecialLabel(inputItems, active).filter(isMediaItem);
-    const upstreamStateChange = Reflect.get(adapters, "onStateChange");
+    const upstreamExtraFilters = Reflect.get(adapters, "extraStatusFilters");
+    const upstreamMatcher = Reflect.get(adapters, "matchesStatusFilter");
     const forwardedAdapters = {
       ...adapters,
-      initialState: resolveSpecialListState(
-        libraryStates.get(container),
-        Reflect.get(adapters, "initialState"),
-        active,
-      ),
-      onStateChange: (state: LibraryRenderState): void => {
-        libraryStates.set(container, state);
-        if (typeof upstreamStateChange === "function") upstreamStateChange(state);
+      extraStatusFilters: (type: string): Array<[string, string]> => [
+        ...(typeof upstreamExtraFilters === "function" ? upstreamExtraFilters(type) : []),
+        ["favorite", specialLabelName(modeOf(plugin))],
+      ],
+      matchesStatusFilter: (item: unknown, filter: string): boolean | undefined => {
+        const specialMatch = matchesSpecialLabelFilter(item, filter);
+        if (typeof specialMatch === "boolean") return specialMatch;
+        return typeof upstreamMatcher === "function"
+          ? upstreamMatcher(item, filter)
+          : undefined;
       },
     };
-    original(container, items, forwardedAdapters);
+    original(container, inputItems, forwardedAdapters);
 
-    const statusBar = container.querySelector(".al-status-bar") as HTMLElement | null;
-    if (statusBar) {
-      const statusButtons = statusBar.querySelectorAll<HTMLButtonElement>(
-        ".al-status-chip:not(.al-special-filter-chip)",
-      );
-      statusButtons.forEach((candidate) => {
-        if (active) candidate.classList.remove("is-active");
-        candidate.addEventListener("click", () => {
-          if (!active) return;
-          activeFilters.set(container, false);
-          AnimeListUI.renderLibrary(container, inputItems, forwardedAdapters);
-        });
-      });
-
-      const button = statusBar.createEl("button", {
-        cls: `al-status-chip al-special-filter-chip${active ? " is-active" : ""}`,
-        text: specialLabelName(modeOf(plugin)),
-      });
-      button.type = "button";
-      button.setAttribute("aria-pressed", active ? "true" : "false");
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (active) return;
-        activeFilters.set(container, true);
-        AnimeListUI.renderLibrary(container, inputItems, forwardedAdapters);
-      });
-    }
-
+    const items = inputItems.filter(isMediaItem);
     const byPath = new Map(items.map((item) => [item.filePath, item]));
     const cards = container.querySelectorAll(".al-card") as NodeListOf<HTMLElement>;
     cards.forEach((card) => {

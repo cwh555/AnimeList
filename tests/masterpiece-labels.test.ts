@@ -4,12 +4,11 @@ import {
   DEFAULT_MASTERPIECE_LABEL,
   collectMasterpieceLabels,
   deleteMasterpieceLabel,
-  filterBySpecialLabel,
   labelsForMasterpieceEnable,
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
+  matchesSpecialLabelFilter,
   renameMasterpieceLabel,
-  resolveSpecialListState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "../src/masterpiece-labels";
@@ -57,21 +56,10 @@ describe("masterpiece label domain", () => {
     });
   });
 
-  it("treats favorite as a mutually exclusive peer list", () => {
-    const currentState = { type: "anime", status: "completed", genre: "all" };
-    const staleInitialState = { type: "all", status: "planned", genre: "all" };
-    assert.deepEqual(
-      resolveSpecialListState(currentState, staleInitialState, true),
-      { type: "anime", status: "all", genre: "all" },
-    );
-    assert.deepEqual(
-      resolveSpecialListState(currentState, staleInitialState, false),
-      currentState,
-    );
-    assert.deepEqual(filterBySpecialLabel([
-      { title: "A", favorite: true },
-      { title: "B", favorite: false },
-    ], true), [{ title: "A", favorite: true }]);
+  it("matches the favorite list through the shared status-filter extension", () => {
+    assert.equal(matchesSpecialLabelFilter({ favorite: true }, "favorite"), true);
+    assert.equal(matchesSpecialLabelFilter({ favorite: false }, "favorite"), false);
+    assert.equal(matchesSpecialLabelFilter({ favorite: true }, "completed"), undefined);
   });
 
   it("normalizes, renames, deletes, and collects categories without duplicates", () => {
