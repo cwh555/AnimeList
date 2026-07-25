@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   check:
@@ -20,7 +21,18 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - name: Capture test diagnostics
+        id: test
+        continue-on-error: true
+        run: npm test > test.log 2>&1
+      - name: Post test diagnostics
+        if: steps.test.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file test.log
+      - name: Fail after test diagnostics
+        if: steps.test.outcome == 'failure'
+        run: exit 1
       - run: npm run community:check
       - run: npm run build
       - run: npm run release:check
