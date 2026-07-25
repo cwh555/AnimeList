@@ -9,7 +9,7 @@ import {
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
   renameMasterpieceLabel,
-  resolveIndependentFilterState,
+  resolveSpecialListState,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
 } from "../src/masterpiece-labels";
@@ -57,11 +57,15 @@ describe("masterpiece label domain", () => {
     });
   });
 
-  it("filters favorites without replacing the current library status", () => {
+  it("treats favorite as a mutually exclusive peer list", () => {
     const currentState = { type: "anime", status: "completed", genre: "all" };
     const staleInitialState = { type: "all", status: "planned", genre: "all" };
     assert.deepEqual(
-      resolveIndependentFilterState(currentState, staleInitialState),
+      resolveSpecialListState(currentState, staleInitialState, true),
+      { type: "anime", status: "all", genre: "all" },
+    );
+    assert.deepEqual(
+      resolveSpecialListState(currentState, staleInitialState, false),
       currentState,
     );
     assert.deepEqual(filterBySpecialLabel([
