@@ -1,6 +1,11 @@
 import { TFile, type Plugin } from "obsidian";
 import { automaticClassificationForResult, writeClassificationSelection } from "./classification-compatibility";
+import {
+  clearClassificationCreateDraft,
+  getClassificationCreateDraft,
+} from "./classification-create-state";
 import { resolveClassifiedMediaResult } from "./classification-resolution";
+import type { ClassificationSelection } from "./media-classification";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "./types";
 
 const PERSISTENCE_MARKER = Symbol.for("animelist.classification-create-persistence-v2");
@@ -13,8 +18,9 @@ interface ClassificationPersistenceHost extends Plugin {
 export function applyResolvedMediaMetadata(
   frontmatter: Record<string, unknown>,
   result: ExternalMediaResult,
+  selection: ClassificationSelection = automaticClassificationForResult(result),
 ): void {
-  writeClassificationSelection(frontmatter, automaticClassificationForResult(result));
+  writeClassificationSelection(frontmatter, selection);
   delete frontmatter.tags;
   if (result.year !== "" && result.year != null) frontmatter.year = result.year;
   if (result.season !== "" && result.season != null) frontmatter.season = result.season;
@@ -33,15 +39,17 @@ export function installClassificationCreatePersistence(plugin: Plugin): void {
   if (Reflect.get(runtime, PERSISTENCE_MARKER) === true) return;
   const original = runtime.createMediaNote.bind(runtime);
   runtime.createMediaNote = async (selected, form) => {
+    const draft = getClassificationCreateDraft(selected);
+    clearClassificationCreateDraft(selected);
     const resolved = await resolveMediaForCreate(runtime, selected);
-    const automatic = automaticClassificationForResult(resolved);
+    const selection = draft ?? automaticClassificationForResult(resolved);
     const file = await original(resolved, {
       ...form,
-      genres: automatic.genres,
-      tags: automatic.tags,
+      genres: [...selection.genres],
+      tags: [...selection.tags],
     });
     await runtime.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyResolvedMediaMetadata(frontmatter, resolved);
+      applyResolvedMediaMetadata(frontmatter, resolved, selection);
     });
     return file;
   };
