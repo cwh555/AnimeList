@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { masterpieceActionText } from "../src/masterpiece-feature-text";
 import {
   DEFAULT_MASTERPIECE_LABEL,
   collectMasterpieceLabels,
@@ -19,6 +20,11 @@ describe("masterpiece label domain", () => {
     assert.equal(normalizeSpecialLabelMode(undefined), "favorite");
     assert.equal(normalizeSpecialLabelMode("favorite"), "favorite");
     assert.equal(normalizeSpecialLabelMode("masterpiece"), "masterpiece");
+  });
+
+  it("uses the same masterpiece action wording for card and edit controls", () => {
+    assert.equal(masterpieceActionText(false), "加入 masterpiece");
+    assert.equal(masterpieceActionText(true), "編輯 masterpiece");
   });
 
   it("creates the default masterpiece category for legacy favorites", () => {

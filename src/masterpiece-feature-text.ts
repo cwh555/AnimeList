@@ -34,6 +34,10 @@ export function masterpieceFeatureText(key: MasterpieceFeatureTextKey): string {
   return TEXT[key];
 }
 
+export function masterpieceActionText(favorite: boolean): string {
+  return masterpieceFeatureText(favorite ? "library.editMasterpiece" : "library.addMasterpiece");
+}
+
 export function specialLabelName(mode: SpecialLabelMode): string {
   return masterpieceFeatureText(mode === "masterpiece" ? "library.masterpiece" : "library.favorite");
 }
