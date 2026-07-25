@@ -14,7 +14,6 @@ const CANONICAL_WARNING = "AniList could not provide a canonical result with cla
 
 interface ClassificationSearchRuntime extends Plugin {
   settings: AnimeListSettings;
-  openAddModal(initialType?: MediaType): void;
   searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
@@ -76,11 +75,7 @@ export function installClassificationSearchRuntime(plugin: Plugin): void {
     mediaType: MediaType,
   ) => ExternalMediaResult;
   runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query, normalizeAniListMedia);
-  const originalOpenAddModal = runtime.openAddModal.bind(runtime);
-  runtime.openAddModal = (initialType = "anime") => {
-    installCanonicalSearch(runtime);
-    originalOpenAddModal(initialType);
-  };
+  installCanonicalSearch(runtime);
   /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Restore strict checks after runtime method binding. */
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
