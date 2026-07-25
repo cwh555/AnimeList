@@ -30,8 +30,9 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/masterpiece-ui.ts"],
+    files: ["src/masterpiece-ui.ts", "src/masterpiece-grouped-view.ts"],
     rules: {
+      "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
