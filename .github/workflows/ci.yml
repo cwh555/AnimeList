@@ -20,3 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run release:check
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
