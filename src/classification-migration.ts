@@ -72,12 +72,17 @@ export function applyCanonicalMigrationMetadata(
   canonical: ExternalMediaResult,
   fileBasename = "",
 ): ReturnType<typeof rebuildClassificationFrontmatter> {
+  const legacyTags = classificationValues(frontmatter.tags);
+  if (legacyTags.length && frontmatter.classification_legacy_tags == null) {
+    frontmatter.classification_legacy_tags = [...legacyTags];
+  }
   const result = rebuildClassificationFrontmatter(
     frontmatter,
     { genres: canonical.genres, tags: [] },
     canonical.sourceId,
     fileBasename,
   );
+  delete frontmatter.tags;
   if (canonical.year !== "" && canonical.year != null) frontmatter.year = canonical.year;
   if (canonical.season !== "" && canonical.season != null) frontmatter.season = canonical.season;
   else delete frontmatter.season;
@@ -117,6 +122,7 @@ export async function migrateMediaClassification(plugin: ClassificationMigration
     await plugin.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
       const beforeGenres = classificationValues(frontmatter.genres);
       const beforeTags = classificationValues(frontmatter.media_tags);
+      const beforeLegacyTags = classificationValues(frontmatter.tags);
       const beforeVersion = Number(frontmatter.classification_version ?? 0);
       const beforeYear = frontmatter.year;
       const beforeSeason = frontmatter.season;
@@ -125,8 +131,9 @@ export async function migrateMediaClassification(plugin: ClassificationMigration
       const afterTags = classificationValues(frontmatter.media_tags);
       if (JSON.stringify(beforeGenres) !== JSON.stringify(afterGenres)
         || JSON.stringify(beforeTags) !== JSON.stringify(afterTags)
-        || beforeVersion < 4 || beforeYear !== frontmatter.year || beforeSeason !== frontmatter.season) summary.changed += 1;
-      summary.removed += result.removed.length;
+        || beforeLegacyTags.length > 0 || beforeVersion < 4
+        || beforeYear !== frontmatter.year || beforeSeason !== frontmatter.season) summary.changed += 1;
+      summary.removed += result.removed.length + beforeLegacyTags.length;
       summary.moved += result.moved.length;
     });
   }
