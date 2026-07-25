@@ -37,6 +37,7 @@ export default defineConfig([
       "src/masterpiece-operation-ui.ts",
       "src/classification-ui.ts",
       "src/classification-settings.ts",
+      "src/classification-create-persistence.ts",
     ],
     rules: {
       "obsidianmd/prefer-create-el": "off",
