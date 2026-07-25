@@ -19,7 +19,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run lint
+      - name: Run lint with diagnostics
+        run: npm run lint 2>&1 | tee lint.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: classification-lint-diagnostics
+          path: lint.log
+          retention-days: 1
       - run: npm test
       - run: npm run community:check
       - run: npm run build
