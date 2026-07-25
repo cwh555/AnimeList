@@ -13,19 +13,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Export source checkout
+        run: tar --exclude=.git --exclude=node_modules -czf /tmp/animelist-serial-cover-source.tar.gz .
+      - name: Upload source checkout
+        uses: actions/upload-artifact@v6
+        with:
+          name: animelist-serial-cover-source
+          path: /tmp/animelist-serial-cover-source.tar.gz
+          retention-days: 1
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Behavior tests
-        run: npm test
-      - name: Community check
-        run: npm run community:check
-      - name: Production build
-        run: npm run build
+      - name: Export npm dependencies
+        run: tar -czf /tmp/animelist-serial-cover-dependencies.tar.gz node_modules -C "$HOME" .npm
+      - name: Upload npm dependencies
+        uses: actions/upload-artifact@v6
+        with:
+          name: animelist-serial-cover-dependencies
+          path: /tmp/animelist-serial-cover-dependencies.tar.gz
+          retention-days: 1
+      - run: npm run check
       - run: npm run release:check
