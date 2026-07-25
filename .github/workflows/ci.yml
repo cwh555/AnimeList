@@ -23,8 +23,10 @@ jobs:
         run: echo "03333f0d1a7c53edab147b5e70d95e1b9a16d5d87925b3cd98a3de77f45a1437  .serial-cover-payload/chunk-03" | sha256sum -c -
       - name: Verify payload chunk 04
         run: echo "a7613c3684e3f0158d1d35644748e66b6aff191110abaebad85f9a377f9cc9f8  .serial-cover-payload/chunk-04" | sha256sum -c -
-      - name: Verify payload chunk 05
-        run: echo "b781acc4fb431031fba16dffbb856e70e7c330ee5d2bd24c192613bd721045c0  .serial-cover-payload/chunk-05" | sha256sum -c -
+      - name: Verify payload chunk 05a
+        run: echo "c50815d747d6da4f34d9ef4b8e687223545445ec6e180085fd0522e589a1fd9a  .serial-cover-payload/chunk-05a" | sha256sum -c -
+      - name: Verify payload chunk 05b
+        run: echo "e43f8f7c10a850776de437fd53ea2bc5575ecb961b5ed1859b129f55a950e8b6  .serial-cover-payload/chunk-05b" | sha256sum -c -
       - name: Verify payload chunk 06
         run: echo "b560da723b05912009ec551ff7ff262b261ef86686e74c2d6aafd32dbecf548b  .serial-cover-payload/chunk-06" | sha256sum -c -
       - name: Verify payload chunk 07
@@ -33,7 +35,18 @@ jobs:
         run: echo "fd22cdc1ea628a5ab0e0375650dcf4cdec50edfd11e01e16dc2ee00b0ff0c294  .serial-cover-payload/chunk-08" | sha256sum -c -
       - name: Reconstruct validated local payload
         run: |
-          cat .serial-cover-payload/chunk-* > /tmp/serial-cover-final.b64
+          cat \
+            .serial-cover-payload/chunk-00 \
+            .serial-cover-payload/chunk-01 \
+            .serial-cover-payload/chunk-02 \
+            .serial-cover-payload/chunk-03 \
+            .serial-cover-payload/chunk-04 \
+            .serial-cover-payload/chunk-05a \
+            .serial-cover-payload/chunk-05b \
+            .serial-cover-payload/chunk-06 \
+            .serial-cover-payload/chunk-07 \
+            .serial-cover-payload/chunk-08 \
+            > /tmp/serial-cover-final.b64
           echo "c92b956b85db30a513688e87d67f033944b9c119929ebea616979ad9f6916021  /tmp/serial-cover-final.b64" | sha256sum -c -
           base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
           echo "fc402eebd68bd4aec0b0bf5acba9d642742f5e93bfba9ec2cf127b235744265c  /tmp/serial-cover-final.tar.gz" | sha256sum -c -
