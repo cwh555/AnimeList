@@ -14,68 +14,54 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Probe 40 exact original-title queries
+      - name: Probe exact original-title queries
         run: |
           python - <<'PY'
-          import json, random, re, time, urllib.error, urllib.parse, urllib.request
-
+          import json, random, time, urllib.error, urllib.parse, urllib.request
           works = {
               "KonoSuba": "この素晴らしい世界に祝福を！",
               "Mushoku Tensei": "無職転生 ～異世界行ったら本気だす～",
               "Invaders of the Rokujouma": "六畳間の侵略者！？",
               "That Time I Got Reincarnated as a Slime": "転生したらスライムだった件",
           }
-
           def get_json(url):
-              delay = 2.0
-              for attempt in range(6):
+              delay = 3.0
+              for attempt in range(5):
                   try:
                       req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "AnimeList-serial-cover-probe/1.0"})
                       with urllib.request.urlopen(req, timeout=30) as response:
-                          return response.status, json.load(response)
+                          return response.status, json.load(response), None
                   except urllib.error.HTTPError as error:
-                      if error.code != 429 or attempt == 5:
-                          raise
+                      if error.code not in (429, 500, 502, 503, 504) or attempt == 4:
+                          return error.code, {}, str(error)
                       retry_after = error.headers.get("Retry-After")
                       wait = float(retry_after) if retry_after and retry_after.isdigit() else delay + random.random()
-                      print(f"429 retry in {wait:.1f}s", flush=True)
                       time.sleep(wait)
-                      delay = min(32.0, delay * 2)
-
-          def image_ok(url):
-              req = urllib.request.Request(url.replace("http:", "https:"), headers={"User-Agent": "AnimeList-serial-cover-probe/1.0", "Range": "bytes=0-127"})
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  return response.status in (200, 206) and len(response.read(128)) > 0
-
+                      delay = min(30.0, delay * 2)
+                  except Exception as error:
+                      return 0, {}, str(error)
           report = []
+          time.sleep(10)
           for display, original in works.items():
-              for volume in range(1, 11):
+              for volume in range(1, 6):
                   query = f"{original} {volume}"
                   params = urllib.parse.urlencode({"q": query, "maxResults": 20, "printType": "books", "langRestrict": "ja", "projection": "lite"})
-                  status, payload = get_json("https://www.googleapis.com/books/v1/volumes?" + params)
-                  matches = []
+                  status, payload, error = get_json("https://www.googleapis.com/books/v1/volumes?" + params)
+                  titles = []
                   for item in payload.get("items", []):
                       info = item.get("volumeInfo", {})
-                      title = " ".join(x for x in [info.get("title", ""), info.get("subtitle", "")] if x)
                       images = info.get("imageLinks", {})
-                      cover = images.get("extraLarge") or images.get("large") or images.get("medium") or images.get("thumbnail")
-                      if cover:
-                          matches.append((title, cover))
-                  downloadable = []
-                  for title, cover in matches[:5]:
-                      try:
-                          if image_ok(cover): downloadable.append(title)
-                      except Exception as error:
-                          print(f"cover failed {display} {volume}: {error}", flush=True)
-                  row = {"work": display, "query": query, "status": status, "totalItems": payload.get("totalItems", 0), "coverCandidates": len(matches), "downloadable": downloadable}
+                      if images.get("extraLarge") or images.get("large") or images.get("medium") or images.get("thumbnail"):
+                          titles.append(" ".join(x for x in [info.get("title", ""), info.get("subtitle", "")] if x))
+                  row = {"work": display, "volume": volume, "query": query, "status": status, "error": error, "titles": titles[:10]}
                   report.append(row)
                   print(json.dumps(row, ensure_ascii=False), flush=True)
-                  time.sleep(1.25)
-
-          print("SUMMARY")
-          for display in works:
-              rows = [row for row in report if row["work"] == display]
-              print(display, sum(bool(row["downloadable"]) for row in rows), "/", len(rows))
-          failures = [row for row in report if not row["downloadable"]]
-          print("FAILURES", json.dumps(failures, ensure_ascii=False))
+                  time.sleep(3)
+          with open("serial-cover-api-report.json", "w", encoding="utf-8") as file:
+              json.dump(report, file, ensure_ascii=False, indent=2)
           PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: serial-cover-api-report
+          path: serial-cover-api-report.json
+          retention-days: 1
