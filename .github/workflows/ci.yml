@@ -18,16 +18,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npx eslint src/classification-ui.ts --max-warnings 0
-      - run: npx eslint src/classification-resolution.ts --max-warnings 0
-      - run: npx eslint src/classification-search-runtime.ts --max-warnings 0
-      - run: npx eslint src/classification-migration.ts --max-warnings 0
-      - run: npx eslint src/classification-settings.ts --max-warnings 0
-      - run: npm run lint
-      - run: node scripts/run-tests.mjs
-      - run: node scripts/check-serial-reading-ui.mjs
-      - run: node scripts/check-test-vault-fixtures.mjs
-      - run: npm run community:check
-      - run: npm run build
+      - run: npm run check
       - run: npm run release:check
