@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   check:
@@ -21,20 +20,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - name: Capture test diagnostics
-        id: test
-        continue-on-error: true
-        run: npm test > test.log 2>&1
-      - name: Post test diagnostics
-        if: steps.test.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          { grep -n -E 'not ok|AssertionError|ERR_|error:|Expected|actual|operator' test.log || true; tail -n 60 test.log; } > test-failure.log
-          gh pr comment ${{ github.event.pull_request.number }} --body-file test-failure.log
-      - name: Fail after test diagnostics
-        if: steps.test.outcome == 'failure'
-        run: exit 1
+      - run: node scripts/run-tests.mjs
+      - run: node scripts/check-serial-reading-ui.mjs
+      - run: node scripts/check-test-vault-fixtures.mjs
       - run: npm run community:check
       - run: npm run build
       - run: npm run release:check
