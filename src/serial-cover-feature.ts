@@ -1,4 +1,5 @@
 import { Modal, Notice, TFile, setIcon } from "obsidian";
+import { configureSerialCoverProvider } from "./serial-cover-provider";
 import type AnimeListPlugin from "./main";
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "./serial-entry-cover";
 import {
@@ -178,6 +179,7 @@ function configureRows(plugin: AnimeListPlugin, context: EditorContext): void {
 }
 
 export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
+  configureSerialCoverProvider({ apiKey: plugin.settings.googleBooksApiKey });
   const contexts = new WeakMap<HTMLElement, EditorContext>();
   let activeEditPath: string | null = null;
   let pendingSave: EditorContext | null = null;

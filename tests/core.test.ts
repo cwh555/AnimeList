@@ -511,9 +511,11 @@ describe("serial-entry cover UI", () => {
     assert.match(stylesheet, /\.al-serial-cover-panel/);
   });
 
-  it("does not store provider credentials in settings", () => {
+  it("stores the user-provided Google Books key in plugin settings, not frontmatter", () => {
     assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
-    assert.equal("serialCoverApiKey" in DEFAULT_SETTINGS, false);
+    assert.equal(DEFAULT_SETTINGS.googleBooksApiKey, "");
+    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+    assert.doesNotMatch(featureSource, /frontmatter\.googleBooksApiKey|google_books_api_key/);
   });
 });
 

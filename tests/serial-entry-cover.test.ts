@@ -13,6 +13,7 @@ import {
 import { setRequestUrlMock } from "./mocks/obsidian";
 import {
   clearSerialCoverProviderCache,
+  configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
   searchSerialCovers,
 } from "../src/serial-cover-provider";
@@ -65,7 +66,7 @@ test("serial cover provider retries 429 and preserves one exact query", async ()
     }
     return { json: { items: [{ id: "v5", volumeInfo: { title: "寄宿学校のジュリエット 5", imageLinks: { thumbnail: "http://cover/5.jpg" } } }] } };
   });
-  const result = await searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5");
+  const result = await searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5", "novel");
   assert.equal(attempts, 2);
   assert.equal(result[0]?.sourceId, "v5");
   for (const url of urls) {
@@ -83,8 +84,34 @@ test("serial cover provider coalesces duplicate concurrent queries", async () =>
     return { json: { items: [] } };
   });
   await Promise.all([
-    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1"),
-    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1"),
+    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
+    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
   ]);
   assert.equal(calls, 1);
+});
+
+
+test("serial cover provider includes configured API key without changing the exact query", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "project-key" });
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  let requested = "";
+  setRequestUrlMock(async (options) => {
+    requested = String(options.url);
+    return { json: { items: [] } };
+  });
+  await searchSerialCovers("転生したらスライムだった件 1", "転生したらスライムだった件", "1", "novel");
+  const url = new URL(requested);
+  assert.equal(url.searchParams.get("q"), "転生したらスライムだった件 1");
+  assert.equal(url.searchParams.get("key"), "project-key");
+  configureSerialCoverProvider({ apiKey: "" });
+});
+
+test("serial cover ranking distinguishes light novels from manga with the same title", () => {
+  const candidates = [
+    { provider: "Google Books", sourceId: "manga", title: "転生したらスライムだった件 1", coverUrl: "manga.jpg", infoUrl: "", categories: ["Comics & Graphic Novels / Manga"] },
+    { provider: "Google Books", sourceId: "novel", title: "転生したらスライムだった件 1", coverUrl: "novel.jpg", infoUrl: "", categories: ["Young Adult Fiction / Light Novel"] },
+  ];
+  assert.equal(rankSerialCoverCandidates(candidates, "転生したらスライムだった件", "1", "novel")[0]?.sourceId, "novel");
+  assert.equal(rankSerialCoverCandidates(candidates, "転生したらスライムだった件", "1", "manga")[0]?.sourceId, "manga");
 });

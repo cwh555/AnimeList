@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   coverFolder: "AnimeList/Covers",
   templateFolder: "AnimeList/Templates",
   timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,
+  googleBooksApiKey: "",
   providers: {
     bangumi: true,
     anilist: true,
