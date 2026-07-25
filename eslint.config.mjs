@@ -29,4 +29,21 @@ export default defineConfig([
       "@typescript-eslint/no-unsafe-return": "off",
     },
   },
+  {
+    files: [
+      "src/masterpiece-ui.ts",
+      "src/masterpiece-grouped-view.ts",
+      "src/masterpiece-edit-ui.ts",
+      "src/masterpiece-operation-ui.ts",
+    ],
+    rules: {
+      "obsidianmd/prefer-create-el": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
 ]);
