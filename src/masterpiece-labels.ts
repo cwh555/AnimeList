@@ -65,11 +65,14 @@ export function filterBySpecialLabel<T>(
   ));
 }
 
-export function resolveIndependentFilterState<T>(
+export function resolveSpecialListState<T extends { status?: string }>(
   currentState: T | undefined,
   initialState: T | undefined,
+  active: boolean,
 ): T | undefined {
-  return currentState ?? initialState;
+  const state = currentState ?? initialState;
+  if (!state || !active) return state;
+  return { ...state, status: "all" };
 }
 
 export function collectMasterpieceLabels(items: Array<{
