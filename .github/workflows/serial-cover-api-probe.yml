@@ -4,64 +4,47 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
-      - name: Probe exact original-title queries
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Extract validated change script
         run: |
           python - <<'PY'
-          import json, random, time, urllib.error, urllib.parse, urllib.request
-          works = {
-              "KonoSuba": "この素晴らしい世界に祝福を！",
-              "Mushoku Tensei": "無職転生 ～異世界行ったら本気だす～",
-              "Invaders of the Rokujouma": "六畳間の侵略者！？",
-              "That Time I Got Reincarnated as a Slime": "転生したらスライムだった件",
-          }
-          def get_json(url):
-              delay = 3.0
-              for attempt in range(5):
-                  try:
-                      req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "AnimeList-serial-cover-probe/1.0"})
-                      with urllib.request.urlopen(req, timeout=30) as response:
-                          return response.status, json.load(response), None
-                  except urllib.error.HTTPError as error:
-                      if error.code not in (429, 500, 502, 503, 504) or attempt == 4:
-                          return error.code, {}, str(error)
-                      retry_after = error.headers.get("Retry-After")
-                      wait = float(retry_after) if retry_after and retry_after.isdigit() else delay + random.random()
-                      time.sleep(wait)
-                      delay = min(30.0, delay * 2)
-                  except Exception as error:
-                      return 0, {}, str(error)
-          report = []
-          time.sleep(10)
-          for display, original in works.items():
-              for volume in range(1, 6):
-                  query = f"{original} {volume}"
-                  params = urllib.parse.urlencode({"q": query, "maxResults": 20, "printType": "books", "langRestrict": "ja", "projection": "lite"})
-                  status, payload, error = get_json("https://www.googleapis.com/books/v1/volumes?" + params)
-                  titles = []
-                  for item in payload.get("items", []):
-                      info = item.get("volumeInfo", {})
-                      images = info.get("imageLinks", {})
-                      if images.get("extraLarge") or images.get("large") or images.get("medium") or images.get("thumbnail"):
-                          titles.append(" ".join(x for x in [info.get("title", ""), info.get("subtitle", "")] if x))
-                  row = {"work": display, "volume": volume, "query": query, "status": status, "error": error, "titles": titles[:10]}
-                  report.append(row)
-                  print(json.dumps(row, ensure_ascii=False), flush=True)
-                  time.sleep(3)
-          with open("serial-cover-api-report.json", "w", encoding="utf-8") as file:
-              json.dump(report, file, ensure_ascii=False, indent=2)
+          from pathlib import Path
+          source = Path('.github/workflows/publish-serial-cover-api-fix.yml').read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          block = source.split(marker, 1)[1].split("\n          PY", 1)[0]
+          lines = [(line[10:] if line.startswith('          ') else line) for line in block.splitlines()]
+          Path('/tmp/apply-serial-cover-api-fix.py').write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
-      - uses: actions/upload-artifact@v6
-        with:
-          name: serial-cover-api-report
-          path: serial-cover-api-report.json
-          retention-days: 1
+      - name: Verify feature head
+        env:
+          EXPECTED_HEAD: cdffd614425b0aabee735cbf5313e18d0b0fb2e6
+        run: |
+          git fetch origin feature/serial-entry-covers
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
+          git checkout -B feature/serial-entry-covers origin/feature/serial-entry-covers
+      - name: Apply validated changes
+        run: python /tmp/apply-serial-cover-api-fix.py
+      - run: npm ci
+      - run: npm run check
+      - run: npm run release:check
+      - name: Publish only after validation
+        env:
+          EXPECTED_HEAD: cdffd614425b0aabee735cbf5313e18d0b0fb2e6
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/types.ts src/settings.ts src/main.ts src/serial-entry-cover.ts src/serial-cover-provider.ts src/serial-cover-service.ts src/serial-cover-feature.ts src/serial-cover-settings.ts src/serial-cover-text.ts tests/core.test.ts tests/serial-entry-cover.test.ts
+          git commit -m "fix: make serial cover lookup quota-safe"
+          git push --force-with-lease=refs/heads/feature/serial-entry-covers:$EXPECTED_HEAD origin HEAD:feature/serial-entry-covers
