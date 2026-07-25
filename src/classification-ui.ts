@@ -1,4 +1,5 @@
 import { Modal, TFile, type Plugin } from "obsidian";
+import { setClassificationCreateDraft } from "./classification-create-state";
 import { classificationText } from "./classification-feature-text";
 import { resolveClassifiedMediaResult } from "./classification-resolution";
 import {
@@ -13,15 +14,14 @@ import {
   normalizeClassificationValues,
   type ClassificationSelection,
 } from "./media-classification";
-import type { ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "./types";
+import { releaseSeasonLabel } from "./release-season";
+import type { ExternalMediaResult, MediaItem, MediaType } from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.media-classification");
 const pendingEditClassification = new Map<string, ClassificationSelection>();
-const pendingCreateClassification = new WeakMap<ExternalMediaResult, ClassificationSelection>();
 
 interface RuntimePlugin extends Plugin {
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
-  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   openAddModal(initialType?: MediaType): void;
   openEditModal(path: string): void;
   collectMediaItems(source?: string): MediaItem[];
@@ -42,6 +42,8 @@ export function classificationMetadataForResult(result: ExternalMediaResult): Cl
   if (result.year !== "" && result.year != null) {
     output.push({ label: classificationText("year"), value: String(result.year) });
   }
+  const season = releaseSeasonLabel(result.season);
+  if (season) output.push({ label: classificationText("season"), value: season });
   const people = result.people.map((value) => value.trim()).filter(Boolean);
   if (people.length) {
     output.push({
@@ -50,13 +52,6 @@ export function classificationMetadataForResult(result: ExternalMediaResult): Cl
     });
   }
   return output;
-}
-
-export function applyClassificationFrontmatter(
-  frontmatter: Record<string, unknown>,
-  selection: ClassificationSelection,
-): void {
-  writeClassificationSelection(frontmatter, selection);
 }
 
 function findLegacyGenreField(form: Element): HTMLElement | null {
@@ -193,20 +188,6 @@ function captureModal(openModal: () => void): ClassificationModal | null {
   return captured;
 }
 
-function installCreatePersistence(plugin: RuntimePlugin): void {
-  const original = plugin.createMediaNote.bind(plugin);
-  plugin.createMediaNote = async (result, form) => {
-    const selection = pendingCreateClassification.get(result) ?? automaticClassificationForResult(result);
-    pendingCreateClassification.delete(result);
-    const normalized = createClassificationSelection(selection.genres, selection.tags);
-    const file = await original(result, { ...form, genres: normalized.genres, tags: normalized.tags });
-    await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyClassificationFrontmatter(frontmatter, normalized);
-    });
-    return file;
-  };
-}
-
 function installEditPersistence(plugin: RuntimePlugin): void {
   const manager = plugin.app.fileManager;
   const original = manager.processFrontMatter.bind(manager);
@@ -227,7 +208,11 @@ function installLibraryClassification(plugin: RuntimePlugin): void {
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     if (!frontmatter?.media_type) return item;
     const selection = storedClassificationSelection(frontmatter);
-    return { ...item, genres: selection.genres, tags: selection.tags };
+    const season = frontmatter.season === 1 || frontmatter.season === 4
+      || frontmatter.season === 7 || frontmatter.season === 10
+      ? frontmatter.season
+      : "";
+    return { ...item, genres: selection.genres, tags: selection.tags, season };
   });
 }
 
@@ -241,11 +226,11 @@ function installModalIntegration(plugin: RuntimePlugin): void {
       const result = await resolveClassifiedMediaResult(plugin, selectedResult);
       await originalRenderDetails(result);
       const automatic = automaticClassificationForResult(result);
-      pendingCreateClassification.set(result, automatic);
+      setClassificationCreateDraft(result, automatic);
       const form = modal.contentEl.querySelector(".al-media-form");
       if (form) installMetadata(form, result);
       installPickers(modal, automatic, (next) => {
-        pendingCreateClassification.set(result, next);
+        setClassificationCreateDraft(result, next);
       });
     };
   };
@@ -273,7 +258,6 @@ function installModalIntegration(plugin: RuntimePlugin): void {
 export function installClassificationUi(plugin: Plugin): void {
   const runtime = plugin as RuntimePlugin;
   if (Reflect.get(runtime, PATCH_MARKER) === true) return;
-  installCreatePersistence(runtime);
   installEditPersistence(runtime);
   installLibraryClassification(runtime);
   installModalIntegration(runtime);
