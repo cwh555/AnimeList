@@ -105,7 +105,11 @@ export function installClassificationSettings(plugin: Plugin): void {
                 const summary = await this.plugin.migrateMediaClassification((state) => {
                   progress.max = Math.max(1, state.total);
                   progress.value = state.processed;
-                  progressText.textContent = classificationText("settings.migrate.progress", state);
+                  progressText.textContent = classificationText("settings.migrate.progress", {
+                    processed: state.processed,
+                    total: state.total,
+                    title: state.title,
+                  });
                 });
                 renderMigrationResult(results, summary);
                 new Notice(classificationText("settings.migrate.notice", {
