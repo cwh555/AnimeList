@@ -165,7 +165,7 @@ export async function migrateMediaClassification(
 
   for (const file of getScopedMarkdownFiles(plugin.app, plugin.getScanFolders())) {
     const frontmatter = await readCurrentFrontmatter(plugin, file);
-    if (!frontmatter.media_type) continue;
+    if (!frontmatter.media_type || frontmatter.animelist_test_fixture === true) continue;
     const item = { path: file.path, title: stringValue(frontmatter.title) || file.basename };
     work.push({ file, item, lookup: migrationLookupResult(frontmatter, file.basename) });
   }
