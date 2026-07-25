@@ -37,5 +37,41 @@ jobs:
       - name: Lint AniList search
         continue-on-error: true
         run: npx eslint src/anilist-search.ts --max-warnings 0
+      - name: Lint AniList client
+        continue-on-error: true
+        run: npx eslint src/anilist-client.ts --max-warnings 0
+      - name: Lint catalog
+        continue-on-error: true
+        run: npx eslint src/classification-catalog.ts --max-warnings 0
+      - name: Lint compatibility
+        continue-on-error: true
+        run: npx eslint src/classification-compatibility.ts --max-warnings 0
+      - name: Lint feature text
+        continue-on-error: true
+        run: npx eslint src/classification-feature-text.ts --max-warnings 0
+      - name: Lint search runtime
+        continue-on-error: true
+        run: npx eslint src/classification-search-runtime.ts --max-warnings 0
+      - name: Lint search merge
+        continue-on-error: true
+        run: npx eslint src/classification-search.ts --max-warnings 0
+      - name: Lint settings
+        continue-on-error: true
+        run: npx eslint src/classification-settings.ts --max-warnings 0
+      - name: Lint UI
+        continue-on-error: true
+        run: npx eslint src/classification-ui.ts --max-warnings 0
+      - name: Lint media classification
+        continue-on-error: true
+        run: npx eslint src/media-classification.ts --max-warnings 0
+      - name: Lint multilingual search
+        continue-on-error: true
+        run: npx eslint src/multilingual-search.ts --max-warnings 0
+      - name: Lint plugin entry
+        continue-on-error: true
+        run: npx eslint src/plugin-entry.ts --max-warnings 0
+      - name: Lint types
+        continue-on-error: true
+        run: npx eslint src/types.ts --max-warnings 0
       - name: Lint remaining source
         run: npm run lint
