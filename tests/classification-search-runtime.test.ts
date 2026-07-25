@@ -60,7 +60,14 @@ describe("classification search runtime installation", () => {
   it("allows only AniList results that already contain canonical genres", () => {
     const results = selectableAniListResults([
       media({ provider: "bangumi", sourceId: "253", genres: ["戀愛"] }),
-      media({ sourceId: "2", genres: [] }),
+      media({
+        sourceId: "2",
+        title: "Unclassified work",
+        originalTitle: "Unclassified work",
+        romajiTitle: "Unclassified work",
+        year: 2000,
+        genres: [],
+      }),
       media({ sourceId: "1", genres: ["動作", "科幻"] }),
     ]);
 
