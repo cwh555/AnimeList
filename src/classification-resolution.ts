@@ -1,4 +1,5 @@
 import { fetchAniListClassifications, mergeAniListClassifications } from "./anilist-classification";
+import { fetchBangumiSubjectTitles } from "./bangumi-subject";
 import { mergeAniListWithLocalizedResult, sameMediaWork } from "./classification-search";
 import { scoreSearchResult } from "./search";
 import type { ExternalMediaResult, MediaType } from "./types";
@@ -13,9 +14,42 @@ function cleanText(value: unknown): string {
   return typeof value === "string" ? value.normalize("NFKC").trim() : "";
 }
 
-function bestQuery(result: ExternalMediaResult): string {
-  return cleanText(result.originalTitle) || cleanText(result.romajiTitle) || cleanText(result.title)
-    || (result.searchTitles ?? []).map(cleanText).find(Boolean) || "";
+function normalizedFormat(value: unknown): string {
+  const format = cleanText(value).toLocaleLowerCase().replace(/[\s-]+/g, "_");
+  if (format === "novel") return "light_novel";
+  if (format === "tv_short") return "tv";
+  return format;
+}
+
+function uniqueQueries(values: readonly unknown[]): string[] {
+  const output: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const clean = cleanText(value);
+    const key = clean.toLocaleLowerCase();
+    if (!clean || seen.has(key)) continue;
+    seen.add(key);
+    output.push(clean);
+  }
+  return output;
+}
+
+async function resolverQueries(selected: ExternalMediaResult): Promise<string[]> {
+  let providerAliases: string[] = [];
+  if (selected.provider.toLocaleLowerCase() === "bangumi") {
+    try {
+      providerAliases = await fetchBangumiSubjectTitles(selected.sourceId);
+    } catch (error) {
+      console.warn("AnimeList could not read Bangumi aliases for classification", error);
+    }
+  }
+  return uniqueQueries([
+    selected.originalTitle,
+    selected.romajiTitle,
+    ...providerAliases,
+    ...(selected.searchTitles ?? []),
+    selected.title,
+  ]).slice(0, 6);
 }
 
 function compatibleFallback(
@@ -24,9 +58,11 @@ function compatibleFallback(
   candidates: readonly ExternalMediaResult[],
 ): ExternalMediaResult | null {
   const selectedYear = Number(selected.year);
+  const selectedFormat = normalizedFormat(selected.format);
   const filtered = candidates.filter((candidate) => {
     if (candidate.mediaType !== selected.mediaType) return false;
-    if (selected.format && candidate.format && selected.format !== candidate.format) return false;
+    const candidateFormat = normalizedFormat(candidate.format);
+    if (selectedFormat && candidateFormat && selectedFormat !== candidateFormat) return false;
     const candidateYear = Number(candidate.year);
     if (Number.isFinite(selectedYear) && selectedYear > 0
       && Number.isFinite(candidateYear) && candidateYear > 0
@@ -45,11 +81,13 @@ async function findAniListEquivalent(
   host: AniListClassificationResolverHost,
   selected: ExternalMediaResult,
 ): Promise<ExternalMediaResult | null> {
-  const query = bestQuery(selected);
-  if (!query) return null;
-  const candidates = await host.searchAniList(selected.mediaType, query);
-  return candidates.find((candidate) => sameMediaWork(candidate, selected))
-    ?? compatibleFallback(selected, query, candidates);
+  for (const query of await resolverQueries(selected)) {
+    const candidates = await host.searchAniList(selected.mediaType, query);
+    const match = candidates.find((candidate) => sameMediaWork(candidate, selected))
+      ?? compatibleFallback(selected, query, candidates);
+    if (match) return match;
+  }
+  return null;
 }
 
 export async function resolveClassifiedMediaResult(
