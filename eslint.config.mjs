@@ -30,7 +30,12 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/masterpiece-ui.ts", "src/masterpiece-grouped-view.ts", "src/masterpiece-edit-ui.ts"],
+    files: [
+      "src/masterpiece-ui.ts",
+      "src/masterpiece-grouped-view.ts",
+      "src/masterpiece-edit-ui.ts",
+      "src/masterpiece-operation-ui.ts",
+    ],
     rules: {
       "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
