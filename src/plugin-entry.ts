@@ -2,6 +2,7 @@ import "./search-pagination";
 import "./progress-ui";
 import AnimeListPlugin from "./main";
 import { installAdditionalProgressUnitsUi } from "./additional-progress-units-ui";
+import { installMasterpieceLabels } from "./masterpiece-ui";
 import { installRatingUi } from "./rating-ui";
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
@@ -9,5 +10,6 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     await super.onload();
     installRatingUi(this);
     installAdditionalProgressUnitsUi(this);
+    await installMasterpieceLabels(this);
   }
 }
