@@ -128,7 +128,7 @@ describe("classification runtime integration", () => {
     assert.equal(frontmatter.classification_source_id, "99468");
   });
 
-  it("resolves a legacy Bangumi note through subject aliases and reports progress", async () => {
+  it("excludes synthetic Test Vault notes and resolves a legacy Bangumi note", async () => {
     aniListClassificationTest.reset();
     bangumiSubjectTest.reset();
     const root = new TFolder();
@@ -139,7 +139,10 @@ describe("classification runtime integration", () => {
     const unresolved = new TFile();
     unresolved.path = "AnimeList/unresolved.md";
     unresolved.basename = "unresolved";
-    root.children = [changed, unresolved];
+    const synthetic = new TFile();
+    synthetic.path = "AnimeList/Test Fixtures/TEST 動畫.md";
+    synthetic.basename = "TEST 動畫";
+    root.children = [changed, unresolved, synthetic];
 
     const records = new Map<TFile, Record<string, unknown>>([
       [changed, {
@@ -152,6 +155,13 @@ describe("classification runtime integration", () => {
         genres: ["TV", "2018", "搞笑"],
       }],
       [unresolved, { media_type: "game", title: "Unresolved" }],
+      [synthetic, {
+        animelist_test_fixture: true,
+        media_type: "anime",
+        title: "TEST 動畫",
+        format: "tv",
+        genres: ["測試資料"],
+      }],
     ]);
 
     const requestedUrls: string[] = [];
@@ -200,6 +210,7 @@ describe("classification runtime integration", () => {
       assert.deepEqual(records.get(changed)?.genres, ["喜劇", "戀愛", "日常", "校園"]);
       assert.equal(records.get(changed)?.classification_source_provider, "anilist");
       assert.equal(records.get(changed)?.classification_source_id, "99468");
+      assert.deepEqual(records.get(synthetic)?.genres, ["測試資料"]);
     } finally {
       setRequestUrlMock(null);
       aniListClassificationTest.reset();
