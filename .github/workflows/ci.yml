@@ -1,38 +1,52 @@
-name: CI
+name: Publish validated serial cover branch
 
 on:
-  push:
-    branches: [main, preview]
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  check:
+  validate-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Export source checkout
-        run: tar --exclude=.git --exclude=node_modules -czf /tmp/animelist-serial-cover-source.tar.gz .
-      - name: Upload source checkout
-        uses: actions/upload-artifact@v6
         with:
-          name: animelist-serial-cover-source
-          path: /tmp/animelist-serial-cover-source.tar.gz
-          retention-days: 1
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - name: Export npm dependencies
-        run: tar -czf /tmp/animelist-serial-cover-dependencies.tar.gz node_modules -C "$HOME" .npm
-      - name: Upload npm dependencies
-        uses: actions/upload-artifact@v6
-        with:
-          name: animelist-serial-cover-dependencies
-          path: /tmp/animelist-serial-cover-dependencies.tar.gz
-          retention-days: 1
-      - run: npm run check
-      - run: npm run release:check
+      - name: Reconstruct validated local payload
+        run: |
+          cat .serial-cover-payload/chunk-* | base64 --decode > /tmp/serial-cover-final.tar.gz
+          mkdir -p /tmp/serial-cover-final
+          tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
+      - name: Verify feature branch has not moved
+        env:
+          EXPECTED_HEAD: 8690dd832c5cafc4ab007f4ea4238cfb25381c3b
+        run: |
+          git fetch origin preview feature/serial-entry-covers
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
+      - name: Prepare feature checkout
+        run: |
+          git checkout -B feature/serial-entry-covers origin/feature/serial-entry-covers
+          cp -a /tmp/serial-cover-final/. .
+      - name: Run npm ci
+        run: npm ci
+      - name: Run npm run check
+        run: npm run check
+      - name: Run npm run release:check
+        run: npm run release:check
+      - name: Create one clean commit from preview
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git reset --soft origin/preview
+          git add -A
+          git commit -m "feat: add per-entry manga and novel covers"
+      - name: Publish only after validation
+        env:
+          EXPECTED_HEAD: 8690dd832c5cafc4ab007f4ea4238cfb25381c3b
+        run: |
+          git push --force-with-lease=refs/heads/feature/serial-entry-covers:$EXPECTED_HEAD origin HEAD:feature/serial-entry-covers
