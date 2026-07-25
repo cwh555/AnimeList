@@ -10,6 +10,7 @@ import { legacyTest } from "./legacy";
 import type { AnimeListSettings, ExternalMediaResult, MediaType } from "./types";
 
 const PATCH_MARKER = Symbol.for("animelist.classification-search-runtime");
+const CANONICAL_WARNING = "AniList could not provide a canonical result with classifications.";
 
 interface ClassificationSearchRuntime extends Plugin {
   settings: AnimeListSettings;
@@ -22,16 +23,14 @@ interface ClassificationSearchRuntime extends Plugin {
 
 function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType): SearchProviderAdapter[] {
   const providers: SearchProviderAdapter[] = [];
-  if (plugin.settings.providers.anilist) {
-    providers.push({
-      label: "AniList",
-      // Limit AniList to one request per search phase, but allow the alias phase.
-      // This is required when a Chinese Bangumi result supplies a Japanese or
-      // English title that AniList can resolve canonically.
-      singleQueryOnly: true,
-      search: (query) => plugin.searchAniList(mediaType, query),
-    });
-  }
+  // Classification is canonicalized exclusively through AniList. Bangumi and
+  // Open Library may supply aliases for discovery, but their raw results are
+  // never exposed as selectable works.
+  providers.push({
+    label: "AniList",
+    singleQueryOnly: true,
+    search: (query) => plugin.searchAniList(mediaType, query),
+  });
   if (plugin.settings.providers.bangumi) {
     providers.push({
       label: "Bangumi",
@@ -45,6 +44,12 @@ function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType)
   return providers;
 }
 
+export function selectableAniListResults(results: readonly ExternalMediaResult[]): ExternalMediaResult[] {
+  return preferAniListSearchResults(results)
+    .filter((result) => result.provider.toLocaleLowerCase() === "anilist")
+    .filter((result) => result.genres.length > 0);
+}
+
 function installCanonicalSearch(plugin: ClassificationSearchRuntime): void {
   plugin.searchExternal = async (mediaType, query) => {
     const response = await searchMultilingualProviders({
@@ -54,7 +59,11 @@ function installCanonicalSearch(plugin: ClassificationSearchRuntime): void {
       dedupe: preferAniListSearchResults,
       maxResults: 24,
     });
-    return { results: preferAniListSearchResults(response.results), warnings: response.warnings };
+    const results = selectableAniListResults(response.results);
+    const warnings = results.length
+      ? response.warnings
+      : [...new Set([...response.warnings, CANONICAL_WARNING])];
+    return { results, warnings };
   };
 }
 
