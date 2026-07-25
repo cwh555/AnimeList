@@ -69,13 +69,13 @@ function installCanonicalSearch(plugin: ClassificationSearchRuntime): void {
 export function installClassificationSearchRuntime(plugin: Plugin): void {
   const runtime = plugin as ClassificationSearchRuntime;
   if (Reflect.get(runtime, PATCH_MARKER) === true) return;
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Runtime method binding crosses the Obsidian plugin boundary. */
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Runtime method binding crosses the legacy adapter boundary. */
   const normalizeAniListMedia = legacyTest.normalizeAniListMedia as unknown as (
     value: unknown,
     mediaType: MediaType,
   ) => ExternalMediaResult;
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment -- Restore strict checks after the legacy adapter read. */
   runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query, normalizeAniListMedia);
   installCanonicalSearch(runtime);
-  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Restore strict checks after runtime method binding. */
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
 }
