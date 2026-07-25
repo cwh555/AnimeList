@@ -25,8 +25,10 @@ function providersFor(plugin: ClassificationSearchRuntime, mediaType: MediaType)
   if (plugin.settings.providers.anilist) {
     providers.push({
       label: "AniList",
+      // Limit AniList to one request per search phase, but allow the alias phase.
+      // This is required when a Chinese Bangumi result supplies a Japanese or
+      // English title that AniList can resolve canonically.
       singleQueryOnly: true,
-      initialOnly: true,
       search: (query) => plugin.searchAniList(mediaType, query),
     });
   }
@@ -67,8 +69,8 @@ export function installClassificationSearchRuntime(plugin: Plugin): void {
   runtime.searchAniList = (mediaType, query) => searchAniListCanonical(mediaType, query, normalizeAniListMedia);
   const originalOpenAddModal = runtime.openAddModal.bind(runtime);
   runtime.openAddModal = (initialType = "anime") => {
-    originalOpenAddModal(initialType);
     installCanonicalSearch(runtime);
+    originalOpenAddModal(initialType);
   };
   /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Restore strict checks after runtime method binding. */
   Object.defineProperty(runtime, PATCH_MARKER, { value: true });
