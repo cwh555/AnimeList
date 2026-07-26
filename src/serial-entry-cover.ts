@@ -9,6 +9,7 @@ export interface SerialCoverCandidate {
   categories?: string[];
   authors?: string[];
   publisher?: string;
+  mediaTypeHint?: Extract<MediaType, "manga" | "novel">;
 }
 
 export interface RankedSerialCoverCandidate extends SerialCoverCandidate {
@@ -63,7 +64,7 @@ export function serialCoverQuery(originalTitle: string, label: string): string |
 
 function labelPattern(label: string): RegExp {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|[^0-9])${escaped}(?:[^0-9]|$)`);
+  return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`);
 }
 
 export function scoreSerialCoverCandidate(
@@ -73,19 +74,36 @@ export function scoreSerialCoverCandidate(
   mediaType?: Extract<MediaType, "manga" | "novel">,
 ): number {
   if (!candidate.coverUrl) return Number.NEGATIVE_INFINITY;
+  if (mediaType && candidate.mediaTypeHint && candidate.mediaTypeHint !== mediaType) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
   const titleKey = comparable(originalTitle);
   const candidateKey = comparable(candidate.title);
+  const labelKey = comparable(label);
   let score = 0;
   if (candidateKey.startsWith(titleKey)) score += 70;
-  else if (candidateKey.includes(titleKey)) score += 52;
+  else if (candidateKey.includes(titleKey)) score += 42;
   else return Number.NEGATIVE_INFINITY;
 
-  if (labelPattern(label).test(clean(candidate.title))) score += 35;
-  else score -= 45;
-  if (/限定|特装|特裝|special|limited|box|セット|合本|合訂/i.test(candidate.title)) score -= 18;
+  const explicitVolume = labelPattern(label).test(clean(candidate.title));
+  const implicitFirstVolume = label === "1" && candidateKey === titleKey;
+  if (explicitVolume) score += 40;
+  else if (implicitFirstVolume) score += 28;
+  else return Number.NEGATIVE_INFINITY;
+
+  if (candidateKey.startsWith(`${titleKey}${labelKey}`)) score += 35;
+  else if (!implicitFirstVolume && candidateKey.startsWith(titleKey)) score -= 28;
+  if (candidateKey === `${titleKey}${labelKey}`) score += 15;
+
+  if (/限定|特装|特裝|special|limited|box|セット|合本|合訂|スピンオフ|エクストラ|かっぽれ|ファンタスティックデイズ|よりみち|転スラ日記|転ちゅら|異聞|番外編|魔物の国の歩き方|美食伝|クレイマン/i.test(candidate.title)) {
+    score -= 40;
+  }
+
+  if (mediaType && candidate.mediaTypeHint === mediaType) score += 45;
   const categories = (candidate.categories ?? []).join(" ").toLocaleLowerCase();
   const metadata = [categories, candidate.publisher ?? "", ...(candidate.authors ?? [])].join(" ").toLocaleLowerCase();
-  const lightNovel = /light\s*novel|ライトノベル|文庫/.test(metadata);
+  const lightNovel = /light\s*novel|ライトノベル|文庫|小说|小説/.test(metadata);
   const comics = /manga|comics|graphic novels|コミック|漫画/.test(metadata);
   if (mediaType === "novel") {
     if (lightNovel) score += 22;
