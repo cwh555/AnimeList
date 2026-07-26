@@ -31,12 +31,12 @@ const manualWorks = [
   {
     title: "關於我被隔壁天使變成廢材這件事",
     referenceTitle: "お隣の天使様にいつの間にか駄目人間にされていた件",
-    expectedId: "280977",
+    expectedId: "280987",
   },
   {
     title: "不時以俄語遮羞的艾利同學",
     referenceTitle: "時々ボソッとロシア語でデレる隣のアーリャさん",
-    expectedId: "339092",
+    expectedId: "327516",
   },
   { title: "冰菓", referenceTitle: "氷菓", expectedId: "27902" },
 ];
