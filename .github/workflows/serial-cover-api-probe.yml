@@ -1,4 +1,5 @@
 name: Validate serial cover UI ordering and timeline
+run-name: Serial cover UI ordering and timeline validation
 
 on:
   pull_request:
