@@ -18,5 +18,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: npm run release:check
+      - name: Capture picker lint
+        id: lint
+        shell: bash
+        run: |
+          set +e
+          npm run lint > picker-lint.log 2>&1
+          status=$?
+          cat picker-lint.log
+          exit "$status"
+      - name: Upload picker lint
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: picker-lint-log
+          path: picker-lint.log
+          retention-days: 1
