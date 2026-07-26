@@ -3,6 +3,7 @@ import type AnimeListPlugin from "./main";
 import { getScopedMarkdownFiles } from "./vault-scope";
 import {
   confidentSerialCover,
+  normalizeManualSerialCoverQuery,
   selectOriginalTitle,
   serialCoverQuery,
   type RankedSerialCoverCandidate,
@@ -152,9 +153,17 @@ function asMediaResult(
 export async function findSerialCoverCandidates(
   context: SerialCoverLookupContext,
   label: string,
+  queryInput?: string,
 ): Promise<RankedSerialCoverCandidate[]> {
-  const query = serialCoverQuery(context.originalTitle, label);
-  return query ? searchSerialCovers(query, context.originalTitle, label, context.mediaType) : [];
+  const normalized = queryInput === undefined
+    ? (() => {
+      const query = serialCoverQuery(context.originalTitle, label);
+      return query ? { query, title: context.originalTitle } : null;
+    })()
+    : normalizeManualSerialCoverQuery(queryInput, label);
+  return normalized
+    ? searchSerialCovers(normalized.query, normalized.title, label, context.mediaType)
+    : [];
 }
 
 export async function downloadSelectedSerialCover(

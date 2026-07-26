@@ -20,7 +20,9 @@ assert.doesNotMatch(serialStyles, /\.status-(?:watching|reading|on_hold)/);
 
 assert.match(coverStyles, /\.animelist-modal \.al-volume-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
 assert.match(coverStyles, /\.al-serial-cover-button\s*\{[\s\S]*height:\s*102px;[\s\S]*width:\s*72px;/);
-assert.match(coverStyles, /\.al-serial-cover-results\s*\{[\s\S]*grid-template-columns:/);
+assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-results\s*\{[\s\S]*overflow-y:\s*auto;/);
+assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result\.is-selected\s*\{/);
+assert.doesNotMatch(coverStyles, /\.al-serial-cover-results/);
 
 assert.match(progressStyles, /\.al-progress\.is-state-progress \.al-progress-fill/);
 assert.match(progressStyles, /\.al-detail-progress/);

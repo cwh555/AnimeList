@@ -1,6 +1,8 @@
 import { Modal, Notice, TFile, setIcon } from "obsidian";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
+import { SerialCoverLoadQueue } from "./serial-cover-load-queue";
 import { SerialCoverSelection } from "./serial-cover-selection";
+import { resolveSerialEntryCoverPaths } from "./serial-cover-timeline";
 import type AnimeListPlugin from "./main";
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "./serial-entry-cover";
 import {
@@ -16,6 +18,9 @@ import {
 } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
 import type { ExternalMediaResult, MediaType } from "./types";
+import { uiText } from "./ui-text";
+
+type AutomaticCoverStatus = "queued" | "loading" | "not-found" | "failed";
 
 interface EditorContext extends SerialCoverLookupContext {
   modal: HTMLElement;
@@ -23,6 +28,9 @@ interface EditorContext extends SerialCoverLookupContext {
   covers: Map<string, StoredSerialCover>;
   knownLabels: Set<string>;
   attempted: Set<string>;
+  autoQueue: SerialCoverLoadQueue;
+  autoStatus: Map<string, AutomaticCoverStatus>;
+  rowRenders: Map<HTMLInputElement, () => void>;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -39,61 +47,154 @@ function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function refreshRows(context: EditorContext): void {
+  for (const [input, render] of context.rowRenders) {
+    if (!input.isConnected) {
+      context.rowRenders.delete(input);
+      continue;
+    }
+    render();
+  }
+}
+
 class CoverSelector extends Modal {
   private readonly selection: SerialCoverSelection;
+  private candidates: RankedSerialCoverCandidate[];
+  private query: string;
 
   constructor(
     private pluginRef: AnimeListPlugin,
     private context: EditorContext,
     private label: string,
-    private candidates: RankedSerialCoverCandidate[],
+    candidates: RankedSerialCoverCandidate[],
     private applyCover: (cover: StoredSerialCover) => void,
   ) {
     super(pluginRef.app);
-    this.selection = new SerialCoverSelection(candidates);
+    this.candidates = [...candidates];
+    this.selection = new SerialCoverSelection(this.candidates);
+    this.query = serialCoverQuery(context.originalTitle, label) ?? context.originalTitle;
   }
 
   onOpen(): void {
     this.modalEl.addClass("animelist-modal", "al-serial-cover-modal");
     this.titleEl.setText(serialCoverText("selectorTitle", { unit: "entry", label: this.label }));
-    const field = this.contentEl.createEl("label", { cls: "al-form-field" });
-    field.createEl("span", { cls: "al-form-label", text: serialCoverText("query") });
-    const input = field.createEl("input", { type: "text" });
-    input.value = serialCoverQuery(this.context.originalTitle, this.label) ?? "";
-    input.readOnly = true;
+    this.contentEl.empty();
 
-    const results = this.contentEl.createDiv({ cls: "al-serial-cover-results" });
-    for (const [index, candidate] of this.candidates.entries()) {
-      const button = results.createEl("button", { cls: "al-serial-cover-candidate" });
-      button.type = "button";
-      if (index === 0) button.addClass("is-selected");
-      const image = button.createEl("img");
-      image.src = candidate.coverUrl;
-      image.alt = candidate.title;
-      button.createEl("small", { text: candidate.title });
-      button.createEl("small", { text: candidate.provider });
-      button.addEventListener("click", () => {
-        results.querySelectorAll(".is-selected")
-          .forEach((element) => element.classList.remove("is-selected"));
-        button.addClass("is-selected");
-        this.selection.select(candidate);
-        applyButton.disabled = !this.selection.canApply;
-      });
-    }
+    this.contentEl.createEl("p", {
+      cls: "al-modal-hint",
+      text: serialCoverText("selectorDescription"),
+    });
 
-    const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
-    const cancelButton = footer.createEl("button", { text: serialCoverText("cancel") });
+    const searchRow = this.contentEl.createDiv({ cls: "al-modal-search-row" });
+    const input = searchRow.createEl("input", { type: "search" });
+    input.value = this.query;
+    input.placeholder = serialCoverText("searchPlaceholder");
+    const searchButton = searchRow.createEl("button", {
+      cls: "mod-cta",
+      text: uiText("action.search"),
+    });
+    searchButton.type = "button";
+
+    this.contentEl.createEl("p", {
+      cls: "al-modal-hint",
+      text: serialCoverText("searchHint"),
+    });
+    const results = this.contentEl.createDiv({ cls: "al-search-results" });
+    const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
+    const cancelButton = footer.createEl("button", { text: uiText("action.cancel") });
+    cancelButton.type = "button";
+    const applyButton = footer.createEl("button", {
+      cls: "mod-cta",
+      text: serialCoverText("apply"),
+    });
+    applyButton.type = "button";
+
+    let searching = false;
+
+    const updateControls = (): void => {
+      input.disabled = searching || this.selection.isApplying;
+      searchButton.disabled = searching || this.selection.isApplying;
+      searchButton.setText(searching ? serialCoverText("searching") : uiText("action.search"));
+      cancelButton.disabled = this.selection.isApplying;
+      applyButton.disabled = searching || !this.selection.canApply;
+      applyButton.setText(this.selection.isApplying
+        ? serialCoverText("applying")
+        : serialCoverText("apply"));
+    };
+
+    const renderResults = (): void => {
+      results.empty();
+      const selected = this.selection.selectedCandidate;
+      if (!this.candidates.length) {
+        results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
+        updateControls();
+        return;
+      }
+
+      for (const candidate of this.candidates) {
+        const row = results.createEl("button", {
+          cls: `al-search-result${selected?.sourceId === candidate.sourceId ? " is-selected" : ""}`,
+        });
+        row.type = "button";
+        row.setAttribute("aria-pressed", selected?.sourceId === candidate.sourceId ? "true" : "false");
+        const image = row.createEl("img");
+        image.src = candidate.coverUrl;
+        image.alt = candidate.title;
+        image.loading = "lazy";
+        const body = row.createDiv({ cls: "al-search-result-body" });
+        body.createEl("strong", { text: candidate.title });
+        body.createEl("span", { text: candidate.provider });
+        body.createEl("span", {
+          text: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+        });
+        row.createSpan({ cls: "al-search-result-use", text: uiText("action.select") });
+        row.addEventListener("click", () => {
+          this.selection.select(candidate);
+          renderResults();
+        });
+      }
+      updateControls();
+    };
+
+    const runSearch = async (): Promise<void> => {
+      const query = input.value.trim();
+      if (!query) {
+        new Notice(serialCoverText("searchPlaceholder"));
+        return;
+      }
+      searching = true;
+      updateControls();
+      try {
+        this.query = query;
+        this.candidates = await findSerialCoverCandidates(this.context, this.label, query);
+        this.selection.replace(this.candidates);
+        renderResults();
+        if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
+      } catch (error) {
+        console.error("AnimeList serial cover search failed", error);
+        this.candidates = [];
+        this.selection.replace([]);
+        renderResults();
+        new Notice(error instanceof Error ? error.message : serialCoverText("notFound"));
+      } finally {
+        searching = false;
+        updateControls();
+      }
+    };
+
+    searchButton.addEventListener("click", () => void runSearch());
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      void runSearch();
+    });
     cancelButton.addEventListener("click", () => this.close());
-    const applyButton = footer.createEl("button", { cls: "mod-cta", text: serialCoverText("apply") });
-    applyButton.disabled = !this.selection.canApply;
     applyButton.addEventListener("click", () => {
       if (!this.selection.selectedCandidate) {
         new Notice(serialCoverText("selectCandidate"));
         return;
       }
-      applyButton.disabled = true;
-      cancelButton.disabled = true;
-      applyButton.setText(serialCoverText("applying"));
+      updateControls();
       void this.selection.apply((candidate) => (
         downloadSelectedSerialCover(this.pluginRef, this.context, candidate, true)
       )).then((cover) => {
@@ -103,13 +204,45 @@ class CoverSelector extends Modal {
       }).catch((error) => {
         console.error("AnimeList serial cover apply failed", error);
         new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
-      }).finally(() => {
-        applyButton.setText(serialCoverText("apply"));
-        applyButton.disabled = !this.selection.canApply;
-        cancelButton.disabled = false;
-      });
+      }).finally(updateControls);
+      updateControls();
     });
+
+    renderResults();
+    updateControls();
+    window.setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
   }
+}
+
+function scheduleAutomaticCover(
+  plugin: AnimeListPlugin,
+  context: EditorContext,
+  label: string,
+): void {
+  if (!serialCoverQuery(context.originalTitle, label)) return;
+  if (context.covers.has(label) || context.attempted.has(label)) return;
+  context.attempted.add(label);
+  context.autoStatus.set(label, "queued");
+  refreshRows(context);
+
+  void context.autoQueue.enqueue(label, async () => {
+    context.autoStatus.set(label, "loading");
+    refreshRows(context);
+    return loadConfidentSerialCover(plugin, context, label);
+  }).then((cover) => {
+    if (cover) {
+      context.covers.set(label, cover);
+      context.autoStatus.delete(label);
+    } else {
+      context.autoStatus.set(label, "not-found");
+    }
+  }).catch((error) => {
+    console.error(`AnimeList serial cover automatic lookup failed for ${label}`, error);
+    context.autoStatus.set(label, "failed");
+  }).finally(() => refreshRows(context));
 }
 
 function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTMLElement): void {
@@ -134,10 +267,18 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
 
   const render = (): void => {
     coverButton.empty();
-    const stored = context.covers.get(labelInput.value.trim());
+    const label = labelInput.value.trim();
+    const stored = context.covers.get(label);
     if (!stored) {
       setIcon(coverButton, "image");
-      status.setText(serialCoverText("series"));
+      const automaticStatus = context.autoStatus.get(label);
+      status.setText(automaticStatus === "queued"
+        ? serialCoverText("queued")
+        : automaticStatus === "loading"
+          ? serialCoverText("loading")
+          : automaticStatus === "not-found" || automaticStatus === "failed"
+            ? serialCoverText("notFound")
+            : serialCoverText("series"));
       clear.hidden = true;
       return;
     }
@@ -147,54 +288,49 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
     status.setText(stored.manual ? serialCoverText("manual") : serialCoverText("autoFound"));
     clear.hidden = false;
   };
+  context.rowRenders.set(labelInput, render);
 
-  const search = async (manual: boolean): Promise<void> => {
+  const search = async (): Promise<void> => {
     const label = labelInput.value.trim();
-    if (!serialCoverQuery(context.originalTitle, label)) return;
+    const query = serialCoverQuery(context.originalTitle, label);
+    if (!query) return;
     status.setText(serialCoverText("loading"));
     try {
-      if (manual) {
-        const candidates = await findSerialCoverCandidates(context, label);
-        new CoverSelector(plugin, context, label, candidates, (cover) => {
-          context.covers.set(label, cover);
-          render();
-        }).open();
-        status.setText(candidates.length ? serialCoverText("series") : serialCoverText("notFound"));
-        return;
-      }
-      const cover = await loadConfidentSerialCover(plugin, context, label);
-      if (cover) {
+      const candidates = await findSerialCoverCandidates(context, label);
+      new CoverSelector(plugin, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
-        render();
-      } else {
-        status.setText(serialCoverText("notFound"));
-      }
+        context.autoStatus.delete(label);
+        refreshRows(context);
+      }).open();
+      status.setText(candidates.length ? serialCoverText("series") : serialCoverText("notFound"));
     } catch (error) {
       status.setText(serialCoverText("notFound"));
-      if (manual) new Notice(error instanceof Error ? error.message : String(error));
+      new Notice(error instanceof Error ? error.message : String(error));
     }
   };
 
-  retry.addEventListener("click", () => void search(true));
-  coverButton.addEventListener("click", () => void search(true));
+  const scheduleCurrentLabel = (): void => {
+    const label = labelInput.value.trim();
+    if (!label || context.knownLabels.has(label)) return;
+    context.knownLabels.add(label);
+    scheduleAutomaticCover(plugin, context, label);
+  };
+
+  retry.addEventListener("click", () => void search());
+  coverButton.addEventListener("click", () => void search());
   clear.addEventListener("click", () => {
     context.covers.delete(labelInput.value.trim());
+    context.autoStatus.delete(labelInput.value.trim());
     render();
   });
   labelInput.addEventListener("input", render);
+  labelInput.addEventListener("change", scheduleCurrentLabel);
   render();
-
-  const label = labelInput.value.trim();
-  const isNewLabel = Boolean(label) && !context.knownLabels.has(label);
-  context.knownLabels.add(label);
-  if (isNewLabel && context.originalTitle && !context.covers.has(label) && !context.attempted.has(label)) {
-    context.attempted.add(label);
-    void search(false);
-  }
+  scheduleCurrentLabel();
 }
 
 function configureRows(plugin: AnimeListPlugin, context: EditorContext): void {
-  context.modal.querySelectorAll<HTMLElement>(".al-volume-row")
+  context.modal.querySelectorAll<HTMLElement>(".al-progress-unit-editor .al-volume-row")
     .forEach((row) => configureRow(plugin, context, row));
 }
 
@@ -204,6 +340,14 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
   let activeEditPath: string | null = null;
   let pendingSave: EditorContext | null = null;
   let createResult: ExternalMediaResult | null = null;
+
+  const originalCollectMediaItems = plugin.collectMediaItems.bind(plugin);
+  plugin.collectMediaItems = (source?: string) => originalCollectMediaItems(source).map((item) => ({
+    ...item,
+    volumeLog: resolveSerialEntryCoverPaths(item.volumeLog, (cover) => (
+      plugin.resolveMediaCoverPath(cover, item.filePath)
+    )),
+  }));
 
   const originalOpenEdit = plugin.openEditModal.bind(plugin);
   plugin.openEditModal = (path: string): void => {
@@ -254,6 +398,9 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
         return label ? [label] : [];
       })),
       attempted: new Set(),
+      autoQueue: new SerialCoverLoadQueue(),
+      autoStatus: new Map(),
+      rowRenders: new Map(),
     };
     contexts.set(modal, context);
     configureRows(plugin, context);
@@ -313,7 +460,7 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
   const saveCapture = (event: MouseEvent): void => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const modal = target.closest<HTMLButtonElement>("button.mod-cta")
+    const modal = target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta")
       ?.closest<HTMLElement>(".animelist-modal");
     const context = modal ? contexts.get(modal) : null;
     if (context) pendingSave = context;
@@ -326,6 +473,7 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
   plugin.register(() => {
     observer.disconnect();
     document.removeEventListener("click", saveCapture, true);
+    plugin.collectMediaItems = originalCollectMediaItems;
     plugin.openEditModal = originalOpenEdit;
     plugin.openAddModal = originalOpenAdd;
     plugin.createMediaNote = originalCreate;

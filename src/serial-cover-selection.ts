@@ -20,6 +20,10 @@ export class SerialCoverSelection {
     return this.selected !== null && !this.applying;
   }
 
+  replace(candidates: RankedSerialCoverCandidate[]): void {
+    if (!this.applying) this.selected = candidates[0] ?? null;
+  }
+
   select(candidate: RankedSerialCoverCandidate): void {
     if (!this.applying) this.selected = candidate;
   }
