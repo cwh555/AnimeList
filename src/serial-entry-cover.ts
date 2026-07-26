@@ -16,6 +16,11 @@ export interface RankedSerialCoverCandidate extends SerialCoverCandidate {
   score: number;
 }
 
+export interface SerialCoverManualQuery {
+  query: string;
+  title: string;
+}
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.normalize("NFKC").replace(/\s+/g, " ").trim() : "";
 }
@@ -60,6 +65,20 @@ export function serialCoverQuery(originalTitle: string, label: string): string |
   const normalizedLabel = clean(label);
   if (!title || !/^\d+(?:\.5)?$/.test(normalizedLabel)) return null;
   return `${title} ${normalizedLabel}`;
+}
+
+export function normalizeManualSerialCoverQuery(
+  value: unknown,
+  label: string,
+): SerialCoverManualQuery | null {
+  const input = clean(value);
+  const normalizedLabel = clean(label);
+  if (!input || !/^\d+(?:\.5)?$/.test(normalizedLabel)) return null;
+  const escaped = normalizedLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const suffix = new RegExp(`\\s*[（(]?${escaped}[）)]?\\s*$`);
+  const title = clean(input.replace(suffix, "")) || input;
+  const query = serialCoverQuery(title, normalizedLabel);
+  return query ? { query, title } : null;
 }
 
 export function serialCoverQueries(originalTitle: string, label: string): string[] {
