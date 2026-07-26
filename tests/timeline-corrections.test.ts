@@ -89,11 +89,13 @@ describe("timeline serial-entry units", () => {
     };
     const chapter = expandTimelineEntries([base])[0];
     const season = expandTimelineEntries([{ ...base, mediaType: "novel", unit: "season" }])[0];
+    const volume = expandTimelineEntries([{ ...base, mediaType: "novel", unit: "volume" }])[0];
 
     assert.equal(chapter.title, "作品 — 第 12 話");
     assert.equal(chapter.serialEntryLabel, "第 12 話");
     assert.equal(season.title, "作品 — 第 12 季");
     assert.equal(season.serialEntryLabel, "第 12 季");
+    assert.equal(volume.title, "作品 — 第 12 卷");
+    assert.equal(volume.serialEntryLabel, "第 12 卷");
   });
-
 });
