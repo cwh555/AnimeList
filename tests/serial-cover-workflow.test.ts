@@ -64,7 +64,7 @@ test("manual cover search ranks against the edited title instead of the stored l
   assert.equal(results[0]?.sourceId, "267778");
 });
 
-test("search result refresh selects the best candidate and enables Apply", async () => {
+test("search result refresh selects the best candidate and updates Apply availability", async () => {
   const selection = new SerialCoverSelection([]);
   assert.equal(selection.canApply, false);
   selection.replace([candidate("20"), candidate("19", 180)]);
@@ -72,6 +72,9 @@ test("search result refresh selects the best candidate and enables Apply", async
   assert.equal(selection.canApply, true);
   assert.equal(await selection.apply(async (selected) => selected.sourceId), "20");
   assert.equal(selection.canApply, true);
+  selection.replace([]);
+  assert.equal(selection.selectedCandidate, null);
+  assert.equal(selection.canApply, false);
 });
 
 test("rapid serial additions are processed in insertion order without skipping after failure", async () => {
