@@ -1,14 +1,14 @@
-name: Verify live serial cover queue
-run-name: Live serial cover queue validation
+name: Validate serial cover picker clicks
+run-name: Serial cover picker DOM validation
 
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  live-queue:
+  validate-picker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,131 +18,297 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Check out validated feature head
+      - name: Check out isolated fix branch
         env:
-          EXPECTED_FEATURE_HEAD: b6aedf8c9effe4772cd3bd7db4182ffd04f0e451
+          EXPECTED_HEAD: b6aedf8c9effe4772cd3bd7db4182ffd04f0e451
         run: |
-          git fetch origin feature/serial-entry-covers
-          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE_HEAD"
-          git checkout --detach origin/feature/serial-entry-covers
+          git fetch origin fix/serial-cover-picker-click
+          test "$(git rev-parse origin/fix/serial-cover-picker-click)" = "$EXPECTED_HEAD"
+          git checkout -B fix/serial-cover-picker-click origin/fix/serial-cover-picker-click
+      - name: Apply explicit picker button and browser interaction test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              source = path.read_text(encoding="utf-8")
+              assert source.count(old) == 1, f"expected one anchor in {path}"
+              path.write_text(source.replace(old, new), encoding="utf-8")
+
+          feature = Path("src/serial-cover-feature.ts")
+          replace_once(
+              feature,
+              'import { SerialCoverLoadQueue } from "./serial-cover-load-queue";\n',
+              'import { appendSerialCoverChoice } from "./serial-cover-choice-ui";\nimport { SerialCoverLoadQueue } from "./serial-cover-load-queue";\n',
+          )
+          replace_once(
+              feature,
+              '''      for (const candidate of this.candidates) {
+        const row = results.createEl("button", {
+          cls: `al-search-result${selected?.sourceId === candidate.sourceId ? " is-selected" : ""}`,
+        });
+        row.type = "button";
+        row.setAttribute("aria-pressed", selected?.sourceId === candidate.sourceId ? "true" : "false");
+        const image = row.createEl("img");
+        image.src = candidate.coverUrl;
+        image.alt = candidate.title;
+        image.loading = "lazy";
+        const body = row.createDiv({ cls: "al-search-result-body" });
+        body.createEl("strong", { text: candidate.title });
+        body.createEl("span", { text: candidate.provider });
+        body.createEl("span", {
+          text: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+        });
+        row.createSpan({ cls: "al-search-result-use", text: uiText("action.select") });
+        row.addEventListener("click", () => {
+          this.selection.select(candidate);
+          renderResults();
+        });
+      }
+''',
+              '''      for (const candidate of this.candidates) {
+        appendSerialCoverChoice(results, {
+          candidate,
+          selected: selected === candidate,
+          selectText: uiText("action.select"),
+          matchScoreText: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+          onSelect: () => {
+            this.selection.select(candidate);
+            renderResults();
+          },
+        });
+      }
+''',
+          )
+
+          Path("src/serial-cover-choice-ui.ts").write_text('''import type { RankedSerialCoverCandidate } from "./serial-entry-cover";
+
+export interface SerialCoverChoiceOptions {
+  candidate: RankedSerialCoverCandidate;
+  selected: boolean;
+  selectText: string;
+  matchScoreText: string;
+  onSelect: () => void;
+}
+
+function elementTarget(value: EventTarget | null): Element | null {
+  return value instanceof Element ? value : null;
+}
+
+export function appendSerialCoverChoice(
+  parent: HTMLElement,
+  options: SerialCoverChoiceOptions,
+): HTMLDivElement {
+  const documentRef = parent.ownerDocument;
+  const row = documentRef.createElement("div");
+  row.className = `al-search-result${options.selected ? " is-selected" : ""}`;
+  row.setAttribute("role", "option");
+  row.setAttribute("aria-selected", options.selected ? "true" : "false");
+  row.tabIndex = 0;
+
+  const image = documentRef.createElement("img");
+  image.src = options.candidate.coverUrl;
+  image.alt = options.candidate.title;
+  image.loading = "lazy";
+
+  const body = documentRef.createElement("div");
+  body.className = "al-search-result-body";
+  const title = documentRef.createElement("strong");
+  title.textContent = options.candidate.title;
+  const provider = documentRef.createElement("span");
+  provider.textContent = options.candidate.provider;
+  const score = documentRef.createElement("span");
+  score.textContent = options.matchScoreText;
+  body.append(title, provider, score);
+
+  const selectButton = documentRef.createElement("button");
+  selectButton.type = "button";
+  selectButton.className = "al-search-result-use";
+  selectButton.textContent = options.selectText;
+
+  const choose = (): void => options.onSelect();
+  selectButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    choose();
+  });
+  row.addEventListener("click", (event) => {
+    if (elementTarget(event.target)?.closest(".al-search-result-use")) return;
+    choose();
+  });
+  row.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    choose();
+  });
+
+  row.append(image, body, selectButton);
+  parent.appendChild(row);
+  return row;
+}
+''', encoding="utf-8")
+
+          Path("scripts/check-serial-cover-click.mjs").write_text('''import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+
+const root = process.cwd();
+const output = path.join(root, ".tmp", "serial-cover-click");
+await rm(output, { recursive: true, force: true });
+await mkdir(output, { recursive: true });
+
+const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
+const compiled = spawnSync(tsc, [
+  "src/serial-cover-choice-ui.ts",
+  "--target", "ES2022",
+  "--module", "ES2022",
+  "--moduleResolution", "Bundler",
+  "--lib", "ES2022,DOM",
+  "--skipLibCheck",
+  "--rootDir", "src",
+  "--outDir", output,
+], { cwd: root, encoding: "utf8" });
+assert.equal(compiled.status, 0, compiled.stderr || compiled.stdout);
+
+await writeFile(path.join(output, "index.html"), `<!doctype html>
+<html><body data-result="pending">
+<div id="results"></div>
+<button id="apply" type="button" disabled>Apply</button>
+<script type="module">
+import { appendSerialCoverChoice } from "./serial-cover-choice-ui.js";
+const candidates = [
+  { provider: "Bangumi", sourceId: "first", title: "Work (1)", coverUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", infoUrl: "", score: 200 },
+  { provider: "Bangumi", sourceId: "second", title: "Work (2)", coverUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", infoUrl: "", score: 190 },
+];
+const results = document.querySelector("#results");
+const apply = document.querySelector("#apply");
+let selected = candidates[0];
+let applied = "";
+function render() {
+  results.replaceChildren();
+  for (const candidate of candidates) {
+    appendSerialCoverChoice(results, {
+      candidate,
+      selected: selected === candidate,
+      selectText: "選用",
+      matchScoreText: `Match ${candidate.score}`,
+      onSelect: () => {
+        selected = candidate;
+        apply.disabled = false;
+        render();
+      },
+    });
+  }
+  apply.disabled = !selected;
+}
+apply.addEventListener("click", () => { applied = selected?.sourceId ?? ""; });
+render();
+const secondSelect = results.querySelectorAll(".al-search-result-use")[1];
+secondSelect.click();
+const secondRow = results.querySelectorAll(".al-search-result")[1];
+apply.click();
+const passed = selected?.sourceId === "second"
+  && secondRow.classList.contains("is-selected")
+  && secondRow.getAttribute("aria-selected") === "true"
+  && !apply.disabled
+  && applied === "second";
+document.body.dataset.result = passed ? "pass" : "fail";
+document.body.dataset.selected = selected?.sourceId ?? "";
+document.body.dataset.applied = applied;
+</script></body></html>`, "utf8");
+
+const browserNames = process.platform === "win32"
+  ? ["chrome.exe", "msedge.exe"]
+  : ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"];
+let browser = "";
+for (const name of browserNames) {
+  const found = spawnSync(process.platform === "win32" ? "where" : "which", [name], { encoding: "utf8" });
+  if (found.status === 0) { browser = found.stdout.trim().split(/\\r?\\n/)[0]; break; }
+}
+assert.ok(browser, "A Chromium-compatible browser is required for the serial-cover click test.");
+
+const server = createServer(async (request, response) => {
+  const pathname = request.url === "/" ? "/index.html" : request.url;
+  const file = path.join(output, pathname.replace(/^\\//, ""));
+  try {
+    const content = await readFile(file);
+    response.setHeader("Content-Type", file.endsWith(".js") ? "text/javascript" : "text/html; charset=utf-8");
+    response.end(content);
+  } catch {
+    response.statusCode = 404;
+    response.end("not found");
+  }
+});
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+const address = server.address();
+assert.ok(address && typeof address === "object");
+const browserResult = spawnSync(browser, [
+  "--headless=new",
+  "--no-sandbox",
+  "--disable-gpu",
+  "--virtual-time-budget=2000",
+  "--dump-dom",
+  `http://127.0.0.1:${address.port}/`,
+], { encoding: "utf8", timeout: 30000 });
+server.close();
+await rm(output, { recursive: true, force: true });
+assert.equal(browserResult.status, 0, browserResult.stderr || browserResult.stdout);
+assert.match(browserResult.stdout, /data-result="pass"/);
+assert.match(browserResult.stdout, /data-selected="second"/);
+assert.match(browserResult.stdout, /data-applied="second"/);
+console.log("Serial cover candidate Select and Apply browser click test passed.");
+''', encoding="utf-8")
+
+          package_path = Path("package.json")
+          package = json.loads(package_path.read_text(encoding="utf-8"))
+          package["scripts"]["test"] = "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs && node scripts/check-serial-cover-click.mjs && node scripts/check-test-vault-fixtures.mjs"
+          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          styles = Path("styles.serial-cover.css")
+          source = styles.read_text(encoding="utf-8")
+          marker = '''.al-serial-cover-modal .al-search-result:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+'''
+          assert source.count(marker) == 1
+          addition = marker + '''
+.al-serial-cover-modal .al-search-result-use {
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+  cursor: pointer;
+  font: inherit;
+}
+
+.al-serial-cover-modal .al-search-result-use:hover,
+.al-serial-cover-modal .al-search-result-use:focus-visible {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  outline: none;
+}
+'''
+          styles.write_text(source.replace(marker, addition), encoding="utf-8")
+          PY
       - name: Run npm ci
         run: npm ci
-      - name: Verify rapid live lookups stay ordered
+      - name: Run complete checks including Chromium clicks
+        run: npm run check
+      - name: Run release check
+        run: npm run release:check
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
+      - name: Commit validated fix
+        env:
+          EXPECTED_HEAD: b6aedf8c9effe4772cd3bd7db4182ffd04f0e451
         run: |
-          mkdir -p .tmp
-          cat > .tmp/obsidian-live.ts <<'TS'
-          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
-            const response = await fetch(options.url, {
-              method: options.method ?? "GET",
-              body: options.body,
-              headers: options.headers,
-            });
-            const text = await response.text();
-            if (!response.ok) {
-              const error = new Error(`Request failed with status ${response.status}`) as Error & {
-                status: number;
-                response: { status: number; headers: Headers };
-              };
-              error.status = response.status;
-              error.response = { status: response.status, headers: response.headers };
-              throw error;
-            }
-            return { json: text ? JSON.parse(text) : {}, text };
-          }
-          TS
-          cat > .tmp/live-serial-queue.ts <<'TS'
-          import { writeFile } from "node:fs/promises";
-          import { SerialCoverLoadQueue } from "../src/serial-cover-load-queue";
-          import {
-            clearSerialCoverProviderCache,
-            configureSerialCoverProvider,
-            configureSerialCoverProviderForTests,
-            searchSerialCovers,
-          } from "../src/serial-cover-provider";
-          import { confidentSerialCover, serialCoverQuery } from "../src/serial-entry-cover";
-
-          const originalTitle = "無職転生 ～異世界行ったら本気だす～";
-          const expected = new Map([
-            ["14", "223981"],
-            ["16", "260752"],
-            ["17", "260753"],
-            ["18", "260754"],
-            ["19", "260755"],
-            ["20", "267778"],
-          ]);
-          const labels = [...expected.keys()];
-          const queue = new SerialCoverLoadQueue();
-          const events: string[] = [];
-          const report: Array<Record<string, unknown>> = [];
-
-          configureSerialCoverProvider({ apiKey: "" });
-          configureSerialCoverProviderForTests({
-            sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
-            random: () => 0,
-          });
-          clearSerialCoverProviderCache();
-
-          const tasks = labels.map((label) => queue.enqueue(label, async () => {
-            events.push(`${label}:start`);
-            const query = serialCoverQuery(originalTitle, label);
-            if (!query) throw new Error(`Could not build query for ${label}`);
-            const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
-            const selected = confidentSerialCover(candidates);
-            if (!selected) throw new Error(`Volume ${label}: no confident result`);
-            const expectedId = expected.get(label);
-            if (selected.sourceId !== expectedId) {
-              throw new Error(`Volume ${label}: expected ${expectedId}, got ${selected.sourceId}`);
-            }
-            const image = await fetch(selected.coverUrl, {
-              headers: {
-                Range: "bytes=0-255",
-                "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)",
-              },
-            });
-            const bytes = await image.arrayBuffer();
-            if (!image.ok || bytes.byteLength === 0) {
-              throw new Error(`Volume ${label}: cover download failed (${image.status})`);
-            }
-            events.push(`${label}:end`);
-            report.push({
-              label,
-              sourceId: selected.sourceId,
-              title: selected.title,
-              score: selected.score,
-              coverStatus: image.status,
-              coverBytes: bytes.byteLength,
-            });
-          }));
-
-          try {
-            await Promise.all(tasks);
-            await queue.whenIdle();
-            const expectedEvents = labels.flatMap((label) => [`${label}:start`, `${label}:end`]);
-            if (JSON.stringify(events) !== JSON.stringify(expectedEvents)) {
-              throw new Error(`Unexpected queue order: ${JSON.stringify(events)}`);
-            }
-            if (report.length !== labels.length) {
-              throw new Error(`Expected ${labels.length} results, got ${report.length}`);
-            }
-            console.log(JSON.stringify({ labels, events, report }, null, 2));
-          } finally {
-            await writeFile("serial-cover-live-queue-report.json", JSON.stringify({ labels, events, report }, null, 2));
-          }
-          TS
-          npx esbuild .tmp/live-serial-queue.ts \
-            --bundle \
-            --platform=node \
-            --format=esm \
-            --target=node24 \
-            --alias:obsidian=./.tmp/obsidian-live.ts \
-            --outfile=.tmp/live-serial-queue.mjs
-          node .tmp/live-serial-queue.mjs | tee serial-cover-live-queue.log
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: serial-cover-live-queue-report
-          path: |
-            serial-cover-live-queue-report.json
-            serial-cover-live-queue.log
-          if-no-files-found: warn
-          retention-days: 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/serial-cover-choice-ui.ts src/serial-cover-feature.ts scripts/check-serial-cover-click.mjs package.json styles.serial-cover.css styles.css
+          git commit -m "fix: make serial cover selection clickable"
+          git push --force-with-lease=refs/heads/fix/serial-cover-picker-click:$EXPECTED_HEAD origin HEAD:fix/serial-cover-picker-click
