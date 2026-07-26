@@ -17,17 +17,18 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Verify and extract validated payload
+      - name: Extract and verify exact source files
         run: |
-          echo "f12f6b6bab4765e9c7ce1dfa2bc2631398ba2ab11feea4782a4a66f3eafa0902  .serial-cover-final-payload/chunk-00" | sha256sum -c -
-          echo "8688eff12dbc28dfb0447fd8a7b9d59bd03d8c826e099f43044bbebafb9a1f88  .serial-cover-final-payload/chunk-01" | sha256sum -c -
-          echo "f12f5732f09f300fdefc4f7f15661ea2b3c1648e999e873501cae250310db2be  .serial-cover-final-payload/chunk-02" | sha256sum -c -
           cat .serial-cover-final-payload/chunk-* > /tmp/serial-cover-final.b64
-          echo "78027a222420c7879ad0ff646baa75685331c1873cd3b52d25a60c830d21681b  /tmp/serial-cover-final.b64" | sha256sum -c -
           base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
-          echo "b13a9960e222f6f7741e3d44f628f18aa8efb83e8ce169e76b76179c145efe7b  /tmp/serial-cover-final.tar.gz" | sha256sum -c -
           mkdir -p /tmp/serial-cover-final
           tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
+          cd /tmp/serial-cover-final
+          echo "061a45800a56a6a3200d44c5a86f68c39ff58228ce521f0b33cb5f4d6c55b016  src/serial-cover-provider.ts" | sha256sum -c -
+          echo "d48395b13188d9dfd7099491e5c14dee054a7090205cc72352d32d6c5b1bbb01  src/serial-entry-cover.ts" | sha256sum -c -
+          echo "1b51a389e28fe04a2b90a43fd66bb0941c1e05b0c5a10d5aa0b61107d1d8ced8  src/serial-cover-service.ts" | sha256sum -c -
+          echo "8441fc40ec4a029df487e6849202754cc451332991913af1c54f01a369fbc71f  src/serial-cover-text.ts" | sha256sum -c -
+          echo "1f26fb5fd7d4a26893e1f982ed69eb090b868f97b6a337cf21d422c171fb434f  tests/serial-entry-cover.test.ts" | sha256sum -c -
       - name: Prepare isolated staging branch
         env:
           EXPECTED_HEAD: 072f3dbd0a6dd125c65c15ed061f724e58ac3222
