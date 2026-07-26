@@ -1,14 +1,14 @@
-name: Validate serial cover UI ordering and timeline
-run-name: Final serial cover UI ordering and timeline validation
+name: Verify live serial cover queue
+run-name: Live serial cover queue validation
 
 on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-publish:
+  live-queue:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,47 +18,131 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Prepare isolated feature staging branch
+      - name: Check out validated feature head
         env:
-          EXPECTED_FEATURE_HEAD: fcb280bb3e3f32c3b669f5d749c3bb62dedb1da1
+          EXPECTED_FEATURE_HEAD: b6aedf8c9effe4772cd3bd7db4182ffd04f0e451
         run: |
-          git fetch origin feature/serial-entry-covers chore/serial-cover-ui-order-timeline-fix
+          git fetch origin feature/serial-entry-covers
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE_HEAD"
-          staging_head="$(git rev-parse origin/chore/serial-cover-ui-order-timeline-fix)"
-          echo "STAGING_HEAD=$staging_head" >> "$GITHUB_ENV"
-          git checkout -B chore/serial-cover-ui-order-timeline-fix origin/chore/serial-cover-ui-order-timeline-fix
-          git merge-base --is-ancestor "$EXPECTED_FEATURE_HEAD" HEAD
+          git checkout --detach origin/feature/serial-entry-covers
       - name: Run npm ci
         run: npm ci
-      - name: Run npm run check
-        id: check
-        shell: bash
+      - name: Verify rapid live lookups stay ordered
         run: |
-          set +e
-          npm run check 2>&1 | tee serial-cover-check.log
-          status=${PIPESTATUS[0]}
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          exit "$status"
-      - name: Upload validation log
+          mkdir -p .tmp
+          cat > .tmp/obsidian-live.ts <<'TS'
+          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
+            const response = await fetch(options.url, {
+              method: options.method ?? "GET",
+              body: options.body,
+              headers: options.headers,
+            });
+            const text = await response.text();
+            if (!response.ok) {
+              const error = new Error(`Request failed with status ${response.status}`) as Error & {
+                status: number;
+                response: { status: number; headers: Headers };
+              };
+              error.status = response.status;
+              error.response = { status: response.status, headers: response.headers };
+              throw error;
+            }
+            return { json: text ? JSON.parse(text) : {}, text };
+          }
+          TS
+          cat > .tmp/live-serial-queue.ts <<'TS'
+          import { writeFile } from "node:fs/promises";
+          import { SerialCoverLoadQueue } from "../src/serial-cover-load-queue";
+          import {
+            clearSerialCoverProviderCache,
+            configureSerialCoverProvider,
+            configureSerialCoverProviderForTests,
+            searchSerialCovers,
+          } from "../src/serial-cover-provider";
+          import { confidentSerialCover, serialCoverQuery } from "../src/serial-entry-cover";
+
+          const originalTitle = "無職転生 ～異世界行ったら本気だす～";
+          const expected = new Map([
+            ["14", "223981"],
+            ["16", "260752"],
+            ["17", "260753"],
+            ["18", "260754"],
+            ["19", "260755"],
+            ["20", "267778"],
+          ]);
+          const labels = [...expected.keys()];
+          const queue = new SerialCoverLoadQueue();
+          const events: string[] = [];
+          const report: Array<Record<string, unknown>> = [];
+
+          configureSerialCoverProvider({ apiKey: "" });
+          configureSerialCoverProviderForTests({
+            sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+            random: () => 0,
+          });
+          clearSerialCoverProviderCache();
+
+          const tasks = labels.map((label) => queue.enqueue(label, async () => {
+            events.push(`${label}:start`);
+            const query = serialCoverQuery(originalTitle, label);
+            if (!query) throw new Error(`Could not build query for ${label}`);
+            const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
+            const selected = confidentSerialCover(candidates);
+            if (!selected) throw new Error(`Volume ${label}: no confident result`);
+            const expectedId = expected.get(label);
+            if (selected.sourceId !== expectedId) {
+              throw new Error(`Volume ${label}: expected ${expectedId}, got ${selected.sourceId}`);
+            }
+            const image = await fetch(selected.coverUrl, {
+              headers: {
+                Range: "bytes=0-255",
+                "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)",
+              },
+            });
+            const bytes = await image.arrayBuffer();
+            if (!image.ok || bytes.byteLength === 0) {
+              throw new Error(`Volume ${label}: cover download failed (${image.status})`);
+            }
+            events.push(`${label}:end`);
+            report.push({
+              label,
+              sourceId: selected.sourceId,
+              title: selected.title,
+              score: selected.score,
+              coverStatus: image.status,
+              coverBytes: bytes.byteLength,
+            });
+          }));
+
+          try {
+            await Promise.all(tasks);
+            await queue.whenIdle();
+            const expectedEvents = labels.flatMap((label) => [`${label}:start`, `${label}:end`]);
+            if (JSON.stringify(events) !== JSON.stringify(expectedEvents)) {
+              throw new Error(`Unexpected queue order: ${JSON.stringify(events)}`);
+            }
+            if (report.length !== labels.length) {
+              throw new Error(`Expected ${labels.length} results, got ${report.length}`);
+            }
+            console.log(JSON.stringify({ labels, events, report }, null, 2));
+          } finally {
+            await writeFile("serial-cover-live-queue-report.json", JSON.stringify({ labels, events, report }, null, 2));
+          }
+          TS
+          npx esbuild .tmp/live-serial-queue.ts \
+            --bundle \
+            --platform=node \
+            --format=esm \
+            --target=node24 \
+            --alias:obsidian=./.tmp/obsidian-live.ts \
+            --outfile=.tmp/live-serial-queue.mjs
+          node .tmp/live-serial-queue.mjs | tee serial-cover-live-queue.log
+      - uses: actions/upload-artifact@v6
         if: always()
-        uses: actions/upload-artifact@v6
         with:
-          name: serial-cover-check-log
-          path: serial-cover-check.log
+          name: serial-cover-live-queue-report
+          path: |
+            serial-cover-live-queue-report.json
+            serial-cover-live-queue.log
+          if-no-files-found: warn
           retention-days: 1
-      - name: Run npm run release:check
-        run: npm run release:check
-      - name: Build production Test Vault
-        env:
-          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
-        run: npm run test-vault
-      - name: Verify generated stylesheet and publish staging branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41826782+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- styles.css; then
-            git add styles.css
-            git commit -m "build: refresh generated serial cover styles"
-            git push --force-with-lease=refs/heads/chore/serial-cover-ui-order-timeline-fix:$STAGING_HEAD origin HEAD:chore/serial-cover-ui-order-timeline-fix
-          fi
-          git status --short
