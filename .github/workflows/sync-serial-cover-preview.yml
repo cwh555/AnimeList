@@ -27,7 +27,8 @@ jobs:
           set -o pipefail
           EXPECTED_FEATURE=c50e88fc0ca5078c0e2d6a039e40f26ab543999d
           EXPECTED_PREVIEW=00027a57bbabd64c0939ea73980c8973c3e95cd2
-          git fetch origin preview feature/serial-entry-covers rebase/serial-entry-covers-preview-sync
+          CONTROLLER=chore/serial-cover-preview-sync-controller
+          git fetch origin preview feature/serial-entry-covers rebase/serial-entry-covers-preview-sync "$CONTROLLER"
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE" || exit 1
           test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW" || exit 1
           test "$(git rev-parse HEAD)" = "$EXPECTED_FEATURE" || exit 1
@@ -41,6 +42,7 @@ jobs:
             {
               echo "rebase=$reason"
               echo "generated-style-conflicts-resolved=$resolved_styles"
+              echo "reading-log-conflicts-resolved=$resolved_reading"
               echo "empty-generated-commits-skipped=$skipped_empty"
               echo 'unmerged-files:'
               printf '%s\n' "$@"
@@ -64,17 +66,34 @@ jobs:
           }
 
           resolved_styles=0
+          resolved_reading=0
           skipped_empty=0
           git rebase origin/preview
           status=$?
           while [ "$status" -ne 0 ]; do
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+
             if [ "${#conflicts[@]}" -eq 1 ] && [ "${conflicts[0]}" = "styles.css" ]; then
               # styles.css is generated from feature stylesheets. Preserve the latest
               # preview artifact during replay, then regenerate after the rebase.
               git checkout --ours -- styles.css
               git add styles.css
               resolved_styles=$((resolved_styles + 1))
+              GIT_EDITOR=true git rebase --continue
+              status=$?
+              continue
+            fi
+
+            if [ "${#conflicts[@]}" -eq 1 ] \
+              && [ "${conflicts[0]}" = "src/additional-progress-units-ui.ts" ]; then
+              # Integrate preview's Obsidian createEl/review-warning refactor with
+              # the feature's single persistent volume_log editor and metadata preservation.
+              git show "origin/$CONTROLLER:.github/rebase-resolutions/additional-progress-units-ui.ts.gz.b64" \
+                | base64 --decode | gzip --decompress > src/additional-progress-units-ui.ts
+              echo "124fa89981b9463976177a1a2980ff79e6c28516d9c6ec6e25e6e143214325c5  src/additional-progress-units-ui.ts" \
+                | sha256sum --check || capture_failure invalid-reading-resolution "${conflicts[@]}"
+              git add src/additional-progress-units-ui.ts
+              resolved_reading=$((resolved_reading + 1))
               GIT_EDITOR=true git rebase --continue
               status=$?
               continue
@@ -97,6 +116,7 @@ jobs:
           {
             echo 'rebase=success'
             echo "generated-style-conflicts-resolved=$resolved_styles"
+            echo "reading-log-conflicts-resolved=$resolved_reading"
             echo "empty-generated-commits-skipped=$skipped_empty"
             echo "head=$(git rev-parse HEAD)"
           } > rebase-report.txt
