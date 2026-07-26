@@ -70,9 +70,11 @@ jobs:
           NODE
           node /tmp/serial-cover-live-probe.mjs
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: serial-cover-direct-apply-live-report-v2
           path: serial-cover-live-report.json
+          if-no-files-found: warn
           retention-days: 7
       - name: Publish validated product commit
         shell: bash
