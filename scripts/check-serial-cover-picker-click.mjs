@@ -21,7 +21,7 @@ const compiled = spawnSync(tsc, [
   "--target", "ES2022",
   "--module", "ES2022",
   "--moduleResolution", "Bundler",
-  "--lib", "ES2022,DOM",
+  "--lib", "ES2022,DOM,DOM.Iterable",
   "--skipLibCheck",
   "--rootDir", "src",
   "--outDir", output,
