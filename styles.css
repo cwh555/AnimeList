@@ -905,33 +905,28 @@
   padding: 4px 7px;
 }
 
-.al-serial-cover-results {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-  margin-top: 12px;
+.al-serial-cover-modal .al-search-results {
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
-.al-serial-cover-candidate {
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-  text-align: left;
-}
-
-.al-serial-cover-candidate.is-selected {
+.al-serial-cover-modal .al-search-result.is-selected {
   border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
   box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
-.al-serial-cover-candidate img {
-  aspect-ratio: 2 / 3;
-  border-radius: var(--radius-s);
-  object-fit: cover;
-  width: 100%;
+.al-serial-cover-modal .al-search-result:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.al-serial-cover-modal .al-modal-actions {
+  position: sticky;
+  bottom: 0;
+  padding-top: 12px;
+  background: var(--background-primary);
 }
 
 .al-serial-cover-migration-progress {
