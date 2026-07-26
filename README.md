@@ -29,6 +29,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > - Added a Score Dashboard for organizing titles across all 0–10 ratings, with drag-and-drop and batch editing.
 > - Added an optional Masterpiece mode with reusable categories and support for assigning a title to multiple categories.
 > - Added chapter, season, and volume tracking for manga and novels, including dated progress entries.
+> - Added optional covers for individual manga and novel progress entries, with automatic lookup, direct card-based manual selection, and timeline support.
 > - Standardized ratings to 0.5-point increments and simplified library statuses to Ongoing, Completed, Wishlist, and Dropped.
 > - Improved multilingual search, result ranking, provider coverage, and conservative duplicate-title warnings.
 > - Improved timeline scaling, progress presentation, and interface terminology.
@@ -38,11 +39,11 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 - One Markdown-based library for anime, manga, and novels.
 - Metadata search through Bangumi, AniList, and Open Library.
 - Card, list, and poster views with search, filters, and sorting.
-- Media-specific progress tracking and dated serial entries.
+- Media-specific progress tracking and dated serial entries with optional per-entry covers.
 - A Score Dashboard for direct and batch rating changes.
 - Favorite mode or reusable Masterpiece categories.
 - A pannable and zoomable completion timeline.
-- Local covers and built-in or custom Markdown templates.
+- Local series and serial-entry covers with remote-image fallback.
 - Desktop and mobile support without a Dataview dependency.
 
 ## Installation
@@ -70,7 +71,7 @@ The interface uses Traditional Chinese. Provider metadata may remain in its orig
 
 ## Documentation
 
-See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, search, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
+See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, search, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
 
 ## Metadata and privacy
 

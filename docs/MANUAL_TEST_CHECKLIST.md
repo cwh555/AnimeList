@@ -57,15 +57,23 @@ Run this checklist before every public release and before the initial Community 
 - [ ] Duplicate novel volume labels are rejected after normalization (`01` and `1` are the same).
 - [ ] Adding a novel volume pre-fills its completion date with today; clearing the field and saving restores today.
 
-### Novel volume history and series cover
+### Dated serial history and entry covers
 
-- [ ] Creating a novel from Bangumi or AniList downloads the normal series cover and shows it on the library card.
-- [ ] Open a novel with several recorded volumes and select **新增一卷**. Existing rows stay sorted by normalized volume number, the modal scrolls the new row into view, and the volume-label field receives focus with its generated label selected.
-- [ ] Change a row from volume `10` to `2.5`, leave the field, and confirm it immediately moves between `2` and `3`; `EX` stays after numbered volumes.
-- [ ] Each volume row contains only volume number, optional start date, completion date, and **移除**.
-- [ ] Saving writes `label`, optional `started_at`, and a non-empty `completed_at` under `volume_log`.
-- [ ] There is no per-volume cover picker, ISBN metadata, Rakuten setting, or novel-volume cover API request.
-- [ ] The library card continues using the normal series cover.
+- [ ] Manga and novels can create dated chapter, season, or volume rows using the selected progress unit.
+- [ ] Adding a new row keeps existing rows sorted by normalized label, scrolls the new row into view, and focuses its label field.
+- [ ] Change a volume row from `10` to `2.5`, leave the field, and confirm it immediately moves between `2` and `3`; `EX` stays after numbered volumes.
+- [ ] Each dated row shows its label, optional start date, completion date, entry-cover area, and remove action.
+- [ ] Rapidly add several rows and confirm automatic cover requests show queued/loading state and run in insertion order without skipping an intermediate row.
+- [ ] A failed automatic cover request does not block later queued rows and does not apply a low-confidence candidate.
+- [ ] Open manual cover search and confirm the result cards contain no separate Select control and the modal contains no Apply action.
+- [ ] Clicking anywhere on a candidate card immediately downloads and applies that cover, updates the row, and closes the search modal.
+- [ ] If a selected cover download fails, the search modal remains open, controls become usable again, and another candidate can be chosen.
+- [ ] Manual searches for `關於我被隔壁天使變成廢材這件事`, `不時以俄語遮羞的艾利同學`, and `冰菓` retain broad candidate lists while ranking the correct novel result near the top.
+- [ ] Clearing an entry cover returns that row to the normal series-cover fallback without changing the library card cover.
+- [ ] Saving writes `label`, optional `started_at`, non-empty `completed_at`, and optional cover metadata under `volume_log`.
+- [ ] Close and reopen the editor; dated rows, selected entry covers, provider/source metadata, and unrelated entry fields remain unchanged.
+- [ ] **Settings → Load missing covers** opens a floating progress modal with current item, progress bar, loaded/not-found/failed/skipped counters, cancellation, close protection, and copyable details.
+- [ ] Loading missing covers never overwrites a dated entry that already has a cover.
 
 ### Notes and templates
 
@@ -82,10 +90,11 @@ Run this checklist before every public release and before the initial Community 
 - [ ] The **所有**, **動畫**, **漫畫**, and **小說** buttons show only their matching completion records and update the summary count and date range.
 - [ ] A type with no matching records keeps the filter buttons visible so another type can be selected.
 - [ ] Completed anime/manga and legacy completed novels appear when they have a completion date.
-- [ ] Every saved novel-volume row appears on the timeline because missing completion dates default to today.
-- [ ] Every novel-volume card uses the series cover and visibly shows both the work title and `第 N 卷`.
+- [ ] Every saved dated chapter, season, or volume row appears on the timeline because missing completion dates default to today.
+- [ ] A dated-entry card uses its own cover when available and falls back to the normal series cover when the entry cover is absent or cannot be resolved.
+- [ ] Every dated-entry card visibly shows the work title and its chapter, season, or volume label.
 - [ ] Records on the same or nearby dates move into alternating vertical lanes and do not overlap at fit, zoomed-in, or zoomed-out scales.
-- [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and novel volumes appear in `1`, `2`, `3` order.
+- [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and serial entries appear in `1`, `2`, `3` order.
 - [ ] Dragging pans the timeline.
 - [ ] Date-spacing controls change horizontal time distance without resizing cards.
 - [ ] Visual-size controls independently shrink and enlarge the complete timeline scene.

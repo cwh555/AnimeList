@@ -35,6 +35,16 @@ Ratings use a 0–10 range in 0.5-point increments. Existing values such as `7.3
 
 Anime shows numeric progress when a usable total is known. Manga and novel progress uses a state-based track: completed titles are full, ongoing or dropped titles with recorded progress are partial, and Wishlist or zero-progress titles are empty.
 
+### Serial-entry covers
+
+Each dated manga or novel entry can store its own optional cover. The normal series cover remains unchanged and is used whenever an entry has no usable cover.
+
+Automatic cover loading is intentionally conservative: AnimeList applies a result only when the title, media type, and entry label form an unambiguous match. Rapidly added entries are processed in insertion order, so a slower request cannot cause an intermediate chapter, season, or volume to be skipped. A failed lookup does not block later queued entries.
+
+Click an entry's cover area or retry action to open manual cover search. Manual search is broader than automatic loading: it searches the edited query and the stored original-language title, keeps lower-confidence candidates visible, and ranks likely title and entry-number matches first. Click anywhere on a candidate card to download and apply that cover immediately; there is no separate Select or Apply step. If the download fails, the search window stays open so another result can be chosen.
+
+Clear an entry cover to return that entry to the series-cover fallback. Existing notes can use **Settings → Load missing covers** to scan dated entries in a floating progress window. The migration reports loaded, not found, failed, and skipped records, supports cancellation, and never overwrites an existing entry cover.
+
 ## Search and duplicate warnings
 
 AnimeList searches enabled providers:
@@ -81,7 +91,7 @@ The timeline shows completion records and dated serial entries. Use the media-ty
 
 Date spacing and visual scale are independent controls. **Fit** displays the complete timeline, while **Reset** restores the calculated default view. The default spacing considers the date range, record density, and unavoidable same-day stacks.
 
-Completed chapter, season, or volume entries reuse the series cover and appear as separate dated events. Select a card to open its Markdown note.
+Completed chapter, season, or volume entries appear as separate dated events. Each event prefers its own entry cover and falls back to the normal series cover when no entry cover is available. Select a card to open its Markdown note.
 
 ## Markdown data and templates
 
@@ -107,7 +117,9 @@ Common values include:
 - `masterpiece_labels`: reusable Masterpiece categories
 - `volume_log`: the backward-compatible container for dated serial entries
 
-AnimeList preserves unrelated frontmatter and Markdown body content when editing supported fields.
+A `volume_log` entry may contain `label`, `started_at`, `completed_at`, and optional cover metadata such as `cover`, `cover_provider`, `cover_source_id`, and `cover_manual`. Entries without cover fields remain valid.
+
+AnimeList preserves unrelated frontmatter, unknown dated-entry fields, and Markdown body content when editing supported fields.
 
 The built-in template is intentionally minimal. Custom templates can be placed in the configured `Anime`, `Manga`, `Novel`, or `Common` template folders. Supported variables include:
 
@@ -124,6 +136,6 @@ The built-in template is intentionally minimal. Custom templates can be placed i
 
 ## Settings and privacy
 
-Settings control storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, and Favorite or Masterpiece mode.
+Settings control storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, Favorite or Masterpiece mode, and migration of missing serial-entry covers.
 
 Only search terms are sent to enabled metadata providers. Ratings, progress, dates, labels, note bodies, and locally stored covers remain in the vault.
