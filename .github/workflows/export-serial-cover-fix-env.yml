@@ -1,0 +1,26 @@
+name: Export serial cover fix environment
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Pack exact checkout
+        run: |
+          tar --exclude=.git --exclude=.tmp -czf serial-cover-fix-env.tar.gz .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: serial-cover-fix-env
+          path: serial-cover-fix-env.tar.gz
+          retention-days: 1
