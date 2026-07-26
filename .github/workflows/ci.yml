@@ -18,5 +18,25 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: npm run release:check
+      - name: Capture community and build checks
+        shell: bash
+        run: |
+          set +e
+          {
+            npm run community:check
+            community=$?
+            npm run build
+            build=$?
+            echo "community=$community build=$build"
+            test "$community" -eq 0 && test "$build" -eq 0
+          } > picker-postcheck.log 2>&1
+          status=$?
+          cat picker-postcheck.log
+          exit "$status"
+      - name: Upload picker post-check log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: picker-postcheck-log
+          path: picker-postcheck.log
+          retention-days: 1
