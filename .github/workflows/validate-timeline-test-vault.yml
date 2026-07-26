@@ -1,0 +1,32 @@
+name: Validate timeline Test Vault
+
+on:
+  pull_request:
+    branches:
+      - fix/timeline-initial-layout-and-units
+    paths:
+      - .github/workflows/validate-timeline-test-vault.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.head_ref == 'chore/validate-timeline-initial-layout'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run complete checks
+        run: npm run check
+      - name: Run release checks
+        run: npm run release:check
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
