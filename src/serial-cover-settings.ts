@@ -10,7 +10,7 @@ import {
 
 const SETTINGS_EXTENSION_ID = "serial-cover";
 
-function createSerialCoverSettingsSection(
+export function createSerialCoverSettingsSection(
   plugin: SerialCoverPlugin,
 ): SettingsSection {
   return {
