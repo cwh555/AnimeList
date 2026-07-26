@@ -7,10 +7,10 @@ permissions:
   contents: read
 
 jobs:
-  test-tail:
+  test-failure:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone and show failing test tail
+      - name: Clone and show failing test
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
@@ -18,6 +18,6 @@ jobs:
           cd repo
           npm ci --silent
           if ! npm test > test.log 2>&1; then
-            tail -n 80 test.log
+            grep -n -B 20 -A 35 "not ok" test.log | tail -n 120
             exit 1
           fi
