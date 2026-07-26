@@ -788,16 +788,21 @@ describe("version documentation", () => {
     const sessions = readFileSync(path.join(process.cwd(), "docs/VERSION_SESSIONS.md"), "utf8");
     const changelog = readFileSync(path.join(process.cwd(), "CHANGELOG.md"), "utf8");
     const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
+    const roadmap = readFileSync(path.join(process.cwd(), "ROADMAP.md"), "utf8");
+    const userGuide = readFileSync(path.join(process.cwd(), "docs/USER_GUIDE.md"), "utf8");
 
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
     assert.match(sessions, /\*\*Release state:\*\* Published through `1\.1\.2`\./);
+    assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
     assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
-    assert.match(changelog, /## 1\.1\.1 - 2026-07-21/);
-    assert.match(changelog, /## 1\.1\.0 - 2026-07-21/);
     assert.match(readme, /> \[!NOTE\]/);
-    assert.match(readme, /> \*\*What's new in 1\.1\.0\*\*/);
-    assert.doesNotMatch(readme, /1\.1\.0 highlights — Unreleased/);
+    assert.match(readme, /> \*\*What's new in 1\.2\.0\*\*/);
+    assert.match(readme, /\[User Guide\]\(docs\/USER_GUIDE\.md\)/);
+    assert.match(userGuide, /## Score Dashboard/);
+    assert.match(userGuide, /## Markdown data and templates/);
+    assert.doesNotMatch(roadmap, /Add a score dashboard/);
+    assert.doesNotMatch(readme, /## Library data/);
   });
 
   it("keeps every runtime and release version synchronized", () => {
