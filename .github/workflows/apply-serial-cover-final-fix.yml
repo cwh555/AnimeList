@@ -21,12 +21,24 @@ jobs:
           cache: npm
       - name: Apply exact product patch
         run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/serial-cover-final.patch.gz.b64')
+          encoded = path.read_text(encoding='utf-8')
+          assert encoded.count('Y7opinm') == 1, 'unexpected staged patch corruption pattern'
+          encoded = encoded.replace('Y7opinm', 'Y7GOpinm', 1)
+          path.write_text(encoded, encoding='utf-8')
+          PY
+          echo "c8a71758ab8a73ef7d942a111b55a3faaf029f64d6e0febf990f26d31bd7ed0b  .github/serial-cover-final.patch.gz.b64" | sha256sum --check
           base64 --decode .github/serial-cover-final.patch.gz.b64 | gzip --decompress > /tmp/serial-cover-final.patch
+          echo "542b1f9a1f16f6fd86681334132b14dfda776e719be5e2bb9d36cacd143e5329  /tmp/serial-cover-final.patch" | sha256sum --check
           patch -p1 < /tmp/serial-cover-final.patch
           rm -f \
             .github/serial-cover-final.patch.gz.b64 \
+            .github/serial-cover-chunk-* \
             .github/serial-cover-fix-export-trigger.txt \
             .github/workflows/export-serial-cover-fix-env.yml \
+            .github/workflows/diagnose-serial-cover-patch.yml \
             .github/workflows/apply-serial-cover-final-fix.yml
       - name: Install dependencies
         run: npm ci
