@@ -1,0 +1,50 @@
+name: Verify preview serial-cover push CI
+
+on:
+  pull_request:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify-preview-push-ci:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_SHA: ab5df95a14b77f5123ae9ee33c158602649a6085
+    steps:
+      - name: Verify preview ref and push-event CI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(gh api repos/cwh555/AnimeList/git/ref/heads/preview --jq '.object.sha')"
+          test "$actual_sha" = "$EXPECTED_SHA"
+
+          for attempt in $(seq 1 30); do
+            run_json="$(gh api -X GET repos/cwh555/AnimeList/actions/runs \
+              -f head_sha="$EXPECTED_SHA" \
+              -f event=push \
+              -f per_page=20 \
+              --jq '.workflow_runs | map(select(.name == "CI")) | sort_by(.created_at) | last // {}')"
+            status="$(jq -r '.status // "missing"' <<<"$run_json")"
+            conclusion="$(jq -r '.conclusion // ""' <<<"$run_json")"
+            run_id="$(jq -r '.id // ""' <<<"$run_json")"
+            echo "attempt=$attempt run_id=$run_id status=$status conclusion=$conclusion"
+
+            if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+              gh api "repos/cwh555/AnimeList/actions/runs/$run_id/jobs" \
+                --jq '.jobs[] | {name, status, conclusion, steps: [.steps[] | {name, conclusion}]}'
+              exit 0
+            fi
+            if [[ "$status" == "completed" && "$conclusion" != "success" ]]; then
+              gh api "repos/cwh555/AnimeList/actions/runs/$run_id/jobs" \
+                --jq '.jobs[] | {name, status, conclusion, steps: [.steps[] | {name, conclusion}]}'
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "Timed out waiting for preview push CI for $EXPECTED_SHA" >&2
+          exit 1
