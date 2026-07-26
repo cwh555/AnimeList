@@ -7,10 +7,13 @@ export class SerialCoverLoadQueue {
     if (!normalizedKey) return Promise.reject(new Error("Serial cover queue key is required."));
 
     const existing = this.pending.get(normalizedKey);
-    if (existing) return existing as Promise<T>;
+    if (existing !== undefined) return existing as Promise<T>;
 
-    const run = this.tail.then(operation);
-    this.tail = run.then(() => undefined, () => undefined);
+    const run: Promise<T> = this.tail.then(operation);
+    this.tail = run.then<void>(
+      () => undefined,
+      () => undefined,
+    );
 
     let tracked!: Promise<T>;
     tracked = run.finally(() => {
