@@ -35,10 +35,7 @@ import {
   normalizeTimelineMaxStackDepth,
   preserveTimelineAxisScreenY,
 } from "./timeline-scale";
-import {
-  centerLatestTimelineAxis,
-  layoutDefaultTimelinePoints,
-} from "./timeline-corrections";
+import { centerLatestTimelineAxis } from "./timeline-corrections";
 
 const PLUGIN_VERSION = "1.1.2";
 const MEDIA_ROOT = "Media";
@@ -1002,7 +999,6 @@ export const TimelineUI = (() => {
       sceneHeight: 0,
       axisY: 0,
       latestItemCenterX: 0,
-      useDefaultStackLimit: true,
     };
 
     const root = makeEl("div", "al-timeline-root");
@@ -1098,21 +1094,10 @@ export const TimelineUI = (() => {
         time: item.completedTime,
         x: sidePadding + Math.round((item.completedTime - minTime) / DAY_MS) * state.daySpacing,
       }));
-      const laidOutItems = state.useDefaultStackLimit
-        ? layoutDefaultTimelinePoints(
-          positionedItems.map((positioned) => positioned.x),
-          CARD_WIDTH + CARD_GAP_X,
-          adapters.maxStackDepth,
-        ).map((placement, index) => ({
-          ...positionedItems[index],
-          anchorX: placement.anchorX,
-          x: placement.x,
-          lane: placement.lane,
-        }))
-        : assignTimelineLanes(positionedItems, CARD_WIDTH + CARD_GAP_X)
-          .map((positioned) => ({ ...positioned, anchorX: positioned.x }));
-      const maximumCardX = Math.max(...laidOutItems.map((positioned) => positioned.x));
-      state.sceneWidth = Math.max(state.sceneWidth, maximumCardX + sidePadding);
+      const laidOutItems = assignTimelineLanes(
+        positionedItems,
+        CARD_WIDTH + CARD_GAP_X,
+      );
       const laneCount = Math.max(1, ...laidOutItems.map((positioned) => positioned.lane + 1));
       const aboveLaneCount = Math.ceil(laneCount / 2);
       const belowLaneCount = Math.floor(laneCount / 2);
@@ -1157,19 +1142,12 @@ export const TimelineUI = (() => {
         scene.appendChild(dayMarker);
       });
 
-      laidOutItems.forEach(({ item, time, x, anchorX, lane }, index) => {
+      laidOutItems.forEach(({ item, time, x, lane }, index) => {
         const level = Math.floor(lane / 2);
         const aboveAxis = lane % 2 === 0;
         const cardY = aboveAxis
           ? axisY - STEM_GAP - CARD_HEIGHT - level * (CARD_HEIGHT + CARD_GAP_Y)
           : axisY + STEM_GAP + level * (CARD_HEIGHT + CARD_GAP_Y);
-        if (Math.abs(x - anchorX) >= 0.5) {
-          const dateLink = makeEl("div", "al-timeline-axis al-timeline-date-link");
-          dateLink.style.left = String(Math.min(anchorX, x)) + "px";
-          dateLink.style.top = String(axisY) + "px";
-          dateLink.style.width = String(Math.abs(x - anchorX)) + "px";
-          scene.appendChild(dateLink);
-        }
         const stemStart = aboveAxis ? cardY + CARD_HEIGHT : axisY;
         const stemEnd = aboveAxis ? axisY : cardY;
         const stem = makeEl("div", "al-timeline-stem");
@@ -1214,7 +1192,6 @@ export const TimelineUI = (() => {
       if (Math.abs(next - previous) < 1e-6) return;
       const dayAtCursor = (((localX - state.x) / state.viewScale) - sidePadding) / previous;
       const previousAxisY = state.axisY;
-      state.useDefaultStackLimit = false;
       state.daySpacing = next;
       renderGeometry();
       state.x = localX - (sidePadding + dayAtCursor * next) * state.viewScale;
@@ -1263,7 +1240,6 @@ export const TimelineUI = (() => {
     };
 
     const resetView = () => {
-      state.useDefaultStackLimit = true;
       state.daySpacing = defaultView.daySpacing;
       state.viewScale = defaultView.viewScale;
       renderGeometry();
@@ -1271,7 +1247,6 @@ export const TimelineUI = (() => {
     };
 
     const fitScene = () => {
-      state.useDefaultStackLimit = false;
       const availableWidth = Math.max(260, viewport.clientWidth / state.viewScale - sidePadding * 2);
       state.daySpacing = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, availableWidth / rangeDays));
       renderGeometry();

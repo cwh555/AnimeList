@@ -4,40 +4,10 @@ import { expandTimelineEntries } from "../src/novel-progress";
 import type { MediaItem } from "../src/types";
 import {
   centerLatestTimelineAxis,
-  layoutDefaultTimelinePoints,
   timelineEntryCopy,
 } from "../src/timeline-corrections";
 
-const CARD_DISTANCE = 136;
-
-describe("timeline default layout corrections", () => {
-  it("keeps same-day overflow within the configured initial stack depth", () => {
-    const placements = layoutDefaultTimelinePoints(
-      Array.from({ length: 14 }, () => 300),
-      CARD_DISTANCE,
-      3,
-    );
-
-    assert.equal(Math.max(...placements.map((placement) => placement.lane)) + 1, 6);
-    assert.deepEqual(
-      placements.slice(0, 6).map((placement) => placement.x),
-      [300, 300, 300, 300, 300, 300],
-    );
-    assert.ok(placements.every((placement) => placement.anchorX === 300));
-    assert.ok(placements.slice(6).every((placement) => placement.x > placement.anchorX));
-  });
-
-  it("reuses only the configured lanes when nearby dates still collide", () => {
-    const placements = layoutDefaultTimelinePoints(
-      [0, 70, 140, 140],
-      CARD_DISTANCE,
-      1,
-    );
-
-    assert.deepEqual(placements.map((placement) => placement.lane), [0, 1, 0, 1]);
-    assert.deepEqual(placements.map((placement) => placement.x), [0, 70, 140, 206]);
-  });
-
+describe("timeline default centering correction", () => {
   it("centers the newest card on x and the timeline axis on y", () => {
     assert.deepEqual(
       centerLatestTimelineAxis(1200, 800, 950, 464, 0.5),

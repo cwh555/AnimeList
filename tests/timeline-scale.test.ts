@@ -121,6 +121,18 @@ describe("timeline scale defaults", () => {
     assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 7);
   });
 
+  it("separates neighboring date groups without flattening same-day overflow", () => {
+    const times = [
+      ...Array.from({ length: 10 }, () => 0),
+      ...Array.from({ length: 3 }, () => DAY_MS),
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1, 3);
+    const points = times.map((time) => (time / DAY_MS) * spacing);
+
+    assert.ok(spacing >= MINIMUM_CARD_DISTANCE);
+    assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 10);
+  });
+
   it("preserves the timeline axis screen coordinate across horizontal scaling", () => {
     assert.equal(preserveTimelineAxisScreenY(25, 300, 464, 0.5), -57);
   });
@@ -342,19 +354,36 @@ describe("timeline scale DOM integration", () => {
     assert.equal(Math.max(...lanes), 1);
   });
 
-  it("caps same-day records at the configured default stack depth", () => {
+  it("keeps same-day records stacked and separates the next date group", () => {
     installFakeDom();
     const container = new FakeElement("div");
-    const items = Array.from({ length: 14 }, (_, index) => ({
+    const firstDay = Array.from({ length: 10 }, (_, index) => ({
       ...timelineItem(index),
-      completedAt: "2026-07-01",
+      title: `First day ${index}`,
+      completedAt: "2026-01-01",
+    }));
+    const secondDay = Array.from({ length: 3 }, (_, index) => ({
+      ...timelineItem(index + 10),
+      title: `Second day ${index}`,
+      completedAt: "2026-01-02",
     }));
 
-    legacyTest.TimelineUI.render(container, items, { maxStackDepth: 3 });
+    legacyTest.TimelineUI.render(container, [...firstDay, ...secondDay], {
+      maxStackDepth: 3,
+    });
 
-    const lanes = descendantsByClass(container, "al-timeline-card")
-      .map((card) => Number(card.dataset.timelineLane));
-    assert.equal(Math.max(...lanes), 5);
+    const cards = descendantsByClass(container, "al-timeline-card");
+    const firstDayCards = cards.filter((card) => card.title.includes("2026-01-01"));
+    const secondDayCards = cards.filter((card) => card.title.includes("2026-01-02"));
+    const firstDayLanes = firstDayCards.map((card) => Number(card.dataset.timelineLane));
+    const secondDayLanes = secondDayCards.map((card) => Number(card.dataset.timelineLane));
+    const firstDayX = Number.parseFloat(firstDayCards[0].style.left) + 60;
+    const secondDayX = Number.parseFloat(secondDayCards[0].style.left) + 60;
+
+    assert.equal(Math.max(...firstDayLanes), 9);
+    assert.deepEqual(secondDayLanes, [0, 1, 2]);
+    assert.ok(secondDayX - firstDayX >= MINIMUM_CARD_DISTANCE);
+    assert.equal(Math.max(...cards.map((card) => Number(card.dataset.timelineLane))), 9);
   });
 
   it("keeps the timeline axis at the same screen y while wheel-scaling time", () => {
