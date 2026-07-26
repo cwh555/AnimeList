@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -114,14 +114,35 @@ const server = createServer(async (request, response) => {
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const address = server.address();
 assert.ok(address && typeof address === "object");
-const browserResult = spawnSync(browser, [
-  "--headless=new",
-  "--no-sandbox",
-  "--disable-gpu",
-  "--virtual-time-budget=2000",
-  "--dump-dom",
-  `http://127.0.0.1:${address.port}/`,
-], { encoding: "utf8", timeout: 30000 });
+
+const browserResult = await new Promise((resolve, reject) => {
+  const child = spawn(browser, [
+    "--headless=new",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--virtual-time-budget=2000",
+    "--dump-dom",
+    `http://127.0.0.1:${address.port}/`,
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  const timer = setTimeout(() => {
+    child.kill("SIGKILL");
+    reject(new Error("Chromium serial-cover click test timed out."));
+  }, 30000);
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  child.on("error", (error) => {
+    clearTimeout(timer);
+    reject(error);
+  });
+  child.on("close", (status) => {
+    clearTimeout(timer);
+    resolve({ status, stdout, stderr });
+  });
+});
 server.close();
 await rm(output, { recursive: true, force: true });
 
