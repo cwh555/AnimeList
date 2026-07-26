@@ -37,8 +37,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Behavior and UI tests
-        run: npm test
+      - name: Node behavior tests
+        run: node scripts/run-tests.mjs
+
+      - name: Serial reading UI checks
+        run: node scripts/check-serial-reading-ui.mjs
+
+      - name: Test Vault fixture checks
+        run: node scripts/check-test-vault-fixtures.mjs
 
       - name: Community preflight
         run: npm run community:check
