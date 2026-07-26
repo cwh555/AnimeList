@@ -12,7 +12,6 @@ import {
 import type { MediaItem } from "./types";
 import { uiText } from "./ui-text";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const CARD_WIDTH = 120;
 const CARD_HEIGHT = 146;
 const CARD_GAP_X = 16;
@@ -88,14 +87,12 @@ function correctTimelineEntryCopy(root: HTMLElement, items: readonly MediaItem[]
 function createDateLink(scene: HTMLElement, anchorX: number, cardX: number, axisY: number): void {
   const distance = Math.abs(cardX - anchorX);
   if (distance < 0.5) return;
-  const link = document.createElement("div");
-  link.className = "al-timeline-stem al-timeline-date-link";
+  const link = scene.createDiv({ cls: "al-timeline-stem al-timeline-date-link" });
   link.style.left = `${Math.min(anchorX, cardX)}px`;
   link.style.top = `${axisY}px`;
   link.style.width = `${distance}px`;
   link.style.height = "2px";
   link.style.transform = "none";
-  scene.appendChild(link);
 }
 
 function applyDefaultTimelineLayout(
