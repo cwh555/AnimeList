@@ -1,0 +1,68 @@
+name: Timeline diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone and run typecheck
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone and run lint
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone and run tests
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm test
+
+  community:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone and run community check
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm run community:check
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone and run build
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm run build
