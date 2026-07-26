@@ -2,8 +2,14 @@ interface DisposablePlugin {
   register(callback: () => void): void;
 }
 
+function isElementNode(value: Node): value is Element {
+  return value.nodeType === 1;
+}
+
 function elementTarget(value: EventTarget | null): Element | null {
-  return value instanceof Element ? value : null;
+  if (!value || !("nodeType" in value)) return null;
+  const node = value as Node;
+  return isElementNode(node) ? node : null;
 }
 
 function selectorModal(target: Element | null): HTMLElement | null {
@@ -57,9 +63,9 @@ export function installSerialCoverPickerEvents(plugin: DisposablePlugin): void {
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       for (const node of record.addedNodes) {
-        if (node.instanceOf(Element)) prepareSelectAffordances(node);
+        if (isElementNode(node)) prepareSelectAffordances(node);
       }
-      const modal = record.target.instanceOf(Element) ? selectorModal(record.target) : null;
+      const modal = isElementNode(record.target) ? selectorModal(record.target) : null;
       if (modal) synchronizeSerialCoverApply(modal);
     }
   });
