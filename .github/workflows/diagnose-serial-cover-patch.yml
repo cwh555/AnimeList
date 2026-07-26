@@ -14,12 +14,13 @@ jobs:
         with:
           ref: fix/serial-cover-picker-and-migration-ui
       - run: |
-          wc -c .github/serial-cover-final.patch.gz.b64 .github/serial-cover-chunk-* || true
-          git hash-object .github/serial-cover-final.patch.gz.b64 .github/serial-cover-chunk-* || true
+          mkdir -p staged-patch
+          cp .github/serial-cover-final.patch.gz.b64 staged-patch/final.patch.gz.b64
+          cp .github/serial-cover-chunk-* staged-patch/ 2>/dev/null || true
+          wc -c staged-patch/*
+          git hash-object staged-patch/*
       - uses: actions/upload-artifact@v6
         with:
           name: staged-serial-cover-patch
-          path: |
-            .github/serial-cover-final.patch.gz.b64
-            .github/serial-cover-chunk-*
+          path: staged-patch
           retention-days: 1
