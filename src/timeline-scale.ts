@@ -10,6 +10,7 @@ export const DEFAULT_TIMELINE_VIEW_SCALE = 1;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CARD_DISTANCE = 120 + 16;
 const DEFAULT_SPACING_SAFETY = 1.04;
+const LAYOUT_SEARCH_STEPS = 48;
 
 export interface TimelineDefaultView {
   daySpacing: number;
@@ -35,6 +36,17 @@ function rangeBasedDaySpacing(rangeDays: number): number {
   return 1.15;
 }
 
+function finiteSortedTimes(completedTimes: readonly number[]): number[] {
+  return completedTimes
+    .filter(Number.isFinite)
+    .slice()
+    .sort((left, right) => left - right);
+}
+
+function dayOffset(time: number, minimumTime: number): number {
+  return Math.round((time - minimumTime) / DAY_MS);
+}
+
 export function normalizeTimelineMaxStackDepth(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_TIMELINE_MAX_STACK_DEPTH;
@@ -46,16 +58,19 @@ export function normalizeTimelineMaxStackDepth(value: unknown): number {
 }
 
 function maximumSameDayCount(sortedCompletedTimes: readonly number[]): number {
+  const times = finiteSortedTimes(sortedCompletedTimes);
+  if (!times.length) return 0;
+  const minimumTime = times[0];
   let maximum = 0;
-  let currentTime: number | null = null;
+  let currentDay: number | null = null;
   let currentCount = 0;
 
-  for (const time of sortedCompletedTimes) {
-    if (!Number.isFinite(time)) continue;
-    if (time === currentTime) {
+  for (const time of times) {
+    const day = dayOffset(time, minimumTime);
+    if (day === currentDay) {
       currentCount += 1;
     } else {
-      currentTime = time;
+      currentDay = day;
       currentCount = 1;
     }
     maximum = Math.max(maximum, currentCount);
@@ -65,51 +80,68 @@ function maximumSameDayCount(sortedCompletedTimes: readonly number[]): number {
 }
 
 /**
- * Calculates the minimum practical default spacing without iterative layout
- * searches. Every work remains part of the density calculation, including
- * multiple works completed on the same day.
- *
- * Same-day works cannot be separated by time scaling, so their maximum count is
- * treated as the unavoidable lane baseline. The effective lane limit is the
- * larger of that baseline and the configured two-sided capacity
- * (`2 * maxStackDepth`). For every consecutive window of one more work than the
- * effective limit, the required spacing follows directly from the first and
- * last completion dates. This ensures that a work on a later date cannot add a
- * new lane above the unavoidable same-day stack.
- *
- * A four-percent margin absorbs pixel rounding without noticeably spreading
- * the timeline.
+ * Runs the same greedy horizontal collision layout used by the timeline UI.
+ * This keeps default-spacing validation tied to the rendered behavior instead
+ * of relying on an approximation that can miss mixed same-day and nearby-date
+ * groups.
+ */
+export function calculateTimelineLaneCount(
+  completedTimes: readonly number[],
+  daySpacing: number,
+): number {
+  const times = finiteSortedTimes(completedTimes);
+  if (!times.length) return 0;
+  const minimumTime = times[0];
+  const laneEnds: number[] = [];
+
+  for (const time of times) {
+    const x = dayOffset(time, minimumTime) * daySpacing;
+    let lane = laneEnds.findIndex((lastX) => x - lastX >= CARD_DISTANCE);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = x;
+  }
+
+  return laneEnds.length;
+}
+
+/**
+ * Calculates the initial/reset date spacing by validating the actual greedy
+ * lane assignment. The configured value remains an initialization target, not
+ * a runtime hard cap: unavoidable same-day records may exceed it, while records
+ * on later dates must reuse the available lanes instead of extending the stack.
  */
 export function calculateDefaultTimelineDaySpacing(
   sortedCompletedTimes: readonly number[],
   rangeDays: number,
   maxStackDepth: number,
 ): number {
-  const configuredLaneLimit = normalizeTimelineMaxStackDepth(maxStackDepth) * 2;
-  const laneLimit = Math.max(
-    configuredLaneLimit,
-    maximumSameDayCount(sortedCompletedTimes),
+  const times = finiteSortedTimes(sortedCompletedTimes);
+  const baseline = clamp(
+    rangeBasedDaySpacing(Math.max(1, rangeDays)),
+    MIN_TIMELINE_DAY_SPACING,
+    MAX_TIMELINE_DAY_SPACING,
   );
-  let densitySpacing = MIN_TIMELINE_DAY_SPACING;
+  if (!times.length) return baseline;
 
-  for (
-    let index = 0;
-    index + laneLimit < sortedCompletedTimes.length;
-    index += 1
-  ) {
-    const first = sortedCompletedTimes[index];
-    const last = sortedCompletedTimes[index + laneLimit];
-    if (!Number.isFinite(first) || !Number.isFinite(last)) continue;
-    const spanDays = (last - first) / DAY_MS;
-    if (spanDays <= 0) continue;
-    densitySpacing = Math.max(
-      densitySpacing,
-      (CARD_DISTANCE * DEFAULT_SPACING_SAFETY) / spanDays,
-    );
+  const laneLimit = Math.max(
+    normalizeTimelineMaxStackDepth(maxStackDepth) * 2,
+    maximumSameDayCount(times),
+  );
+  if (calculateTimelineLaneCount(times, baseline) <= laneLimit) return baseline;
+  if (calculateTimelineLaneCount(times, MAX_TIMELINE_DAY_SPACING) > laneLimit) {
+    return MAX_TIMELINE_DAY_SPACING;
+  }
+
+  let lower = baseline;
+  let upper = MAX_TIMELINE_DAY_SPACING;
+  for (let step = 0; step < LAYOUT_SEARCH_STEPS; step += 1) {
+    const candidate = (lower + upper) / 2;
+    if (calculateTimelineLaneCount(times, candidate) <= laneLimit) upper = candidate;
+    else lower = candidate;
   }
 
   return clamp(
-    Math.max(rangeBasedDaySpacing(Math.max(1, rangeDays)), densitySpacing),
+    upper * DEFAULT_SPACING_SAFETY,
     MIN_TIMELINE_DAY_SPACING,
     MAX_TIMELINE_DAY_SPACING,
   );
@@ -134,6 +166,19 @@ export function centerTimelinePoint(
   return {
     x: viewportWidth / 2 - pointX * viewScale,
     y: viewportHeight / 2 - pointY * viewScale,
+  };
+}
+
+export function centerTimelineLatestDateAndAxis(
+  viewportWidth: number,
+  viewportHeight: number,
+  latestDateX: number,
+  axisY: number,
+  viewScale: number,
+): TimelinePan {
+  return {
+    x: viewportWidth / 2 - latestDateX * viewScale,
+    y: viewportHeight / 2 - axisY * viewScale,
   };
 }
 
