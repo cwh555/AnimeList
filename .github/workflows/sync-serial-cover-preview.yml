@@ -140,7 +140,7 @@ jobs:
       - name: Commit regenerated stylesheet
         if: steps.rebase.outputs.success == 'true'
         run: |
-          mapfile -t changed < <(git status --porcelain | sed 's/^...//')
+          mapfile -t changed < <(git status --porcelain --untracked-files=no | sed 's/^...//')
           if [ "${#changed[@]}" -gt 0 ]; then
             printf '%s\n' "${changed[@]}"
             test "${#changed[@]}" -eq 1
