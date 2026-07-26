@@ -17,6 +17,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run check
+      - run: npm ci --silent
+      - name: Run check with concise diagnostics
+        run: |
+          set +e
+          npm run check > check.log 2>&1
+          status=$?
+          tail -n 100 check.log
+          exit "$status"
       - run: npm run release:check
