@@ -6,9 +6,53 @@ import {
   centerLatestTimelineAxis,
   timelineEntryCopy,
 } from "../src/timeline-corrections";
+import { calculateDefaultTimelineDaySpacing } from "../src/timeline-scale";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MINIMUM_CARD_DISTANCE = 136;
+
+function laneCount(points: readonly number[], minimumDistance: number): number {
+  const laneEnds: number[] = [];
+  for (const point of points) {
+    let lane = laneEnds.findIndex((lastPoint) => point - lastPoint >= minimumDistance);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = point;
+  }
+  return laneEnds.length;
+}
+
+describe("timeline default spacing capacity", () => {
+  it("allows a sixth overlapping work within three lanes per side", () => {
+    const baseline = calculateDefaultTimelineDaySpacing([0, DAY_MS], 1, 3);
+    const times = [
+      ...Array.from({ length: 5 }, () => 0),
+      DAY_MS,
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1, 3);
+    const points = times.map((time) => (time / DAY_MS) * spacing);
+
+    assert.equal(spacing, baseline);
+    assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 6);
+  });
+
+  it("separates the next date when overlap would require a seventh lane", () => {
+    const baseline = calculateDefaultTimelineDaySpacing([0, DAY_MS], 1, 3);
+    const times = [
+      ...Array.from({ length: 5 }, () => 0),
+      DAY_MS,
+      DAY_MS,
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1, 3);
+    const points = times.map((time) => (time / DAY_MS) * spacing);
+
+    assert.ok(spacing > baseline);
+    assert.ok(spacing >= MINIMUM_CARD_DISTANCE);
+    assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 5);
+  });
+});
 
 describe("timeline default centering correction", () => {
-  it("keeps newest-card x centering independent from axis y centering", () => {
+  it("centers the newest card on x and the timeline axis on y", () => {
     assert.deepEqual(
       centerLatestTimelineAxis(1200, 800, 950, 464, 0.5),
       { x: 125, y: 168 },
