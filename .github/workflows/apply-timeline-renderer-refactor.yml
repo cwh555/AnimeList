@@ -1,0 +1,42 @@
+name: Apply timeline renderer refactor
+
+on:
+  push:
+    branches: [feature/fix-timeline-layout]
+    paths:
+      - scripts/apply-timeline-renderer-refactor.mjs
+      - .github/workflows/apply-timeline-renderer-refactor.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/fix-timeline-layout
+          fetch-depth: 0
+      - name: Validate and apply refactor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-timeline-renderer-refactor.mjs')
+          source = path.read_text(encoding='utf-8')
+          source = source.replace(r'dateLink.style.left = \\`${Math.min(anchorX, x)}px\\`;', 'dateLink.style.left = String(Math.min(anchorX, x)) + "px";')
+          source = source.replace(r'dateLink.style.top = \\`${axisY}px\\`;', 'dateLink.style.top = String(axisY) + "px";')
+          source = source.replace(r'dateLink.style.width = \\`${Math.abs(x - anchorX)}px\\`;', 'dateLink.style.width = String(Math.abs(x - anchorX)) + "px";')
+          path.write_text(source, encoding='utf-8')
+          PY
+          node --check scripts/apply-timeline-renderer-refactor.mjs
+          node scripts/apply-timeline-renderer-refactor.mjs
+          git diff --check
+      - name: Commit renderer integration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "refactor: integrate timeline fixes into renderer"
+          git push origin HEAD:feature/fix-timeline-layout
