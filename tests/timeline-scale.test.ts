@@ -382,6 +382,8 @@ describe("timeline scale DOM integration", () => {
 
     assert.equal(Math.max(...firstDayLanes), 9);
     assert.deepEqual(secondDayLanes, [0, 1, 2]);
+    assert.ok(firstDayCards.every((card) => Number.parseFloat(card.style.left) + 60 === firstDayX));
+    assert.ok(secondDayCards.every((card) => Number.parseFloat(card.style.left) + 60 === secondDayX));
     assert.ok(secondDayX - firstDayX >= MINIMUM_CARD_DISTANCE);
     assert.equal(Math.max(...cards.map((card) => Number(card.dataset.timelineLane))), 9);
   });

@@ -846,11 +846,10 @@ describe("timeline modal and Traditional Chinese labels", () => {
     assert.doesNotMatch(mainSource, /showSection\("timeline"\)/);
   });
 
-  it("shows novel volume labels and uses collision-aware vertical lanes", () => {
+  it("shows novel volume labels through the tracked timeline classes", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
     assert.match(legacySource, /al-timeline-volume-label/);
-    assert.match(legacySource, /assignTimelineLanes\(positionedItems, CARD_WIDTH \+ CARD_GAP_X\)/);
     assert.match(legacySource, /aboveAxis = lane % 2 === 0/);
     assert.match(stylesheet, /\.al-timeline-volume-label/);
   });
