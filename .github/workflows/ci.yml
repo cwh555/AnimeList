@@ -17,19 +17,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --silent
-      - name: Run check with diagnostic artifact
-        run: |
-          set +e
-          npm run check > check.log 2>&1
-          status=$?
-          tail -n 40 check.log
-          exit "$status"
-      - name: Upload check diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: serial-cover-check-log
-          path: check.log
-          if-no-files-found: error
+      - run: npm ci
+      - run: npm run check
       - run: npm run release:check
