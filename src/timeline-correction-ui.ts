@@ -3,7 +3,6 @@ import type AnimeListPlugin from "./main";
 import { TimelineUI } from "./legacy";
 import { expandTimelineEntries } from "./novel-progress";
 import { defaultProgressUnit } from "./progress-units";
-import type { ReadingProgressUnit } from "./progress-units";
 import {
   centerLatestTimelineAxis,
   layoutDefaultTimelinePoints,
@@ -60,7 +59,7 @@ function timelineCopyTargets(items: readonly MediaItem[]): Map<string, TimelineC
     const copy = timelineEntryCopy(
       item.seriesTitle || item.title,
       item.volumeLabel,
-      unit as ReadingProgressUnit,
+      unit,
     );
     const queue = targets.get(originalCardTitle) ?? [];
     queue.push({
@@ -91,8 +90,6 @@ function createDateLink(scene: HTMLElement, anchorX: number, cardX: number, axis
   link.style.left = `${Math.min(anchorX, cardX)}px`;
   link.style.top = `${axisY}px`;
   link.style.width = `${distance}px`;
-  link.style.height = "2px";
-  link.style.transform = "none";
 }
 
 function applyDefaultTimelineLayout(
