@@ -829,13 +829,13 @@ describe("version documentation", () => {
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
 
-    assert.equal(manifest.version, "1.1.2");
+    assert.equal(manifest.version, "1.2.0");
     assert.equal(packageJson.version, manifest.version);
     assert.equal(packageLock.version, manifest.version);
     assert.equal(packageLock.packages[""]?.version, manifest.version);
     assert.equal(versions[manifest.version], "1.5.0");
-    assert.match(mainSource, /const PLUGIN_VERSION = "1\.1\.2";/);
-    assert.match(legacySource, /const PLUGIN_VERSION = "1\.1\.2";/);
+    assert.match(mainSource, /const PLUGIN_VERSION = "1\.2\.0";/);
+    assert.match(legacySource, /const PLUGIN_VERSION = "1\.2\.0";/);
   });
 });
 
