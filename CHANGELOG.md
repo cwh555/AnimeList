@@ -7,6 +7,7 @@
 - Added a Score Dashboard with 0.5-point lanes, media-type filters, zoom, drag-and-drop rating changes, and batch editing.
 - Added an optional Masterpiece mode with reusable categories, multiple categories per title, grouped library sections, and backward-compatible Favorite data.
 - Added chapter, season, and volume progress units for manga and novels, with unit-aware dated entries.
+- Added optional covers for individual manga and novel dated entries, with conservative automatic loading, broad manual search, and migration for existing records.
 - Added configurable Chinese, English, and original-language search expansion.
 - Added conservative duplicate-title warnings with direct navigation to an existing note.
 
@@ -22,10 +23,12 @@
 - Improved multilingual title discovery, season and edition ranking, provider result pagination, cover caching, and library navigation.
 - Improved timeline default spacing, same-day stacking, independent date spacing and view scaling, and fit/reset controls.
 - Improved progress controls and dated serial-entry editing across manga and novels.
+- Improved serial-entry cover handling with insertion-ordered automatic lookups, direct candidate-card selection, broad manual discovery, and per-entry timeline covers with series-cover fallback.
 
 ### Compatibility
 
 - Existing Favorite data, legacy statuses, `volume_log` entries, unrelated frontmatter, and Markdown note content remain supported.
+- Existing dated entries without cover metadata remain valid; editing dates, labels, or covers preserves unrelated entry fields.
 - Anime remains restricted to episode progress, while manga and novels may use chapter, season, or volume units.
 
 ## 1.1.2 - 2026-07-22
