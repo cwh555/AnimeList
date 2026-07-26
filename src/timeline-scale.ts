@@ -22,6 +22,11 @@ export interface TimelinePan {
   y: number;
 }
 
+interface TimelineLaneAssignment {
+  day: number;
+  lane: number;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -47,6 +52,25 @@ function dayOffset(time: number, minimumTime: number): number {
   return Math.round((time - minimumTime) / DAY_MS);
 }
 
+function assignTimelineLanes(
+  completedTimes: readonly number[],
+  daySpacing: number,
+): TimelineLaneAssignment[] {
+  const times = finiteSortedTimes(completedTimes);
+  if (!times.length) return [];
+  const minimumTime = times[0];
+  const laneEnds: number[] = [];
+
+  return times.map((time) => {
+    const day = dayOffset(time, minimumTime);
+    const x = day * daySpacing;
+    let lane = laneEnds.findIndex((lastX) => x - lastX >= CARD_DISTANCE);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = x;
+    return { day, lane };
+  });
+}
+
 export function normalizeTimelineMaxStackDepth(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_TIMELINE_MAX_STACK_DEPTH;
@@ -57,58 +81,54 @@ export function normalizeTimelineMaxStackDepth(value: unknown): number {
   );
 }
 
-function maximumSameDayCount(sortedCompletedTimes: readonly number[]): number {
-  const times = finiteSortedTimes(sortedCompletedTimes);
-  if (!times.length) return 0;
-  const minimumTime = times[0];
-  let maximum = 0;
-  let currentDay: number | null = null;
-  let currentCount = 0;
-
-  for (const time of times) {
-    const day = dayOffset(time, minimumTime);
-    if (day === currentDay) {
-      currentCount += 1;
-    } else {
-      currentDay = day;
-      currentCount = 1;
-    }
-    maximum = Math.max(maximum, currentCount);
-  }
-
-  return maximum;
-}
-
 /**
  * Runs the same greedy horizontal collision layout used by the timeline UI.
- * This keeps default-spacing validation tied to the rendered behavior instead
- * of relying on an approximation that can miss mixed same-day and nearby-date
- * groups.
  */
 export function calculateTimelineLaneCount(
   completedTimes: readonly number[],
   daySpacing: number,
 ): number {
-  const times = finiteSortedTimes(completedTimes);
-  if (!times.length) return 0;
-  const minimumTime = times[0];
-  const laneEnds: number[] = [];
+  const assignments = assignTimelineLanes(completedTimes, daySpacing);
+  return assignments.reduce((maximum, assignment) => (
+    Math.max(maximum, assignment.lane + 1)
+  ), 0);
+}
 
-  for (const time of times) {
-    const x = dayOffset(time, minimumTime) * daySpacing;
-    let lane = laneEnds.findIndex((lastX) => x - lastX >= CARD_DISTANCE);
-    if (lane < 0) lane = laneEnds.length;
-    laneEnds[lane] = x;
+/**
+ * Verifies the configured initialization depth per completion date. Same-day
+ * records are the only local exception: a date with more records than the
+ * configured two-sided capacity may use exactly the lanes it inherently needs,
+ * but that exception must not raise the permitted stack depth for other dates.
+ */
+export function timelineLayoutRespectsInitialStackDepth(
+  completedTimes: readonly number[],
+  daySpacing: number,
+  maxStackDepth: number,
+): boolean {
+  const configuredLaneLimit = normalizeTimelineMaxStackDepth(maxStackDepth) * 2;
+  const assignments = assignTimelineLanes(completedTimes, daySpacing);
+  const dateGroups = new Map<number, number[]>();
+
+  for (const assignment of assignments) {
+    const lanes = dateGroups.get(assignment.day) ?? [];
+    lanes.push(assignment.lane);
+    dateGroups.set(assignment.day, lanes);
   }
 
-  return laneEnds.length;
+  for (const lanes of dateGroups.values()) {
+    const allowedLaneCount = Math.max(configuredLaneLimit, lanes.length);
+    const usedLaneCount = Math.max(...lanes) + 1;
+    if (usedLaneCount > allowedLaneCount) return false;
+  }
+
+  return true;
 }
 
 /**
  * Calculates the initial/reset date spacing by validating the actual greedy
- * lane assignment. The configured value remains an initialization target, not
- * a runtime hard cap: unavoidable same-day records may exceed it, while records
- * on later dates must reuse the available lanes instead of extending the stack.
+ * lane assignment. The setting controls the initial stack on every date;
+ * unavoidable same-day overflow stays local to that date instead of globally
+ * relaxing the stack-depth target for unrelated parts of the timeline.
  */
 export function calculateDefaultTimelineDaySpacing(
   sortedCompletedTimes: readonly number[],
@@ -123,12 +143,14 @@ export function calculateDefaultTimelineDaySpacing(
   );
   if (!times.length) return baseline;
 
-  const laneLimit = Math.max(
-    normalizeTimelineMaxStackDepth(maxStackDepth) * 2,
-    maximumSameDayCount(times),
-  );
-  if (calculateTimelineLaneCount(times, baseline) <= laneLimit) return baseline;
-  if (calculateTimelineLaneCount(times, MAX_TIMELINE_DAY_SPACING) > laneLimit) {
+  if (timelineLayoutRespectsInitialStackDepth(times, baseline, maxStackDepth)) {
+    return baseline;
+  }
+  if (!timelineLayoutRespectsInitialStackDepth(
+    times,
+    MAX_TIMELINE_DAY_SPACING,
+    maxStackDepth,
+  )) {
     return MAX_TIMELINE_DAY_SPACING;
   }
 
@@ -136,8 +158,11 @@ export function calculateDefaultTimelineDaySpacing(
   let upper = MAX_TIMELINE_DAY_SPACING;
   for (let step = 0; step < LAYOUT_SEARCH_STEPS; step += 1) {
     const candidate = (lower + upper) / 2;
-    if (calculateTimelineLaneCount(times, candidate) <= laneLimit) upper = candidate;
-    else lower = candidate;
+    if (timelineLayoutRespectsInitialStackDepth(times, candidate, maxStackDepth)) {
+      upper = candidate;
+    } else {
+      lower = candidate;
+    }
   }
 
   return clamp(
