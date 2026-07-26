@@ -17,8 +17,10 @@ jobs:
         run: |
           git fetch origin feature/serial-entry-covers
           git checkout --detach origin/feature/serial-entry-covers
-          git rev-parse HEAD > feature-head.txt
-          tar --exclude=.git --exclude=node_modules --exclude=.tmp -czf serial-cover-followup-source.tar.gz .
+          git rev-parse HEAD > /tmp/feature-head.txt
+          tar --exclude=.git --exclude=node_modules --exclude=.tmp -czf /tmp/serial-cover-followup-source.tar.gz .
+          cp /tmp/feature-head.txt .
+          cp /tmp/serial-cover-followup-source.tar.gz .
       - uses: actions/upload-artifact@v6
         with:
           name: serial-cover-followup-source
