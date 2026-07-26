@@ -20,7 +20,7 @@ jobs:
       - name: Prepare isolated feature staging branch
         env:
           EXPECTED_FEATURE_HEAD: fcb280bb3e3f32c3b669f5d749c3bb62dedb1da1
-          EXPECTED_STAGING_HEAD: 573c58c93d5fc99c5296ec6b3f5ca1591d398ec7
+          EXPECTED_STAGING_HEAD: a41aa74dbfafba26af313ec72f550b306140c3b9
         run: |
           git fetch origin feature/serial-entry-covers chore/serial-cover-ui-order-timeline-fix
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE_HEAD"
@@ -39,7 +39,7 @@ jobs:
         run: npm run test-vault
       - name: Verify generated stylesheet and publish staging branch
         env:
-          EXPECTED_STAGING_HEAD: 573c58c93d5fc99c5296ec6b3f5ca1591d398ec7
+          EXPECTED_STAGING_HEAD: a41aa74dbfafba26af313ec72f550b306140c3b9
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
