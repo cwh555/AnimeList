@@ -26,7 +26,7 @@ async function checkCover(url: string): Promise<{ status: number; bytes: number 
   return { status: response.status, bytes };
 }
 
-const report: { manual: unknown[]; automatic: unknown[] } = { manual: [], automatic: [] };
+const report: { manual: unknown[]; automatic: unknown[]; failures: string[] } = { manual: [], automatic: [], failures: [] };
 const manualWorks = [
   {
     title: "關於我被隔壁天使變成廢材這件事",
@@ -53,15 +53,17 @@ for (const work of manualWorks) {
     label,
     "novel",
   );
-  if (candidates.length < 1) throw new Error(`Manual search returned no candidates for ${work.title}`);
+  const visible = candidates.slice(0, 8);
+  if (candidates.length < 1) {
+    report.failures.push(`Manual search returned no candidates for ${work.title}`);
+  }
   if (candidates[0]?.sourceId !== work.expectedId) {
-    throw new Error(
+    report.failures.push(
       `Manual search ranked the wrong first candidate for ${work.title}: expected ${work.expectedId}, got ${candidates[0]?.sourceId} ${candidates[0]?.title}`,
     );
   }
-  const visible = candidates.slice(0, 8);
   if (visible.some((candidate) => !candidate.coverUrl)) {
-    throw new Error(`Manual search returned a candidate without cover for ${work.title}`);
+    report.failures.push(`Manual search returned a candidate without cover for ${work.title}`);
   }
   report.manual.push({
     ...work,
@@ -75,7 +77,7 @@ for (const work of manualWorks) {
       score: candidate.score,
       coverUrl: candidate.coverUrl,
     })),
-    topCoverCheck: await checkCover(visible[0].coverUrl),
+    topCoverCheck: visible[0] ? await checkCover(visible[0].coverUrl) : null,
   });
 }
 
@@ -109,3 +111,4 @@ for (const [label, expectedId] of expected) {
 const { writeFile } = await import("node:fs/promises");
 await writeFile("serial-cover-live-report.json", JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify(report, null, 2));
+if (report.failures.length > 0) throw new Error(report.failures.join("\n"));
