@@ -20,11 +20,11 @@ jobs:
       - name: Prepare isolated feature staging branch
         env:
           EXPECTED_FEATURE_HEAD: fcb280bb3e3f32c3b669f5d749c3bb62dedb1da1
-          EXPECTED_STAGING_HEAD: 4f677592bc46ccdc597a2a22056e2284c6c92cbc
         run: |
           git fetch origin feature/serial-entry-covers chore/serial-cover-ui-order-timeline-fix
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE_HEAD"
-          test "$(git rev-parse origin/chore/serial-cover-ui-order-timeline-fix)" = "$EXPECTED_STAGING_HEAD"
+          staging_head="$(git rev-parse origin/chore/serial-cover-ui-order-timeline-fix)"
+          echo "STAGING_HEAD=$staging_head" >> "$GITHUB_ENV"
           git checkout -B chore/serial-cover-ui-order-timeline-fix origin/chore/serial-cover-ui-order-timeline-fix
           git merge-base --is-ancestor "$EXPECTED_FEATURE_HEAD" HEAD
       - name: Run npm ci
@@ -38,14 +38,12 @@ jobs:
           ANIMELIST_TEST_VAULT_NO_OPEN: "1"
         run: npm run test-vault
       - name: Verify generated stylesheet and publish staging branch
-        env:
-          EXPECTED_STAGING_HEAD: 4f677592bc46ccdc597a2a22056e2284c6c92cbc
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git diff --quiet -- styles.css; then
             git add styles.css
             git commit -m "build: refresh generated serial cover styles"
-            git push --force-with-lease=refs/heads/chore/serial-cover-ui-order-timeline-fix:$EXPECTED_STAGING_HEAD origin HEAD:chore/serial-cover-ui-order-timeline-fix
+            git push --force-with-lease=refs/heads/chore/serial-cover-ui-order-timeline-fix:$STAGING_HEAD origin HEAD:chore/serial-cover-ui-order-timeline-fix
           fi
           git status --short
