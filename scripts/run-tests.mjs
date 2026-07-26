@@ -24,6 +24,7 @@ await writeFile(entryFile, [
   'import "../../tests/search-settings.test.ts";',
   'import "../../tests/timeline-scale.test.ts";',
   'import "../../tests/timeline-scale-work-items.test.ts";',
+  'import "../../tests/timeline-corrections.test.ts";',
   'import "../../tests/rating.test.ts";',
   'import "../../tests/progress-units.test.ts";',
   'import "../../tests/masterpiece-labels.test.ts";',
