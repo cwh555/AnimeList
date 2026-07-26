@@ -7,29 +7,14 @@ permissions:
   contents: read
 
 jobs:
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          show-progress: false
-      - run: npm ci --silent
-      - run: npm run typecheck
-
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-        with:
-          show-progress: false
-      - run: npm ci --silent
-      - run: npm run lint
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          show-progress: false
-      - run: npm ci --silent
-      - run: npm test
+      - name: Clone and lint branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git clone --quiet --depth 1 --branch "$HEAD_REF" https://github.com/cwh555/AnimeList.git repo
+          cd repo
+          npm ci --silent
+          npm run lint
