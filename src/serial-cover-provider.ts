@@ -1,6 +1,8 @@
 import { requestUrl } from "obsidian";
 import {
+  confidentSerialCover,
   rankSerialCoverCandidates,
+  serialCoverQueries,
   type RankedSerialCoverCandidate,
   type SerialCoverCandidate,
 } from "./serial-entry-cover";
@@ -235,16 +237,33 @@ async function requestSerialCovers(
   label: string,
   mediaType: SerialMediaType,
 ): Promise<RankedSerialCoverCandidate[]> {
+  const queries: string[] = [];
+  const seenQueries = new Set<string>();
+  for (const candidateQuery of [query, ...serialCoverQueries(originalTitle, label)]) {
+    const key = candidateQuery.normalize("NFKC").trim();
+    if (!key || seenQueries.has(key)) continue;
+    seenQueries.add(key);
+    queries.push(candidateQuery);
+  }
   let bangumiCandidates: SerialCoverCandidate[] = [];
   let bangumiError: unknown;
-  try {
-    bangumiCandidates = await searchBangumi(query, mediaType);
-  } catch (error) {
-    bangumiError = error;
+
+  for (const bangumiQuery of queries) {
+    try {
+      bangumiCandidates = deduplicateCandidates([
+        ...bangumiCandidates,
+        ...await searchBangumi(bangumiQuery, mediaType),
+      ]);
+    } catch (error) {
+      bangumiError ??= error;
+      continue;
+    }
+    const ranked = rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
+    if (confidentSerialCover(ranked)) return ranked;
   }
-  if (bangumiCandidates.length > 0) {
-    return rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
-  }
+
+  const rankedBangumi = rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
+  if (rankedBangumi.length > 0) return rankedBangumi;
   if (apiKey) {
     const googleCandidates = await searchGoogleBooks(query);
     if (googleCandidates.length > 0) {

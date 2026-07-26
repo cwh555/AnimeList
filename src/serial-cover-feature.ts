@@ -1,5 +1,6 @@
 import { Modal, Notice, TFile, setIcon } from "obsidian";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
+import { SerialCoverSelection } from "./serial-cover-selection";
 import type AnimeListPlugin from "./main";
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "./serial-entry-cover";
 import {
@@ -39,7 +40,7 @@ function list(value: unknown): unknown[] {
 }
 
 class CoverSelector extends Modal {
-  private selected: RankedSerialCoverCandidate | null = null;
+  private readonly selection: SerialCoverSelection;
 
   constructor(
     private pluginRef: AnimeListPlugin,
@@ -49,6 +50,7 @@ class CoverSelector extends Modal {
     private applyCover: (cover: StoredSerialCover) => void,
   ) {
     super(pluginRef.app);
+    this.selection = new SerialCoverSelection(candidates);
   }
 
   onOpen(): void {
@@ -61,9 +63,10 @@ class CoverSelector extends Modal {
     input.readOnly = true;
 
     const results = this.contentEl.createDiv({ cls: "al-serial-cover-results" });
-    for (const candidate of this.candidates) {
+    for (const [index, candidate] of this.candidates.entries()) {
       const button = results.createEl("button", { cls: "al-serial-cover-candidate" });
       button.type = "button";
+      if (index === 0) button.addClass("is-selected");
       const image = button.createEl("img");
       image.src = candidate.coverUrl;
       image.alt = candidate.title;
@@ -73,22 +76,39 @@ class CoverSelector extends Modal {
         results.querySelectorAll(".is-selected")
           .forEach((element) => element.classList.remove("is-selected"));
         button.addClass("is-selected");
-        this.selected = candidate;
+        this.selection.select(candidate);
+        applyButton.disabled = !this.selection.canApply;
       });
     }
 
     const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
-    footer.createEl("button", { text: serialCoverText("cancel") })
-      .addEventListener("click", () => this.close());
-    footer.createEl("button", { cls: "mod-cta", text: serialCoverText("apply") })
-      .addEventListener("click", () => {
-        if (!this.selected) return;
-        void downloadSelectedSerialCover(this.pluginRef, this.context, this.selected, true)
-          .then((cover) => {
-            this.applyCover(cover);
-            this.close();
-          });
+    const cancelButton = footer.createEl("button", { text: serialCoverText("cancel") });
+    cancelButton.addEventListener("click", () => this.close());
+    const applyButton = footer.createEl("button", { cls: "mod-cta", text: serialCoverText("apply") });
+    applyButton.disabled = !this.selection.canApply;
+    applyButton.addEventListener("click", () => {
+      if (!this.selection.selectedCandidate) {
+        new Notice(serialCoverText("selectCandidate"));
+        return;
+      }
+      applyButton.disabled = true;
+      cancelButton.disabled = true;
+      applyButton.setText(serialCoverText("applying"));
+      void this.selection.apply((candidate) => (
+        downloadSelectedSerialCover(this.pluginRef, this.context, candidate, true)
+      )).then((cover) => {
+        if (!cover) return;
+        this.applyCover(cover);
+        this.close();
+      }).catch((error) => {
+        console.error("AnimeList serial cover apply failed", error);
+        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
+      }).finally(() => {
+        applyButton.setText(serialCoverText("apply"));
+        applyButton.disabled = !this.selection.canApply;
+        cancelButton.disabled = false;
       });
+    });
   }
 }
 
