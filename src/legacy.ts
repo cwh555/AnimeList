@@ -8,9 +8,12 @@ import {
   mediaFormatLabel,
   mediaProviderLabel,
   mediaStatusLabel,
+  mediaStatusOptions,
   statusFilterOptions,
   uiText,
 } from "./ui-text";
+import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+import { CURRENT_MEDIA_SCHEMA_VERSION } from "./schema-migration";
 import {
   compareVolumeLabels,
   expandTimelineEntries,
@@ -23,8 +26,18 @@ import {
   progressRatio,
   serializeVolumeLog,
 } from "./novel-progress";
+import {
+  MAX_TIMELINE_DAY_SPACING,
+  MAX_TIMELINE_VIEW_SCALE,
+  MIN_TIMELINE_DAY_SPACING,
+  MIN_TIMELINE_VIEW_SCALE,
+  calculateDefaultTimelineView,
+  normalizeTimelineMaxStackDepth,
+  preserveTimelineAxisScreenY,
+} from "./timeline-scale";
+import { centerLatestTimelineAxis } from "./timeline-corrections";
 
-const PLUGIN_VERSION = "1.1.2";
+const PLUGIN_VERSION = "1.2.0";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
@@ -384,28 +397,29 @@ function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
   const hasScore = form.score !== "" && form.score != null;
   const score = hasScore ? Number(form.score) : null;
   const completedAt = String(form.completedAt || "").trim();
+  const status = normalizeMediaStatus(form.status);
   if (!title) throw new Error(uiText("validation.titleRequired"));
-  if (form.status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+  if (status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
   if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
     throw new Error(uiText("validation.scoreRange"));
   }
-  if (form.status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
+  if (status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
   const total = result.mediaType === "anime"
     ? Math.max(0, numeric(form.total ?? result.total))
     : 0;
-  const progress = completedProgress(form.status, total, form.progress, result.mediaType);
+  const progress = completedProgress(status, total, form.progress, result.mediaType);
   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
     : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
   const volumeLog = result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [];
-  const lines = ["---", "schema_version: 5"];
+  const lines = ["---", `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`];
   lines.push(`title: ${yamlScalar(title)}`);
   if (result.originalTitle) lines.push(`title_original: ${yamlScalar(result.originalTitle)}`);
   if (result.romajiTitle && result.romajiTitle !== result.originalTitle) lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
-  lines.push(`status: ${yamlScalar(form.status || "planned")}`);
+  lines.push(`status: ${yamlScalar(status)}`);
   if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
   lines.push(`progress: ${yamlScalar(progress)}`);
   if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
@@ -492,7 +506,7 @@ export const AnimeListUI = (() => {
     return {
     ...item,
     mediaType,
-    status: String(item.status || "planned").toLowerCase(),
+    status: normalizeMediaStatus(item.status),
     format: String(item.format || item.mediaType || item.media_type || "").toLowerCase(),
     releaseStatus: normalizeReleaseStatus(item.releaseStatus || item.release_status),
     progress: normalizeProgressValue(item.progress),
@@ -525,10 +539,11 @@ export const AnimeListUI = (() => {
     return uiText("library.notStarted");
   };
 
-  const statusMatch = (item, filter) => {
-    if (filter === "all") return true;
-    if (filter === "active") return ["watching", "reading"].includes(item.status);
-    return item.status === filter;
+  const statusMatch = (item, filter, adapters) => {
+    const customMatch = adapters.matchesStatusFilter?.(item, filter);
+    return typeof customMatch === "boolean"
+      ? customMatch
+      : mediaStatusMatches(item.status, filter);
   };
 
   function renderLibrary(container, inputItems, adapters = {}) {
@@ -537,9 +552,16 @@ export const AnimeListUI = (() => {
     const genres = [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
     const initialState = adapters.initialState || {};
     const initialView = ["grid", "list", "poster"].includes(initialState.view || adapters.initialView) ? (initialState.view || adapters.initialView) : "grid";
+    const initialType = ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all";
+    const statusOptions = (type) => [
+      ...statusFilterOptions(type),
+      ...asArray(adapters.extraStatusFilters?.(type)),
+    ];
+    const initialStatus = String(initialState.status || "");
+    const initialStatusKeys = new Set(statusOptions(initialType).map(([key]) => key));
     const state = {
-      type: ["all", "anime", "manga", "novel"].includes(initialState.type) ? initialState.type : "all",
-      status: initialState.status || "all",
+      type: initialType,
+      status: initialStatusKeys.has(initialStatus) ? initialStatus : normalizeStatusFilter(initialStatus),
       genre: initialState.genre || "all",
       query: initialState.query || "",
       sort: initialState.sort || "completed-desc",
@@ -672,7 +694,7 @@ export const AnimeListUI = (() => {
     const renderStatusButtons = () => {
       statusButtons.clear();
       statusBar.replaceChildren();
-      statusFilterOptions(state.type).forEach(([key, label]) => {
+      statusOptions(state.type).forEach(([key, label]) => {
         const button = makeEl("button", `al-status-chip${key === state.status ? " is-active" : ""}`, label);
         button.type = "button";
         button.addEventListener("click", () => {
@@ -694,6 +716,13 @@ export const AnimeListUI = (() => {
     shell.appendChild(resultHead);
     const grid = makeEl("div", "al-grid is-grid");
     shell.appendChild(grid);
+    const cardCache = new Map();
+    const coverSizes = (view) => view === "list"
+      ? "116px"
+      : view === "poster"
+        ? "(max-width: 440px) 50vw, 180px"
+        : "(max-width: 780px) 50vw, (min-width: 1500px) 20vw, 240px";
+    const eagerCoverCount = (view) => view === "poster" ? 10 : view === "list" ? 4 : 6;
 
     const makeCard = (item) => {
       const card = makeEl("article", `al-card status-${item.status}`);
@@ -707,10 +736,30 @@ export const AnimeListUI = (() => {
       const media = makeEl("div", "al-cover-wrap");
       if (item.cover) {
         const image = makeEl("img", "al-cover");
-        image.src = item.cover;
+        const sources = item.coverSources;
         image.alt = uiText("library.coverAlt", { title: item.title });
-        image.loading = state.view === "poster" ? "eager" : "lazy";
+        image.loading = "lazy";
         image.decoding = "async";
+        image.fetchPriority = "auto";
+        if (sources?.placeholder) {
+          media.classList.add("has-cover-placeholder");
+          media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;
+        }
+        if (sources?.srcset) image.srcset = sources.srcset;
+        image.src = sources?.src || item.cover;
+        const reveal = () => image.classList.add("is-loaded");
+        image.addEventListener("load", reveal, { once: true });
+        image.addEventListener("error", () => {
+          image.remove();
+          media.classList.remove("has-cover-placeholder");
+          media.style.removeProperty("background-image");
+          const missing = makeEl("div", "al-cover-missing");
+          const icon = makeEl("span", "al-icon-large");
+          setAnimeListIcon(icon, "book");
+          missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
+          media.prepend(missing);
+        }, { once: true });
+        if (image.complete && image.naturalWidth > 0) reveal();
         media.appendChild(image);
       } else {
         const missing = makeEl("div", "al-cover-missing");
@@ -800,7 +849,7 @@ export const AnimeListUI = (() => {
       const query = state.query;
       let filtered = items.filter((item) => {
         if (state.type !== "all" && item.mediaType !== state.type) return false;
-        if (!statusMatch(item, state.status)) return false;
+        if (!statusMatch(item, state.status, adapters)) return false;
         if (state.genre !== "all" && !item.genres.includes(state.genre)) return false;
         if (!query) return true;
         return [item.title, item.originalTitle, item.format, ...item.genres, ...item.people, ...item.platforms].join(" ").toLocaleLowerCase().includes(query);
@@ -834,7 +883,21 @@ export const AnimeListUI = (() => {
         grid.appendChild(empty);
         return;
       }
-      filtered.forEach((item) => grid.appendChild(makeCard(item)));
+      const eagerCount = eagerCoverCount(state.view);
+      filtered.forEach((item, index) => {
+        let card = cardCache.get(item.filePath);
+        if (!card) {
+          card = makeCard(item);
+          cardCache.set(item.filePath, card);
+        }
+        const image = card.querySelector("img.al-cover");
+        if (image) {
+          image.loading = index < eagerCount ? "eager" : "lazy";
+          image.fetchPriority = index < 2 ? "high" : "auto";
+          image.sizes = coverSizes(state.view);
+        }
+        grid.appendChild(card);
+      });
       if (adapters.onStateChange) adapters.onStateChange({ ...state });
     }
 
@@ -861,10 +924,10 @@ function filterTimelineEntries(items, mediaType) {
 
 export const TimelineUI = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const MIN_DAY_SPACING = 0.18;
-  const MAX_DAY_SPACING = 96;
-  const MIN_VIEW_SCALE = 0.55;
-  const MAX_VIEW_SCALE = 1.6;
+  const MIN_DAY_SPACING = MIN_TIMELINE_DAY_SPACING;
+  const MAX_DAY_SPACING = MAX_TIMELINE_DAY_SPACING;
+  const MIN_VIEW_SCALE = MIN_TIMELINE_VIEW_SCALE;
+  const MAX_VIEW_SCALE = MAX_TIMELINE_VIEW_SCALE;
   const CARD_WIDTH = 120;
   const CARD_HEIGHT = 146;
   const CARD_GAP_X = 16;
@@ -880,15 +943,6 @@ export const TimelineUI = (() => {
   const formatDate = (time) => {
     const date = new Date(time);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  };
-  const initialDaySpacing = (rangeDays) => {
-    if (rangeDays <= 21) return 34;
-    if (rangeDays <= 60) return 18;
-    if (rangeDays <= 120) return 11;
-    if (rangeDays <= 365) return 6;
-    if (rangeDays <= 730) return 3.5;
-    if (rangeDays <= 1825) return 2;
-    return 1.15;
   };
   const tickStepForSpacing = (spacing) => {
     const candidates = [1, 2, 3, 7, 14, 30, 60, 90, 180, 365, 730];
@@ -930,8 +984,22 @@ export const TimelineUI = (() => {
     const minTime = dates[0] || 0;
     const maxTime = dates[dates.length - 1] || minTime;
     const rangeDays = Math.max(1, Math.round((maxTime - minTime) / DAY_MS));
-    const baseSpacing = initialDaySpacing(rangeDays);
-    const state = { x: 0, y: 0, daySpacing: baseSpacing, viewScale: 1, sceneWidth: 0, sceneHeight: 0 };
+    const defaultView = calculateDefaultTimelineView(
+      items.map((item) => item.completedTime),
+      rangeDays,
+      adapters.maxStackDepth,
+    );
+    const baseSpacing = defaultView.daySpacing;
+    const state = {
+      x: 0,
+      y: 0,
+      daySpacing: defaultView.daySpacing,
+      viewScale: defaultView.viewScale,
+      sceneWidth: 0,
+      sceneHeight: 0,
+      axisY: 0,
+      latestItemCenterX: 0,
+    };
 
     const root = makeEl("div", "al-timeline-root");
     const toolbar = makeEl("div", "al-timeline-toolbar");
@@ -982,9 +1050,11 @@ export const TimelineUI = (() => {
     scaleIn.type = "button"; scaleIn.title = uiText("timeline.scaleIn"); scaleIn.setAttribute("aria-label", scaleIn.title); setAnimeListIcon(scaleIn, "plus");
     scaleControls.append(scaleOut, scaleLabel, scaleIn);
 
+    const reset = makeEl("button", "", "");
+    reset.type = "button"; reset.title = uiText("timeline.reset"); reset.setAttribute("aria-label", reset.title); setAnimeListIcon(reset, "rotate-ccw");
     const fit = makeEl("button", "", "");
     fit.type = "button"; fit.title = uiText("timeline.fit"); fit.setAttribute("aria-label", fit.title); setAnimeListIcon(fit, "fit");
-    controls.append(spacingControls, scaleControls, fit);
+    controls.append(spacingControls, scaleControls, reset, fit);
     controls.hidden = !items.length;
     toolbar.append(copy, typeFilters, controls);
     root.appendChild(toolbar);
@@ -1024,12 +1094,16 @@ export const TimelineUI = (() => {
         time: item.completedTime,
         x: sidePadding + Math.round((item.completedTime - minTime) / DAY_MS) * state.daySpacing,
       }));
-      const laidOutItems = assignTimelineLanes(positionedItems, CARD_WIDTH + CARD_GAP_X);
+      const laidOutItems = assignTimelineLanes(
+        positionedItems,
+        CARD_WIDTH + CARD_GAP_X,
+      );
       const laneCount = Math.max(1, ...laidOutItems.map((positioned) => positioned.lane + 1));
       const aboveLaneCount = Math.ceil(laneCount / 2);
       const belowLaneCount = Math.floor(laneCount / 2);
       const axisY = SCENE_PADDING_Y + STEM_GAP
         + aboveLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y;
+      state.axisY = axisY;
       state.sceneHeight = axisY + SCENE_PADDING_Y
         + (belowLaneCount > 0
           ? STEM_GAP + belowLaneCount * (CARD_HEIGHT + CARD_GAP_Y) - CARD_GAP_Y
@@ -1068,7 +1142,7 @@ export const TimelineUI = (() => {
         scene.appendChild(dayMarker);
       });
 
-      laidOutItems.forEach(({ item, time, x, lane }) => {
+      laidOutItems.forEach(({ item, time, x, lane }, index) => {
         const level = Math.floor(lane / 2);
         const aboveAxis = lane % 2 === 0;
         const cardY = aboveAxis
@@ -1098,13 +1172,14 @@ export const TimelineUI = (() => {
         const displayTitle = item.seriesTitle || item.title;
         text.appendChild(makeEl("strong", "", displayTitle));
         if (item.volumeLabel) {
-          text.appendChild(makeEl("span", "al-timeline-volume-label", uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
+          text.appendChild(makeEl("span", "al-timeline-volume-label", item.serialEntryLabel || uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
         }
         text.appendChild(makeEl("small", "", formatDate(time)));
         card.appendChild(text);
         if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
         card.addEventListener("click", () => openFile(item.filePath));
         scene.appendChild(card);
+        if (index === laidOutItems.length - 1) state.latestItemCenterX = x;
       });
       applyPan();
     };
@@ -1116,9 +1191,16 @@ export const TimelineUI = (() => {
       const next = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, nextSpacing));
       if (Math.abs(next - previous) < 1e-6) return;
       const dayAtCursor = (((localX - state.x) / state.viewScale) - sidePadding) / previous;
+      const previousAxisY = state.axisY;
       state.daySpacing = next;
       renderGeometry();
       state.x = localX - (sidePadding + dayAtCursor * next) * state.viewScale;
+      state.y = preserveTimelineAxisScreenY(
+        state.y,
+        previousAxisY,
+        state.axisY,
+        state.viewScale,
+      );
       applyPan();
     };
 
@@ -1138,13 +1220,37 @@ export const TimelineUI = (() => {
       applyPan();
     };
 
+    const centerScene = () => {
+      state.x = (viewport.clientWidth - state.sceneWidth * state.viewScale) / 2;
+      state.y = (viewport.clientHeight - state.sceneHeight * state.viewScale) / 2;
+      applyPan();
+    };
+
+    const centerLatestItem = () => {
+      const pan = centerLatestTimelineAxis(
+        viewport.clientWidth,
+        viewport.clientHeight,
+        state.latestItemCenterX,
+        state.axisY,
+        state.viewScale,
+      );
+      state.x = pan.x;
+      state.y = pan.y;
+      applyPan();
+    };
+
+    const resetView = () => {
+      state.daySpacing = defaultView.daySpacing;
+      state.viewScale = defaultView.viewScale;
+      renderGeometry();
+      centerLatestItem();
+    };
+
     const fitScene = () => {
       const availableWidth = Math.max(260, viewport.clientWidth / state.viewScale - sidePadding * 2);
       state.daySpacing = Math.min(MAX_DAY_SPACING, Math.max(MIN_DAY_SPACING, availableWidth / rangeDays));
       renderGeometry();
-      state.x = (viewport.clientWidth - state.sceneWidth * state.viewScale) / 2;
-      state.y = (viewport.clientHeight - state.sceneHeight * state.viewScale) / 2;
-      applyPan();
+      centerScene();
     };
 
     const viewportCenter = () => {
@@ -1155,6 +1261,7 @@ export const TimelineUI = (() => {
     zoomOut.addEventListener("click", () => { const center = viewportCenter(); setDaySpacingAt(state.daySpacing / 1.25, center.x); });
     scaleIn.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale * 1.15, center.x, center.y); });
     scaleOut.addEventListener("click", () => { const center = viewportCenter(); setViewScaleAt(state.viewScale / 1.15, center.x, center.y); });
+    reset.addEventListener("click", resetView);
     fit.addEventListener("click", fitScene);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
@@ -1188,12 +1295,13 @@ export const TimelineUI = (() => {
     viewport.addEventListener("pointercancel", stopDrag);
 
     renderGeometry();
-    window.setTimeout(fitScene, 0);
+    window.setTimeout(resetView, 0);
     return {
       items: items.length,
       totalItems: allItems.length,
       type: selectedType,
       fitScene,
+      resetView,
       getDaySpacing: () => state.daySpacing,
       getViewScale: () => state.viewScale,
       getSceneWidth: () => state.sceneWidth,
@@ -1684,9 +1792,7 @@ class AddMediaModal extends Modal {
     form.className = "al-media-form";
     const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", result.title), uiText("add.required"));
     titleInput.required = true;
-    const statusOptions = result.mediaType === "anime"
-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const statusOptions = mediaStatusOptions();
     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, "planned"));
     const releaseStatus = result.mediaType === "anime"
       ? null
@@ -1741,7 +1847,7 @@ class AddMediaModal extends Modal {
     const createButton = createEl("button");
     createButton.type = "button";
     createButton.className = "mod-cta";
-    createButton.textContent = uiText("action.add");
+    createButton.textContent = uiText("action.collect");
     createButton.addEventListener("click", async () => {
       if (!titleInput.value.trim()) { new Notice(uiText("validation.titleRequired")); return; }
       const hasScore = score.value.trim() !== "";
@@ -1770,7 +1876,7 @@ class AddMediaModal extends Modal {
         console.error("AnimeList create note failed", error);
         new Notice(uiText("notice.createFailed", { error: error?.message || error }));
         createButton.disabled = false;
-        createButton.textContent = uiText("action.add");
+        createButton.textContent = uiText("action.collect");
       }
     });
     actions.appendChild(createButton);
@@ -1839,12 +1945,10 @@ class EditMediaModal extends Modal {
     const mediaType = String(frontmatter.media_type || "anime");
     const form = createDiv();
     form.className = "al-media-form";
-    const statusOptions = mediaType === "anime"
-      ? [["planned", uiText("media.status.plannedAnime")], ["watching", uiText("media.status.watching")], ["completed", uiText("media.status.completedAnime")], ["on_hold", uiText("media.status.pausedAnime")], ["dropped", uiText("media.status.droppedAnime")]]
-      : [["planned", uiText("media.status.plannedReading")], ["reading", uiText("media.status.reading")], ["completed", uiText("media.status.completedReading")], ["on_hold", uiText("media.status.pausedReading")], ["dropped", uiText("media.status.droppedReading")]];
+    const statusOptions = mediaStatusOptions();
     const titleInput = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", frontmatter.title || this.file.basename), uiText("add.required"));
     titleInput.required = true;
-    const currentStatus = String(frontmatter.status || "planned");
+    const currentStatus = normalizeMediaStatus(frontmatter.status);
     const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(statusOptions, currentStatus));
     const releaseStatus = mediaType === "anime"
       ? null
@@ -1909,9 +2013,9 @@ class EditMediaModal extends Modal {
         const completedVolume = highestCompletedVolume(volumeLog);
         if (mediaType === "novel" && completedVolume && compareVolumeLabels(nextProgress, completedVolume) < 0) nextProgress = completedVolume === "EX" ? "EX" : Number(completedVolume);
         await this.plugin.app.fileManager.processFrontMatter(this.file, (fm) => {
-          fm.schema_version = 5;
+          fm.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
           fm.title = nextTitle;
-          fm.status = status.value;
+          fm.status = normalizeMediaStatus(status.value);
           if (mediaType !== "anime") fm.release_status = releaseStatus?.value || "unknown";
           if (mediaType === "anime") fm.progress_total = nextTotal;
           else delete fm.progress_total;
@@ -1949,6 +2053,9 @@ export class TimelineModal extends Modal {
     this.modalEl.classList.add("animelist-timeline-modal");
     this.contentEl.replaceChildren();
     TimelineUI.render(this.contentEl, this.items, {
+      maxStackDepth: normalizeTimelineMaxStackDepth(
+        this.plugin.settings?.timelineMaxStackDepth,
+      ),
       openFile: async (path) => {
         this.close();
         await this.plugin.app.workspace.openLinkText(path, "", false);

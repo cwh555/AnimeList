@@ -1,4 +1,10 @@
 import type { MediaType } from "./types";
+import {
+  MEDIA_STATUS_FILTER_ORDER,
+  MEDIA_STATUS_VALUES,
+  normalizeMediaStatus,
+} from "./media-status";
+import type { MediaStatus, MediaStatusFilter } from "./media-status";
 
 /**
  * Single source of truth for every user-visible label, hint, validation message,
@@ -9,8 +15,10 @@ export const UI_TEXT = {
   "app.openLibrary": "開啟 AnimeList",
   "app.openTimeline": "開啟時間軸",
   "app.initializeLibrary": "建立收藏庫資料夾",
+  "app.optimizeCovers": "最佳化既有封面縮圖",
+  "app.clearCoverCache": "清除封面縮圖快取",
 
-  "settings.intro": "AnimeList keeps media records in Markdown. These settings only control where notes, covers, and templates are stored and scanned.",
+  "settings.intro": "AnimeList keeps media records in Markdown. Configure storage, timeline layout, metadata providers, and library setup here.",
   "settings.storageLayout.name": "Storage layout",
   "settings.storageLayout.desc": "Managed mode creates Anime, Manga, and Novel subfolders. Flat mode writes every media note directly into one folder.",
   "settings.storageLayout.managed": "Managed library",
@@ -25,6 +33,10 @@ export const UI_TEXT = {
   "settings.coverFolder.desc": "Downloaded cover images are stored below this folder, grouped by media type.",
   "settings.templateFolder.name": "Template folder",
   "settings.templateFolder.desc": "Custom templates are read from Anime, Manga, Novel, and Common subfolders below this location.",
+  "settings.timeline.heading": "Timeline",
+  "settings.timeline.desc": "Controls the initial layout used when the timeline first opens or is restored to its default view.",
+  "settings.timelineMaxStackDepth.name": "Default maximum stack depth",
+  "settings.timelineMaxStackDepth.desc": "Maximum card layers on each side when calculating the default timeline spacing.",
   "settings.providers.heading": "Metadata providers",
   "settings.provider.bangumi.desc": "Search anime, manga, and light novels. Useful for Chinese and Japanese titles.",
   "settings.provider.anilist.desc": "Search anime, manga, and light novels with structured metadata.",
@@ -44,23 +56,10 @@ export const UI_TEXT = {
   "media.type.manga": "漫畫",
   "media.type.novel": "小說",
   "media.status.all": "所有",
-  // Cross-media filters use one concise name. Edit these five values to choose
-  // the common wording shown while the library is on the "全部" tab.
-  "media.status.active": "進行中",
-  "media.status.completed": "完成",
+  "media.status.ongoing": "進行中",
+  "media.status.completed": "已完成",
   "media.status.planned": "願望清單",
-  "media.status.paused": "擱置",
   "media.status.dropped": "棄置",
-  "media.status.watching": "追番中",
-  "media.status.reading": "閱讀中",
-  "media.status.completedAnime": "已完成",
-  "media.status.completedReading": "已完成",
-  "media.status.plannedAnime": "待追",
-  "media.status.plannedReading": "待讀",
-  "media.status.pausedAnime": "擱置",
-  "media.status.droppedAnime": "棄番",
-  "media.status.pausedReading": "擱置",
-  "media.status.droppedReading": "棄讀",
   "media.unit.episode": "集",
   "media.unit.chapter": "話",
   "media.unit.volume": "卷",
@@ -86,7 +85,7 @@ export const UI_TEXT = {
   "media.release.finished": "已完結",
   "media.release.hiatus": "休載中",
   "media.release.cancelled": "已中止",
-  "media.release.unknown": "出版狀態未知",
+  "media.release.unknown": "發行狀態未知",
   "media.untitled": "未命名作品",
 
   "library.kicker": "PERSONAL MEDIA LIBRARY",
@@ -111,7 +110,7 @@ export const UI_TEXT = {
   "library.view.grid": "卡片",
   "library.view.list": "清單",
   "library.view.poster": "縮圖",
-  "library.emptyTitle": "沒有符合條件的項目",
+  "library.emptyTitle": "沒有符合條件的作品",
   "library.emptyDescription": "請調整分類、狀態或搜尋條件。",
   "library.resultAll": "全部作品",
   "library.resultMeta": "顯示 {shown}，共 {total} 部{genre}",
@@ -141,6 +140,7 @@ export const UI_TEXT = {
   "timeline.scaleOut": "縮小畫面",
   "timeline.scaleIn": "放大畫面",
   "timeline.scaleLabel": "畫面 {percent}%",
+  "timeline.reset": "恢復預設",
   "timeline.fit": "完整顯示",
   "timeline.zoomLabel": "{percent}% · 每日 {spacing} px",
   "timeline.volumeLabel": "第 {volume} 卷",
@@ -175,9 +175,11 @@ export const UI_TEXT = {
 
   "add.kicker": "ADD TO YOUR LIBRARY",
   "add.title": "收錄",
-  "add.description": "選擇類型並搜尋作品。",
+  "add.description": "選擇作品類型並搜尋作品。",
   "add.searching": "尋找中…",
-  "add.processing": "新增中…",
+  "add.loadMore": "載入更多",
+  "add.loadingMore": "載入中…",
+  "add.processing": "收錄中…",
   "add.placeholderAnime": "例如：輝夜姬想讓人告白",
   "add.placeholderManga": "例如：葬送的芙莉蓮",
   "add.placeholderNovel": "例如：無職轉生、Norwegian Wood",
@@ -187,11 +189,11 @@ export const UI_TEXT = {
   "add.emptyResult": "還沒有找到合適的結果。可以改用原文、日文或英文名稱再試一次。",
   "add.noCover": "No cover",
   "add.unknownYear": "年份不明",
-  "add.titleLabel": "書架上的名稱",
+  "add.titleLabel": "作品名稱",
   "add.required": "必填",
   "add.statusLabel": "目前狀態",
-  "add.releaseStatusLabel": "日本原版出版狀態",
-  "add.scoreLabel": "我的評分（0–10）",
+  "add.releaseStatusLabel": "發行狀態",
+  "add.scoreLabel": "評分（0–10）",
   "add.scoreHint": "{status}時必填；其他狀態可留空。",
   "add.startedAt": "開始日期",
   "add.startedHint": "選填",
@@ -206,9 +208,9 @@ export const UI_TEXT = {
   "add.genres": "分類",
   "add.genresHint": "可用逗號或頓號分隔；常見中英文分類會自動統一。",
   "add.template": "筆記模板",
-  "add.templateHint": "模板直接讀取 Templates 資料夾；可自行新增或修改。",
+  "add.templateHint": "模板直接讀取 Templates Folder；可自行新增或修改。",
   "add.noTemplate": "不套用模板",
-  "add.favorite": "收進最愛",
+  "add.favorite": "加入最愛",
   "add.sourceNovel": "作品封面會儲存到 vault；分卷紀錄只包含卷數與日期。",
   "add.sourceMedia": "封面會優先儲存到 vault，並保留資料來源。",
 
@@ -216,7 +218,7 @@ export const UI_TEXT = {
   "edit.description": "調整自己的進度、日期與評分；外部作品資料會保持原樣。",
 
   "delete.title": "刪除作品？",
-  "delete.description": "「{title}」的 Markdown 筆記會移到系統垃圾桶；本地封面不會一併刪除。",
+  "delete.description": "「{title}」的 Markdown notes 會移到系統垃圾桶；本地封面不會一併刪除。",
 
   "detail.favorite": "★ 最愛",
   "detail.favoriteAdd": "☆ 加入最愛",
@@ -234,11 +236,11 @@ export const UI_TEXT = {
   "common.sharedName": "{name}（共用）",
   "template.builtinPlain": "簡潔筆記（內建）",
 
-  "field.score": "個人評分",
+  "field.score": "評分",
   "field.completedAt": "完成日期",
   "validation.titleRequired": "請輸入作品名稱。",
   "validation.completedFieldRequired": "{status}狀態必須填寫{field}",
-  "validation.scoreRange": "個人評分必須是 0 到 10 之間的數字",
+  "validation.scoreRange": "評分必須是 0 到 10 之間的數字",
   "validation.volumeFormat": "{label}僅支援整數、.5 或 EX",
   "validation.volumeInvalid": "無效卷數：{value}。僅支援整數、.5 或 EX。",
   "validation.volumeDuplicate": "卷數 {volume} 重複。",
@@ -248,23 +250,36 @@ export const UI_TEXT = {
   "notice.searchNoResults": "沒有找到相符作品，換個名稱再試一次。",
   "notice.searchUnavailable": "目前無法連上外部資料庫，請稍後再試。",
   "notice.collected": "已收錄：{title}",
-  "notice.createFailed": "新增失敗：{error}",
+  "notice.createFailed": "收錄失敗：{error}",
   "notice.deleted": "作品已從收藏庫移除。",
   "notice.deleteFailed": "刪除失敗：{error}",
   "notice.saved": "已儲存。",
   "notice.saveFailed": "儲存失敗：{error}",
   "notice.mediaNoteMissing": "找不到這筆作品筆記。",
-  "notice.favoriteAdded": "已收進最愛。",
+  "notice.favoriteAdded": "已加入最愛。",
   "notice.favoriteRemoved": "已從最愛中移除。",
   "notice.existingSource": "這筆外部資料已經在收藏庫中，已開啟原筆記。",
   "notice.existingMedia": "作品已存在，已開啟原筆記。",
-  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。"
+  "notice.coverRemote": "封面無法存到本機，改用遠端圖片。",
+  "notice.coverOptimizeEmpty": "收藏庫中沒有可最佳化的本地封面。",
+  "notice.coverOptimizeProgress": "正在最佳化封面：已完成 {completed} 張，共 {total} 張",
+  "notice.coverOptimizeDone": "封面最佳化完成：成功 {optimized}，失敗 {failed}。",
+  "notice.coverCacheCleared": "已清除 {removed} 個封面縮圖快取檔案。",
+  "notice.statusMigration": "已更新 {count} 部作品的清單狀態。",
+  "notice.statusMigrationFailed": "無法完成清單狀態更新：{error}"
 } as const;
 
 export type UiMediaType = "all" | MediaType;
-export type UiStatusFilter = "all" | "active" | "completed" | "planned" | "on_hold" | "dropped";
+export type UiStatusFilter = MediaStatusFilter;
 export type UiTextKey = keyof typeof UI_TEXT;
 export type UiTextVariables = Record<string, string | number>;
+
+const STATUS_TEXT_KEYS = {
+  planned: "media.status.planned",
+  ongoing: "media.status.ongoing",
+  completed: "media.status.completed",
+  dropped: "media.status.dropped",
+} as const satisfies Record<MediaStatus, UiTextKey>;
 
 export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string {
   const template = UI_TEXT[key];
@@ -273,41 +288,23 @@ export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string 
   ));
 }
 
-export function completedStatusLabel(mediaType: MediaType): string {
-  return uiText(mediaType === "anime" ? "media.status.completedAnime" : "media.status.completedReading");
+export function completedStatusLabel(_mediaType: MediaType): string {
+  return uiText("media.status.completed");
 }
 
-export function mediaStatusLabel(status: string, mediaType: UiMediaType = "all"): string {
-  if (mediaType === "anime") {
-    if (status === "watching" || status === "active") return uiText("media.status.watching");
-    if (status === "completed") return uiText("media.status.completedAnime");
-    if (status === "planned") return uiText("media.status.plannedAnime");
-    if (status === "on_hold") return uiText("media.status.pausedAnime");
-    if (status === "dropped") return uiText("media.status.droppedAnime");
-  } else if (mediaType === "manga" || mediaType === "novel") {
-    if (status === "reading" || status === "active") return uiText("media.status.reading");
-    if (status === "completed") return uiText("media.status.completedReading");
-    if (status === "planned") return uiText("media.status.plannedReading");
-    if (status === "on_hold") return uiText("media.status.pausedReading");
-    if (status === "dropped") return uiText("media.status.droppedReading");
-  }
-
-  if (status === "active" || status === "watching" || status === "reading") return uiText("media.status.active");
-  if (status === "completed") return uiText("media.status.completed");
-  if (status === "planned") return uiText("media.status.planned");
-  if (status === "on_hold") return uiText("media.status.paused");
-  if (status === "dropped") return uiText("media.status.dropped");
-  return status;
+export function mediaStatusLabel(status: string, _mediaType: UiMediaType = "all"): string {
+  const normalized = normalizeMediaStatus(status);
+  return uiText(STATUS_TEXT_KEYS[normalized]);
 }
 
-export function statusFilterOptions(mediaType: UiMediaType): Array<[UiStatusFilter, string]> {
+export function mediaStatusOptions(): Array<[MediaStatus, string]> {
+  return MEDIA_STATUS_VALUES.map((status) => [status, uiText(STATUS_TEXT_KEYS[status])]);
+}
+
+export function statusFilterOptions(_mediaType: UiMediaType): Array<[UiStatusFilter, string]> {
   return [
     ["all", uiText("media.status.all")],
-    ["active", mediaStatusLabel("active", mediaType)],
-    ["completed", mediaStatusLabel("completed", mediaType)],
-    ["planned", mediaStatusLabel("planned", mediaType)],
-    ["on_hold", mediaStatusLabel("on_hold", mediaType)],
-    ["dropped", mediaStatusLabel("dropped", mediaType)],
+    ...MEDIA_STATUS_FILTER_ORDER.map((status): [MediaStatus, string] => [status, uiText(STATUS_TEXT_KEYS[status])]),
   ];
 }
 

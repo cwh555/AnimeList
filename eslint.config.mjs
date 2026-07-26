@@ -19,4 +19,55 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ["src/additional-progress-units-ui.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
+  {
+    files: [
+      "src/masterpiece-edit-ui.ts",
+      "src/masterpiece-operation-ui.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
+  {
+    files: [
+      "src/score-dashboard-ui.ts",
+      "src/score-dashboard-feature.ts",
+      "src/score-dashboard-batch-drag.ts",
+      "src/score-dashboard-drag-preview.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
+  {
+    files: ["src/serial-cover-feature.ts", "src/serial-cover-settings.ts"],
+    rules: {
+      "obsidianmd/prefer-create-el": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
 ]);

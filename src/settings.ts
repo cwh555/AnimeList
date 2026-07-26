@@ -1,6 +1,25 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
-import type { AnimeListSettings, StorageMode } from "./types";
+import { installReliableLibraryNavigation } from "./library-navigation";
+import "./search-pagination";
+import "./search-enhancements";
+import {
+  DEFAULT_SEARCH_LANGUAGES,
+  normalizeSearchLanguageSettings,
+} from "./multilingual-search";
+import { searchFeatureText } from "./search-feature-text";
+import {
+  DEFAULT_TIMELINE_MAX_STACK_DEPTH,
+  MAX_TIMELINE_MAX_STACK_DEPTH,
+  MIN_TIMELINE_MAX_STACK_DEPTH,
+  normalizeTimelineMaxStackDepth,
+} from "./timeline-scale";
+import type {
+  AnimeListSettings,
+  SearchLanguage,
+  SearchLanguageSettings,
+  StorageMode,
+} from "./types";
 import { uiText } from "./ui-text";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
@@ -15,10 +34,16 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   additionalScanFolders: [],
   coverFolder: "AnimeList/Covers",
   templateFolder: "AnimeList/Templates",
+  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,
+  googleBooksApiKey: "",
   providers: {
     bangumi: true,
     anilist: true,
     openlibrary: true,
+  },
+  searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
+  migrations: {
+    mediaStatus: 0,
   },
   uiState: {
     section: "library",
@@ -33,9 +58,29 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
 export interface AnimeListSettingsHost {
   app: App;
   settings: AnimeListSettings;
+  loadData(): Promise<unknown>;
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+}
+
+export interface SettingsSection {
+  heading?: string;
+  description?: string;
+  definitions: SettingDefinition[];
+}
+
+export type SettingsSectionExtension = (
+  tab: AnimeListSettingTab,
+) => SettingsSection | SettingsSection[];
+
+const SETTINGS_SECTION_EXTENSIONS = new Map<string, SettingsSectionExtension>();
+
+export function registerSettingsSectionExtension(
+  id: string,
+  extension: SettingsSectionExtension,
+): void {
+  SETTINGS_SECTION_EXTENSIONS.set(id, extension);
 }
 
 function splitFolders(value: string): string[] {
@@ -45,16 +90,24 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
+function rawSearchLanguages(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>).searchLanguages;
+}
+
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private searchLanguagesHydrated = false;
+  private searchLanguagesHydration: Promise<void> | null = null;
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
+    installReliableLibraryNavigation(plugin);
   }
 
   getSettingDefinitions(): SettingDefinition[] {
-    const definitions: SettingDefinition[] = [
+    return [
       {
         name: uiText("settings.storageLayout.name"),
         desc: uiText("settings.storageLayout.desc"),
@@ -88,6 +141,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderTemplateFolder(setting),
       },
       {
+        name: uiText("settings.timelineMaxStackDepth.name"),
+        desc: uiText("settings.timelineMaxStackDepth.desc"),
+        render: (setting) => this.renderTimelineMaxStackDepth(setting),
+      },
+      {
         name: uiText("media.provider.bangumi"),
         desc: uiText("settings.provider.bangumi.desc"),
         render: (setting) => this.renderProvider(setting, "bangumi"),
@@ -113,11 +171,80 @@ export class AnimeListSettingTab extends PluginSettingTab {
         render: (setting) => this.renderCopyTemplates(setting),
       },
     ];
-    return definitions;
+  }
+
+  getSearchLanguageDefinitions(): SettingDefinition[] {
+    return [
+      {
+        name: searchFeatureText("settings.languages.chinese.name"),
+        desc: searchFeatureText("settings.languages.chinese.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "chinese"),
+      },
+      {
+        name: searchFeatureText("settings.languages.english.name"),
+        desc: searchFeatureText("settings.languages.english.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "english"),
+      },
+      {
+        name: searchFeatureText("settings.languages.original.name"),
+        desc: searchFeatureText("settings.languages.original.desc"),
+        render: (setting) => this.renderSearchLanguage(setting, "original"),
+      },
+    ];
+  }
+
+  getSettingSections(): SettingsSection[] {
+    const base = this.getSettingDefinitions();
+    const sections: SettingsSection[] = [
+      { definitions: base.slice(0, 6) },
+      {
+        heading: uiText("settings.timeline.heading"),
+        description: uiText("settings.timeline.desc"),
+        definitions: base.slice(6, 7),
+      },
+      {
+        heading: searchFeatureText("settings.languages.heading"),
+        definitions: this.getSearchLanguageDefinitions(),
+      },
+      {
+        heading: uiText("settings.providers.heading"),
+        definitions: base.slice(7, 10),
+      },
+      {
+        heading: uiText("settings.setup.heading"),
+        definitions: base.slice(10),
+      },
+    ];
+    const extensions = [...SETTINGS_SECTION_EXTENSIONS.values()]
+      .flatMap((extension) => extension(this));
+    sections.splice(1, 0, ...extensions);
+    return sections;
   }
 
   display(): void {
+    this.plugin.settings.timelineMaxStackDepth = normalizeTimelineMaxStackDepth(
+      this.plugin.settings.timelineMaxStackDepth,
+    );
     this.renderImperativeSettings();
+    void this.hydrateSearchLanguages();
+  }
+
+  private async hydrateSearchLanguages(): Promise<void> {
+    if (this.searchLanguagesHydrated) return;
+    if (this.searchLanguagesHydration === null) {
+      this.searchLanguagesHydration = (async () => {
+        const loaded = await this.plugin.loadData();
+        this.plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawSearchLanguages(loaded));
+        this.searchLanguagesHydrated = true;
+        this.renderImperativeSettings();
+      })().catch((error) => {
+        console.warn("AnimeList could not restore search language settings", error);
+        this.searchLanguagesHydrated = true;
+      }).finally(() => {
+        this.searchLanguagesHydration = null;
+      });
+    }
+    await this.searchLanguagesHydration;
   }
 
   private renderImperativeSettings(): void {
@@ -127,19 +254,18 @@ export class AnimeListSettingTab extends PluginSettingTab {
       text: uiText("settings.intro"),
     });
 
-    const definitions = this.getSettingDefinitions();
-    definitions.forEach((definition, index) => {
-      if (definition.visible && !definition.visible()) return;
-      if (definition.name === uiText("media.provider.bangumi")) {
-        new Setting(containerEl).setName(uiText("settings.providers.heading")).setHeading();
+    for (const section of this.getSettingSections()) {
+      if (section.heading) {
+        const heading = new Setting(containerEl).setName(section.heading).setHeading();
+        if (section.description) heading.setDesc(section.description);
       }
-      if (definition.name === uiText("settings.createFolders.name")) {
-        new Setting(containerEl).setName(uiText("settings.setup.heading")).setHeading();
+      for (const definition of section.definitions) {
+        if (definition.visible && !definition.visible()) continue;
+        const setting = new Setting(containerEl).setName(definition.name);
+        if (definition.desc) setting.setDesc(definition.desc);
+        definition.render?.(setting);
       }
-      const setting = new Setting(containerEl).setName(definition.name);
-      if (definition.desc) setting.setDesc(definition.desc);
-      definition.render?.(setting);
-    });
+    }
   }
 
   private refreshSettingsTab(): void {
@@ -171,7 +297,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_LIBRARY_FOLDER)
         .setValue(this.plugin.settings.libraryRoot)
         .onChange(async (value) => {
-          this.plugin.settings.libraryRoot = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList";
+          this.plugin.settings.libraryRoot = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList";
           await this.plugin.saveSettings();
         });
     });
@@ -183,7 +310,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder("Media")
         .setValue(this.plugin.settings.flatMediaFolder)
         .onChange(async (value) => {
-          this.plugin.settings.flatMediaFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "");
+          this.plugin.settings.flatMediaFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "");
           await this.plugin.saveSettings();
         });
     });
@@ -208,7 +336,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_COVER_FOLDER)
         .setValue(this.plugin.settings.coverFolder)
         .onChange(async (value) => {
-          this.plugin.settings.coverFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
+          this.plugin.settings.coverFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Covers";
           await this.plugin.saveSettings();
         });
     });
@@ -220,13 +349,49 @@ export class AnimeListSettingTab extends PluginSettingTab {
         .setPlaceholder(DEFAULT_TEMPLATE_FOLDER)
         .setValue(this.plugin.settings.templateFolder)
         .onChange(async (value) => {
-          this.plugin.settings.templateFolder = normalizePath(value.trim()).replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
+          this.plugin.settings.templateFolder = normalizePath(value.trim())
+            .replace(/^\/+|\/+$/g, "") || "AnimeList/Templates";
           await this.plugin.saveSettings();
         });
     });
   }
 
+  private searchLanguages(): SearchLanguageSettings {
+    if (!this.plugin.settings.searchLanguages) {
+      this.plugin.settings.searchLanguages = { ...DEFAULT_SEARCH_LANGUAGES };
+    }
+    return this.plugin.settings.searchLanguages;
+  }
 
+  private renderSearchLanguage(setting: Setting, language: SearchLanguage): void {
+    setting.addToggle((toggle) => {
+      toggle.setValue(this.searchLanguages()[language]).onChange(async (value) => {
+        this.searchLanguages()[language] = value;
+        await this.plugin.saveSettings();
+      });
+    });
+  }
+
+  private renderTimelineMaxStackDepth(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      for (
+        let depth = MIN_TIMELINE_MAX_STACK_DEPTH;
+        depth <= MAX_TIMELINE_MAX_STACK_DEPTH;
+        depth += 1
+      ) {
+        dropdown.addOption(String(depth), String(depth));
+      }
+      dropdown
+        .setValue(String(normalizeTimelineMaxStackDepth(
+          this.plugin.settings.timelineMaxStackDepth,
+        )))
+        .onChange(async (value) => {
+          this.plugin.settings.timelineMaxStackDepth =
+            normalizeTimelineMaxStackDepth(value);
+          await this.plugin.saveSettings();
+        });
+    });
+  }
 
   private renderProvider(setting: Setting, key: keyof AnimeListSettings["providers"]): void {
     setting.addToggle((toggle) => {

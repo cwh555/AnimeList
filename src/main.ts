@@ -15,9 +15,16 @@ import LegacyAnimeListPlugin, {
   legacyTest,
 } from "./legacy";
 import { BUILTIN_TEMPLATES, BUILTIN_TEMPLATE_PREFIX, getBuiltInTemplateOptions } from "./builtin-templates";
+import { CoverThumbnailCache } from "./cover-cache";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { completedRequirementMessage, uiText } from "./ui-text";
+import { normalizeMediaStatus, normalizeStatusFilter } from "./media-status";
+import {
+  MEDIA_STATUS_MIGRATION_VERSION,
+  migrateMediaStatusNotes,
+} from "./schema-migration";
 import { rankSearchResults, searchQueryVariants } from "./search";
+import { normalizeTimelineMaxStackDepth } from "./timeline-scale";
 import type {
   AnimeListSettings,
   ExternalMediaResult,
@@ -34,7 +41,7 @@ import {
 } from "./novel-progress";
 
 const VIEW_TYPE = "animelist-library";
-const PLUGIN_VERSION = "1.1.2";
+const PLUGIN_VERSION = "1.2.0";
 const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 const DISPLAY_NAME = "AnimeList";
 
@@ -156,9 +163,15 @@ class AnimeListView extends ItemView {
 export class AnimeListPlugin extends LegacyAnimeListPlugin {
   settings: AnimeListSettings = structuredClone(DEFAULT_SETTINGS);
   private saveUiTimer: number | null = null;
+  private coverCache!: CoverThumbnailCache;
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    await this.migrateMediaStatuses();
+    this.coverCache = new CoverThumbnailCache(this.app, this.manifest.id);
+    await this.coverCache.initialize();
+    this.coverCache.scheduleCleanup();
+    this.register(() => this.coverCache.dispose());
 
     this.registerView(VIEW_TYPE, (leaf) => new AnimeListView(leaf, this));
     this.addRibbonIcon("library", uiText("app.openLibrary"), () => void this.openLibrary());
@@ -176,6 +189,8 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     this.addCommand({ id: "add-media", name: uiText("action.collect"), callback: () => this.openAddModal("anime") });
     this.addCommand({ id: "open-timeline", name: uiText("app.openTimeline"), callback: () => void this.openTimeline() });
     this.addCommand({ id: "initialize-library", name: uiText("app.initializeLibrary"), callback: () => void this.initializeLibrary(false) });
+    this.addCommand({ id: "optimize-cover-thumbnails", name: uiText("app.optimizeCovers"), callback: () => void this.optimizeExistingCovers() });
+    this.addCommand({ id: "clear-cover-thumbnail-cache", name: uiText("app.clearCoverCache"), callback: () => void this.clearCoverCache() });
     this.addSettingTab(new AnimeListSettingTab(this.app, this));
 
     this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
@@ -198,6 +213,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const raw = await this.loadData();
     const loaded = isRecord(raw) ? raw : {};
     const providers = isRecord(loaded.providers) ? loaded.providers : {};
+    const migrations = isRecord(loaded.migrations) ? loaded.migrations : {};
     const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
     this.settings = {
       storageMode: loaded.storageMode === "flat" ? "flat" : "managed",
@@ -208,20 +224,42 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         : [],
       coverFolder: typeof loaded.coverFolder === "string" ? loaded.coverFolder : DEFAULT_SETTINGS.coverFolder,
       templateFolder: typeof loaded.templateFolder === "string" ? loaded.templateFolder : DEFAULT_SETTINGS.templateFolder,
+      timelineMaxStackDepth: normalizeTimelineMaxStackDepth(
+        loaded.timelineMaxStackDepth,
+      ),
+      googleBooksApiKey: typeof loaded.googleBooksApiKey === "string" ? loaded.googleBooksApiKey.trim() : "",
       providers: {
         bangumi: typeof providers.bangumi === "boolean" ? providers.bangumi : DEFAULT_SETTINGS.providers.bangumi,
         anilist: typeof providers.anilist === "boolean" ? providers.anilist : DEFAULT_SETTINGS.providers.anilist,
         openlibrary: typeof providers.openlibrary === "boolean" ? providers.openlibrary : DEFAULT_SETTINGS.providers.openlibrary,
       },
+      migrations: {
+        mediaStatus: typeof migrations.mediaStatus === "number" ? migrations.mediaStatus : 0,
+      },
       uiState: {
         section: uiState.section === "timeline" ? "timeline" : "library",
         type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel" ? uiState.type : "all",
-        status: typeof uiState.status === "string" ? uiState.status : DEFAULT_SETTINGS.uiState.status,
+        status: normalizeStatusFilter(uiState.status),
         genre: typeof uiState.genre === "string" ? uiState.genre : DEFAULT_SETTINGS.uiState.genre,
         sort: typeof uiState.sort === "string" ? uiState.sort : DEFAULT_SETTINGS.uiState.sort,
         view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
       },
     };
+  }
+
+  private async migrateMediaStatuses(): Promise<void> {
+    if (this.settings.migrations.mediaStatus >= MEDIA_STATUS_MIGRATION_VERSION) return;
+    try {
+      const result = await migrateMediaStatusNotes(this.app, this.getScanFolders());
+      this.settings.migrations.mediaStatus = MEDIA_STATUS_MIGRATION_VERSION;
+      await this.saveSettings();
+      if (result.total > 0) {
+        new Notice(uiText("notice.statusMigration", { count: result.total }));
+      }
+    } catch (error) {
+      console.error("AnimeList media-status migration failed", error);
+      new Notice(uiText("notice.statusMigrationFailed", { error: errorMessage(error) }));
+    }
   }
 
   async saveSettings(): Promise<void> {
@@ -318,17 +356,27 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     }
   }
 
-  resolveMediaCoverPath(value: unknown, sourcePath: string): string {
-    const coverPath = stringValue(value)
+  private normalizedCoverPath(value: unknown): string {
+    return stringValue(value)
       .replace(/^!\[\[/, "")
       .replace(/^\[\[/, "")
       .replace(/\]\]$/, "")
       .split("|")[0];
-    if (/^https?:\/\//i.test(coverPath)) return coverPath;
-    if (!coverPath) return "";
+  }
+
+  resolveMediaCoverFile(value: unknown, sourcePath: string): TFile | null {
+    const coverPath = this.normalizedCoverPath(value);
+    if (!coverPath || /^https?:\/\//i.test(coverPath)) return null;
     const coverFile = this.app.metadataCache.getFirstLinkpathDest(coverPath, sourcePath)
       ?? this.app.vault.getAbstractFileByPath(coverPath);
-    return coverFile instanceof TFile ? this.app.vault.getResourcePath(coverFile) : "";
+    return coverFile instanceof TFile ? coverFile : null;
+  }
+
+  resolveMediaCoverPath(value: unknown, sourcePath: string): string {
+    const coverPath = this.normalizedCoverPath(value);
+    if (/^https?:\/\//i.test(coverPath)) return coverPath;
+    const coverFile = this.resolveMediaCoverFile(value, sourcePath);
+    return coverFile ? this.app.vault.getResourcePath(coverFile) : "";
   }
 
   collectMediaItems(source?: string): MediaItem[] {
@@ -341,7 +389,9 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
         if (!frontmatter?.media_type) return null;
 
+        const coverFile = this.resolveMediaCoverFile(frontmatter.cover, file.path);
         const cover = this.resolveMediaCoverPath(frontmatter.cover, file.path);
+        const coverSources = coverFile ? this.coverCache.getSources(coverFile) : undefined;
 
         const studios = stringArray(frontmatter.studios);
         const authors = stringArray(frontmatter.authors);
@@ -355,7 +405,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
           originalTitle: stringValue(frontmatter.title_original, stringValue(frontmatter.title_romaji)),
           mediaType,
           format: stringValue(frontmatter.format, stringValue(frontmatter.media_type)),
-          status: stringValue(frontmatter.status, "planned"),
+          status: normalizeMediaStatus(frontmatter.status),
           releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
           progress: normalizeProgressValue(frontmatter.progress),
           total: mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0,
@@ -368,6 +418,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
           platforms: stringArray(frontmatter.platforms),
           sourceUrls: stringArray(frontmatter.source_urls),
           cover,
+          coverSources,
           filePath: file.path,
           updated: file.stat.mtime,
           updatedLabel: uiText("library.updatedAt", { date: formatFileModifiedTime(file.stat.mtime) }),
@@ -377,6 +428,37 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
         };
       })
       .filter((item): item is MediaItem => item !== null);
+  }
+
+  private localCoverFiles(): TFile[] {
+    const unique = new Map<string, TFile>();
+    for (const note of getScopedMarkdownFiles(this.app, this.getScanFolders())) {
+      const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;
+      const cover = this.resolveMediaCoverFile(frontmatter?.cover, note.path);
+      if (cover) unique.set(cover.path, cover);
+    }
+    return Array.from(unique.values());
+  }
+
+  async optimizeExistingCovers(): Promise<void> {
+    const files = this.localCoverFiles();
+    if (!files.length) {
+      new Notice(uiText("notice.coverOptimizeEmpty"));
+      return;
+    }
+    const progress = new Notice(uiText("notice.coverOptimizeProgress", { completed: 0, total: files.length }), 0);
+    const result = await this.coverCache.optimizeFiles(files, (completed, total) => {
+      progress.setMessage(uiText("notice.coverOptimizeProgress", { completed, total }));
+    });
+    progress.setMessage(uiText("notice.coverOptimizeDone", result));
+    window.setTimeout(() => progress.hide(), 5000);
+    this.refreshViews();
+  }
+
+  async clearCoverCache(): Promise<void> {
+    const removed = await this.coverCache.clear();
+    new Notice(uiText("notice.coverCacheCleared", { removed }));
+    this.refreshViews();
   }
 
   async setFavorite(path: string, next: boolean): Promise<void> {
@@ -577,7 +659,12 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     await this.ensureFolder(folder);
     const filename = `${slugify(result.title)}-${result.provider}-${result.sourceId || Date.now()}`;
     const path = await this.uniqueFilePath(folder, filename, extension);
-    await this.app.vault.createBinary(path, response.arrayBuffer);
+    const file = await this.app.vault.createBinary(path, response.arrayBuffer);
+    try {
+      await this.coverCache.optimizeFile(file);
+    } catch (error) {
+      console.warn("AnimeList cover thumbnail generation failed", error);
+    }
     return path;
   }
 
@@ -616,6 +703,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
     const templateContent = await this.readTemplate(form.templatePath);
     const preparedForm: MediaNoteForm = {
       ...form,
+      status: normalizeMediaStatus(form.status),
       volumeLog: result.mediaType === "novel"
         ? normalizeVolumeLog(form.volumeLog)
         : [],

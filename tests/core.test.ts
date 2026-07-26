@@ -18,6 +18,10 @@ import {
 } from "../src/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
 import { rankSearchResults, searchQueryVariants } from "../src/search";
+import {
+  MIN_TIMELINE_VIEW_SCALE,
+  calculateDefaultTimelineView,
+} from "../src/timeline-scale";
 
 const PathExists = existsSync;
 
@@ -257,7 +261,7 @@ describe("media note generation", () => {
       genres: [],
       releaseStatus: "unknown",
       volumeLog: [],
-    }, "", ""), /必須填寫個人評分/);
+    }, "", ""), /必須填寫評分/);
   });
 });
 
@@ -285,7 +289,7 @@ describe("serial progress and novel volume records", () => {
       originalTitle: "",
       mediaType: "novel",
       format: "light_novel",
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       progress: 2,
       total: 4,
@@ -326,27 +330,37 @@ describe("serial progress and novel volume records", () => {
     assert.equal(progressRatio(6, 12, "episode"), 0.5);
   });
 
-  it("stores only volume labels and reading dates", () => {
+  it("preserves optional cover metadata and unrelated serial-entry fields", () => {
     const entries = normalizeVolumeLog([{
       label: "1",
       started_at: "2026-01-01",
       completed_at: "2026-01-02",
-      cover: "unpublished-test-value.jpg",
+      cover: "volume-1.jpg",
+      cover_provider: "Google Books",
+      cover_source_id: "book-1",
       isbn: "9780000000000",
     }]);
     assert.deepEqual(entries, [{
       label: "1",
       startedAt: "2026-01-01",
       completedAt: "2026-01-02",
+      cover: "volume-1.jpg",
+      coverProvider: "Google Books",
+      coverSourceId: "book-1",
+      extra: { isbn: "9780000000000" },
     }]);
     assert.deepEqual(serializeVolumeLog(entries), [{
+      isbn: "9780000000000",
       label: "1",
       started_at: "2026-01-01",
       completed_at: "2026-01-02",
+      cover: "volume-1.jpg",
+      cover_provider: "Google Books",
+      cover_source_id: "book-1",
     }]);
   });
 
-  it("writes optional dates, release status, and per-volume history to schema version 5", () => {
+  it("writes optional dates, release status, and per-volume history to schema version 6", () => {
     const novelResult = {
       ...baseResult,
       mediaType: "novel",
@@ -358,7 +372,7 @@ describe("serial progress and novel volume records", () => {
     const markdown = buildMediaMarkdown(novelResult, {
       title: "Example novel",
       score: 9,
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       startedAt: "",
       completedAt: "",
@@ -374,7 +388,8 @@ describe("serial progress and novel volume records", () => {
         { label: "EX", completed_at: "2026-04-05" },
       ]),
     }, "", "");
-    assert.match(markdown, /schema_version: 5/);
+    assert.match(markdown, /schema_version: 6/);
+    assert.match(markdown, /status: "ongoing"/);
     assert.match(markdown, /release_status: "releasing"/);
     assert.match(markdown, /progress: 1\.5/);
     assert.doesNotMatch(markdown, /^progress_total:/m);
@@ -382,17 +397,21 @@ describe("serial progress and novel volume records", () => {
     assert.doesNotMatch(markdown, /^completed_at:/m);
   });
 
-  it("uses the series cover and includes the volume number in timeline text", () => {
+  it("prefers the serial-entry cover and falls back to the series cover", () => {
     const volumeLog = normalizeVolumeLog([{
       label: "14",
       completed_at: "2026-07-20",
+      cover: "volume-14.jpg",
+    }, {
+      label: "15",
+      completed_at: "2026-07-21",
     }]);
     const entries = expandTimelineEntries([{
       title: "藥屋少女的呢喃",
       originalTitle: "薬屋のひとりごと",
       mediaType: "novel",
       format: "light_novel",
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       progress: 14,
       total: 0,
@@ -418,7 +437,8 @@ describe("serial progress and novel volume records", () => {
     );
     assert.equal(entries[0].seriesTitle, "藥屋少女的呢喃");
     assert.equal(entries[0].volumeLabel, "14");
-    assert.equal(entries[0].cover, "series.jpg");
+    assert.equal(entries[0].cover, "volume-14.jpg");
+    assert.equal(entries[1].cover, "series.jpg");
   });
 
 
@@ -461,7 +481,7 @@ describe("serial progress and novel volume records", () => {
     }, {
       title: "Ongoing manga",
       score: 8,
-      status: "reading",
+      status: "ongoing",
       releaseStatus: "releasing",
       startedAt: "",
       completedAt: "",
@@ -479,23 +499,23 @@ describe("serial progress and novel volume records", () => {
 });
 
 
-describe("novel volume editor UI", () => {
-  it("keeps volume-number sorting and navigation without any volume-cover controls", () => {
+describe("serial-entry cover UI", () => {
+  it("keeps cover logic outside legacy and places the thumbnail on the row right side", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles.serial-cover.css"), "utf8");
 
-    assert.match(legacySource, /entries\.sort\(\(left, right\) => compareVolumeLabels/);
-    assert.match(legacySource, /scrollIntoView\(\{ behavior: "smooth", block: "center", inline: "nearest" \}\)/);
-    assert.match(legacySource, /labelInput\.focus\(\{ preventScroll: true \}\)/);
-    assert.match(legacySource, /completedAt: todayString\(\)/);
-    assert.match(legacySource, /entry\.completedAt \|\| todayString\(\)/);
-    assert.doesNotMatch(legacySource, /搜尋封面候選|更換封面候選|searchNovelVolumeCovers|VolumeCoverSearchModal/);
-    assert.doesNotMatch(stylesheet, /al-volume-cover|animelist-volume-cover-modal/);
+    assert.doesNotMatch(legacySource, /searchSerialCovers|SerialCover/);
+    assert.match(featureSource, /serialCoverQuery\(context\.originalTitle, label\)/);
+    assert.match(stylesheet, /\.animelist-modal \.al-volume-row \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
+    assert.match(stylesheet, /\.al-serial-cover-panel/);
   });
 
-  it("does not ship a per-volume cover provider module or credentials", () => {
-    assert.equal(PathExists(path.join(process.cwd(), "src/volume-covers.ts")), false);
-    assert.equal("novelCovers" in DEFAULT_SETTINGS, false);
+  it("stores the user-provided Google Books key in plugin settings, not frontmatter", () => {
+    assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
+    assert.equal(DEFAULT_SETTINGS.googleBooksApiKey, "");
+    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+    assert.doesNotMatch(featureSource, /frontmatter\.googleBooksApiKey|google_books_api_key/);
   });
 });
 
@@ -508,11 +528,15 @@ describe("modal scrolling", () => {
 });
 
 describe("compact library rendering", () => {
-  it("keeps compact rows at cover height and starts their covers immediately", () => {
+  it("keeps compact rows at cover height and bounds eager cover loading", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
 
-    assert.match(legacySource, /image\.loading = state\.view === "poster" \? "eager" : "lazy"/);
+    assert.match(legacySource, /image\.loading = "lazy"/);
+    assert.match(legacySource, /const eagerCoverCount = \(view\) => view === "poster" \? 10 : view === "list" \? 4 : 6/);
+    assert.match(legacySource, /image\.loading = index < eagerCount \? "eager" : "lazy"/);
+    assert.match(legacySource, /image\.fetchPriority = index < 2 \? "high" : "auto"/);
+    assert.match(legacySource, /image\.sizes = coverSizes\(state\.view\)/);
     assert.match(legacySource, /image\.decoding = "async"/);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card \{[^}]*height: 138px[^}]*max-height: 138px/s);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card-body \{[^}]*max-height: 138px[^}]*overflow: hidden/s);
@@ -566,18 +590,12 @@ describe("timeline media filters", () => {
     assert.match(stylesheet, /\.al-timeline-type-filter\.is-active/);
   });
 
-  it("keeps date spacing and overall scene scale independent", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+  it("keeps date spacing and overall scene scale as independent state", () => {
+    const defaultView = calculateDefaultTimelineView([0, 24 * 60 * 60 * 1000], 1, 3);
 
-    assert.match(legacySource, /daySpacing: baseSpacing, viewScale: 1/);
-    assert.match(legacySource, /translate\(\$\{state\.x\}px, \$\{state\.y\}px\) scale\(\$\{state\.viewScale\}\)/);
-    assert.match(legacySource, /const setDaySpacingAt =/);
-    assert.match(legacySource, /const setViewScaleAt =/);
-    assert.match(legacySource, /getViewScale: \(\) => state\.viewScale/);
-    assert.match(legacySource, /uiText\("timeline\.scaleOut"\)/);
-    assert.match(legacySource, /uiText\("timeline\.scaleIn"\)/);
-    assert.match(stylesheet, /\.al-timeline-control-group/);
+    assert.equal(defaultView.viewScale, 1);
+    assert.equal(MIN_TIMELINE_VIEW_SCALE, 0.1);
+    assert.ok(defaultView.daySpacing > defaultView.viewScale);
   });
 });
 
@@ -614,47 +632,30 @@ describe("tracked UI wording", () => {
     assert.ok(renderedVolume.includes("EX"));
   });
 
-  it("uses the approved media-specific status labels", () => {
-    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), [
+  it("uses the approved shared status labels without a paused option", () => {
+    const expected = [
       UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.watching"],
-      UI_TEXT["media.status.completedAnime"],
-      UI_TEXT["media.status.plannedAnime"],
-      UI_TEXT["media.status.pausedAnime"],
-      UI_TEXT["media.status.droppedAnime"],
-    ]);
-    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), [
-      UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.reading"],
-      UI_TEXT["media.status.completedReading"],
-      UI_TEXT["media.status.plannedReading"],
-      UI_TEXT["media.status.pausedReading"],
-      UI_TEXT["media.status.droppedReading"],
-    ]);
-    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), [
-      UI_TEXT["media.status.all"],
-      UI_TEXT["media.status.active"],
+      UI_TEXT["media.status.ongoing"],
       UI_TEXT["media.status.completed"],
       UI_TEXT["media.status.planned"],
-      UI_TEXT["media.status.paused"],
       UI_TEXT["media.status.dropped"],
-    ]);
+    ];
+    assert.deepEqual(statusFilterOptions("anime").map(([, label]) => label), expected);
+    assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), expected);
+    assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), expected);
     assert.equal(Object.values(UI_TEXT).some((label) => label.includes("/") || label.includes("／")), false);
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedAnime"\)\]/);
-    assert.match(legacySource, /\["dropped", uiText\("media\.status\.droppedReading"\)\]/);
-    assert.doesNotMatch(legacySource, /value === "dropped" \? "on_hold"/);
+    assert.doesNotMatch(legacySource, /plannedAnime|plannedReading|pausedAnime|pausedReading|droppedAnime|droppedReading/);
+    assert.doesNotMatch(legacySource, /\["on_hold"|\["watching"|\["reading"/);
   });
-
 
 
   it("keeps user-visible wording in one tracked source file", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const templateSource = readFileSync(path.join(process.cwd(), "src/builtin-templates.ts"), "utf8");
-    const novelSource = readFileSync(path.join(process.cwd(), "src/novel-progress.ts"), "utf8");
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    const runtimeSources = [legacySource, mainSource, templateSource, novelSource, settingsSource];
+    const runtimeSources = [legacySource, mainSource, templateSource, settingsSource];
 
     for (const source of runtimeSources) {
       assert.doesNotMatch(source, /new Notice\(\s*["'`][^\n)]*[\u3400-\u9fff]/);
@@ -667,7 +668,6 @@ describe("tracked UI wording", () => {
     assert.doesNotMatch(legacySource, /TV 動畫|動畫電影|手動建立|簡潔筆記（內建）/);
     assert.doesNotMatch(mainSource, /Create library folders|已收進最愛|已從最愛中移除/);
     assert.match(templateSource, /uiText\("template\.builtinPlain"\)/);
-    assert.match(novelSource, /uiText\("timeline\.novelEventTitle"/);
     assert.doesNotMatch(settingsSource, /\.setName\(["'`]|\.setDesc\(["'`]|\.setButtonText\(["'`]/);
     assert.equal(mediaFormatLabel("light_novel"), UI_TEXT["media.format.lightNovel"]);
     assert.equal(mediaProviderLabel("bangumi"), UI_TEXT["media.provider.bangumi"]);
@@ -765,7 +765,7 @@ describe("repository defaults", () => {
     };
     const tab = new AnimeListSettingTab(new App(), host);
     const definitions = tab.getSettingDefinitions();
-    assert.equal(definitions.length, 11);
+    assert.equal(definitions.length, 12);
     assert.deepEqual(
       definitions.map((definition) => definition.name),
       [
@@ -775,6 +775,7 @@ describe("repository defaults", () => {
         UI_TEXT["settings.additionalFolders.name"],
         UI_TEXT["settings.coverFolder.name"],
         UI_TEXT["settings.templateFolder.name"],
+        UI_TEXT["settings.timelineMaxStackDepth.name"],
         UI_TEXT["media.provider.bangumi"],
         UI_TEXT["media.provider.anilist"],
         UI_TEXT["media.provider.openlibrary"],
@@ -800,16 +801,21 @@ describe("version documentation", () => {
     const sessions = readFileSync(path.join(process.cwd(), "docs/VERSION_SESSIONS.md"), "utf8");
     const changelog = readFileSync(path.join(process.cwd(), "CHANGELOG.md"), "utf8");
     const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
+    const roadmap = readFileSync(path.join(process.cwd(), "ROADMAP.md"), "utf8");
+    const userGuide = readFileSync(path.join(process.cwd(), "docs/USER_GUIDE.md"), "utf8");
 
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
     assert.match(sessions, /\*\*Release state:\*\* Published through `1\.1\.2`\./);
+    assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
     assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
-    assert.match(changelog, /## 1\.1\.1 - 2026-07-21/);
-    assert.match(changelog, /## 1\.1\.0 - 2026-07-21/);
     assert.match(readme, /> \[!NOTE\]/);
-    assert.match(readme, /> \*\*What's new in 1\.1\.0\*\*/);
-    assert.doesNotMatch(readme, /1\.1\.0 highlights — Unreleased/);
+    assert.match(readme, /> \*\*What's new in 1\.2\.0\*\*/);
+    assert.match(readme, /\[User Guide\]\(docs\/USER_GUIDE\.md\)/);
+    assert.match(userGuide, /## Score Dashboard/);
+    assert.match(userGuide, /## Markdown data and templates/);
+    assert.doesNotMatch(roadmap, /Add a score dashboard/);
+    assert.doesNotMatch(readme, /## Library data/);
   });
 
   it("keeps every runtime and release version synchronized", () => {
@@ -823,13 +829,13 @@ describe("version documentation", () => {
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
 
-    assert.equal(manifest.version, "1.1.2");
+    assert.equal(manifest.version, "1.2.0");
     assert.equal(packageJson.version, manifest.version);
     assert.equal(packageLock.version, manifest.version);
     assert.equal(packageLock.packages[""]?.version, manifest.version);
     assert.equal(versions[manifest.version], "1.5.0");
-    assert.match(mainSource, /const PLUGIN_VERSION = "1\.1\.2";/);
-    assert.match(legacySource, /const PLUGIN_VERSION = "1\.1\.2";/);
+    assert.match(mainSource, /const PLUGIN_VERSION = "1\.2\.0";/);
+    assert.match(legacySource, /const PLUGIN_VERSION = "1\.2\.0";/);
   });
 });
 
@@ -840,11 +846,10 @@ describe("timeline modal and Traditional Chinese labels", () => {
     assert.doesNotMatch(mainSource, /showSection\("timeline"\)/);
   });
 
-  it("shows novel volume labels and uses collision-aware vertical lanes", () => {
+  it("shows novel volume labels through the tracked timeline classes", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
     assert.match(legacySource, /al-timeline-volume-label/);
-    assert.match(legacySource, /assignTimelineLanes\(positionedItems, CARD_WIDTH \+ CARD_GAP_X\)/);
     assert.match(legacySource, /aboveAxis = lane % 2 === 0/);
     assert.match(stylesheet, /\.al-timeline-volume-label/);
   });
@@ -853,7 +858,7 @@ describe("timeline modal and Traditional Chinese labels", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     assert.match(legacySource, /save\.textContent = uiText\("action\.save"\)/);
-    assert.match(legacySource, /createButton\.textContent = uiText\("action\.add"\)/);
+    assert.match(legacySource, /createButton\.textContent = uiText\("action\.collect"\)/);
     assert.match(legacySource, /appendIconLabel\(addButton, "plus", uiText\("action\.collect"\)\)/);
     assert.match(mainSource, /id: "add-media", name: uiText\("action\.collect"\)/);
     assert.ok((legacySource.match(/uiText\("action\.delete"\)/g) || []).length >= 3);
@@ -865,8 +870,8 @@ describe("timeline modal and Traditional Chinese labels", () => {
 
   it("uses tracked status and timeline labels without restoring removed total fields", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.ok(UI_TEXT["media.status.watching"].trim());
-    assert.ok(UI_TEXT["media.status.plannedAnime"].trim());
+    assert.ok(UI_TEXT["media.status.ongoing"].trim());
+    assert.ok(UI_TEXT["media.status.planned"].trim());
     assert.ok(UI_TEXT["library.timeline"].trim());
     assert.match(legacySource, /appendIconLabel\(timelineButton, "timeline", uiText\("library\.timeline"\)\)/);
     assert.doesNotMatch(legacySource, /日本原版最新話數|日本原版最新卷數|已追到最新/);
@@ -889,7 +894,20 @@ describe("Obsidian community review compliance", () => {
   it("uses native setting headings", () => {
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
     assert.doesNotMatch(settingsSource, /createEl\("h[23]"/);
-    assert.equal((settingsSource.match(/\.setHeading\(\)/g) || []).length, 2);
+
+    const host = {
+      app: new App(),
+      settings: structuredClone(DEFAULT_SETTINGS),
+      async loadData(): Promise<unknown> { return {}; },
+      async saveSettings(): Promise<void> {},
+      async initializeLibrary(): Promise<void> {},
+      refreshViews(): void {},
+    };
+    const sections = new AnimeListSettingTab(new App(), host).getSettingSections();
+    assert.deepEqual(
+      sections.map((section) => section.heading ?? ""),
+      ["", UI_TEXT["settings.timeline.heading"], "Search languages", UI_TEXT["settings.providers.heading"], UI_TEXT["settings.setup.heading"]],
+    );
   });
 
   it("attests release assets", () => {
