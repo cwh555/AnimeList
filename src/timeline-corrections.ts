@@ -57,7 +57,10 @@ export function layoutDefaultTimelinePoints(
   });
 }
 
-/** Centers the newest card horizontally while keeping the timeline axis vertical center. */
+/**
+ * Centers the newest card on the horizontal axis while independently keeping
+ * the timeline axis at the vertical center of the viewport.
+ */
 export function centerLatestTimelineAxis(
   viewportWidth: number,
   viewportHeight: number,
