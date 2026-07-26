@@ -1,0 +1,25 @@
+name: Inspect staged serial cover patch
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/serial-cover-picker-and-migration-ui
+      - run: |
+          wc -c .github/serial-cover-final.patch.gz.b64 .github/serial-cover-chunk-* || true
+          git hash-object .github/serial-cover-final.patch.gz.b64 .github/serial-cover-chunk-* || true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: staged-serial-cover-patch
+          path: |
+            .github/serial-cover-final.patch.gz.b64
+            .github/serial-cover-chunk-*
+          retention-days: 1
