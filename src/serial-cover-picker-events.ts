@@ -57,9 +57,9 @@ export function installSerialCoverPickerEvents(plugin: DisposablePlugin): void {
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       for (const node of record.addedNodes) {
-        if (node instanceof Element) prepareSelectAffordances(node);
+        if (node.instanceOf(Element)) prepareSelectAffordances(node);
       }
-      const modal = record.target instanceof Element ? selectorModal(record.target) : null;
+      const modal = record.target.instanceOf(Element) ? selectorModal(record.target) : null;
       if (modal) synchronizeSerialCoverApply(modal);
     }
   });
