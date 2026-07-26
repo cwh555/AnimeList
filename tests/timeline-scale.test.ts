@@ -121,6 +121,18 @@ describe("timeline scale defaults", () => {
     assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 7);
   });
 
+  it("separates neighboring date groups without flattening same-day overflow", () => {
+    const times = [
+      ...Array.from({ length: 10 }, () => 0),
+      ...Array.from({ length: 3 }, () => DAY_MS),
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1, 3);
+    const points = times.map((time) => (time / DAY_MS) * spacing);
+
+    assert.ok(spacing >= MINIMUM_CARD_DISTANCE);
+    assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 10);
+  });
+
   it("preserves the timeline axis screen coordinate across horizontal scaling", () => {
     assert.equal(preserveTimelineAxisScreenY(25, 300, 464, 0.5), -57);
   });
@@ -342,6 +354,40 @@ describe("timeline scale DOM integration", () => {
     assert.equal(Math.max(...lanes), 1);
   });
 
+  it("keeps same-day records stacked and separates the next date group", () => {
+    installFakeDom();
+    const container = new FakeElement("div");
+    const firstDay = Array.from({ length: 10 }, (_, index) => ({
+      ...timelineItem(index),
+      title: `First day ${index}`,
+      completedAt: "2026-01-01",
+    }));
+    const secondDay = Array.from({ length: 3 }, (_, index) => ({
+      ...timelineItem(index + 10),
+      title: `Second day ${index}`,
+      completedAt: "2026-01-02",
+    }));
+
+    legacyTest.TimelineUI.render(container, [...firstDay, ...secondDay], {
+      maxStackDepth: 3,
+    });
+
+    const cards = descendantsByClass(container, "al-timeline-card");
+    const firstDayCards = cards.filter((card) => card.title.includes("2026-01-01"));
+    const secondDayCards = cards.filter((card) => card.title.includes("2026-01-02"));
+    const firstDayLanes = firstDayCards.map((card) => Number(card.dataset.timelineLane));
+    const secondDayLanes = secondDayCards.map((card) => Number(card.dataset.timelineLane));
+    const firstDayX = Number.parseFloat(firstDayCards[0].style.left) + 60;
+    const secondDayX = Number.parseFloat(secondDayCards[0].style.left) + 60;
+
+    assert.equal(Math.max(...firstDayLanes), 9);
+    assert.deepEqual(secondDayLanes, [0, 1, 2]);
+    assert.ok(firstDayCards.every((card) => Number.parseFloat(card.style.left) + 60 === firstDayX));
+    assert.ok(secondDayCards.every((card) => Number.parseFloat(card.style.left) + 60 === secondDayX));
+    assert.ok(secondDayX - firstDayX >= MINIMUM_CARD_DISTANCE);
+    assert.equal(Math.max(...cards.map((card) => Number(card.dataset.timelineLane))), 9);
+  });
+
   it("keeps the timeline axis at the same screen y while wheel-scaling time", () => {
     installFakeDom();
     const container = new FakeElement("div");
@@ -371,7 +417,7 @@ describe("timeline scale DOM integration", () => {
     assert.ok(Math.abs(nextAxisScreenY - initialAxisScreenY) < 1e-6);
   });
 
-  it("initializes and restores the latest timeline card at viewport center", () => {
+  it("centers the latest card horizontally and the timeline axis vertically", () => {
     installFakeDom();
     const container = new FakeElement("div");
     legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
@@ -385,8 +431,13 @@ describe("timeline scale DOM integration", () => {
     assert.ok(latest);
 
     const initialCenter = screenCenter(latest, scene);
+    const initialAxis = descendantsByClass(container, "al-timeline-axis")[0];
+    const initialTransform = parseTransform(scene.style.transform);
     assert.equal(initialCenter.x, viewport.clientWidth / 2);
-    assert.equal(initialCenter.y, viewport.clientHeight / 2);
+    assert.equal(
+      initialTransform.y + Number.parseFloat(initialAxis.style.top) * initialTransform.scale,
+      viewport.clientHeight / 2,
+    );
 
     descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
     descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
@@ -395,7 +446,12 @@ describe("timeline scale DOM integration", () => {
       .find((card) => card.title.includes("Newest"));
     assert.ok(restoredLatest);
     const restoredCenter = screenCenter(restoredLatest, scene);
+    const restoredAxis = descendantsByClass(container, "al-timeline-axis")[0];
+    const restoredTransform = parseTransform(scene.style.transform);
     assert.equal(restoredCenter.x, viewport.clientWidth / 2);
-    assert.equal(restoredCenter.y, viewport.clientHeight / 2);
+    assert.equal(
+      restoredTransform.y + Number.parseFloat(restoredAxis.style.top) * restoredTransform.scale,
+      viewport.clientHeight / 2,
+    );
   });
 });

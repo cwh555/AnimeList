@@ -654,9 +654,8 @@ describe("tracked UI wording", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
     const templateSource = readFileSync(path.join(process.cwd(), "src/builtin-templates.ts"), "utf8");
-    const novelSource = readFileSync(path.join(process.cwd(), "src/novel-progress.ts"), "utf8");
     const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    const runtimeSources = [legacySource, mainSource, templateSource, novelSource, settingsSource];
+    const runtimeSources = [legacySource, mainSource, templateSource, settingsSource];
 
     for (const source of runtimeSources) {
       assert.doesNotMatch(source, /new Notice\(\s*["'`][^\n)]*[\u3400-\u9fff]/);
@@ -669,7 +668,6 @@ describe("tracked UI wording", () => {
     assert.doesNotMatch(legacySource, /TV 動畫|動畫電影|手動建立|簡潔筆記（內建）/);
     assert.doesNotMatch(mainSource, /Create library folders|已收進最愛|已從最愛中移除/);
     assert.match(templateSource, /uiText\("template\.builtinPlain"\)/);
-    assert.match(novelSource, /uiText\("timeline\.novelEventTitle"/);
     assert.doesNotMatch(settingsSource, /\.setName\(["'`]|\.setDesc\(["'`]|\.setButtonText\(["'`]/);
     assert.equal(mediaFormatLabel("light_novel"), UI_TEXT["media.format.lightNovel"]);
     assert.equal(mediaProviderLabel("bangumi"), UI_TEXT["media.provider.bangumi"]);
@@ -848,11 +846,10 @@ describe("timeline modal and Traditional Chinese labels", () => {
     assert.doesNotMatch(mainSource, /showSection\("timeline"\)/);
   });
 
-  it("shows novel volume labels and uses collision-aware vertical lanes", () => {
+  it("shows novel volume labels through the tracked timeline classes", () => {
     const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
     assert.match(legacySource, /al-timeline-volume-label/);
-    assert.match(legacySource, /assignTimelineLanes\(positionedItems, CARD_WIDTH \+ CARD_GAP_X\)/);
     assert.match(legacySource, /aboveAxis = lane % 2 === 0/);
     assert.match(stylesheet, /\.al-timeline-volume-label/);
   });

@@ -1,5 +1,6 @@
 import { normalizeSerialEntryRecord, serializeSerialEntryRecord } from "./serial-entry-record";
-import { uiText } from "./ui-text";
+import { defaultProgressUnit } from "./progress-units";
+import { timelineEntryCopy } from "./timeline-corrections";
 import type { MediaItem, NovelVolumeEntry, ProgressValue, ReleaseStatus, TimelineMediaEntry } from "./types";
 const NUMERIC_VOLUME_PATTERN = /^(?:\d+(?:\.5)?|\.5)$/;
 function primitiveText(value: unknown): string { return typeof value === "string" || typeof value === "number" ? String(value) : ""; }
@@ -31,7 +32,23 @@ export function expandTimelineEntries(items: MediaItem[]): TimelineMediaEntry[] 
   for (const item of items) {
     const completedVolumes = item.mediaType === "novel" || item.mediaType === "manga" ? normalizeVolumeLog(item.volumeLog).filter((entry) => Boolean(entry.completedAt)) : [];
     if (completedVolumes.length) {
-      for (const volume of completedVolumes) output.push({ ...item, seriesTitle: item.title, title: uiText("timeline.novelEventTitle", { title: item.title, volume: volume.label }), completedAt: volume.completedAt, cover: volume.cover || item.cover, volumeLabel: volume.label });
+      for (const volume of completedVolumes) {
+        const unit = defaultProgressUnit(item.mediaType, item.unit);
+        const copy = timelineEntryCopy(
+          item.title,
+          volume.label,
+          unit === "episode" ? "volume" : unit,
+        );
+        output.push({
+          ...item,
+          seriesTitle: item.title,
+          title: copy.title,
+          serialEntryLabel: copy.label,
+          completedAt: volume.completedAt,
+          cover: volume.cover || item.cover,
+          volumeLabel: volume.label,
+        });
+      }
       continue;
     }
     if (item.status === "completed" && item.completedAt) output.push({ ...item });

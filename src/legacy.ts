@@ -32,10 +32,10 @@ import {
   MIN_TIMELINE_DAY_SPACING,
   MIN_TIMELINE_VIEW_SCALE,
   calculateDefaultTimelineView,
-  centerTimelinePoint,
   normalizeTimelineMaxStackDepth,
   preserveTimelineAxisScreenY,
 } from "./timeline-scale";
+import { centerLatestTimelineAxis } from "./timeline-corrections";
 
 const PLUGIN_VERSION = "1.1.2";
 const MEDIA_ROOT = "Media";
@@ -999,7 +999,6 @@ export const TimelineUI = (() => {
       sceneHeight: 0,
       axisY: 0,
       latestItemCenterX: 0,
-      latestItemCenterY: 0,
     };
 
     const root = makeEl("div", "al-timeline-root");
@@ -1095,7 +1094,10 @@ export const TimelineUI = (() => {
         time: item.completedTime,
         x: sidePadding + Math.round((item.completedTime - minTime) / DAY_MS) * state.daySpacing,
       }));
-      const laidOutItems = assignTimelineLanes(positionedItems, CARD_WIDTH + CARD_GAP_X);
+      const laidOutItems = assignTimelineLanes(
+        positionedItems,
+        CARD_WIDTH + CARD_GAP_X,
+      );
       const laneCount = Math.max(1, ...laidOutItems.map((positioned) => positioned.lane + 1));
       const aboveLaneCount = Math.ceil(laneCount / 2);
       const belowLaneCount = Math.floor(laneCount / 2);
@@ -1170,17 +1172,14 @@ export const TimelineUI = (() => {
         const displayTitle = item.seriesTitle || item.title;
         text.appendChild(makeEl("strong", "", displayTitle));
         if (item.volumeLabel) {
-          text.appendChild(makeEl("span", "al-timeline-volume-label", uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
+          text.appendChild(makeEl("span", "al-timeline-volume-label", item.serialEntryLabel || uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
         }
         text.appendChild(makeEl("small", "", formatDate(time)));
         card.appendChild(text);
         if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
         card.addEventListener("click", () => openFile(item.filePath));
         scene.appendChild(card);
-        if (index === laidOutItems.length - 1) {
-          state.latestItemCenterX = x;
-          state.latestItemCenterY = cardY + CARD_HEIGHT / 2;
-        }
+        if (index === laidOutItems.length - 1) state.latestItemCenterX = x;
       });
       applyPan();
     };
@@ -1228,11 +1227,11 @@ export const TimelineUI = (() => {
     };
 
     const centerLatestItem = () => {
-      const pan = centerTimelinePoint(
+      const pan = centerLatestTimelineAxis(
         viewport.clientWidth,
         viewport.clientHeight,
         state.latestItemCenterX,
-        state.latestItemCenterY,
+        state.axisY,
         state.viewScale,
       );
       state.x = pan.x;
