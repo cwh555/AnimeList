@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   calculateDefaultTimelineDaySpacing,
   calculateTimelineLaneCount,
+  timelineLayoutRespectsInitialStackDepth,
 } from "../src/timeline-scale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -30,6 +31,7 @@ describe("timeline work-level density", () => {
 
     assert.equal(Math.max(...lanes) + 1, 5);
     assert.equal(lanes.at(-1), 0);
+    assert.equal(timelineLayoutRespectsInitialStackDepth(times, spacing, 1), true);
   });
 
   it("counts every work when separating neighboring date groups", () => {
@@ -53,5 +55,20 @@ describe("timeline work-level density", () => {
 
     assert.ok(spacing > 0);
     assert.ok(calculateTimelineLaneCount(times, spacing) <= 6);
+    assert.equal(timelineLayoutRespectsInitialStackDepth(times, spacing, 3), true);
+  });
+
+  it("does not let a distant same-day overflow relax other date groups", () => {
+    const denseDates = Array.from({ length: 11 }, (_, day) => (
+      [day * DAY_MS, day * DAY_MS]
+    )).flat();
+    const distantSameDayOverflow = Array.from({ length: 10 }, () => 1000 * DAY_MS);
+    const times = [...denseDates, ...distantSameDayOverflow];
+
+    assert.equal(timelineLayoutRespectsInitialStackDepth(times, 28, 3), false);
+
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1000, 3);
+    assert.equal(timelineLayoutRespectsInitialStackDepth(times, spacing, 3), true);
+    assert.equal(calculateTimelineLaneCount(times, spacing), 10);
   });
 });
