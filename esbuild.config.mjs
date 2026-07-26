@@ -7,13 +7,14 @@ const outfile = process.env.ANIMELIST_BUILD_OUTFILE || "main.js";
 const GENERATED_STYLE_START = "/* BEGIN GENERATED FEATURE STYLES */";
 const GENERATED_STYLE_END = "/* END GENERATED FEATURE STYLES */";
 async function buildStyles() {
-  const [currentStyles, serialStyles, progressStyles, masterpieceStyles, scoreDashboardStyles, serialCoverStyles] = await Promise.all([
+  const [currentStyles, serialStyles, progressStyles, masterpieceStyles, scoreDashboardStyles, serialCoverStyles, timelineStyles] = await Promise.all([
     readFile("styles.css", "utf8"),
     readFile("styles.serial-reading.css", "utf8"),
     readFile("styles.progress.css", "utf8"),
     readFile("styles.masterpiece.css", "utf8"),
     readFile("styles.score-dashboard.css", "utf8"),
     readFile("styles.serial-cover.css", "utf8"),
+    readFile("styles.timeline.css", "utf8"),
   ]);
   const generatedStart = currentStyles.indexOf(GENERATED_STYLE_START);
   const legacyGeneratedStart = currentStyles.indexOf("/* BEGIN GENERATED SERIAL READING UI */");
@@ -25,6 +26,7 @@ async function buildStyles() {
     masterpieceStyles.trim(),
     scoreDashboardStyles.trim(),
     serialCoverStyles.trim(),
+    timelineStyles.trim(),
   ].join("\n\n");
   const outputStyles = `${baseStyles}\n\n${GENERATED_STYLE_START}\n${generatedStyles}\n${GENERATED_STYLE_END}\n`;
   await writeFile("styles.css", outputStyles, "utf8");
