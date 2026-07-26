@@ -1,5 +1,5 @@
 name: Validate serial cover UI ordering and timeline
-run-name: Serial cover UI ordering and timeline validation
+run-name: Final serial cover UI ordering and timeline validation
 
 on:
   pull_request:
@@ -55,7 +55,7 @@ jobs:
       - name: Verify generated stylesheet and publish staging branch
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41826782+github-actions[bot]@users.noreply.github.com"
           if ! git diff --quiet -- styles.css; then
             git add styles.css
             git commit -m "build: refresh generated serial cover styles"
