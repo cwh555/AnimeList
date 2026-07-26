@@ -24,6 +24,8 @@ export const PROGRESS_UNIT_FEATURE_TEXT = {
   progressLabel: "目前閱讀{unit}數",
   progressHintInteger: "支援非負整數。",
   progressHintVolume: "支援整數、.5 與 EX。",
+  timelineLabel: "第 {label} {unit}",
+  timelineEventTitle: "{title} — 第 {label} {unit}",
 } as const;
 
 type TextTemplateKey = Exclude<keyof typeof PROGRESS_UNIT_FEATURE_TEXT, "unit">;

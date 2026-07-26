@@ -32,10 +32,11 @@ import {
   MIN_TIMELINE_DAY_SPACING,
   MIN_TIMELINE_VIEW_SCALE,
   calculateDefaultTimelineView,
-  centerTimelinePoint,
+  centerTimelineLatestDateAndAxis,
   normalizeTimelineMaxStackDepth,
   preserveTimelineAxisScreenY,
 } from "./timeline-scale";
+import { timelineSerialLabel } from "./timeline-entry";
 
 const PLUGIN_VERSION = "1.1.2";
 const MEDIA_ROOT = "Media";
@@ -1170,7 +1171,7 @@ export const TimelineUI = (() => {
         const displayTitle = item.seriesTitle || item.title;
         text.appendChild(makeEl("strong", "", displayTitle));
         if (item.volumeLabel) {
-          text.appendChild(makeEl("span", "al-timeline-volume-label", uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
+          text.appendChild(makeEl("span", "al-timeline-volume-label", timelineSerialLabel(item, item.volumeLabel)));
         }
         text.appendChild(makeEl("small", "", formatDate(time)));
         card.appendChild(text);
@@ -1228,11 +1229,11 @@ export const TimelineUI = (() => {
     };
 
     const centerLatestItem = () => {
-      const pan = centerTimelinePoint(
+      const pan = centerTimelineLatestDateAndAxis(
         viewport.clientWidth,
         viewport.clientHeight,
         state.latestItemCenterX,
-        state.latestItemCenterY,
+        state.axisY,
         state.viewScale,
       );
       state.x = pan.x;
