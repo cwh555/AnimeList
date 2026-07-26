@@ -1,4 +1,4 @@
-name: Export validated serial cover head
+name: Export serial cover follow-up source
 
 on:
   pull_request:
@@ -13,19 +13,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Export staging head
+      - name: Export exact feature head
         run: |
-          git fetch origin chore/serial-cover-final-publish feature/serial-entry-covers
-          git rev-parse origin/chore/serial-cover-final-publish > staging-head.txt
-          git rev-parse origin/feature/serial-entry-covers > feature-head.txt
-          git rev-list --left-right --count origin/feature/serial-entry-covers...origin/chore/serial-cover-final-publish > ahead-behind.txt
-          git diff --quiet origin/chore/serial-cover-final-publish -- src/serial-cover-provider.ts src/serial-entry-cover.ts src/serial-cover-service.ts src/serial-cover-text.ts tests/serial-entry-cover.test.ts || true
-          cat staging-head.txt feature-head.txt ahead-behind.txt
+          git fetch origin feature/serial-entry-covers
+          git checkout --detach origin/feature/serial-entry-covers
+          git rev-parse HEAD > feature-head.txt
+          tar --exclude=.git --exclude=node_modules --exclude=.tmp -czf serial-cover-followup-source.tar.gz .
       - uses: actions/upload-artifact@v6
         with:
-          name: validated-serial-cover-head
+          name: serial-cover-followup-source
           path: |
-            staging-head.txt
             feature-head.txt
-            ahead-behind.txt
+            serial-cover-followup-source.tar.gz
           retention-days: 1
