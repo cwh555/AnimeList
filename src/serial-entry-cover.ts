@@ -62,6 +62,18 @@ export function serialCoverQuery(originalTitle: string, label: string): string |
   return `${title} ${normalizedLabel}`;
 }
 
+export function serialCoverQueries(originalTitle: string, label: string): string[] {
+  const exact = serialCoverQuery(originalTitle, label);
+  if (!exact) return [];
+  const title = clean(originalTitle);
+  const normalizedLabel = clean(label);
+  const separator = title.search(/[～〜~]/u);
+  if (separator <= 0) return [exact];
+  const shortTitle = clean(title.slice(0, separator));
+  if (comparable(shortTitle).length < 3 || comparable(shortTitle) === comparable(title)) return [exact];
+  return [exact, `${shortTitle} ${normalizedLabel}`];
+}
+
 function labelPattern(label: string): RegExp {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`);

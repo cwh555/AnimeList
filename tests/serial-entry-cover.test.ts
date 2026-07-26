@@ -4,6 +4,7 @@ import {
   confidentSerialCover,
   rankSerialCoverCandidates,
   selectOriginalTitle,
+  serialCoverQueries,
   serialCoverQuery,
 } from "../src/serial-entry-cover";
 import {
@@ -11,6 +12,7 @@ import {
   missingSerialCoverEntryCount,
 } from "../src/serial-cover-migration";
 import { setRequestUrlMock } from "./mocks/obsidian";
+import { SerialCoverSelection } from "../src/serial-cover-selection";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
@@ -35,6 +37,16 @@ function bangumiSubject(options: {
 test("serial cover query uses original title and numeric label only", () => {
   assert.equal(serialCoverQuery("寄宿学校のジュリエット", "5"), "寄宿学校のジュリエット 5");
   assert.equal(serialCoverQuery("寄宿学校のジュリエット", "EX"), null);
+});
+
+
+
+test("serial cover query adds a safe Bangumi short-title fallback", () => {
+  assert.deepEqual(
+    serialCoverQueries("無職転生 ～異世界行ったら本気だす～", "14"),
+    ["無職転生 ~異世界行ったら本気だす~ 14", "無職転生 14"],
+  );
+  assert.deepEqual(serialCoverQueries("寄宿学校のジュリエット", "5"), ["寄宿学校のジュリエット 5"]);
 });
 
 test("original title selection prefers stored native aliases", () => {
@@ -104,7 +116,7 @@ test("serial cover provider coalesces duplicate concurrent queries", async () =>
     searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
     searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
   ]);
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
 });
 
 test("Bangumi media type removes manga duplicates and spin-offs", async () => {
@@ -231,4 +243,70 @@ test("serial cover ranking prefers an explicitly numbered first volume", () => {
   ], "無職転生 ～異世界行ったら本気だす～", "1", "novel");
   assert.equal(ranked[0]?.sourceId, "volume-1");
   assert.equal(confidentSerialCover(ranked)?.sourceId, "volume-1");
+});
+
+
+test("Bangumi retries a shortened series query when the exact long title misses a high volume", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "" });
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  const keywords: string[] = [];
+  setRequestUrlMock(async (options) => {
+    const body = JSON.parse(String(options.body)) as { keyword: string };
+    keywords.push(body.keyword);
+    if (body.keyword === "無職転生 ～異世界行ったら本気だす～ 14") {
+      return { json: { data: [
+        bangumiSubject({ id: 101114, title: "無職転生 ～異世界行ったら本気だす～", platform: "小说" }),
+        bangumiSubject({ id: 100704, title: "無職転生 ~異世界行ったら本気だす~ (1)", platform: "小说" }),
+      ] } };
+    }
+    return { json: { data: [
+      bangumiSubject({ id: 223981, title: "無職転生 ~異世界行ったら本気だす~ (14)", platform: "小说" }),
+      bangumiSubject({ id: 321204, title: "無職転生 ~異世界行ったら本気だす~ (14)", platform: "漫画" }),
+    ] } };
+  });
+  const result = await searchSerialCovers(
+    "無職転生 ～異世界行ったら本気だす～ 14",
+    "無職転生 ～異世界行ったら本気だす～",
+    "14",
+    "novel",
+  );
+  assert.deepEqual(keywords, ["無職転生 ～異世界行ったら本気だす～ 14", "無職転生 14"]);
+  assert.equal(result[0]?.sourceId, "223981");
+  assert.equal(confidentSerialCover(result)?.sourceId, "223981");
+});
+
+test("Mushoku Tensei high-volume novel titles remain confident", () => {
+  for (const label of ["14", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26"]) {
+    const ranked = rankSerialCoverCandidates([
+      { provider: "Bangumi", sourceId: `novel-${label}`, title: `無職転生 ~異世界行ったら本気だす~ (${label})`, coverUrl: `${label}.jpg`, infoUrl: "", mediaTypeHint: "novel", categories: ["小说"] },
+      { provider: "Bangumi", sourceId: `manga-${label}`, title: `無職転生 ~異世界行ったら本気だす~ (${label})`, coverUrl: `manga-${label}.jpg`, infoUrl: "", mediaTypeHint: "manga", categories: ["漫画"] },
+    ], "無職転生 ～異世界行ったら本気だす～", label, "novel");
+    assert.equal(confidentSerialCover(ranked)?.sourceId, `novel-${label}`);
+  }
+});
+
+test("manual serial cover selection defaults to the best result and applies once", async () => {
+  const first = { provider: "Bangumi", sourceId: "14", title: "無職転生 (14)", coverUrl: "14.jpg", infoUrl: "", score: 200 };
+  const second = { provider: "Bangumi", sourceId: "15", title: "無職転生 (15)", coverUrl: "15.jpg", infoUrl: "", score: 180 };
+  const selection = new SerialCoverSelection([first, second]);
+  assert.equal(selection.selectedCandidate?.sourceId, "14");
+  assert.equal(selection.canApply, true);
+  selection.select(second);
+  let applied = "";
+  const result = await selection.apply(async (candidate) => {
+    applied = candidate.sourceId;
+    return "saved-cover";
+  });
+  assert.equal(applied, "15");
+  assert.equal(result, "saved-cover");
+  assert.equal(selection.canApply, true);
+});
+
+test("manual serial cover selection restores Apply after a download error", async () => {
+  const candidate = { provider: "Bangumi", sourceId: "14", title: "無職転生 (14)", coverUrl: "14.jpg", infoUrl: "", score: 200 };
+  const selection = new SerialCoverSelection([candidate]);
+  await assert.rejects(selection.apply(async () => { throw new Error("download failed"); }), /download failed/);
+  assert.equal(selection.isApplying, false);
+  assert.equal(selection.canApply, true);
 });
