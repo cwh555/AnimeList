@@ -38,7 +38,21 @@ jobs:
         run: npm run lint
 
       - name: Node behavior tests
-        run: node scripts/run-tests.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/run-tests.mjs > node-test.log 2>&1
+          status=$?
+          cat node-test.log
+          exit "$status"
+
+      - name: Upload Node test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timeline-node-test-log
+          path: node-test.log
+          if-no-files-found: error
 
       - name: Serial reading UI checks
         run: node scripts/check-serial-reading-ui.mjs
