@@ -1,0 +1,55 @@
+name: Squash validated timeline fix
+
+on:
+  pull_request:
+    branches:
+      - preview
+    paths:
+      - .github/workflows/squash-timeline-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  squash:
+    if: github.head_ref == 'chore/squash-timeline-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/timeline-initial-layout-and-units
+          fetch-depth: 0
+
+      - name: Verify expected feature head
+        run: |
+          test "$(git rev-parse HEAD)" = "c6c02be0c33d90e80c6c7673c2fe67d8ad7799a2"
+          git fetch origin preview
+          test "$(git rev-parse origin/preview)" = "a74fc66735b672ef5cebd15dbe20144d3645a3ff"
+
+      - name: Rebuild as one feature commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git reset --soft origin/preview
+          git commit -m "fix: restore timeline initialization behavior"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run complete checks
+        run: npm run check
+
+      - name: Run release checks
+        run: npm run release:check
+
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
+
+      - name: Publish with lease protection
+        run: |
+          git push \
+            --force-with-lease=refs/heads/fix/timeline-initial-layout-and-units:c6c02be0c33d90e80c6c7673c2fe67d8ad7799a2 \
+            origin HEAD:refs/heads/fix/timeline-initial-layout-and-units
