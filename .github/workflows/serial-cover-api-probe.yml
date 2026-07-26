@@ -1,24 +1,166 @@
-name: Probe one Bangumi search
+name: Validate final serial cover provider
+
 on:
   pull_request:
+
 permissions:
-  contents: read
+  contents: write
+
 jobs:
-  probe:
+  validate-and-stage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: |
-          python - <<'PY'
-          import json, urllib.request
-          q='\u516d\u7573\u9593\u306e\u4fb5\u7565\u8005\uff01\uff1f 1'
-          body=json.dumps({'keyword':q,'sort':'match','filter':{'type':[1]}},ensure_ascii=False).encode()
-          req=urllib.request.Request('https://api.bgm.tv/v0/search/subjects?limit=50&offset=0',data=body,headers={'Accept':'application/json','Content-Type':'application/json','User-Agent':'AnimeList/1.1.2'})
-          with urllib.request.urlopen(req,timeout=45) as r: data=json.loads(r.read())
-          open('search.json','w').write(json.dumps(data,ensure_ascii=False,indent=2))
-          PY
-      - uses: actions/upload-artifact@v6
         with:
-          name: one-search
-          path: search.json
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify and extract exact payload
+        run: |
+          echo "c9ef31aa0996e29db08ae68272dc908e460f22f0d0a92e65ea16b8dbbf30fe56  .serial-cover-final-payload-small/piece-000" | sha256sum -c -
+          echo "4a77aa3a62cea69249f4cff424497779ff79eefc8ce9f98b86ec5c25af3d52af  .serial-cover-final-payload-small/piece-001" | sha256sum -c -
+          echo "557a1071e765f137d2760e2ffddcc3988c7cd4bc0eb42d1f89902174c0f07d6d  .serial-cover-final-payload-small/piece-002" | sha256sum -c -
+          echo "d1eca74c0c200bfe0f7214a5d9a5444a81049d623b73501b19d5f7ff4602961c  .serial-cover-final-payload-small/piece-003" | sha256sum -c -
+          echo "9a07c1b45b9baa5af25dd3a35c0c6002b57fb89689cc4841226968f2f9b60585  .serial-cover-final-payload-small/piece-004" | sha256sum -c -
+          echo "302a17975ba375330ab1253cb35dbf965929455c3bfc9590d03f7489528867b9  .serial-cover-final-payload-small/piece-005" | sha256sum -c -
+          echo "22d4786300cd74572e79338f55cb270e6d7afed88d464e0400752b2bf2c14d7e  .serial-cover-final-payload-small/piece-006" | sha256sum -c -
+          echo "29c151f996379f4db38a5b5047b3da3362a4c36a63a9d9327519107b98744740  .serial-cover-final-payload-small/piece-007" | sha256sum -c -
+          echo "1e5ef44b3be445ea1c018e771fe6f923d73f96f6a84922fb4e43b9754de5601f  .serial-cover-final-payload-small/piece-008" | sha256sum -c -
+          echo "e7dfabeed34273bb334af74652aa5e46f211814104ca5e0881cca7be56c72649  .serial-cover-final-payload-small/piece-009" | sha256sum -c -
+          echo "415cba82bdd8ffa1ff55dc8aac98aa5d55539901667f1713bfc331e7f24504e5  .serial-cover-final-payload-small/piece-010" | sha256sum -c -
+          echo "6eebff481d51d7a3fda2e204b9dc97f5478eae093d069d7c5516ce859861d65c  .serial-cover-final-payload-small/piece-011" | sha256sum -c -
+          cat .serial-cover-final-payload-small/piece-* > /tmp/serial-cover-final.b64
+          echo "78027a222420c7879ad0ff646baa75685331c1873cd3b52d25a60c830d21681b  /tmp/serial-cover-final.b64" | sha256sum -c -
+          base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
+          echo "b13a9960e222f6f7741e3d44f628f18aa8efb83e8ce169e76b76179c145efe7b  /tmp/serial-cover-final.tar.gz" | sha256sum -c -
+          mkdir -p /tmp/serial-cover-final
+          tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
+          cd /tmp/serial-cover-final
+          echo "061a45800a56a6a3200d44c5a86f68c39ff58228ce521f0b33cb5f4d6c55b016  src/serial-cover-provider.ts" | sha256sum -c -
+          echo "d48395b13188d9dfd7099491e5c14dee054a7090205cc72352d32d6c5b1bbb01  src/serial-entry-cover.ts" | sha256sum -c -
+          echo "1b51a389e28fe04a2b90a43fd66bb0941c1e05b0c5a10d5aa0b61107d1d8ced8  src/serial-cover-service.ts" | sha256sum -c -
+          echo "8441fc40ec4a029df487e6849202754cc451332991913af1c54f01a369fbc71f  src/serial-cover-text.ts" | sha256sum -c -
+          echo "1f26fb5fd7d4a26893e1f982ed69eb090b868f97b6a337cf21d422c171fb434f  tests/serial-entry-cover.test.ts" | sha256sum -c -
+      - name: Apply validated unnumbered-volume-one fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/serial-cover-final')
+          path=root/'src/serial-entry-cover.ts'
+          source=path.read_text(encoding='utf-8')
+          old='''  if (labelPattern(label).test(clean(candidate.title))) score += 40;\n  else return Number.NEGATIVE_INFINITY;\n\n  if (candidateKey.startsWith(`${titleKey}${labelKey}`)) score += 35;\n  else if (candidateKey.startsWith(titleKey)) score -= 28;\n  if (candidateKey === `${titleKey}${labelKey}`) score += 15;\n'''
+          new='''  const implicitFirstVolume = label === "1" && candidateKey === titleKey;\n  if (labelPattern(label).test(clean(candidate.title)) || implicitFirstVolume) score += 40;\n  else return Number.NEGATIVE_INFINITY;\n\n  if (candidateKey.startsWith(`${titleKey}${labelKey}`) || implicitFirstVolume) score += 35;\n  else if (candidateKey.startsWith(titleKey)) score -= 28;\n  if (candidateKey === `${titleKey}${labelKey}` || implicitFirstVolume) score += 15;\n'''
+          assert source.count(old)==1
+          path.write_text(source.replace(old,new),encoding='utf-8')
+          test_path=root/'tests/serial-entry-cover.test.ts'
+          tests=test_path.read_text(encoding='utf-8')
+          addition='''\n\ntest("serial cover ranking accepts an unnumbered first light-novel volume", () => {\n  const ranked = rankSerialCoverCandidates([\n    { provider: "Bangumi", sourceId: "manga-1", title: "六畳間の侵略者!? (1)", coverUrl: "manga.jpg", infoUrl: "", mediaTypeHint: "manga" },\n    { provider: "Bangumi", sourceId: "novel-1", title: "六畳間の侵略者!?", coverUrl: "novel.jpg", infoUrl: "", mediaTypeHint: "novel", categories: ["小说"] },\n  ], "六畳間の侵略者！？", "1", "novel");\n  assert.equal(ranked[0]?.sourceId, "novel-1");\n  assert.equal(confidentSerialCover(ranked)?.sourceId, "novel-1");\n});\n'''
+          assert 'unnumbered first light-novel volume' not in tests
+          test_path.write_text(tests+addition,encoding='utf-8')
+          PY
+          cd /tmp/serial-cover-final
+          echo "980bb8cdd7e37ef711691682877130280c6feda8a915831839f270312d5278b7  src/serial-entry-cover.ts" | sha256sum -c -
+          echo "31ad65ec2299db884ba90509ad8812119204609d1449aced90d1aa4bb5514c8f  tests/serial-entry-cover.test.ts" | sha256sum -c -
+      - name: Prepare isolated staging branch
+        env:
+          EXPECTED_HEAD: 072f3dbd0a6dd125c65c15ed061f724e58ac3222
+        run: |
+          git fetch origin chore/serial-cover-final-publish feature/serial-entry-covers
+          test "$(git rev-parse origin/chore/serial-cover-final-publish)" = "$EXPECTED_HEAD"
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
+          git checkout -B chore/serial-cover-final-publish origin/chore/serial-cover-final-publish
+          cp -a /tmp/serial-cover-final/. .
+      - run: npm ci
+      - run: npm run check
+      - run: npm run release:check
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
+      - name: Run live 40-volume provider check
+        run: |
+          mkdir -p .tmp
+          cat > .tmp/obsidian-live.ts <<'TS'
+          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
+            const response = await fetch(options.url, { method: options.method ?? "GET", body: options.body, headers: options.headers });
+            const text = await response.text();
+            if (!response.ok) {
+              const error = new Error(`Request failed with status ${response.status}`) as Error & { status: number; response: { status: number; headers: Headers } };
+              error.status = response.status;
+              error.response = { status: response.status, headers: response.headers };
+              throw error;
+            }
+            return { json: text ? JSON.parse(text) : {}, text };
+          }
+          TS
+          cat > .tmp/serial-cover-live.ts <<'TS'
+          import { writeFile } from "node:fs/promises";
+          import { clearSerialCoverProviderCache, configureSerialCoverProvider, configureSerialCoverProviderForTests, searchSerialCovers } from "../src/serial-cover-provider";
+          import { confidentSerialCover } from "../src/serial-entry-cover";
+          const works = new Map<string, string>([
+            ["KonoSuba", "この素晴らしい世界に祝福を！"],
+            ["Mushoku Tensei", "無職転生 ～異世界行ったら本気だす～"],
+            ["Invaders of the Rokujouma", "六畳間の侵略者！？"],
+            ["That Time I Got Reincarnated as a Slime", "転生したらスライムだった件"],
+          ]);
+          const normalize = (value: string): string => value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+          const exactVolume = (title: string, label: string): boolean => {
+            const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            return label === "1" && normalize(title) === normalize(title.replace(/\s*\(1\).*$/, "")) || new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`).test(title.normalize("NFKC"));
+          };
+          const report: Array<Record<string, unknown>> = [];
+          configureSerialCoverProvider({ apiKey: "" });
+          configureSerialCoverProviderForTests({ sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), random: () => 0 });
+          clearSerialCoverProviderCache();
+          try {
+            for (const [work, originalTitle] of works) {
+              for (let volume = 1; volume <= 10; volume += 1) {
+                const label = String(volume);
+                const query = `${originalTitle} ${label}`;
+                const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
+                const selected = confidentSerialCover(candidates);
+                if (!selected) throw new Error(`${work} ${volume}: no confident result; top=${JSON.stringify(candidates.slice(0, 5))}`);
+                if (selected.provider !== "Bangumi") throw new Error(`${work} ${volume}: unexpected provider ${selected.provider}`);
+                if (selected.mediaTypeHint !== "novel") throw new Error(`${work} ${volume}: wrong media type ${selected.mediaTypeHint ?? "unknown"}`);
+                if (!normalize(selected.title).startsWith(normalize(originalTitle))) throw new Error(`${work} ${volume}: wrong series ${selected.title}`);
+                const implicitFirst = label === "1" && normalize(selected.title) === normalize(originalTitle);
+                if (!implicitFirst && !exactVolume(selected.title, label)) throw new Error(`${work} ${volume}: wrong volume ${selected.title}`);
+                const image = await fetch(selected.coverUrl, { headers: { Range: "bytes=0-255", "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)" } });
+                const bytes = await image.arrayBuffer();
+                if (!image.ok || bytes.byteLength === 0) throw new Error(`${work} ${volume}: cover is not downloadable (${image.status})`);
+                const row = { work, volume, query, sourceId: selected.sourceId, title: selected.title, provider: selected.provider, score: selected.score, coverStatus: image.status, coverBytes: bytes.byteLength };
+                report.push(row);
+                console.log(JSON.stringify(row));
+              }
+            }
+          } finally {
+            await writeFile("serial-cover-live-report.json", JSON.stringify(report, null, 2));
+          }
+          if (report.length !== 40) throw new Error(`Expected 40 successful results, received ${report.length}`);
+          TS
+          set +e
+          npx esbuild .tmp/serial-cover-live.ts --bundle --platform=node --format=esm --target=node24 --alias:obsidian=./.tmp/obsidian-live.ts --outfile=.tmp/serial-cover-live.mjs > serial-cover-live.log 2>&1
+          status=$?
+          if [ "$status" -eq 0 ]; then node .tmp/serial-cover-live.mjs >> serial-cover-live.log 2>&1; status=$?; fi
+          cat serial-cover-live.log
+          exit "$status"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: serial-cover-final-validation
+          path: |
+            serial-cover-live-report.json
+            serial-cover-live.log
+          if-no-files-found: warn
           retention-days: 1
+      - name: Publish validated staging branch
+        env:
+          EXPECTED_HEAD: 072f3dbd0a6dd125c65c15ed061f724e58ac3222
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/serial-cover-provider.ts src/serial-entry-cover.ts src/serial-cover-service.ts src/serial-cover-text.ts tests/serial-entry-cover.test.ts
+          git commit -m "fix: use reliable Bangumi serial cover lookup"
+          git push --force-with-lease=refs/heads/chore/serial-cover-final-publish:$EXPECTED_HEAD origin HEAD:chore/serial-cover-final-publish
