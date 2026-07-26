@@ -5,12 +5,10 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "tests");
 const entryFile = path.join(outputDir, "entry.ts");
 const outputFile = path.join(outputDir, "tests.mjs");
-
 await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 await writeFile(entryFile, [
@@ -32,32 +30,14 @@ await writeFile(entryFile, [
   'import "../../tests/score-dashboard.test.ts";',
   'import "../../tests/score-dashboard-selection.test.ts";',
   'import "../../tests/score-dashboard-drag-scroll.test.ts";',
+  'import "../../tests/serial-entry-cover.test.ts";',
+  'import "../../tests/serial-cover-workflow.test.ts";',
+  'import "../../tests/serial-cover-migration-modal.test.ts";',
   "",
 ].join("\n"));
-
 try {
-  await build({
-    absWorkingDir: root,
-    entryPoints: [entryFile],
-    outfile: outputFile,
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node18",
-    alias: {
-      obsidian: path.join(root, "tests", "mocks", "obsidian.ts"),
-    },
-    external: builtinModules.flatMap((name) => [name, `node:${name}`]),
-    logLevel: "warning",
-  });
-
-  const result = spawnSync(process.execPath, ["--test", outputFile], {
-    cwd: root,
-    stdio: "inherit",
-  });
+  await build({ absWorkingDir: root, entryPoints: [entryFile], outfile: outputFile, bundle: true, platform: "node", format: "esm", target: "node18", alias: { obsidian: path.join(root, "tests", "mocks", "obsidian.ts") }, external: builtinModules.flatMap((name) => [name, `node:${name}`]), logLevel: "warning" });
+  const result = spawnSync(process.execPath, ["--test", outputFile], { cwd: root, stdio: "inherit" });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
-} finally {
-  stop();
-  await rm(outputDir, { recursive: true, force: true });
-}
+} finally { stop(); await rm(outputDir, { recursive: true, force: true }); }

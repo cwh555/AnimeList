@@ -227,6 +227,7 @@ export class AnimeListPlugin extends LegacyAnimeListPlugin {
       timelineMaxStackDepth: normalizeTimelineMaxStackDepth(
         loaded.timelineMaxStackDepth,
       ),
+      googleBooksApiKey: typeof loaded.googleBooksApiKey === "string" ? loaded.googleBooksApiKey.trim() : "",
       providers: {
         bangumi: typeof providers.bangumi === "boolean" ? providers.bangumi : DEFAULT_SETTINGS.providers.bangumi,
         anilist: typeof providers.anilist === "boolean" ? providers.anilist : DEFAULT_SETTINGS.providers.anilist,

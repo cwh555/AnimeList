@@ -16,7 +16,8 @@
     "test-vault:fixtures": "node scripts/test-vault-fixtures.mjs",
     "release:check": "node scripts/check-release.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
-    "community:check": "node scripts/check-community-review.mjs"
+    "community:check": "node scripts/check-community-review.mjs",
+    "test:browser": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs"
   },
   "keywords": [
     "obsidian",

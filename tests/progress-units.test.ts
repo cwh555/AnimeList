@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { applyReadingProgressSnapshot } from "../src/reading-progress-persistence";
 import {
   compareSerialLabels,
   defaultProgressUnit,
@@ -62,4 +63,50 @@ describe("reading progress units", () => {
     assert.ok(compareSerialLabels("1.5", "EX", "volume") < 0);
     assert.equal(highestCompletedSerialLabel(entries, "volume"), "EX");
   });
+
+
+  it("persists the single reading log and reloads edited entries with metadata", () => {
+    const frontmatter: Record<string, unknown> = {
+      title: "無職転生",
+      volume_log: [{ label: "1", completed_at: "2026-01-01" }],
+      unrelated: "keep",
+    };
+
+    applyReadingProgressSnapshot(frontmatter, {
+      unit: "volume",
+      progress: 2,
+      entries: [{
+        label: "2",
+        startedAt: "2026-02-01",
+        completedAt: "2026-02-02",
+        cover: "volume-2.jpg",
+        coverProvider: "Bangumi",
+        coverSourceId: "volume-2",
+        extra: { isbn: "9780000000002" },
+      }],
+    });
+
+    assert.equal(frontmatter.progress_unit, "volume");
+    assert.equal(frontmatter.progress, 2);
+    assert.equal(frontmatter.unrelated, "keep");
+    assert.deepEqual(frontmatter.volume_log, [{
+      isbn: "9780000000002",
+      label: "2",
+      started_at: "2026-02-01",
+      completed_at: "2026-02-02",
+      cover: "volume-2.jpg",
+      cover_provider: "Bangumi",
+      cover_source_id: "volume-2",
+    }]);
+    assert.deepEqual(normalizeSerialLog(frontmatter.volume_log, "volume"), [{
+      label: "2",
+      startedAt: "2026-02-01",
+      completedAt: "2026-02-02",
+      cover: "volume-2.jpg",
+      coverProvider: "Bangumi",
+      coverSourceId: "volume-2",
+      extra: { isbn: "9780000000002" },
+    }]);
+  });
+
 });
