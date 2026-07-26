@@ -10,7 +10,6 @@ import { installRatingUi } from "./rating-ui";
 import { installScoreDashboard } from "./score-dashboard-feature";
 import { installSerialEntryCovers } from "./serial-cover-feature";
 import { installSerialCoverSettings } from "./serial-cover-settings";
-import { installTimelineCorrections } from "./timeline-correction-ui";
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
   async onload(): Promise<void> {
@@ -19,7 +18,6 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     installAdditionalProgressUnitsUi(this);
     installSerialEntryCovers(this);
     installSerialCoverSettings(this);
-    installTimelineCorrections(this);
     await installMasterpieceLabels(this);
     installMasterpieceOperationUi(this);
     installMasterpieceEditUi(this);

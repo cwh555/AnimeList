@@ -342,6 +342,21 @@ describe("timeline scale DOM integration", () => {
     assert.equal(Math.max(...lanes), 1);
   });
 
+  it("caps same-day records at the configured default stack depth", () => {
+    installFakeDom();
+    const container = new FakeElement("div");
+    const items = Array.from({ length: 14 }, (_, index) => ({
+      ...timelineItem(index),
+      completedAt: "2026-07-01",
+    }));
+
+    legacyTest.TimelineUI.render(container, items, { maxStackDepth: 3 });
+
+    const lanes = descendantsByClass(container, "al-timeline-card")
+      .map((card) => Number(card.dataset.timelineLane));
+    assert.equal(Math.max(...lanes), 5);
+  });
+
   it("keeps the timeline axis at the same screen y while wheel-scaling time", () => {
     installFakeDom();
     const container = new FakeElement("div");
@@ -371,7 +386,7 @@ describe("timeline scale DOM integration", () => {
     assert.ok(Math.abs(nextAxisScreenY - initialAxisScreenY) < 1e-6);
   });
 
-  it("initializes and restores the latest timeline card at viewport center", () => {
+  it("centers the latest card horizontally and the timeline axis vertically", () => {
     installFakeDom();
     const container = new FakeElement("div");
     legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
@@ -385,8 +400,13 @@ describe("timeline scale DOM integration", () => {
     assert.ok(latest);
 
     const initialCenter = screenCenter(latest, scene);
+    const initialAxis = descendantsByClass(container, "al-timeline-axis")[0];
+    const initialTransform = parseTransform(scene.style.transform);
     assert.equal(initialCenter.x, viewport.clientWidth / 2);
-    assert.equal(initialCenter.y, viewport.clientHeight / 2);
+    assert.equal(
+      initialTransform.y + Number.parseFloat(initialAxis.style.top) * initialTransform.scale,
+      viewport.clientHeight / 2,
+    );
 
     descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
     descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
@@ -395,7 +415,12 @@ describe("timeline scale DOM integration", () => {
       .find((card) => card.title.includes("Newest"));
     assert.ok(restoredLatest);
     const restoredCenter = screenCenter(restoredLatest, scene);
+    const restoredAxis = descendantsByClass(container, "al-timeline-axis")[0];
+    const restoredTransform = parseTransform(scene.style.transform);
     assert.equal(restoredCenter.x, viewport.clientWidth / 2);
-    assert.equal(restoredCenter.y, viewport.clientHeight / 2);
+    assert.equal(
+      restoredTransform.y + Number.parseFloat(restoredAxis.style.top) * restoredTransform.scale,
+      viewport.clientHeight / 2,
+    );
   });
 });

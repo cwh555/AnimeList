@@ -37,7 +37,7 @@ export interface MediaItem {
   sourceUrls: string[]; cover: string; coverSources?: CoverSources; filePath: string; updated: number;
   updatedLabel: string; startedAt: string; completedAt: string; volumeLog: NovelVolumeEntry[];
 }
-export interface TimelineMediaEntry extends MediaItem { seriesTitle?: string; volumeLabel?: string; }
+export interface TimelineMediaEntry extends MediaItem { seriesTitle?: string; volumeLabel?: string; serialEntryLabel?: string; }
 export interface ExternalMediaResult {
   provider: string; sourceId: string; title: string; originalTitle: string; romajiTitle: string; mediaType: MediaType;
   format: string; total: number; unit: string; year: number | string; genres: string[]; rawGenres: string[];

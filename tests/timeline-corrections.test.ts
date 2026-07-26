@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { expandTimelineEntries } from "../src/novel-progress";
+import type { MediaItem } from "../src/types";
 import {
   centerLatestTimelineAxis,
   layoutDefaultTimelinePoints,
@@ -58,4 +60,40 @@ describe("timeline serial-entry units", () => {
       label: "第 7.5 卷",
     });
   });
+
+  it("expands manga and novel entries with their stored unit", () => {
+    const base: MediaItem = {
+      title: "作品",
+      originalTitle: "",
+      mediaType: "manga",
+      format: "manga",
+      status: "ongoing",
+      releaseStatus: "releasing",
+      progress: 1,
+      total: 0,
+      unit: "chapter",
+      score: null,
+      favorite: false,
+      year: 2026,
+      genres: [],
+      people: [],
+      platforms: [],
+      sourceUrls: [],
+      cover: "series.jpg",
+      filePath: "Media/example.md",
+      updated: 0,
+      updatedLabel: "",
+      startedAt: "",
+      completedAt: "",
+      volumeLog: [{ label: "12", startedAt: "", completedAt: "2026-07-01" }],
+    };
+    const chapter = expandTimelineEntries([base])[0];
+    const season = expandTimelineEntries([{ ...base, mediaType: "novel", unit: "season" }])[0];
+
+    assert.equal(chapter.title, "作品 — 第 12 話");
+    assert.equal(chapter.serialEntryLabel, "第 12 話");
+    assert.equal(season.title, "作品 — 第 12 季");
+    assert.equal(season.serialEntryLabel, "第 12 季");
+  });
+
 });
