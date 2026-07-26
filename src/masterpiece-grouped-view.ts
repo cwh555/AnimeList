@@ -1,6 +1,10 @@
-import { AnimeListUI } from "./legacy";
 import type AnimeListPlugin from "./main";
 import type { MediaItem } from "./types";
+import {
+  legacyLibraryRenderer,
+  type LibraryRenderAdapters,
+  type LibraryRenderState,
+} from "./legacy-library-renderer";
 import {
   SPECIAL_LABEL_FILTER,
   groupMasterpieceItems,
@@ -11,35 +15,28 @@ interface MasterpieceSettings {
   specialLabelMode?: "favorite" | "masterpiece";
 }
 
-type MasterpiecePlugin = AnimeListPlugin & {
-  settings: AnimeListPlugin["settings"] & MasterpieceSettings;
-};
-
-interface LibraryState {
-  status?: string;
-  view?: string;
+interface MasterpiecePlugin {
+  settings: MasterpieceSettings;
 }
 
-interface LibraryAdapters {
-  openFile?: (path: string) => void;
-  editItem?: (path: string) => void;
-  toggleFavorite?: (path: string, next: boolean) => Promise<void> | void;
-  onStateChange?: (state: LibraryState) => void;
-  [key: string]: unknown;
-}
-
-interface GroupedCardItem extends MediaItem {
+interface GroupedMediaItem extends MediaItem {
   masterpieceLabels?: unknown;
+}
+
+interface GroupedCardItem extends GroupedMediaItem {
   card: HTMLElement;
 }
 
 const installedRenderers = new WeakSet<object>();
 
-function isMediaItem(value: unknown): value is MediaItem & { masterpieceLabels?: unknown } {
-  return typeof value === "object"
-    && value !== null
-    && typeof Reflect.get(value, "filePath") === "string"
-    && typeof Reflect.get(value, "title") === "string";
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMediaItem(value: unknown): value is GroupedMediaItem {
+  return isRecord(value)
+    && typeof value.filePath === "string"
+    && typeof value.title === "string";
 }
 
 function itemIdentity(item: MediaItem): string {
@@ -55,7 +52,7 @@ function cardIdentity(card: HTMLElement): string {
 function bindClonedCard(
   card: HTMLElement,
   item: MediaItem,
-  adapters: LibraryAdapters,
+  adapters: LibraryRenderAdapters,
 ): void {
   card.dataset.path = item.filePath;
   card.addEventListener("click", () => adapters.openFile?.(item.filePath));
@@ -84,10 +81,10 @@ function bindClonedCard(
 
 function resolveVisibleItems(
   cards: HTMLElement[],
-  inputItems: Array<MediaItem & { masterpieceLabels?: unknown }>,
+  inputItems: GroupedMediaItem[],
 ): GroupedCardItem[] {
   const byPath = new Map(inputItems.map((item) => [item.filePath, item]));
-  const byIdentity = new Map<string, Array<MediaItem & { masterpieceLabels?: unknown }>>();
+  const byIdentity = new Map<string, GroupedMediaItem[]>();
   for (const item of inputItems) {
     const key = itemIdentity(item);
     const values = byIdentity.get(key) ?? [];
@@ -104,13 +101,19 @@ function resolveVisibleItems(
   });
 }
 
+function cloneCard(card: HTMLElement): HTMLElement | null {
+  const cloned = card.cloneNode(true);
+  return cloned.nodeType === Node.ELEMENT_NODE ? cloned as HTMLElement : null;
+}
+
 function renderGroupedCards(
   container: HTMLElement,
-  inputItems: Array<MediaItem & { masterpieceLabels?: unknown }>,
-  adapters: LibraryAdapters,
-  state: LibraryState,
+  inputItems: GroupedMediaItem[],
+  adapters: LibraryRenderAdapters,
+  state: LibraryRenderState,
+  plugin: MasterpiecePlugin,
 ): void {
-  if (normalizeSpecialLabelMode((Reflect.get(adapters, "plugin") as MasterpiecePlugin | undefined)?.settings?.specialLabelMode) !== "masterpiece") return;
+  if (normalizeSpecialLabelMode(plugin.settings.specialLabelMode) !== "masterpiece") return;
   if (state.status !== SPECIAL_LABEL_FILTER) return;
 
   const root = container.querySelector<HTMLElement>(".al-grid");
@@ -127,51 +130,53 @@ function renderGroupedCards(
   const usedPaths = new Set<string>();
 
   for (const group of groups) {
-    const section = createEl("section", { cls: "al-masterpiece-group" });
+    const section = root.createEl("section", { cls: "al-masterpiece-group" });
     section.dataset.groupKey = group.key;
 
-    const heading = createEl("div", { cls: "al-masterpiece-group-heading" });
-    const title = createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
-    const count = createEl("span", { cls: "al-masterpiece-group-count", text: String(group.items.length) });
-    heading.append(title, count);
+    const heading = section.createDiv({ cls: "al-masterpiece-group-heading" });
+    heading.createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
+    heading.createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
 
-    const grid = createEl("div", { cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid` });
+    const grid = section.createDiv({
+      cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid`,
+    });
     group.items.forEach((entry) => {
       let card = entry.card;
       if (usedPaths.has(entry.filePath)) {
-        card = entry.card.cloneNode(true) as HTMLElement;
+        const cloned = cloneCard(entry.card);
+        if (!cloned) return;
+        card = cloned;
         bindClonedCard(card, entry, adapters);
       } else {
         usedPaths.add(entry.filePath);
       }
       grid.appendChild(card);
     });
-
-    section.append(heading, grid);
-    root.appendChild(section);
   }
 }
 
 export function installMasterpieceGroupedView(plugin: AnimeListPlugin): void {
-  if (installedRenderers.has(AnimeListUI)) return;
-  installedRenderers.add(AnimeListUI);
-  const original = AnimeListUI.renderLibrary.bind(AnimeListUI);
-  const host = plugin as MasterpiecePlugin;
+  if (installedRenderers.has(legacyLibraryRenderer)) return;
+  installedRenderers.add(legacyLibraryRenderer);
+  const original = legacyLibraryRenderer.renderLibrary;
+  const host = plugin as unknown as MasterpiecePlugin;
 
-  AnimeListUI.renderLibrary = (container, rawItems, rawAdapters = {}): void => {
-    const adapters = rawAdapters as LibraryAdapters;
+  legacyLibraryRenderer.renderLibrary = (
+    container: HTMLElement,
+    rawItems: unknown[],
+    rawAdapters: LibraryRenderAdapters = {},
+  ): void => {
     const inputItems = rawItems.filter(isMediaItem);
-    const upstreamStateChange = adapters.onStateChange;
+    const upstreamStateChange = rawAdapters.onStateChange;
     let renderVersion = 0;
-    const forwardedAdapters: LibraryAdapters = {
-      ...adapters,
-      plugin: host,
+    const forwardedAdapters: LibraryRenderAdapters = {
+      ...rawAdapters,
       onStateChange: (state) => {
         upstreamStateChange?.(state);
         const version = ++renderVersion;
         queueMicrotask(() => {
           if (version !== renderVersion) return;
-          renderGroupedCards(container, inputItems, forwardedAdapters, state);
+          renderGroupedCards(container, inputItems, forwardedAdapters, state, host);
         });
       },
     };

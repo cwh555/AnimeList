@@ -6,28 +6,11 @@
 /* The novel volume editor belongs to the whole form, not one half of its grid. */
 .animelist-modal .al-volume-editor {
   grid-column: 1 / -1;
-  grid-template-areas:
-    "copy"
-    "rows"
-    "add";
 }
 
-/* Keep the explanatory copy above the rows while moving Add another below them. */
-.animelist-modal .al-volume-editor-header {
-  display: contents;
-}
-
-.animelist-modal .al-volume-editor-header > div {
-  grid-area: copy;
-}
-
-.animelist-modal .al-volume-editor-header > .al-secondary-button {
-  grid-area: add;
+/* Keep the explanatory copy above the rows and the add action below them. */
+.animelist-modal .al-volume-editor > .al-secondary-button {
   justify-self: start;
-}
-
-.animelist-modal .al-volume-editor-rows {
-  grid-area: rows;
 }
 
 /* Use the full modal width: compact volume label, two comfortable date fields,
@@ -77,7 +60,7 @@
     justify-content: flex-end;
   }
 
-  .animelist-modal .al-volume-editor-header > .al-secondary-button {
+  .animelist-modal .al-volume-editor > .al-secondary-button {
     width: 100%;
   }
 }

@@ -555,7 +555,7 @@
   }
 }
 
-/* BEGIN GENERATED SERIAL READING UI */
+/* BEGIN GENERATED FEATURE STYLES */
 /* Serial-reading UI overrides.
  * Kept separate from the established stylesheet so this feature branch remains
  * isolated and the production build can append the rules idempotently.
@@ -564,28 +564,11 @@
 /* The novel volume editor belongs to the whole form, not one half of its grid. */
 .animelist-modal .al-volume-editor {
   grid-column: 1 / -1;
-  grid-template-areas:
-    "copy"
-    "rows"
-    "add";
 }
 
-/* Keep the explanatory copy above the rows while moving Add another below them. */
-.animelist-modal .al-volume-editor-header {
-  display: contents;
-}
-
-.animelist-modal .al-volume-editor-header > div {
-  grid-area: copy;
-}
-
-.animelist-modal .al-volume-editor-header > .al-secondary-button {
-  grid-area: add;
+/* Keep the explanatory copy above the rows and the add action below them. */
+.animelist-modal .al-volume-editor > .al-secondary-button {
   justify-self: start;
-}
-
-.animelist-modal .al-volume-editor-rows {
-  grid-area: rows;
 }
 
 /* Use the full modal width: compact volume label, two comfortable date fields,
@@ -605,52 +588,6 @@
 .al-grid.is-list .al-progress {
   width: 100%;
   max-width: none;
-}
-
-/* Manga and novel totals are frequently unknown. When no numeric track was
- * rendered, show a state-based track instead: completed=full, active/paused/
- * dropped=half, planned=empty. This deliberately avoids presenting a fake
- * percentage value. */
-.al-progress:not(:has(.al-progress-track)) {
-  position: relative;
-  padding-top: 18px;
-}
-
-.al-progress:not(:has(.al-progress-track))::before,
-.al-progress:not(:has(.al-progress-track))::after {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 0;
-  height: 4px;
-  border-radius: 99px;
-}
-
-.al-progress:not(:has(.al-progress-track))::before {
-  width: 100%;
-  background: var(--background-modifier-border, #383840);
-}
-
-.al-progress:not(:has(.al-progress-track))::after {
-  width: 0;
-  background: var(--al-accent);
-}
-
-.al-card.status-completed .al-progress:not(:has(.al-progress-track))::after {
-  width: 100%;
-}
-
-.al-card.status-watching .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-reading .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-on_hold .al-progress:not(:has(.al-progress-track))::after,
-.al-card.status-dropped .al-progress:not(:has(.al-progress-track))::after {
-  width: 50%;
-}
-
-/* Planned/wishlist cards keep the empty track but do not repeat a
- * "not started" sentence below it. */
-.al-card.status-planned .al-progress-row > span:first-child {
-  display: none;
 }
 
 @media (max-width: 900px) {
@@ -681,8 +618,223 @@
     justify-content: flex-end;
   }
 
-  .animelist-modal .al-volume-editor-header > .al-secondary-button {
+  .animelist-modal .al-volume-editor > .al-secondary-button {
     width: 100%;
   }
 }
-/* END GENERATED SERIAL READING UI */
+
+/* Unified progress presentation.
+ * Numeric anime progress and state-based manga/novel progress share the same
+ * DOM structure; only the presentation model decides the fill amount.
+ */
+
+.al-progress.is-state-progress .al-progress-fill {
+  background: color-mix(in srgb, var(--al-accent) 82%, var(--text-muted));
+}
+
+.al-progress.is-empty-progress .al-progress-fill {
+  width: 0;
+}
+
+.al-detail-progress {
+  margin: -8px 0 20px;
+  padding: 0 12px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: var(--background-secondary);
+}
+
+.al-detail-actions.has-detail-progress {
+  margin-bottom: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.al-detail-progress .al-progress-row {
+  margin-top: 7px;
+}
+
+.al-masterpiece-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.al-masterpiece-group {
+  min-width: 0;
+}
+
+.al-masterpiece-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 11px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--al-border);
+}
+
+.al-shell .al-masterpiece-group-title {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.al-masterpiece-group-count {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--al-accent-soft);
+  font-size: .63rem;
+  text-align: center;
+}
+
+.al-masterpiece-group-grid {
+  width: 100%;
+}
+
+.al-masterpiece-selection-modal .al-media-form {
+  gap: 8px;
+}
+
+.al-masterpiece-new-label-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: stretch;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.al-masterpiece-new-label-setting .setting-item-info {
+  margin: 0;
+}
+
+.al-masterpiece-new-label-setting .setting-item-control {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.al-masterpiece-new-label-setting input[type="text"] {
+  width: 100%;
+  max-width: none;
+}
+
+.al-masterpiece-selection-modal .al-modal-actions {
+  justify-content: flex-end;
+}
+
+.animelist-score-dashboard-view { padding: 0 24px 48px; }
+.al-score-dashboard {
+  --al-score-poster-width: 72.5px;
+  --al-score-poster-height: 108.75px;
+  --al-score-poster-gap: 5px;
+  --al-score-lane-margin: 5px;
+  --al-score-lane-min-height: 118.75px;
+  width: 100%; color: var(--text-normal);
+}
+.al-score-dashboard * { box-sizing: border-box; }
+.al-score-dashboard-header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding:26px 0 20px; border-bottom:1px solid var(--background-modifier-border); }
+.al-score-dashboard-kicker { margin-bottom:7px; color:var(--interactive-accent); font-size:.68rem; font-weight:800; letter-spacing:.16em; }
+.al-score-dashboard-title { margin:0; font-size:clamp(1.8rem,3vw,2.6rem); line-height:1.08; letter-spacing:-.035em; }
+.al-score-dashboard-description { margin:8px 0 0; color:var(--text-muted); font-size:.82rem; }
+.al-score-dashboard-summary { max-width:420px; color:var(--text-muted); font-size:.72rem; line-height:1.5; text-align:right; }
+.al-score-dashboard-controls { position:sticky; z-index:6; top:0; display:flex; align-items:center; gap:10px; padding:14px 0; background:var(--background-primary); }
+.al-score-dashboard-tabs { display:flex; gap:4px; padding:4px; overflow:auto; border:1px solid var(--background-modifier-border); border-radius:11px; background:var(--background-secondary); }
+.al-score-dashboard-tab { min-height:34px; padding:0 12px; border:0; border-radius:8px; color:var(--text-muted); background:transparent; white-space:nowrap; }
+.al-score-dashboard-tab:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
+.al-score-dashboard-tab.is-active { color:var(--text-on-accent); background:var(--interactive-accent); }
+.al-score-dashboard-count { margin-left:7px; padding:1px 5px; border-radius:999px; background:color-mix(in srgb,currentColor 13%,transparent); font-size:.62rem; }
+.al-score-dashboard-action-group { display:flex; align-items:center; gap:2px; padding:3px; border:1px solid var(--background-modifier-border); border-radius:11px; background:var(--background-secondary); }
+.al-score-tool-button { display:inline-flex; min-height:34px; align-items:center; gap:7px; padding:0 10px; border:0; border-radius:8px; color:var(--text-muted); background:transparent; font-size:.72rem; font-weight:650; white-space:nowrap; }
+.al-score-tool-button:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
+.al-score-tool-button.is-active { color:var(--interactive-accent); background:color-mix(in srgb,var(--interactive-accent) 14%,var(--background-primary)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--interactive-accent) 28%,transparent); }
+.al-score-tool-button:focus-visible { outline:2px solid var(--interactive-accent); outline-offset:1px; }
+.al-score-tool-icon { display:grid; width:16px; height:16px; place-items:center; }
+.al-score-tool-icon svg { width:16px; height:16px; }
+.al-score-tool-label { line-height:1; }
+.al-score-tool-badge { display:grid; min-width:20px; height:20px; place-items:center; padding:0 5px; border-radius:999px; color:var(--text-muted); background:var(--background-primary); font-size:.62rem; font-variant-numeric:tabular-nums; }
+.al-score-tool-button.is-active .al-score-tool-badge { color:var(--interactive-accent); background:color-mix(in srgb,var(--interactive-accent) 12%,var(--background-primary)); }
+.al-score-dashboard-zoom { display:flex; align-items:center; gap:9px; margin-left:auto; min-height:40px; padding:0 12px; border:1px solid var(--background-modifier-border); border-radius:10px; background:var(--background-secondary); color:var(--text-muted); font-size:.72rem; }
+.al-score-dashboard-zoom input { width:130px; accent-color:var(--interactive-accent); }
+.al-score-dashboard-zoom output { min-width:38px; text-align:right; }
+.al-score-batch-toolbar { position:sticky; z-index:5; top:68px; display:none; align-items:center; gap:8px; margin:0 0 12px; padding:10px 12px; border:1px solid color-mix(in srgb,var(--interactive-accent) 45%,var(--background-modifier-border)); border-radius:12px; background:color-mix(in srgb,var(--interactive-accent) 8%,var(--background-secondary)); box-shadow:var(--shadow-s); }
+.al-score-batch-toolbar.is-visible { display:flex; }
+.al-score-batch-count { min-width:78px; color:var(--text-normal); font-size:.78rem; }
+.al-score-batch-toolbar button,.al-score-batch-target { min-height:32px; border-radius:8px; font-size:.72rem; }
+.al-score-batch-secondary { color:var(--text-muted); background:var(--background-primary); border:1px solid var(--background-modifier-border); }
+.al-score-batch-target { min-width:118px; margin-left:auto; padding:0 28px 0 10px; border:1px solid var(--background-modifier-border); background:var(--background-primary); color:var(--text-normal); }
+.al-score-batch-shift { padding:0 11px; border:1px solid color-mix(in srgb,var(--interactive-accent) 40%,var(--background-modifier-border)); color:var(--text-normal); background:color-mix(in srgb,var(--interactive-accent) 9%,var(--background-primary)); }
+.al-score-batch-toolbar :disabled { opacity:.45; cursor:not-allowed; }
+.al-score-board { overflow:hidden; border:1px solid var(--background-modifier-border); border-radius:14px; background:var(--background-primary-alt); }
+.al-score-group { display:grid; grid-template-columns:82px minmax(0,1fr); border-bottom:1px solid var(--background-modifier-border); }
+.al-score-group:last-child { border-bottom:0; }
+.al-score-major { display:flex; min-height:var(--al-score-lane-min-height); flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:4px; color:#fff; background:var(--al-score-color,var(--background-modifier-border)); text-align:center; overflow:hidden; }
+.al-score-major-number { font-size:clamp(1rem,1.45vw,1.4rem); line-height:1; }
+.al-score-major-count { max-width:100%; font-size:.58rem; font-weight:700; line-height:1.2; overflow-wrap:anywhere; }
+.al-score-group-lanes { min-width:0; }
+.al-score-lane { display:grid; grid-template-columns:54px minmax(0,1fr); min-height:var(--al-score-lane-min-height); border-bottom:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); transition:box-shadow .12s ease,background .12s ease; }
+.al-score-lane:last-child { border-bottom:0; }
+.al-score-lane.is-drop-target { position:relative; z-index:2; box-shadow:inset 0 0 0 3px var(--interactive-accent); }
+.al-score-lane-label { display:grid; place-items:center; padding:2px; border-right:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); color:var(--al-score-color,var(--text-muted)); font-size:.76rem; font-weight:800; line-height:1; overflow:hidden; }
+.al-score-lane-posters { display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-start; gap:var(--al-score-poster-gap); min-width:0; overflow-x:hidden; padding:var(--al-score-lane-margin) 12px; background:color-mix(in srgb,var(--al-score-color,var(--background-secondary)) 7%,var(--background-primary-alt)); }
+.al-score-poster { position:relative; flex:0 0 var(--al-score-poster-width); width:var(--al-score-poster-width); height:var(--al-score-poster-height); overflow:hidden; padding:0; border:1px solid color-mix(in srgb,var(--text-normal) 16%,transparent); border-radius:5px; background:var(--background-secondary); box-shadow:0 3px 9px rgba(0,0,0,.18); transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease; cursor:grab; }
+.al-score-dashboard.is-moving-poster .al-score-poster { transition:none; }
+.al-score-poster:active { cursor:grabbing; }
+.al-score-poster:hover,.al-score-poster:focus-visible { z-index:2; transform:translateY(-2px) scale(1.035); border-color:var(--interactive-accent); outline:none; }
+.al-score-poster.is-dragging { opacity:.45; }
+.al-score-poster.is-batch-dragging { opacity:.28; }
+.al-score-poster.is-selected { border-color:var(--interactive-accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--interactive-accent) 42%,transparent),0 5px 13px rgba(0,0,0,.24); }
+.al-score-poster-check { position:absolute; z-index:3; top:4px; right:4px; display:none; width:19px; height:19px; place-items:center; border:1px solid color-mix(in srgb,var(--text-on-accent) 55%,transparent); border-radius:999px; color:var(--text-on-accent); background:color-mix(in srgb,var(--background-primary) 72%,transparent); backdrop-filter:blur(4px); }
+.al-score-poster-check svg { width:13px; height:13px; }
+.al-score-dashboard.is-batch-mode .al-score-poster { cursor:pointer; }
+.al-score-dashboard.is-batch-mode .al-score-poster[draggable="true"] { cursor:grab; }
+.al-score-dashboard.is-batch-mode .al-score-poster[draggable="true"]:active { cursor:grabbing; }
+.al-score-dashboard.is-batch-mode .al-score-poster-check { display:grid; }
+.al-score-dashboard.is-batch-mode .al-score-poster.is-selected .al-score-poster-check { background:var(--interactive-accent); }
+.al-score-poster-image { display:block; width:100%; height:100%; object-fit:cover; }
+.al-score-poster-missing { display:grid; width:100%; height:100%; place-items:center; color:var(--text-faint); }
+.al-score-poster-missing svg { width:42%; height:42%; fill:none; stroke:currentColor; }
+.al-score-lane-empty { align-self:center; color:var(--text-faint); font-size:.68rem; line-height:1.2; }
+.al-score-drag-preview { position:fixed; z-index:10000; top:-10000px; left:-10000px; overflow:visible; pointer-events:none; }
+.al-score-drag-preview::before,.al-score-drag-preview::after { content:""; position:absolute; inset:0; border:1px solid color-mix(in srgb,var(--text-normal) 22%,transparent); border-radius:5px; background:var(--background-secondary); box-shadow:0 4px 12px rgba(0,0,0,.24); }
+.al-score-drag-preview::before,.al-score-drag-preview::after { display:none; }
+.al-score-drag-preview[data-stack-depth="1"]::before { display:block; transform:translate(7px,7px) rotate(2deg); }
+.al-score-drag-preview[data-stack-depth="2"]::before { display:block; transform:translate(7px,7px) rotate(2deg); }
+.al-score-drag-preview[data-stack-depth="2"]::after { display:block; transform:translate(13px,13px) rotate(4deg); }
+.al-score-drag-preview-card { position:relative; z-index:3; width:100%; height:100%; overflow:hidden; border:1px solid color-mix(in srgb,var(--text-normal) 20%,transparent); border-radius:5px; background:var(--background-secondary); box-shadow:0 5px 15px rgba(0,0,0,.3); }
+.al-score-drag-preview-card .al-score-poster-image,.al-score-drag-preview-card .al-score-poster-missing { display:block; width:100%; height:100%; object-fit:cover; }
+.al-score-drag-preview-count { position:absolute; z-index:4; right:-13px; bottom:-13px; display:grid; min-width:30px; height:30px; place-items:center; padding:0 7px; border:2px solid var(--background-primary); border-radius:999px; color:var(--text-on-accent); background:var(--interactive-accent); box-shadow:0 3px 10px rgba(0,0,0,.3); font-size:.72rem; font-variant-numeric:tabular-nums; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-group { grid-template-columns:48px minmax(0,1fr); }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane { grid-template-columns:40px minmax(0,1fr); }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major { padding:2px; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major-number { font-size:.78rem; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-major-count { display:none; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane-label { font-size:.62rem; }
+.al-score-dashboard[data-label-layout="compact"] .al-score-lane-empty { font-size:.62rem; }
+.al-score-group.is-unrated .al-score-major { color:var(--text-muted); background:var(--background-secondary); }
+.al-score-group.is-unrated .al-score-lane-posters { background:var(--background-primary-alt); }
+.al-score-dashboard-button { gap:6px; }
+.al-score-confirm-summary { display:grid; gap:6px; margin:14px 0; padding:12px; border-radius:9px; background:var(--background-secondary); color:var(--text-muted); }
+@media (max-width:900px) {
+  .al-score-batch-toolbar { flex-wrap:wrap; top:112px; }
+  .al-score-batch-target { margin-left:0; }
+}
+@media (max-width:780px) {
+  .animelist-score-dashboard-view { padding-inline:12px; }
+  .al-score-dashboard-header { align-items:flex-start; flex-direction:column; gap:12px; }
+  .al-score-dashboard-summary { text-align:left; }
+  .al-score-dashboard-controls { flex-wrap:wrap; }
+  .al-score-dashboard-tabs { width:100%; }
+  .al-score-dashboard-action-group { flex:1; }
+  .al-score-tool-button { flex:1; justify-content:center; }
+  .al-score-dashboard-zoom { order:4; width:100%; margin-left:0; }
+  .al-score-dashboard-zoom input { flex:1; }
+  .al-score-batch-toolbar { position:static; }
+  .al-score-group { grid-template-columns:60px minmax(0,1fr); }
+  .al-score-lane { grid-template-columns:44px minmax(0,1fr); }
+}
+/* END GENERATED FEATURE STYLES */

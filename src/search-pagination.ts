@@ -356,10 +356,12 @@ function renderPagination(modal: LegacyAddMediaModal, state: PaginationState): v
 }
 
 function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | null {
-  const originalModalOpen = Reflect.get(Modal.prototype, "open") as (this: Modal) => void;
+  const openDescriptor = Object.getOwnPropertyDescriptor(Modal.prototype, "open");
+  const originalModalOpen: unknown = openDescriptor?.value;
+  if (!openDescriptor || typeof originalModalOpen !== "function") return null;
   let captured: LegacyAddMediaModal | null = null;
   Modal.prototype.open = function openAndCapture(this: Modal): void {
-    originalModalOpen.call(this);
+    Reflect.apply(originalModalOpen, this, []);
     const candidate = this as Partial<LegacyAddMediaModal>;
     if (this.modalEl.classList.contains("animelist-modal")
       && typeof candidate.renderSearch === "function"
@@ -370,18 +372,15 @@ function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | 
   try {
     openLegacyModal();
   } finally {
-    Modal.prototype.open = originalModalOpen;
+    Object.defineProperty(Modal.prototype, "open", openDescriptor);
   }
   return captured;
 }
 
 function installNativePagination(modal: LegacyAddMediaModal): void {
   const state = freshState();
-  const originalRenderSearch = Reflect.get(modal, "renderSearch") as (this: LegacyAddMediaModal) => void;
-  const originalSearch = Reflect.get(modal, "search") as (
-    this: LegacyAddMediaModal,
-    button: HTMLButtonElement,
-  ) => Promise<void>;
+  const originalRenderSearch = modal.renderSearch;
+  const originalSearch = modal.search;
   modal.renderSearch = () => {
     originalRenderSearch.call(modal);
     renderPagination(modal, state);

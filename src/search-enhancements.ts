@@ -38,11 +38,6 @@ type CreateMediaNoteMethod = (
   form: MediaNoteForm,
 ) => Promise<unknown>;
 
-type BoundCreateMediaNote = (
-  result: ExternalMediaResult,
-  form: MediaNoteForm,
-) => Promise<unknown>;
-
 interface LegacyAddMediaModal extends Modal {
   renderDetails: (result: ExternalMediaResult) => Promise<void>;
 }
@@ -180,9 +175,9 @@ function installInstanceEnhancements(plugin: SearchEnhancedPlugin): void {
     return { results: response.results, warnings: response.warnings };
   };
 
-  const originalCreateMediaNote = createMediaNoteMethod(plugin).bind(plugin) as BoundCreateMediaNote;
+  const originalCreateMediaNote = createMediaNoteMethod(plugin);
   methods.createMediaNote = async (result, form) => {
-    const created: unknown = await originalCreateMediaNote(result, form);
+    const created: unknown = await originalCreateMediaNote.call(plugin, result, form);
     if (!(created instanceof TFile)) throw new Error("AnimeList createMediaNote returned an invalid file.");
     const aliases = aliasesFor(result);
     if (aliases.length) {
@@ -228,10 +223,12 @@ function renderDuplicateWarning(
 }
 
 function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | null {
-  const originalModalOpen = Reflect.get(Modal.prototype, "open") as (this: Modal) => void;
+  const openDescriptor = Object.getOwnPropertyDescriptor(Modal.prototype, "open");
+  const originalModalOpen: unknown = openDescriptor?.value;
+  if (!openDescriptor || typeof originalModalOpen !== "function") return null;
   let captured: LegacyAddMediaModal | null = null;
   Modal.prototype.open = function openAndCapture(this: Modal): void {
-    originalModalOpen.call(this);
+    Reflect.apply(originalModalOpen, this, []);
     const candidate = this as Partial<LegacyAddMediaModal>;
     if (this.modalEl.classList.contains("animelist-modal") && typeof candidate.renderDetails === "function") {
       captured = candidate as LegacyAddMediaModal;
@@ -240,7 +237,7 @@ function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | 
   try {
     openLegacyModal();
   } finally {
-    Modal.prototype.open = originalModalOpen;
+    Object.defineProperty(Modal.prototype, "open", openDescriptor);
   }
   return captured;
 }
@@ -249,10 +246,7 @@ function installDuplicateWarning(
   plugin: SearchEnhancedPlugin,
   modal: LegacyAddMediaModal,
 ): void {
-  const originalRenderDetails = Reflect.get(modal, "renderDetails") as (
-    this: LegacyAddMediaModal,
-    result: ExternalMediaResult,
-  ) => Promise<void>;
+  const originalRenderDetails = modal.renderDetails;
   modal.renderDetails = async (result) => {
     await originalRenderDetails.call(modal, result);
     renderDuplicateWarning(plugin, modal, result);

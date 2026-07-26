@@ -43,15 +43,14 @@ function installLibraryButton(): void {
     const result = original(container, items, adapters);
     const actions = container.querySelector<HTMLElement>(".al-hero-actions");
     if (!actions || actions.querySelector(".al-score-dashboard-button")) return result;
-    const button = document.createElement("button");
+    const button = actions.createEl("button", {
+      cls: "al-secondary-button al-score-dashboard-button",
+    });
     button.type = "button";
-    button.className = "al-secondary-button al-score-dashboard-button";
     button.title = text.open;
     button.setAttribute("aria-label", text.open);
     setIcon(button, "table-properties");
-    const label = document.createElement("span");
-    label.textContent = text.title;
-    button.appendChild(label);
+    button.createSpan({ text: text.title });
     button.addEventListener("click", () => openDashboard?.());
     const addButton = actions.querySelector(".al-add-button");
     actions.insertBefore(button, addButton);
