@@ -1,131 +1,32 @@
-name: Validate final serial cover provider
+name: Inspect serial cover payload
 
 on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-stage:
+  inspect:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - name: Extract and verify exact source files
+      - name: Inspect payload
         run: |
-          cat .serial-cover-final-payload/chunk-* > /tmp/serial-cover-final.b64
-          base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
-          mkdir -p /tmp/serial-cover-final
-          tar -xzf /tmp/serial-cover-final.tar.gz -C /tmp/serial-cover-final
-          cd /tmp/serial-cover-final
-          echo "061a45800a56a6a3200d44c5a86f68c39ff58228ce521f0b33cb5f4d6c55b016  src/serial-cover-provider.ts" | sha256sum -c -
-          echo "d48395b13188d9dfd7099491e5c14dee054a7090205cc72352d32d6c5b1bbb01  src/serial-entry-cover.ts" | sha256sum -c -
-          echo "1b51a389e28fe04a2b90a43fd66bb0941c1e05b0c5a10d5aa0b61107d1d8ced8  src/serial-cover-service.ts" | sha256sum -c -
-          echo "8441fc40ec4a029df487e6849202754cc451332991913af1c54f01a369fbc71f  src/serial-cover-text.ts" | sha256sum -c -
-          echo "1f26fb5fd7d4a26893e1f982ed69eb090b868f97b6a337cf21d422c171fb434f  tests/serial-entry-cover.test.ts" | sha256sum -c -
-      - name: Prepare isolated staging branch
-        env:
-          EXPECTED_HEAD: 072f3dbd0a6dd125c65c15ed061f724e58ac3222
-        run: |
-          git fetch origin chore/serial-cover-final-publish feature/serial-entry-covers
-          test "$(git rev-parse origin/chore/serial-cover-final-publish)" = "$EXPECTED_HEAD"
-          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
-          git checkout -B chore/serial-cover-final-publish origin/chore/serial-cover-final-publish
-          cp -a /tmp/serial-cover-final/. .
-      - run: npm ci
-      - run: npm run check
-      - run: npm run release:check
-      - name: Build production Test Vault
-        env:
-          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
-        run: npm run test-vault
-      - name: Run live 40-volume provider check
-        run: |
-          mkdir -p .tmp
-          cat > .tmp/obsidian-live.ts <<'TS'
-          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
-            const response = await fetch(options.url, { method: options.method ?? "GET", body: options.body, headers: options.headers });
-            const text = await response.text();
-            if (!response.ok) {
-              const error = new Error(`Request failed with status ${response.status}`) as Error & { status: number; response: { status: number; headers: Headers } };
-              error.status = response.status;
-              error.response = { status: response.status, headers: response.headers };
-              throw error;
-            }
-            return { json: text ? JSON.parse(text) : {}, text };
-          }
-          TS
-          cat > .tmp/serial-cover-live.ts <<'TS'
-          import { writeFile } from "node:fs/promises";
-          import { clearSerialCoverProviderCache, configureSerialCoverProvider, configureSerialCoverProviderForTests, searchSerialCovers } from "../src/serial-cover-provider";
-          import { confidentSerialCover } from "../src/serial-entry-cover";
-          const works = new Map<string, string>([
-            ["KonoSuba", "この素晴らしい世界に祝福を！"],
-            ["Mushoku Tensei", "無職転生 ～異世界行ったら本気だす～"],
-            ["Invaders of the Rokujouma", "六畳間の侵略者！？"],
-            ["That Time I Got Reincarnated as a Slime", "転生したらスライムだった件"],
-          ]);
-          const normalize = (value: string): string => value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
-          const exactVolume = (title: string, label: string): boolean => {
-            const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`).test(title.normalize("NFKC"));
-          };
-          const report: Array<Record<string, unknown>> = [];
-          configureSerialCoverProvider({ apiKey: "" });
-          configureSerialCoverProviderForTests({ sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), random: () => 0 });
-          clearSerialCoverProviderCache();
-          try {
-            for (const [work, originalTitle] of works) {
-              for (let volume = 1; volume <= 10; volume += 1) {
-                const label = String(volume);
-                const query = `${originalTitle} ${label}`;
-                const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
-                const selected = confidentSerialCover(candidates);
-                if (!selected) throw new Error(`${work} ${volume}: no confident result; top=${JSON.stringify(candidates.slice(0, 5))}`);
-                if (selected.provider !== "Bangumi") throw new Error(`${work} ${volume}: unexpected provider ${selected.provider}`);
-                if (selected.mediaTypeHint !== "novel") throw new Error(`${work} ${volume}: wrong media type ${selected.mediaTypeHint ?? "unknown"}`);
-                if (!normalize(selected.title).startsWith(normalize(originalTitle))) throw new Error(`${work} ${volume}: wrong series ${selected.title}`);
-                if (!exactVolume(selected.title, label)) throw new Error(`${work} ${volume}: wrong volume ${selected.title}`);
-                const image = await fetch(selected.coverUrl, { headers: { Range: "bytes=0-255", "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)" } });
-                const bytes = await image.arrayBuffer();
-                if (!image.ok || bytes.byteLength === 0) throw new Error(`${work} ${volume}: cover is not downloadable (${image.status})`);
-                const row = { work, volume, query, sourceId: selected.sourceId, title: selected.title, provider: selected.provider, score: selected.score, coverStatus: image.status, coverBytes: bytes.byteLength };
-                report.push(row);
-                console.log(JSON.stringify(row));
-              }
-            }
-          } finally {
-            await writeFile("serial-cover-live-report.json", JSON.stringify(report, null, 2));
-          }
-          if (report.length !== 40) throw new Error(`Expected 40 successful results, received ${report.length}`);
-          TS
           set +e
-          npx esbuild .tmp/serial-cover-live.ts --bundle --platform=node --format=esm --target=node24 --alias:obsidian=./.tmp/obsidian-live.ts --outfile=.tmp/serial-cover-live.mjs > serial-cover-live.log 2>&1
-          status=$?
-          if [ "$status" -eq 0 ]; then node .tmp/serial-cover-live.mjs >> serial-cover-live.log 2>&1; status=$?; fi
-          cat serial-cover-live.log
-          exit "$status"
+          {
+            sha256sum .serial-cover-final-payload/chunk-*
+            cat .serial-cover-final-payload/chunk-* > /tmp/serial-cover-final.b64
+            sha256sum /tmp/serial-cover-final.b64
+            base64 --decode /tmp/serial-cover-final.b64 > /tmp/serial-cover-final.tar.gz
+            echo "base64_status=$?"
+            sha256sum /tmp/serial-cover-final.tar.gz
+            tar -tzf /tmp/serial-cover-final.tar.gz
+            echo "tar_status=$?"
+          } > payload-debug.txt 2>&1
+          cat payload-debug.txt
       - uses: actions/upload-artifact@v6
-        if: always()
         with:
-          name: serial-cover-final-validation
-          path: |
-            serial-cover-live-report.json
-            serial-cover-live.log
-          if-no-files-found: warn
+          name: serial-cover-payload-debug
+          path: payload-debug.txt
           retention-days: 1
-      - name: Publish validated staging branch
-        env:
-          EXPECTED_HEAD: 072f3dbd0a6dd125c65c15ed061f724e58ac3222
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/serial-cover-provider.ts src/serial-entry-cover.ts src/serial-cover-service.ts src/serial-cover-text.ts tests/serial-entry-cover.test.ts
-          git commit -m "fix: use reliable Bangumi serial cover lookup"
-          git push --force-with-lease=refs/heads/chore/serial-cover-final-publish:$EXPECTED_HEAD origin HEAD:chore/serial-cover-final-publish
