@@ -1,4 +1,4 @@
-name: Validate serial cover follow-up
+name: Validate serial progress persistence fix
 
 on:
   pull_request:
@@ -17,35 +17,68 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Verify and extract follow-up payload
-        run: |
-          echo "619bfd0c8e3d8a9ed261e2b06b85c294227a88d953744be294e1caa6112102b9  .serial-cover-followup-payload/piece-000" | sha256sum -c -
-          echo "3bfec4bac60f71222e522378fca55996bbfcea84dfa49ce552e779db9dc5d117  .serial-cover-followup-payload/piece-001" | sha256sum -c -
-          echo "0196540ac9e27f09774823893d1e8291c3b375186730325585c35137d78706df  .serial-cover-followup-payload/piece-002" | sha256sum -c -
-          echo "379ea983825712178d00e4a8ee97fb95a99fa28b4feb42fbeba50cd39cfb997d  .serial-cover-followup-payload/piece-003" | sha256sum -c -
-          echo "de1285d3e7ada2196d973b575ee2514b2fb53a4b22b4e2ee3fd57ad5f6ae0d39  .serial-cover-followup-payload/piece-004" | sha256sum -c -
-          cat .serial-cover-followup-payload/piece-* > /tmp/serial-cover-followup.b64
-          echo "7c0dc4dd37dc114031610cdb3e5cf22163d12b443613b9d5e3719468a4f1debd  /tmp/serial-cover-followup.b64" | sha256sum -c -
-          base64 --decode /tmp/serial-cover-followup.b64 > /tmp/serial-cover-followup.tar.gz
-          echo "4eb7c88d3c8710fa8c51f3de607ea2ae5f5f4436d0bf893d560587a52111b55b  /tmp/serial-cover-followup.tar.gz" | sha256sum -c -
-          mkdir -p /tmp/serial-cover-followup
-          tar -xzf /tmp/serial-cover-followup.tar.gz -C /tmp/serial-cover-followup
-          cd /tmp/serial-cover-followup
-          echo "e1dbcb03bdc7793bd3ce82888cf41cc8ff5d51bb10199737ea51b9334f598d67  src/serial-cover-provider.ts" | sha256sum -c -
-          echo "9f33ebb0c0e23d8cab3a599f8d35fbb46fbc5ed833d6a620ae7618c910c3d925  src/serial-entry-cover.ts" | sha256sum -c -
-          echo "0ab00c443d85e6a8316480413db963cd44e2add0a544bb0985362fc9e4722d16  src/serial-cover-selection.ts" | sha256sum -c -
-          echo "cc118a610ec35a637ad7d070cb071d73f5bc03f195227d34ce8f3e4c4dabd79f  src/serial-cover-feature.ts" | sha256sum -c -
-          echo "391d47ec150fca4ac21883b358dcc8c57ce276e81e266d125cb3f6f134baed75  src/serial-cover-text.ts" | sha256sum -c -
-          echo "4923ddc906b6bdf3c5f0a71f1a55d3bab00ca6cdae18950d9aec5a7412426515  tests/serial-entry-cover.test.ts" | sha256sum -c -
       - name: Prepare isolated staging branch
         env:
-          EXPECTED_HEAD: 7b2e04d29c2d0b6ada7762612f9a54bfc2476749
+          EXPECTED_HEAD: b86a2044b62635a4e72d94150900c5f4d523c84c
         run: |
-          git fetch origin feature/serial-entry-covers chore/serial-cover-followup-debug
+          git fetch origin feature/serial-entry-covers chore/serial-progress-persistence-fix
           test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
-          test "$(git rev-parse origin/chore/serial-cover-followup-debug)" = "$EXPECTED_HEAD"
-          git checkout -B chore/serial-cover-followup-debug origin/chore/serial-cover-followup-debug
-          cp -a /tmp/serial-cover-followup/. .
+          test "$(git rev-parse origin/chore/serial-progress-persistence-fix)" = "$EXPECTED_HEAD"
+          git checkout -B chore/serial-progress-persistence-fix origin/chore/serial-progress-persistence-fix
+      - name: Apply duplicate-editor and persistence fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              source = path.read_text(encoding="utf-8")
+              assert source.count(old) == 1, f"expected one anchor in {path}: {old!r}"
+              path.write_text(source.replace(old, new), encoding="utf-8")
+
+          ui = Path("src/additional-progress-units-ui.ts")
+          replace_once(ui, '  serializeSerialLog,\n', '')
+          replace_once(
+              ui,
+              'import type { ReadingProgressUnit } from "./progress-units";\n',
+              'import type { ReadingProgressUnit } from "./progress-units";\nimport { applyReadingProgressSnapshot } from "./reading-progress-persistence";\n',
+          )
+          replace_once(
+              ui,
+              '''    entries.push({\n      label,\n      startedAt: entry.startedAt,\n      completedAt: entry.completedAt || todayString(),\n    });\n''',
+              '''    entries.push({\n      ...entry,\n      label,\n      startedAt: entry.startedAt,\n      completedAt: entry.completedAt || todayString(),\n    });\n''',
+          )
+          replace_once(
+              ui,
+              '''function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {\n  frontmatter.progress_unit = state.unit;\n  frontmatter.progress = state.preparedProgress;\n  const entries = serializeSerialLog(state.entries, state.unit);\n  // Retain the existing key so older novel notes remain compatible.\n  if (entries.length) frontmatter.volume_log = entries;\n  else delete frontmatter.volume_log;\n}\n''',
+              '''function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {\n  applyReadingProgressSnapshot(frontmatter, {\n    unit: state.unit,\n    progress: state.preparedProgress,\n    entries: state.entries,\n  });\n}\n''',
+          )
+          replace_once(
+              ui,
+              '''    const originalEditor = form.querySelector<HTMLElement>(".al-volume-editor");\n    if (originalEditor) {\n      originalEditor.hidden = true;\n      originalEditor.setAttribute("aria-hidden", "true");\n    }\n''',
+              '''    form.querySelectorAll<HTMLElement>(".al-volume-editor:not(.al-progress-unit-editor)")\n      .forEach((originalEditor) => originalEditor.remove());\n''',
+          )
+          replace_once(
+              ui,
+              '    const button = event.target.closest<HTMLButtonElement>("button.mod-cta");\n',
+              '    const button = event.target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta");\n',
+          )
+
+          Path("src/reading-progress-persistence.ts").write_text('''import { serializeSerialLog, type ReadingProgressUnit } from "./progress-units";\nimport type { NovelVolumeEntry, ProgressValue } from "./types";\n\nexport interface ReadingProgressSnapshot {\n  unit: ReadingProgressUnit;\n  progress: ProgressValue;\n  entries: NovelVolumeEntry[];\n}\n\nexport function applyReadingProgressSnapshot(\n  frontmatter: Record<string, unknown>,\n  snapshot: ReadingProgressSnapshot,\n): void {\n  frontmatter.progress_unit = snapshot.unit;\n  frontmatter.progress = snapshot.progress;\n  const entries = serializeSerialLog(snapshot.entries, snapshot.unit);\n  if (entries.length) frontmatter.volume_log = entries;\n  else delete frontmatter.volume_log;\n}\n''', encoding="utf-8")
+
+          tests_path = Path("tests/progress-units.test.ts")
+          tests = tests_path.read_text(encoding="utf-8")
+          assert 'reading-progress-persistence' not in tests
+          tests = tests.replace(
+              'import { describe, it } from "node:test";\n',
+              'import { describe, it } from "node:test";\nimport { applyReadingProgressSnapshot } from "../src/reading-progress-persistence";\n',
+              1,
+          )
+          assert tests.rstrip().endswith('});')
+          tests = tests.rstrip()[:-3] + '''\n\n  it("persists the single reading log and reloads edited entries with metadata", () => {\n    const frontmatter: Record<string, unknown> = {\n      title: "無職転生",\n      volume_log: [{ label: "1", completed_at: "2026-01-01" }],\n      unrelated: "keep",\n    };\n\n    applyReadingProgressSnapshot(frontmatter, {\n      unit: "volume",\n      progress: 2,\n      entries: [{\n        label: "2",\n        startedAt: "2026-02-01",\n        completedAt: "2026-02-02",\n        cover: "volume-2.jpg",\n        coverProvider: "Bangumi",\n        coverSourceId: "volume-2",\n        extra: { isbn: "9780000000002" },\n      }],\n    });\n\n    assert.equal(frontmatter.progress_unit, "volume");\n    assert.equal(frontmatter.progress, 2);\n    assert.equal(frontmatter.unrelated, "keep");\n    assert.deepEqual(frontmatter.volume_log, [{\n      isbn: "9780000000002",\n      label: "2",\n      started_at: "2026-02-01",\n      completed_at: "2026-02-02",\n      cover: "volume-2.jpg",\n      cover_provider: "Bangumi",\n      cover_source_id: "volume-2",\n    }]);\n    assert.deepEqual(normalizeSerialLog(frontmatter.volume_log, "volume"), [{\n      label: "2",\n      startedAt: "2026-02-01",\n      completedAt: "2026-02-02",\n      cover: "volume-2.jpg",\n      coverProvider: "Bangumi",\n      coverSourceId: "volume-2",\n      extra: { isbn: "9780000000002" },\n    }]);\n  });\n\n});\n'''
+          tests_path.write_text(tests, encoding="utf-8")
+
+          Path("scripts/check-serial-reading-ui.mjs").write_text('''import assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\nconst [serialStyles, coverStyles, progressStyles, buildConfig, progressEditorSource] = await Promise.all([\n  readFile("styles.serial-reading.css", "utf8"),\n  readFile("styles.serial-cover.css", "utf8"),\n  readFile("styles.progress.css", "utf8"),\n  readFile("esbuild.config.mjs", "utf8"),\n  readFile("src/additional-progress-units-ui.ts", "utf8"),\n]);\n\nassert.match(serialStyles, /\\.animelist-modal \\.al-volume-editor \\{[\\s\\S]*grid-column:\\s*1\\s*\\/\\s*-1;/);\nassert.match(serialStyles, /grid-template-areas:[\\s\\S]*"copy"[\\s\\S]*"rows"[\\s\\S]*"add"/);\nassert.match(serialStyles, /\\.al-volume-editor-header\\s*\\{[\\s\\S]*display:\\s*contents;/);\nassert.match(serialStyles, /\\.al-volume-editor-header > \\.al-secondary-button\\s*\\{[\\s\\S]*grid-area:\\s*add;/);\nassert.match(serialStyles, /\\.al-volume-row-fields\\s*\\{[\\s\\S]*minmax\\(96px,[\\s\\S]*repeat\\(2,\\s*minmax\\(190px,/);\nassert.match(serialStyles, /\\.al-grid\\.is-list \\.al-progress\\s*\\{[\\s\\S]*width:\\s*100%;[\\s\\S]*max-width:\\s*none;/);\nassert.doesNotMatch(serialStyles, /\\.al-progress:not\\(:has\\(/);\nassert.doesNotMatch(serialStyles, /\\.status-(?:watching|reading|on_hold)/);\n\nassert.match(coverStyles, /\\.animelist-modal \\.al-volume-row\\s*\\{[\\s\\S]*grid-template-columns:\\s*minmax\\(0, 1fr\\) auto auto;/);\nassert.match(coverStyles, /\\.al-serial-cover-button\\s*\\{[\\s\\S]*height:\\s*102px;[\\s\\S]*width:\\s*72px;/);\nassert.match(coverStyles, /\\.al-serial-cover-results\\s*\\{[\\s\\S]*grid-template-columns:/);\n\nassert.match(progressStyles, /\\.al-progress\\.is-state-progress \\.al-progress-fill/);\nassert.match(progressStyles, /\\.al-detail-progress/);\n\nassert.match(progressEditorSource, /\\.al-volume-editor:not\\(\\.al-progress-unit-editor\\)/);\nassert.match(progressEditorSource, /originalEditor\\) => originalEditor\\.remove\\(\\)/);\nassert.doesNotMatch(progressEditorSource, /originalEditor\\.hidden/);\nassert.match(progressEditorSource, /\\.al-modal-actions > button\\.mod-cta/);\n\nassert.match(buildConfig, /readFile\\("styles\\.serial-reading\\.css", "utf8"\\)/);\nassert.match(buildConfig, /readFile\\("styles\\.serial-cover\\.css", "utf8"\\)/);\nassert.match(buildConfig, /readFile\\("styles\\.progress\\.css", "utf8"\\)/);\nassert.match(buildConfig, /currentStyles\\.indexOf\\(GENERATED_STYLE_START\\)/);\nassert.match(buildConfig, /writeFile\\("styles\\.css", outputStyles, "utf8"\\)/);\n\nconsole.log("Serial reading, cover, and progress UI checks passed.");\n''', encoding="utf-8")
+          PY
       - name: Run npm ci
         run: npm ci
       - name: Run npm run check
@@ -56,90 +89,12 @@ jobs:
         env:
           ANIMELIST_TEST_VAULT_NO_OPEN: "1"
         run: npm run test-vault
-      - name: Verify Mushoku Tensei volumes 14 through 26
-        run: |
-          mkdir -p .tmp
-          cat > .tmp/obsidian-live.ts <<'TS'
-          export const requestLog: Array<{ url: string; body: string }> = [];
-          export async function requestUrl(options: { url: string; method?: string; body?: string; headers?: Record<string, string> }): Promise<{ json: unknown; text: string }> {
-            requestLog.push({ url: options.url, body: options.body ?? "" });
-            const response = await fetch(options.url, { method: options.method ?? "GET", body: options.body, headers: options.headers });
-            const text = await response.text();
-            if (!response.ok) {
-              const error = new Error(`Request failed with status ${response.status}`) as Error & { status: number; response: { status: number; headers: Headers } };
-              error.status = response.status;
-              error.response = { status: response.status, headers: response.headers };
-              throw error;
-            }
-            return { json: text ? JSON.parse(text) : {}, text };
-          }
-          TS
-          cat > .tmp/mushoku-live.ts <<'TS'
-          import { writeFile } from "node:fs/promises";
-          import { requestLog } from "./obsidian-live";
-          import { clearSerialCoverProviderCache, configureSerialCoverProvider, configureSerialCoverProviderForTests, searchSerialCovers } from "../src/serial-cover-provider";
-          import { confidentSerialCover, serialCoverQuery } from "../src/serial-entry-cover";
-
-          const originalTitle = "無職転生 ～異世界行ったら本気だす～";
-          const expectedIds = new Map<number, string>([
-            [14, "223981"], [15, "223980"], [16, "260752"], [17, "260753"], [18, "260754"], [19, "260755"], [20, "267778"],
-            [21, "277156"], [22, "287149"], [23, "305455"], [24, "321201"], [25, "348137"], [26, "403823"],
-          ]);
-          const report: Array<Record<string, unknown>> = [];
-          configureSerialCoverProvider({ apiKey: "" });
-          configureSerialCoverProviderForTests({ sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), random: () => 0 });
-          clearSerialCoverProviderCache();
-
-          try {
-            for (const [volume, expectedId] of expectedIds) {
-              const label = String(volume);
-              const query = serialCoverQuery(originalTitle, label);
-              if (!query) throw new Error(`Could not build query for volume ${volume}`);
-              const logStart = requestLog.length;
-              const candidates = await searchSerialCovers(query, originalTitle, label, "novel");
-              const selected = confidentSerialCover(candidates);
-              if (!selected) throw new Error(`Volume ${volume}: no confident result; top=${JSON.stringify(candidates.slice(0, 5))}`);
-              if (selected.provider !== "Bangumi") throw new Error(`Volume ${volume}: provider ${selected.provider}`);
-              if (selected.mediaTypeHint !== "novel") throw new Error(`Volume ${volume}: media type ${selected.mediaTypeHint ?? "unknown"}`);
-              if (selected.sourceId !== expectedId) throw new Error(`Volume ${volume}: expected ${expectedId}, got ${selected.sourceId} (${selected.title})`);
-              const requests = requestLog.slice(logStart).map((entry) => JSON.parse(entry.body).keyword as string);
-              if (requests[0] !== query) throw new Error(`Volume ${volume}: exact query was not first: ${JSON.stringify(requests)}`);
-              if (requests.length > 2 || (requests[1] !== undefined && requests[1] !== `無職転生 ${label}`)) {
-                throw new Error(`Volume ${volume}: unexpected fallback sequence: ${JSON.stringify(requests)}`);
-              }
-              const image = await fetch(selected.coverUrl, { headers: { Range: "bytes=0-255", "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)" } });
-              const bytes = await image.arrayBuffer();
-              if (!image.ok || bytes.byteLength === 0) throw new Error(`Volume ${volume}: cover download failed (${image.status})`);
-              const row = { volume, expectedId, sourceId: selected.sourceId, title: selected.title, score: selected.score, queries: requests, coverStatus: image.status, coverBytes: bytes.byteLength };
-              report.push(row);
-              console.log(JSON.stringify(row));
-            }
-          } finally {
-            await writeFile("mushoku-14-26-live-report.json", JSON.stringify(report, null, 2));
-          }
-          if (report.length !== expectedIds.size) throw new Error(`Expected ${expectedIds.size} results, received ${report.length}`);
-          TS
-          set +e
-          npx esbuild .tmp/mushoku-live.ts --bundle --platform=node --format=esm --target=node24 --alias:obsidian=./.tmp/obsidian-live.ts --outfile=.tmp/mushoku-live.mjs > mushoku-14-26-live.log 2>&1
-          status=$?
-          if [ "$status" -eq 0 ]; then node .tmp/mushoku-live.mjs >> mushoku-14-26-live.log 2>&1; status=$?; fi
-          cat mushoku-14-26-live.log
-          exit "$status"
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: serial-cover-followup-validation
-          path: |
-            mushoku-14-26-live-report.json
-            mushoku-14-26-live.log
-          if-no-files-found: warn
-          retention-days: 1
       - name: Publish validated staging branch
         env:
-          EXPECTED_HEAD: 7b2e04d29c2d0b6ada7762612f9a54bfc2476749
+          EXPECTED_HEAD: b86a2044b62635a4e72d94150900c5f4d523c84c
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/serial-cover-provider.ts src/serial-entry-cover.ts src/serial-cover-selection.ts src/serial-cover-feature.ts src/serial-cover-text.ts tests/serial-entry-cover.test.ts
-          git commit -m "fix: improve serial cover fallback and apply action"
-          git push --force-with-lease=refs/heads/chore/serial-cover-followup-debug:$EXPECTED_HEAD origin HEAD:chore/serial-cover-followup-debug
+          git add src/additional-progress-units-ui.ts src/reading-progress-persistence.ts tests/progress-units.test.ts scripts/check-serial-reading-ui.mjs
+          git commit -m "fix: keep a single persistent reading log"
+          git push --force-with-lease=refs/heads/chore/serial-progress-persistence-fix:$EXPECTED_HEAD origin HEAD:chore/serial-progress-persistence-fix
