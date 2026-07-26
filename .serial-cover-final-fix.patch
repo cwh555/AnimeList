@@ -1,0 +1,45 @@
+--- a/src/serial-entry-cover.ts
++++ b/src/serial-entry-cover.ts
+@@ -86,11 +86,14 @@
+   else if (candidateKey.includes(titleKey)) score += 42;
+   else return Number.NEGATIVE_INFINITY;
+ 
+-  if (labelPattern(label).test(clean(candidate.title))) score += 40;
++  const explicitVolume = labelPattern(label).test(clean(candidate.title));
++  const implicitFirstVolume = label === "1" && candidateKey === titleKey;
++  if (explicitVolume) score += 40;
++  else if (implicitFirstVolume) score += 28;
+   else return Number.NEGATIVE_INFINITY;
+ 
+   if (candidateKey.startsWith(`${titleKey}${labelKey}`)) score += 35;
+-  else if (candidateKey.startsWith(titleKey)) score -= 28;
++  else if (!implicitFirstVolume && candidateKey.startsWith(titleKey)) score -= 28;
+   if (candidateKey === `${titleKey}${labelKey}`) score += 15;
+ 
+   if (/限定|特装|特裝|special|limited|box|セット|合本|合訂|スピンオフ|エクストラ|かっぽれ|ファンタスティックデイズ|よりみち|転スラ日記|転ちゅら|異聞|番外編|魔物の国の歩き方|美食伝|クレイマン/i.test(candidate.title)) {
+--- a/tests/serial-entry-cover.test.ts
++++ b/tests/serial-entry-cover.test.ts
+@@ -212,3 +212,23 @@
+   assert.equal(result[0]?.sourceId, "manga");
+   assert.equal(result[0]?.mediaTypeHint, "manga");
+ });
++
++
++test("serial cover ranking accepts an unnumbered first light-novel volume", () => {
++  const ranked = rankSerialCoverCandidates([
++    { provider: "Bangumi", sourceId: "manga-1", title: "六畳間の侵略者!? (1)", coverUrl: "manga.jpg", infoUrl: "", mediaTypeHint: "manga" },
++    { provider: "Bangumi", sourceId: "novel-1", title: "六畳間の侵略者!?", coverUrl: "novel.jpg", infoUrl: "", mediaTypeHint: "novel", categories: ["小说"] },
++  ], "六畳間の侵略者！？", "1", "novel");
++  assert.equal(ranked[0]?.sourceId, "novel-1");
++  assert.equal(confidentSerialCover(ranked)?.sourceId, "novel-1");
++});
++
++
++test("serial cover ranking prefers an explicitly numbered first volume", () => {
++  const ranked = rankSerialCoverCandidates([
++    { provider: "Bangumi", sourceId: "series", title: "無職転生 ～異世界行ったら本気だす～", coverUrl: "series.jpg", infoUrl: "", mediaTypeHint: "novel", categories: ["小说"] },
++    { provider: "Bangumi", sourceId: "volume-1", title: "無職転生 ～異世界行ったら本気だす～ (1)", coverUrl: "volume-1.jpg", infoUrl: "", mediaTypeHint: "novel", categories: ["小说"] },
++  ], "無職転生 ～異世界行ったら本気だす～", "1", "novel");
++  assert.equal(ranked[0]?.sourceId, "volume-1");
++  assert.equal(confidentSerialCover(ranked)?.sourceId, "volume-1");
++});
