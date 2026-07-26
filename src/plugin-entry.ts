@@ -9,7 +9,6 @@ import { installMasterpieceLabels } from "./masterpiece-ui";
 import { installRatingUi } from "./rating-ui";
 import { installScoreDashboard } from "./score-dashboard-feature";
 import { installSerialEntryCovers } from "./serial-cover-feature";
-import { installSerialCoverPickerEvents } from "./serial-cover-picker-events";
 import { installSerialCoverSettings } from "./serial-cover-settings";
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
@@ -18,7 +17,6 @@ export default class AnimeListPluginEntry extends AnimeListPlugin {
     installRatingUi(this);
     installAdditionalProgressUnitsUi(this);
     installSerialEntryCovers(this);
-    installSerialCoverPickerEvents(this);
     installSerialCoverSettings(this);
     await installMasterpieceLabels(this);
     installMasterpieceOperationUi(this);
