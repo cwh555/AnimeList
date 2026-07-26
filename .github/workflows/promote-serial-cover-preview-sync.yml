@@ -1,0 +1,30 @@
+name: Promote validated serial cover preview sync
+run-name: Promote validated serial cover rebase to feature
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify and update feature with force-with-lease
+        run: |
+          set -euo pipefail
+          EXPECTED_FEATURE=c50e88fc0ca5078c0e2d6a039e40f26ab543999d
+          EXPECTED_PREVIEW=00027a57bbabd64c0939ea73980c8973c3e95cd2
+          VALIDATED_HEAD=a5e15a4b76af5f65a4ee1b2edff37a4b16564e69
+          STAGING=rebase/serial-entry-covers-preview-sync
+          FEATURE=feature/serial-entry-covers
+          git fetch origin preview "$FEATURE" "$STAGING"
+          test "$(git rev-parse origin/$FEATURE)" = "$EXPECTED_FEATURE"
+          test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
+          test "$(git rev-parse origin/$STAGING)" = "$VALIDATED_HEAD"
+          test "$(git merge-base origin/preview origin/$STAGING)" = "$EXPECTED_PREVIEW"
+          git push --force-with-lease=refs/heads/$FEATURE:$EXPECTED_FEATURE origin "$VALIDATED_HEAD:refs/heads/$FEATURE"
