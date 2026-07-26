@@ -7,7 +7,6 @@ import {
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
 } from "../src/serial-cover-provider";
-import { SerialCoverSelection } from "../src/serial-cover-selection";
 import { findSerialCoverCandidates } from "../src/serial-cover-service";
 import { resolveSerialEntryCoverPaths } from "../src/serial-cover-timeline";
 import { normalizeManualSerialCoverQuery } from "../src/serial-entry-cover";
@@ -60,21 +59,8 @@ test("manual cover search ranks against the edited title instead of the stored l
     originalTitle: "無職転生 ～異世界行ったら本気だす～",
   }, "20", "無職転生");
 
-  assert.deepEqual(keywords, ["無職転生 20"]);
+  assert.equal(keywords[0], "無職転生 20");
   assert.equal(results[0]?.sourceId, "267778");
-});
-
-test("search result refresh selects the best candidate and updates Apply availability", async () => {
-  const selection = new SerialCoverSelection([]);
-  assert.equal(selection.canApply, false);
-  selection.replace([candidate("20"), candidate("19", 180)]);
-  assert.equal(selection.selectedCandidate?.sourceId, "20");
-  assert.equal(selection.canApply, true);
-  assert.equal(await selection.apply(async (selected) => selected.sourceId), "20");
-  assert.equal(selection.canApply, true);
-  selection.replace([]);
-  assert.equal(selection.selectedCandidate, null);
-  assert.equal(selection.canApply, false);
 });
 
 test("rapid serial additions are processed in insertion order without skipping after failure", async () => {

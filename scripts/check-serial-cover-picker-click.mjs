@@ -14,7 +14,14 @@ await mkdir(output, { recursive: true });
 
 await build({
   absWorkingDir: root,
-  entryPoints: ["src/serial-cover-picker.ts"],
+  stdin: {
+    contents: `
+      export { renderSerialCoverCandidateRow } from "./src/serial-cover-picker";
+      export { SerialCoverDirectApply, directlyApplySerialCover } from "./src/serial-cover-direct-apply";
+    `,
+    resolveDir: root,
+    loader: "ts",
+  },
   outfile: path.join(output, "serial-cover-picker.js"),
   bundle: true,
   platform: "browser",
@@ -29,8 +36,7 @@ const html = `<!doctype html>
 <html>
 <body data-result="pending">
   <section class="al-serial-cover-modal">
-    <div class="al-search-results" role="listbox"></div>
-    <div class="al-modal-actions"><button type="button" class="mod-cta" disabled>Apply</button></div>
+    <div class="al-search-results"></div>
   </section>
   <script>
     function applyInfo(element, info) {
@@ -63,49 +69,60 @@ const html = `<!doctype html>
       { provider: "Bangumi", sourceId: "first", title: "Volume 1", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 100 },
       { provider: "Bangumi", sourceId: "second", title: "Volume 2", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 99 },
     ];
+    const modal = document.querySelector(".al-serial-cover-modal");
     const results = document.querySelector(".al-search-results");
-    const apply = document.querySelector(".al-modal-actions .mod-cta");
-    let selected = candidates[0];
+    const action = new SerialCoverPicker.SerialCoverDirectApply();
     let applied = "";
+    let loaded = "";
+    let closed = false;
 
-    const updateApply = () => { apply.disabled = selected === null; };
+    const finish = () => {
+      const rows = [...results.querySelectorAll("button.al-search-result")];
+      const passed = rows.length === 2
+        && rows.every((row) => row instanceof HTMLButtonElement && row.type === "button")
+        && !document.querySelector(".al-search-result-use")
+        && ![...document.querySelectorAll("button")].some((button) => button.textContent === "Apply" || button.textContent === "選用")
+        && loaded === "second"
+        && applied === "cover:second"
+        && closed
+        && modal.hidden;
+      document.body.dataset.result = passed ? "pass" : "fail";
+      document.body.dataset.loaded = loaded;
+      document.body.dataset.applied = applied;
+      document.body.dataset.closed = String(closed);
+      document.body.dataset.rowCount = String(rows.length);
+    };
+
     const render = () => {
       results.replaceChildren();
       for (const candidate of candidates) {
+        const applying = action.activeSourceId === candidate.sourceId;
         SerialCoverPicker.renderSerialCoverCandidateRow(results, candidate, {
-          selected: selected?.sourceId === candidate.sourceId,
-          selectLabel: "選用",
-          matchLabel: "Match score " + candidate.score,
-          onSelect: () => {
-            selected = candidate;
+          disabled: action.isApplying,
+          applying,
+          matchLabel: applying ? "Applying…" : "Match score " + candidate.score,
+          onChoose: () => {
+            const operation = SerialCoverPicker.directlyApplySerialCover(
+              action,
+              candidate,
+              async (selected) => {
+                loaded = selected.sourceId;
+                await Promise.resolve();
+                return "cover:" + selected.sourceId;
+              },
+              (cover) => { applied = cover; },
+              () => { closed = true; modal.hidden = true; },
+            );
             render();
-            updateApply();
+            operation.then(finish);
           },
         });
       }
     };
-    apply.addEventListener("click", () => { applied = selected?.sourceId || ""; });
-    render();
-    updateApply();
 
-    const initialEnabled = !apply.disabled;
-    const secondSelect = results.querySelectorAll("button.al-search-result-use")[1];
-    const nativeButton = secondSelect instanceof HTMLButtonElement && secondSelect.type === "button";
-    secondSelect.click();
-    apply.click();
-    const secondRow = results.querySelector('[data-source-id="second"]');
-    const passed = initialEnabled
-      && nativeButton
-      && selected?.sourceId === "second"
-      && secondRow?.classList.contains("is-selected")
-      && secondRow?.getAttribute("aria-selected") === "true"
-      && !apply.disabled
-      && applied === "second";
-    document.body.dataset.result = passed ? "pass" : "fail";
-    document.body.dataset.selected = selected?.sourceId || "";
-    document.body.dataset.applied = applied;
-    document.body.dataset.initialEnabled = String(initialEnabled);
-    document.body.dataset.nativeButton = String(nativeButton);
+    render();
+    const secondRow = results.querySelectorAll("button.al-search-result")[1];
+    secondRow.click();
   </script>
 </body>
 </html>`;
@@ -234,12 +251,12 @@ try {
 
   assert.deepEqual(dataset, {
     result: "pass",
-    selected: "second",
-    applied: "second",
-    initialEnabled: "true",
-    nativeButton: "true",
+    loaded: "second",
+    applied: "cover:second",
+    closed: "true",
+    rowCount: "2",
   });
-  console.log("Serial cover native Select and Apply Chromium click test passed.");
+  console.log("Serial cover card click directly applies and closes in Chromium.");
 } finally {
   socket?.close();
   if (chrome.exitCode === null && chrome.signalCode === null) {

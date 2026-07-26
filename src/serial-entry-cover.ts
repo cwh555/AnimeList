@@ -1,3 +1,4 @@
+import { collectChineseDiscoveryQueries, traditionalToSimplifiedQuery } from "./chinese-search-variants";
 import type { MediaType, NovelVolumeEntry } from "./types";
 
 export interface SerialCoverCandidate {
@@ -93,6 +94,34 @@ export function serialCoverQueries(originalTitle: string, label: string): string
   return [exact, `${shortTitle} ${normalizedLabel}`];
 }
 
+export function manualSerialCoverQueries(title: string, label: string): string[] {
+  const output: string[] = [];
+  const seen = new Set<string>();
+  const add = (candidate: string | null): void => {
+    const value = clean(candidate);
+    const key = comparable(value);
+    if (!value || !key || seen.has(key)) return;
+    seen.add(key);
+    output.push(value);
+  };
+
+  for (const candidate of serialCoverQueries(title, label)) add(candidate);
+
+  const compact = traditionalToSimplifiedQuery(clean(title))
+    .replace(/(?:關於|关于|关於|關于|這件事|这件事|不時|不时|有時|有时|同學|同学|的|我|被|以)/gu, "")
+    .replace(/[^\p{Script=Han}]+/gu, "");
+  const characters = [...compact];
+  if (characters.length >= 4) {
+    add(serialCoverQuery(characters.slice(0, 4).join(""), label));
+    add(serialCoverQuery(characters.slice(-4).join(""), label));
+  }
+
+  for (const variant of collectChineseDiscoveryQueries(title, 3)) {
+    add(serialCoverQuery(variant, label));
+  }
+  return output;
+}
+
 function labelPattern(label: string): RegExp {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`);
@@ -161,6 +190,60 @@ export function rankSerialCoverCandidates(
     .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title));
 }
 
+
+function manualTitleSimilarity(candidateTitle: string, queryTitle: string): number {
+  const candidateKey = comparable(candidateTitle);
+  const queryKey = comparable(queryTitle);
+  if (!candidateKey || !queryKey) return 0;
+  if (candidateKey === queryKey) return 100;
+  if (candidateKey.startsWith(queryKey)) return 82;
+  if (candidateKey.includes(queryKey)) return 70;
+  if (queryKey.includes(candidateKey)) return 52;
+  const queryCharacters = new Set(queryKey);
+  let shared = 0;
+  for (const character of new Set(candidateKey)) {
+    if (queryCharacters.has(character)) shared += 1;
+  }
+  return Math.round(35 * shared / Math.max(1, queryCharacters.size));
+}
+
+export function scoreManualSerialCoverCandidate(
+  candidate: SerialCoverCandidate,
+  queryTitle: string,
+  label: string,
+  mediaType?: Extract<MediaType, "manga" | "novel">,
+  referenceTitle?: string,
+): number {
+  if (!candidate.coverUrl) return Number.NEGATIVE_INFINITY;
+  let score = Math.max(
+    manualTitleSimilarity(candidate.title, queryTitle),
+    manualTitleSimilarity(candidate.title, referenceTitle ?? ""),
+  );
+  if (labelPattern(label).test(clean(candidate.title))) score += 44;
+  else if (label === "1" && [queryTitle, referenceTitle].some((title) => (
+    comparable(candidate.title) === comparable(title)
+  ))) score += 18;
+  else if (/\d+(?:\.5)?/u.test(clean(candidate.title))) score -= 12;
+  if (mediaType && candidate.mediaTypeHint === mediaType) score += 36;
+  else if (mediaType && candidate.mediaTypeHint && candidate.mediaTypeHint !== mediaType) score -= 10;
+  return score;
+}
+
+export function rankManualSerialCoverCandidates(
+  candidates: SerialCoverCandidate[],
+  queryTitle: string,
+  label: string,
+  mediaType?: Extract<MediaType, "manga" | "novel">,
+  referenceTitle?: string,
+): RankedSerialCoverCandidate[] {
+  return candidates
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreManualSerialCoverCandidate(candidate, queryTitle, label, mediaType, referenceTitle),
+    }))
+    .filter((candidate) => Number.isFinite(candidate.score))
+    .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title));
+}
 export function confidentSerialCover(
   candidates: RankedSerialCoverCandidate[],
 ): RankedSerialCoverCandidate | null {

@@ -39,8 +39,10 @@ assert.doesNotMatch(serialStyles, /\.status-(?:watching|reading|on_hold)/);
 assert.match(coverStyles, /\.animelist-modal \.al-volume-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
 assert.match(coverStyles, /\.al-serial-cover-button\s*\{[\s\S]*height:\s*102px;[\s\S]*width:\s*72px;/);
 assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-results\s*\{[\s\S]*overflow-y:\s*auto;/);
-assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result\.is-selected\s*\{/);
-assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result-use\s*\{[\s\S]*cursor:\s*pointer;/);
+assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result\s*\{[\s\S]*width:\s*100%;[\s\S]*text-align:\s*left;/);
+assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result:disabled\s*\{[\s\S]*cursor:\s*progress;/);
+assert.match(coverStyles, /\.al-serial-cover-modal \.al-search-result\.is-applying\s*\{/);
+assert.doesNotMatch(coverStyles, /al-search-result-use|is-selected/);
 assert.match(coverStyles, /\.modal-container \.al-serial-cover-migration-modal/);
 assert.match(coverStyles, /\.al-serial-cover-migration-status-card/);
 assert.match(coverStyles, /\.al-serial-cover-migration-metrics/);
@@ -57,14 +59,14 @@ assert.match(progressEditorSource, /originalEditor\) => originalEditor\.remove\(
 assert.doesNotMatch(progressEditorSource, /originalEditor\.hidden/);
 assert.match(progressEditorSource, /\.al-modal-actions > button\.mod-cta/);
 
-// The candidate picker must create a native Select button and route it directly to
-// the modal's existing selection callback. No document-level event bridge is used.
-assert.match(pickerSource, /row\.createEl\("button",\s*\{[\s\S]*cls:\s*"al-search-result-use"/);
-assert.match(pickerSource, /selectButton\.type\s*=\s*"button"/);
-assert.match(pickerSource, /selectButton\.addEventListener\("click",[\s\S]*options\.onSelect\(\)/);
-assert.match(pickerSource, /row\.setAttribute\("aria-selected"/);
-assert.match(coverFeatureSource, /renderSerialCoverCandidateRow\(results, candidate/);
-assert.match(coverFeatureSource, /this\.selection\.select\(candidate\);[\s\S]*renderResults\(\);/);
+// The whole candidate card is the only action. There is no Select affordance or
+// secondary Apply button/state; clicking a card downloads, commits, and closes.
+assert.match(pickerSource, /container\.createEl\("button",\s*\{[\s\S]*al-search-result/);
+assert.match(pickerSource, /row\.type\s*=\s*"button"/);
+assert.match(pickerSource, /row\.addEventListener\("click",\s*options\.onChoose\)/);
+assert.doesNotMatch(pickerSource, /al-search-result-use|selectLabel|aria-selected/);
+assert.match(coverFeatureSource, /directlyApplySerialCover\([\s\S]*downloadSelectedSerialCover[\s\S]*this\.applyCover[\s\S]*this\.close\(\)/);
+assert.doesNotMatch(coverFeatureSource, /applyButton|SerialCoverSelection|this\.selection/);
 assert.doesNotMatch(pluginEntrySource, /installSerialCoverPickerEvents/);
 
 // The settings action opens a dedicated modal instead of rendering an inline
