@@ -1,4 +1,4 @@
-name: Export serial cover follow-up source
+name: Probe Mushoku Tensei high-volume covers
 
 on:
   pull_request:
@@ -7,24 +7,57 @@ permissions:
   contents: read
 
 jobs:
-  export:
+  probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Export exact feature head
+      - name: Probe Bangumi search results
         run: |
-          git fetch origin feature/serial-entry-covers
-          git checkout --detach origin/feature/serial-entry-covers
-          git rev-parse HEAD > /tmp/feature-head.txt
-          tar --exclude=.git --exclude=node_modules --exclude=.tmp -czf /tmp/serial-cover-followup-source.tar.gz .
-          cp /tmp/feature-head.txt .
-          cp /tmp/serial-cover-followup-source.tar.gz .
+          python - <<'PY'
+          import json
+          import time
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          original = "無職転生 ～異世界行ったら本気だす～"
+          volumes = list(range(14, 27))
+          report = []
+          headers = {
+              "Accept": "application/json",
+              "Content-Type": "application/json",
+              "User-Agent": "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)",
+          }
+
+          def search(keyword):
+              url = "https://api.bgm.tv/v0/search/subjects?limit=50&offset=0"
+              body = json.dumps({"keyword": keyword, "sort": "match", "filter": {"type": [1]}}, ensure_ascii=False).encode("utf-8")
+              request = urllib.request.Request(url, data=body, headers=headers)
+              with urllib.request.urlopen(request, timeout=45) as response:
+                  return response.status, json.loads(response.read().decode("utf-8"))
+
+          for volume in volumes:
+              row = {"volume": volume, "queries": []}
+              for keyword in [f"{original} {volume}", f"無職転生 {volume}"]:
+                  status, payload = search(keyword)
+                  candidates = []
+                  for item in payload.get("data", []):
+                      candidates.append({
+                          "id": item.get("id"),
+                          "name": item.get("name"),
+                          "name_cn": item.get("name_cn"),
+                          "platform": item.get("platform"),
+                          "meta_tags": item.get("meta_tags"),
+                          "images": item.get("images"),
+                      })
+                  row["queries"].append({"keyword": keyword, "status": status, "total": payload.get("total"), "candidates": candidates})
+                  print(json.dumps({"volume": volume, "keyword": keyword, "total": payload.get("total"), "names": [c.get("name") for c in candidates[:10]]}, ensure_ascii=False), flush=True)
+                  time.sleep(1)
+              report.append(row)
+          Path("mushoku-high-volume-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+          PY
       - uses: actions/upload-artifact@v6
         with:
-          name: serial-cover-followup-source
-          path: |
-            feature-head.txt
-            serial-cover-followup-source.tar.gz
+          name: mushoku-high-volume-report
+          path: mushoku-high-volume-report.json
           retention-days: 1
