@@ -32,6 +32,7 @@ await writeFile(entryFile, [
   'import "../../tests/score-dashboard-drag-scroll.test.ts";',
   'import "../../tests/serial-entry-cover.test.ts";',
   'import "../../tests/serial-cover-workflow.test.ts";',
+  'import "../../tests/serial-cover-migration-modal.test.ts";',
   "",
 ].join("\n"));
 try {

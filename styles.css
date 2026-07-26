@@ -911,6 +911,10 @@
   padding-right: 4px;
 }
 
+.al-serial-cover-modal .al-search-result {
+  cursor: pointer;
+}
+
 .al-serial-cover-modal .al-search-result.is-selected {
   border-color: var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
@@ -922,6 +926,20 @@
   outline-offset: 2px;
 }
 
+.al-serial-cover-modal .al-search-result-use {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.al-serial-cover-modal .al-search-result-use:hover,
+.al-serial-cover-modal .al-search-result-use:focus-visible {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  outline: none;
+}
+
 .al-serial-cover-modal .al-modal-actions {
   position: sticky;
   bottom: 0;
@@ -929,16 +947,106 @@
   background: var(--background-primary);
 }
 
+.modal-container .al-serial-cover-migration-modal.al-serial-cover-migration-modal {
+  width: min(680px, calc(100vw - 28px));
+  max-width: 680px;
+}
+
+.al-serial-cover-migration-description {
+  margin-bottom: 16px;
+}
+
+.al-serial-cover-migration-status-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-secondary);
+}
+
+.al-serial-cover-migration-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.al-serial-cover-migration-phase {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--text-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  font-size: var(--font-ui-smaller);
+  font-weight: 700;
+}
+
+.al-serial-cover-migration-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.al-serial-cover-migration-message {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .al-serial-cover-migration-progress {
-  margin-top: 8px;
   width: 100%;
+  height: 9px;
+  accent-color: var(--interactive-accent);
+}
+
+.al-serial-cover-migration-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.al-serial-cover-migration-metric {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary-alt);
+  text-align: center;
+}
+
+.al-serial-cover-migration-metric-value {
+  color: var(--text-normal);
+  font-size: 1.05rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.al-serial-cover-migration-metric-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
 }
 
 .al-serial-cover-report {
-  margin-top: 8px;
-  max-height: 220px;
+  max-height: min(32vh, 260px);
+  margin: 12px 0 0;
   overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  background: var(--background-primary-alt);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.al-serial-cover-migration-actions {
+  margin-top: 14px;
 }
 
 @media (max-width: 700px) {
@@ -953,6 +1061,10 @@
 
   .animelist-modal .al-volume-row-actions {
     grid-column: 1 / -1;
+  }
+
+  .al-serial-cover-migration-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 /* END GENERATED FEATURE STYLES */

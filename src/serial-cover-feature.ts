@@ -1,6 +1,7 @@
 import { Modal, Notice, TFile, setIcon } from "obsidian";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
 import { SerialCoverLoadQueue } from "./serial-cover-load-queue";
+import { renderSerialCoverCandidateRow } from "./serial-cover-picker";
 import { SerialCoverSelection } from "./serial-cover-selection";
 import { resolveSerialEntryCoverPaths } from "./serial-cover-timeline";
 import type AnimeListPlugin from "./main";
@@ -131,26 +132,16 @@ class CoverSelector extends Modal {
         return;
       }
 
+      results.setAttribute("role", "listbox");
       for (const candidate of this.candidates) {
-        const row = results.createEl("button", {
-          cls: `al-search-result${selected?.sourceId === candidate.sourceId ? " is-selected" : ""}`,
-        });
-        row.type = "button";
-        row.setAttribute("aria-pressed", selected?.sourceId === candidate.sourceId ? "true" : "false");
-        const image = row.createEl("img");
-        image.src = candidate.coverUrl;
-        image.alt = candidate.title;
-        image.loading = "lazy";
-        const body = row.createDiv({ cls: "al-search-result-body" });
-        body.createEl("strong", { text: candidate.title });
-        body.createEl("span", { text: candidate.provider });
-        body.createEl("span", {
-          text: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
-        });
-        row.createSpan({ cls: "al-search-result-use", text: uiText("action.select") });
-        row.addEventListener("click", () => {
-          this.selection.select(candidate);
-          renderResults();
+        renderSerialCoverCandidateRow(results, candidate, {
+          selected: selected?.sourceId === candidate.sourceId,
+          selectLabel: uiText("action.select"),
+          matchLabel: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+          onSelect: () => {
+            this.selection.select(candidate);
+            renderResults();
+          },
         });
       }
       updateControls();
