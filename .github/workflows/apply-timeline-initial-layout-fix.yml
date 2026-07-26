@@ -1,0 +1,219 @@
+name: Apply timeline initial layout fix
+
+on:
+  pull_request:
+    branches:
+      - preview
+    paths:
+      - .github/workflows/apply-timeline-initial-layout-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.head_ref == 'fix/timeline-initial-layout-and-units'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/timeline-initial-layout-and-units
+          fetch-depth: 0
+
+      - name: Apply thin timeline UI integration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "src/legacy.ts",
+              '  centerTimelinePoint,\n',
+              '  centerTimelineLatestDateAndAxis,\n',
+          )
+          replace_once(
+              "src/legacy.ts",
+              '} from "./timeline-scale";\n\nconst PLUGIN_VERSION',
+              '} from "./timeline-scale";\nimport { timelineSerialLabel } from "./timeline-entry";\n\nconst PLUGIN_VERSION',
+          )
+          replace_once(
+              "src/legacy.ts",
+              '          text.appendChild(makeEl("span", "al-timeline-volume-label", uiText("timeline.volumeLabel", { volume: item.volumeLabel })));',
+              '          text.appendChild(makeEl("span", "al-timeline-volume-label", timelineSerialLabel(item, item.volumeLabel)));',
+          )
+          replace_once(
+              "src/legacy.ts",
+              '''    const centerLatestItem = () => {
+              const pan = centerTimelinePoint(
+                viewport.clientWidth,
+                viewport.clientHeight,
+                state.latestItemCenterX,
+                state.latestItemCenterY,
+                state.viewScale,
+              );''',
+              '''    const centerLatestItem = () => {
+              const pan = centerTimelineLatestDateAndAxis(
+                viewport.clientWidth,
+                viewport.clientHeight,
+                state.latestItemCenterX,
+                state.axisY,
+                state.viewScale,
+              );''',
+          )
+
+          replace_once(
+              "tests/timeline-scale.test.ts",
+              '''  it("initializes and restores the latest timeline card at viewport center", () => {
+              installFakeDom();
+              const container = new FakeElement("div");
+              legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
+                maxStackDepth: 3,
+              });
+
+              const viewport = descendantsByClass(container, "al-timeline-viewport")[0];
+              const scene = descendantsByClass(container, "al-timeline-scene")[0];
+              const latest = descendantsByClass(container, "al-timeline-card")
+                .find((card) => card.title.includes("Newest"));
+              assert.ok(latest);
+
+              const initialCenter = screenCenter(latest, scene);
+              assert.equal(initialCenter.x, viewport.clientWidth / 2);
+              assert.equal(initialCenter.y, viewport.clientHeight / 2);
+
+              descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
+              descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
+
+              const restoredLatest = descendantsByClass(container, "al-timeline-card")
+                .find((card) => card.title.includes("Newest"));
+              assert.ok(restoredLatest);
+              const restoredCenter = screenCenter(restoredLatest, scene);
+              assert.equal(restoredCenter.x, viewport.clientWidth / 2);
+              assert.equal(restoredCenter.y, viewport.clientHeight / 2);
+            });''',
+              '''  it("centers the latest date horizontally and the timeline axis vertically", () => {
+              installFakeDom();
+              const container = new FakeElement("div");
+              legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
+                maxStackDepth: 3,
+              });
+
+              const viewport = descendantsByClass(container, "al-timeline-viewport")[0];
+              const scene = descendantsByClass(container, "al-timeline-scene")[0];
+              const latest = descendantsByClass(container, "al-timeline-card")
+                .find((card) => card.title.includes("Newest"));
+              const initialAxis = descendantsByClass(container, "al-timeline-axis")[0];
+              assert.ok(latest);
+
+              const initialCenter = screenCenter(latest, scene);
+              const initialTransform = parseTransform(scene.style.transform);
+              const initialAxisScreenY = initialTransform.y
+                + Number.parseFloat(initialAxis.style.top) * initialTransform.scale;
+              assert.equal(initialCenter.x, viewport.clientWidth / 2);
+              assert.equal(initialAxisScreenY, viewport.clientHeight / 2);
+
+              descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
+              descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
+
+              const restoredLatest = descendantsByClass(container, "al-timeline-card")
+                .find((card) => card.title.includes("Newest"));
+              const restoredAxis = descendantsByClass(container, "al-timeline-axis")[0];
+              assert.ok(restoredLatest);
+              const restoredCenter = screenCenter(restoredLatest, scene);
+              const restoredTransform = parseTransform(scene.style.transform);
+              const restoredAxisScreenY = restoredTransform.y
+                + Number.parseFloat(restoredAxis.style.top) * restoredTransform.scale;
+              assert.equal(restoredCenter.x, viewport.clientWidth / 2);
+              assert.equal(restoredAxisScreenY, viewport.clientHeight / 2);
+            });''',
+          )
+
+          marker = '''  it("keeps the timeline axis at the same screen y while wheel-scaling time", () => {'''
+          unit_test = '''  it("renders dated entries with their configured reading units", () => {
+              installFakeDom();
+              const container = new FakeElement("div");
+              const chapter = {
+                ...timelineItem(0),
+                title: "Chapter work",
+                mediaType: "manga",
+                unit: "chapter",
+                status: "ongoing",
+                completedAt: "",
+                volumeLog: [{ label: "10", startedAt: "", completedAt: "2026-07-01" }],
+              };
+              const season = {
+                ...timelineItem(1),
+                title: "Season work",
+                mediaType: "novel",
+                unit: "season",
+                status: "ongoing",
+                completedAt: "",
+                volumeLog: [{ label: "2", startedAt: "", completedAt: "2026-07-02" }],
+              };
+              const volume = {
+                ...timelineItem(2),
+                title: "Volume work",
+                mediaType: "novel",
+                unit: "volume",
+                status: "ongoing",
+                completedAt: "",
+                volumeLog: [{ label: "3", startedAt: "", completedAt: "2026-07-03" }],
+              };
+
+              legacyTest.TimelineUI.render(container, [chapter, season, volume], {
+                maxStackDepth: 3,
+              });
+
+              assert.deepEqual(
+                descendantsByClass(container, "al-timeline-volume-label").map((label) => label.textContent),
+                ["第 10 話", "第 2 季", "第 3 卷"],
+              );
+            });
+
+          '''
+          replace_once("tests/timeline-scale.test.ts", marker, unit_test + marker)
+
+          Path(".github/workflows/apply-timeline-initial-layout-fix.yml").unlink()
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run complete checks
+        run: npm run check
+
+      - name: Run release checks
+        run: npm run release:check
+
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
+
+      - name: Publish validated product commit
+        shell: bash
+        run: |
+          git diff --check
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/legacy.ts \
+            src/novel-progress.ts \
+            src/progress-unit-feature-text.ts \
+            src/timeline-entry.ts \
+            src/timeline-scale.ts \
+            tests/progress-units.test.ts \
+            tests/timeline-scale.test.ts \
+            tests/timeline-scale-work-items.test.ts \
+            .github/workflows/apply-timeline-initial-layout-fix.yml
+          git commit -m "fix: restore timeline initialization behavior"
+          git push origin HEAD:fix/timeline-initial-layout-and-units
