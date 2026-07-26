@@ -1,5 +1,5 @@
 name: Sync serial cover feature with preview
-run-name: Inspect serial cover preview rebase
+run-name: Validate serial cover preview rebase
 
 on:
   pull_request:
@@ -32,31 +32,51 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_FEATURE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git rebase origin/preview; then
-            echo success=true >> "$GITHUB_OUTPUT"
-            printf 'rebase=success\nhead=%s\n' "$(git rev-parse HEAD)" > rebase-report.txt
-          else
-            status=$?
+
+          resolved_styles=0
+          git rebase origin/preview
+          status=$?
+          while [ "$status" -ne 0 ]; do
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if [ "${#conflicts[@]}" -eq 1 ] && [ "${conflicts[0]}" = "styles.css" ]; then
+              # styles.css is generated from feature stylesheets. Preserve the latest
+              # preview artifact during replay, then regenerate after the rebase.
+              git checkout --ours -- styles.css
+              git add styles.css
+              resolved_styles=$((resolved_styles + 1))
+              GIT_EDITOR=true git rebase --continue
+              status=$?
+              continue
+            fi
+
             echo success=false >> "$GITHUB_OUTPUT"
             {
               echo 'rebase=conflict'
+              echo "generated-style-conflicts-resolved=$resolved_styles"
               echo 'unmerged-files:'
-              git diff --name-only --diff-filter=U
+              printf '%s\n' "${conflicts[@]}"
               echo
               echo 'status:'
               git status --short
             } > rebase-report.txt
             mkdir -p rebase-conflicts
-            while IFS= read -r file; do
+            for file in "${conflicts[@]}"; do
               [ -n "$file" ] || continue
               mkdir -p "rebase-conflicts/$(dirname "$file")"
               cp "$file" "rebase-conflicts/$file" 2>/dev/null || true
               git show ":1:$file" > "rebase-conflicts/${file}.base" 2>/dev/null || true
               git show ":2:$file" > "rebase-conflicts/${file}.ours" 2>/dev/null || true
               git show ":3:$file" > "rebase-conflicts/${file}.theirs" 2>/dev/null || true
-            done < <(git diff --name-only --diff-filter=U)
+            done
             exit "$status"
-          fi
+          done
+
+          echo success=true >> "$GITHUB_OUTPUT"
+          {
+            echo 'rebase=success'
+            echo "generated-style-conflicts-resolved=$resolved_styles"
+            echo "head=$(git rev-parse HEAD)"
+          } > rebase-report.txt
       - name: Install dependencies
         if: steps.rebase.outputs.success == 'true'
         run: npm ci
@@ -74,6 +94,18 @@ jobs:
         env:
           ANIMELIST_TEST_VAULT_NO_OPEN: "1"
         run: npm run test-vault
+      - name: Commit regenerated stylesheet
+        if: steps.rebase.outputs.success == 'true'
+        run: |
+          mapfile -t changed < <(git status --porcelain | sed 's/^...//')
+          if [ "${#changed[@]}" -gt 0 ]; then
+            printf '%s\n' "${changed[@]}"
+            test "${#changed[@]}" -eq 1
+            test "${changed[0]}" = "styles.css"
+            git add styles.css
+            git commit -m "build: regenerate styles after preview sync"
+          fi
+          echo "validated_head=$(git rev-parse HEAD)" >> rebase-report.txt
       - name: Publish validated staging rebase
         if: steps.rebase.outputs.success == 'true'
         run: |
