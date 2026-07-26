@@ -86,7 +86,7 @@ function correctTimelineEntryCopy(root: HTMLElement, items: readonly MediaItem[]
 function createDateLink(scene: HTMLElement, anchorX: number, cardX: number, axisY: number): void {
   const distance = Math.abs(cardX - anchorX);
   if (distance < 0.5) return;
-  const link = scene.createDiv({ cls: "al-timeline-stem al-timeline-date-link" });
+  const link = scene.createDiv({ cls: "al-timeline-axis al-timeline-date-link" });
   link.style.left = `${Math.min(anchorX, cardX)}px`;
   link.style.top = `${axisY}px`;
   link.style.width = `${distance}px`;
@@ -98,12 +98,12 @@ function applyDefaultTimelineLayout(
 ): boolean {
   const viewport = root.querySelector<HTMLElement>(".al-timeline-viewport");
   const scene = root.querySelector<HTMLElement>(".al-timeline-scene");
-  const axis = root.querySelector<HTMLElement>(".al-timeline-axis");
+  const axis = root.querySelector<HTMLElement>(".al-timeline-axis:not(.al-timeline-date-link)");
   if (!viewport || !scene || !axis) return false;
 
   scene.querySelectorAll(".al-timeline-date-link").forEach((element) => element.remove());
   const cards = [...scene.querySelectorAll<HTMLElement>(".al-timeline-card")];
-  const stems = [...scene.querySelectorAll<HTMLElement>(".al-timeline-stem:not(.al-timeline-date-link)")];
+  const stems = [...scene.querySelectorAll<HTMLElement>(".al-timeline-stem")];
   if (!cards.length || cards.length !== stems.length) return false;
 
   const anchors = cards.map((card) => {
