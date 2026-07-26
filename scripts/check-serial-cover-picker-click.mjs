@@ -23,6 +23,7 @@ const compiled = spawnSync(tsc, [
   "--module", "ES2022",
   "--moduleResolution", "Bundler",
   "--lib", "ES2022,DOM,DOM.Iterable",
+  "--types", "obsidian",
   "--skipLibCheck",
   "--rootDir", "src",
   "--outDir", output,
