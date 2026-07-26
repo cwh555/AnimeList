@@ -9,9 +9,9 @@ import {
   normalizeSerialLog,
   normalizeSerialProgress,
   progressUnitsFor,
-  serializeSerialLog,
 } from "./progress-units";
 import type { ReadingProgressUnit } from "./progress-units";
+import { applyReadingProgressSnapshot } from "./reading-progress-persistence";
 import {
   progressUnitFeatureText,
   progressUnitLabel,
@@ -267,6 +267,7 @@ function validateAndPrepare(state: ProgressEditorState): void {
     }
     seen.add(label);
     entries.push({
+      ...entry,
       label,
       startedAt: entry.startedAt,
       completedAt: entry.completedAt || todayString(),
@@ -290,12 +291,11 @@ function validateAndPrepare(state: ProgressEditorState): void {
 }
 
 function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {
-  frontmatter.progress_unit = state.unit;
-  frontmatter.progress = state.preparedProgress;
-  const entries = serializeSerialLog(state.entries, state.unit);
-  // Retain the existing key so older novel notes remain compatible.
-  if (entries.length) frontmatter.volume_log = entries;
-  else delete frontmatter.volume_log;
+  applyReadingProgressSnapshot(frontmatter, {
+    unit: state.unit,
+    progress: state.preparedProgress,
+    entries: state.entries,
+  });
 }
 
 export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void {
@@ -372,11 +372,8 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
       replaceUnitOptions(unitSelect, mediaType, selected);
     }
 
-    const originalEditor = form.querySelector<HTMLElement>(".al-volume-editor");
-    if (originalEditor) {
-      originalEditor.hidden = true;
-      originalEditor.setAttribute("aria-hidden", "true");
-    }
+    form.querySelectorAll<HTMLElement>(".al-volume-editor:not(.al-progress-unit-editor)")
+      .forEach((originalEditor) => originalEditor.remove());
     const editor = document.createElement("section");
     editor.className = "al-volume-editor al-progress-unit-editor";
     const favorite = form.querySelector(".al-form-checkbox");
@@ -422,7 +419,7 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
 
   const handleClick = (event: MouseEvent): void => {
     if (!isElement(event.target)) return;
-    const button = event.target.closest<HTMLButtonElement>("button.mod-cta");
+    const button = event.target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta");
     const modal = button?.closest<HTMLElement>(".animelist-modal");
     if (!button || !modal) return;
     const state = states.get(modal);
