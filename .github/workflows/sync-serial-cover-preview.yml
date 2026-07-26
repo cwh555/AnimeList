@@ -23,13 +23,14 @@ jobs:
         id: rebase
         shell: bash
         run: |
+          set +e
           set -o pipefail
           EXPECTED_FEATURE=c50e88fc0ca5078c0e2d6a039e40f26ab543999d
           EXPECTED_PREVIEW=00027a57bbabd64c0939ea73980c8973c3e95cd2
           git fetch origin preview feature/serial-entry-covers rebase/serial-entry-covers-preview-sync
-          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE"
-          test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
-          test "$(git rev-parse HEAD)" = "$EXPECTED_FEATURE"
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE" || exit 1
+          test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW" || exit 1
+          test "$(git rev-parse HEAD)" = "$EXPECTED_FEATURE" || exit 1
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
