@@ -55,13 +55,9 @@
 }
 
 .al-serial-cover-modal .al-search-result {
+  width: 100%;
   cursor: pointer;
-}
-
-.al-serial-cover-modal .al-search-result.is-selected {
-  border-color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
-  box-shadow: 0 0 0 1px var(--interactive-accent);
+  text-align: left;
 }
 
 .al-serial-cover-modal .al-search-result:focus-visible {
@@ -69,25 +65,14 @@
   outline-offset: 2px;
 }
 
-.al-serial-cover-modal .al-search-result-use {
-  appearance: none;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
+.al-serial-cover-modal .al-search-result:disabled {
+  cursor: progress;
+  opacity: 0.68;
 }
 
-.al-serial-cover-modal .al-search-result-use:hover,
-.al-serial-cover-modal .al-search-result-use:focus-visible {
-  color: var(--text-on-accent);
-  background: var(--interactive-accent);
-  outline: none;
-}
-
-.al-serial-cover-modal .al-modal-actions {
-  position: sticky;
-  bottom: 0;
-  padding-top: 12px;
-  background: var(--background-primary);
+.al-serial-cover-modal .al-search-result.is-applying {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
 .modal-container .al-serial-cover-migration-modal.al-serial-cover-migration-modal {

@@ -1,8 +1,8 @@
 import { Modal, Notice, TFile, setIcon } from "obsidian";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
+import { directlyApplySerialCover, SerialCoverDirectApply } from "./serial-cover-direct-apply";
 import { SerialCoverLoadQueue } from "./serial-cover-load-queue";
 import { renderSerialCoverCandidateRow } from "./serial-cover-picker";
-import { SerialCoverSelection } from "./serial-cover-selection";
 import { resolveSerialEntryCoverPaths } from "./serial-cover-timeline";
 import type AnimeListPlugin from "./main";
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "./serial-entry-cover";
@@ -59,7 +59,7 @@ function refreshRows(context: EditorContext): void {
 }
 
 class CoverSelector extends Modal {
-  private readonly selection: SerialCoverSelection;
+  private readonly directApply = new SerialCoverDirectApply();
   private candidates: RankedSerialCoverCandidate[];
   private query: string;
 
@@ -72,7 +72,6 @@ class CoverSelector extends Modal {
   ) {
     super(pluginRef.app);
     this.candidates = [...candidates];
-    this.selection = new SerialCoverSelection(this.candidates);
     this.query = serialCoverQuery(context.originalTitle, label) ?? context.originalTitle;
   }
 
@@ -101,47 +100,53 @@ class CoverSelector extends Modal {
       text: serialCoverText("searchHint"),
     });
     const results = this.contentEl.createDiv({ cls: "al-search-results" });
-    const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const cancelButton = footer.createEl("button", { text: uiText("action.cancel") });
-    cancelButton.type = "button";
-    const applyButton = footer.createEl("button", {
-      cls: "mod-cta",
-      text: serialCoverText("apply"),
-    });
-    applyButton.type = "button";
-
     let searching = false;
 
     const updateControls = (): void => {
-      input.disabled = searching || this.selection.isApplying;
-      searchButton.disabled = searching || this.selection.isApplying;
+      const busy = searching || this.directApply.isApplying;
+      input.disabled = busy;
+      searchButton.disabled = busy;
       searchButton.setText(searching ? serialCoverText("searching") : uiText("action.search"));
-      cancelButton.disabled = this.selection.isApplying;
-      applyButton.disabled = searching || !this.selection.canApply;
-      applyButton.setText(this.selection.isApplying
-        ? serialCoverText("applying")
-        : serialCoverText("apply"));
+    };
+
+    const chooseCandidate = async (candidate: RankedSerialCoverCandidate): Promise<void> => {
+      if (searching || this.directApply.isApplying) return;
+      const operation = directlyApplySerialCover(
+        this.directApply,
+        candidate,
+        (selected) => downloadSelectedSerialCover(this.pluginRef, this.context, selected, true),
+        this.applyCover,
+        () => this.close(),
+      );
+      renderResults();
+      updateControls();
+      try {
+        await operation;
+      } catch (error) {
+        console.error("AnimeList serial cover apply failed", error);
+        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
+        renderResults();
+        updateControls();
+      }
     };
 
     const renderResults = (): void => {
       results.empty();
-      const selected = this.selection.selectedCandidate;
       if (!this.candidates.length) {
         results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
         updateControls();
         return;
       }
 
-      results.setAttribute("role", "listbox");
       for (const candidate of this.candidates) {
+        const applying = this.directApply.activeSourceId === candidate.sourceId;
         renderSerialCoverCandidateRow(results, candidate, {
-          selected: selected?.sourceId === candidate.sourceId,
-          selectLabel: uiText("action.select"),
-          matchLabel: serialCoverText("matchScore", { score: Math.round(candidate.score) }),
-          onSelect: () => {
-            this.selection.select(candidate);
-            renderResults();
-          },
+          disabled: searching || this.directApply.isApplying,
+          applying,
+          matchLabel: applying
+            ? serialCoverText("applying")
+            : serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+          onChoose: () => void chooseCandidate(candidate),
         });
       }
       updateControls();
@@ -155,20 +160,20 @@ class CoverSelector extends Modal {
       }
       searching = true;
       updateControls();
+      renderResults();
       try {
         this.query = query;
         this.candidates = await findSerialCoverCandidates(this.context, this.label, query);
-        this.selection.replace(this.candidates);
         renderResults();
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
         this.candidates = [];
-        this.selection.replace([]);
         renderResults();
         new Notice(error instanceof Error ? error.message : serialCoverText("notFound"));
       } finally {
         searching = false;
+        renderResults();
         updateControls();
       }
     };
@@ -178,25 +183,6 @@ class CoverSelector extends Modal {
       if (event.key !== "Enter") return;
       event.preventDefault();
       void runSearch();
-    });
-    cancelButton.addEventListener("click", () => this.close());
-    applyButton.addEventListener("click", () => {
-      if (!this.selection.selectedCandidate) {
-        new Notice(serialCoverText("selectCandidate"));
-        return;
-      }
-      updateControls();
-      void this.selection.apply((candidate) => (
-        downloadSelectedSerialCover(this.pluginRef, this.context, candidate, true)
-      )).then((cover) => {
-        if (!cover) return;
-        this.applyCover(cover);
-        this.close();
-      }).catch((error) => {
-        console.error("AnimeList serial cover apply failed", error);
-        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
-      }).finally(updateControls);
-      updateControls();
     });
 
     renderResults();
@@ -287,7 +273,7 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
     if (!query) return;
     status.setText(serialCoverText("loading"));
     try {
-      const candidates = await findSerialCoverCandidates(context, label);
+      const candidates = await findSerialCoverCandidates(context, label, query);
       new CoverSelector(plugin, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
         context.autoStatus.delete(label);

@@ -1,6 +1,8 @@
 import { requestUrl } from "obsidian";
 import {
   confidentSerialCover,
+  manualSerialCoverQueries,
+  rankManualSerialCoverCandidates,
   rankSerialCoverCandidates,
   serialCoverQueries,
   type RankedSerialCoverCandidate,
@@ -187,7 +189,11 @@ function deduplicateCandidates(candidates: SerialCoverCandidate[]): SerialCoverC
   return output;
 }
 
-async function searchBangumi(query: string, mediaType: SerialMediaType): Promise<SerialCoverCandidate[]> {
+async function searchBangumi(
+  query: string,
+  mediaType: SerialMediaType,
+  strictMediaType = true,
+): Promise<SerialCoverCandidate[]> {
   const payload = record(await requestWithBackoff({
     url: `${BANGUMI_SEARCH_URL}?limit=50&offset=0`,
     method: "POST",
@@ -198,10 +204,11 @@ async function searchBangumi(query: string, mediaType: SerialMediaType): Promise
     },
     body: JSON.stringify({ keyword: query, sort: "match", filter: { type: [1] } }),
   }));
+  const opposite = mediaType === "novel" ? "manga" : "novel";
   const candidates = asArray(payload?.data)
     .map(bangumiCandidate)
     .filter((candidate): candidate is SerialCoverCandidate => (
-      candidate !== null && candidate.mediaTypeHint !== (mediaType === "novel" ? "manga" : "novel")
+      candidate !== null && (!strictMediaType || candidate.mediaTypeHint !== opposite)
     ))
     .sort((left, right) => Number(right.mediaTypeHint === mediaType) - Number(left.mediaTypeHint === mediaType))
     .map((candidate) => candidate.mediaTypeHint
@@ -274,6 +281,52 @@ async function requestSerialCovers(
   return [];
 }
 
+async function requestManualSerialCovers(
+  query: string,
+  queryTitle: string,
+  referenceTitle: string,
+  label: string,
+  mediaType: SerialMediaType,
+): Promise<RankedSerialCoverCandidate[]> {
+  const queries: string[] = [];
+  const seenQueries = new Set<string>();
+  for (const candidateQuery of [
+    query,
+    ...manualSerialCoverQueries(queryTitle, label),
+    ...manualSerialCoverQueries(referenceTitle, label),
+  ]) {
+    const key = candidateQuery.normalize("NFKC").trim();
+    if (!key || seenQueries.has(key)) continue;
+    seenQueries.add(key);
+    queries.push(candidateQuery);
+  }
+
+  let bangumiCandidates: SerialCoverCandidate[] = [];
+  let bangumiError: unknown;
+  for (const bangumiQuery of queries) {
+    try {
+      bangumiCandidates = deduplicateCandidates([
+        ...bangumiCandidates,
+        ...await searchBangumi(bangumiQuery, mediaType, false),
+      ]);
+    } catch (error) {
+      bangumiError ??= error;
+    }
+  }
+
+  if (bangumiCandidates.length > 0) {
+    return rankManualSerialCoverCandidates(bangumiCandidates, queryTitle, label, mediaType, referenceTitle);
+  }
+  if (apiKey) {
+    const googleCandidates = await searchGoogleBooks(query);
+    if (googleCandidates.length > 0) {
+      return rankManualSerialCoverCandidates(googleCandidates, queryTitle, label, mediaType, referenceTitle);
+    }
+  }
+  if (bangumiError !== undefined) throw bangumiError;
+  return [];
+}
+
 export async function searchSerialCovers(
   query: string,
   originalTitle: string,
@@ -287,6 +340,32 @@ export async function searchSerialCovers(
   if (pending !== undefined) return pending;
 
   const request = enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType))
+    .then((value) => {
+      resultCache.set(key, {
+        expiresAt: Date.now() + (value.length ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS),
+        value,
+      });
+      return value;
+    })
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, request);
+  return request;
+}
+
+export async function searchManualSerialCovers(
+  query: string,
+  queryTitle: string,
+  referenceTitle: string,
+  label: string,
+  mediaType: SerialMediaType,
+): Promise<RankedSerialCoverCandidate[]> {
+  const key = `manual:${mediaType}:${query.normalize("NFKC").trim()}:${referenceTitle.normalize("NFKC").trim()}`;
+  const cached = resultCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = inFlight.get(key);
+  if (pending !== undefined) return pending;
+
+  const request = enqueue(() => requestManualSerialCovers(query, queryTitle, referenceTitle, label, mediaType))
     .then((value) => {
       resultCache.set(key, {
         expiresAt: Date.now() + (value.length ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS),

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   confidentSerialCover,
+  manualSerialCoverQueries,
+  rankManualSerialCoverCandidates,
   rankSerialCoverCandidates,
   selectOriginalTitle,
   serialCoverQueries,
@@ -12,11 +14,12 @@ import {
   missingSerialCoverEntryCount,
 } from "../src/serial-cover-migration";
 import { setRequestUrlMock } from "./mocks/obsidian";
-import { SerialCoverSelection } from "../src/serial-cover-selection";
+import { directlyApplySerialCover, SerialCoverDirectApply } from "../src/serial-cover-direct-apply";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
+  searchManualSerialCovers,
   searchSerialCovers,
 } from "../src/serial-cover-provider";
 
@@ -286,27 +289,98 @@ test("Mushoku Tensei high-volume novel titles remain confident", () => {
   }
 });
 
-test("manual serial cover selection defaults to the best result and applies once", async () => {
-  const first = { provider: "Bangumi", sourceId: "14", title: "無職転生 (14)", coverUrl: "14.jpg", infoUrl: "", score: 200 };
-  const second = { provider: "Bangumi", sourceId: "15", title: "無職転生 (15)", coverUrl: "15.jpg", infoUrl: "", score: 180 };
-  const selection = new SerialCoverSelection([first, second]);
-  assert.equal(selection.selectedCandidate?.sourceId, "14");
-  assert.equal(selection.canApply, true);
-  selection.select(second);
-  let applied = "";
-  const result = await selection.apply(async (candidate) => {
-    applied = candidate.sourceId;
-    return "saved-cover";
-  });
-  assert.equal(applied, "15");
-  assert.equal(result, "saved-cover");
-  assert.equal(selection.canApply, true);
+test("manual cover discovery includes broad Chinese queries without replacing the exact query", () => {
+  assert.deepEqual(manualSerialCoverQueries("關於我被隔壁天使變成廢材這件事", "1").slice(0, 3), [
+    "關於我被隔壁天使變成廢材這件事 1",
+    "隔壁天使 1",
+    "變成废材 1",
+  ]);
+  assert.ok(manualSerialCoverQueries("不時以俄語遮羞的艾利同學", "1").includes("俄语遮羞 1"));
+  assert.deepEqual(manualSerialCoverQueries("冰菓", "1"), ["冰菓 1"]);
 });
 
-test("manual serial cover selection restores Apply after a download error", async () => {
+test("manual ranking retains candidates that automatic confidence filtering rejects", () => {
+  const candidates = [
+    { provider: "Bangumi", sourceId: "translated", title: "邻座的天使同学 第1卷", coverUrl: "translated.jpg", infoUrl: "", mediaTypeHint: "novel" as const },
+    { provider: "Bangumi", sourceId: "manga", title: "隔壁天使 漫画 1", coverUrl: "manga.jpg", infoUrl: "", mediaTypeHint: "manga" as const },
+  ];
+  assert.deepEqual(rankSerialCoverCandidates(candidates, "關於我被隔壁天使變成廢材這件事", "1", "novel"), []);
+  assert.deepEqual(
+    rankManualSerialCoverCandidates(
+      candidates,
+      "關於我被隔壁天使變成廢材這件事",
+      "1",
+      "novel",
+      "お隣の天使様にいつの間にか駄目人間にされていた件",
+    ).map((candidate) => candidate.sourceId),
+    ["translated", "manga"],
+  );
+});
+
+
+test("manual ranking prioritizes the stored original title without filtering broad results", () => {
+  const candidates = [
+    { provider: "Bangumi", sourceId: "noise", title: "隔壁的冬歌同學只在意我 (1)", coverUrl: "noise.jpg", infoUrl: "", mediaTypeHint: "novel" as const },
+    { provider: "Bangumi", sourceId: "correct", title: "お隣の天使様にいつの間にか駄目人間にされていた件", coverUrl: "correct.jpg", infoUrl: "", mediaTypeHint: "novel" as const },
+  ];
+  const ranked = rankManualSerialCoverCandidates(
+    candidates,
+    "關於我被隔壁天使變成廢材這件事",
+    "1",
+    "novel",
+    "お隣の天使様にいつの間にか駄目人間にされていた件",
+  );
+  assert.deepEqual(ranked.map((candidate) => candidate.sourceId), ["correct", "noise"]);
+  assert.equal(ranked.length, 2);
+});
+
+test("manual provider keeps broad results instead of requiring automatic confidence", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "" });
+  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
+  setRequestUrlMock(async () => ({
+    json: { data: [bangumiSubject({ id: 700, title: "完全不同的譯名 (1)", platform: "小说" })] },
+  }));
+  const manual = await searchManualSerialCovers(
+    "隔壁天使 1",
+    "隔壁天使",
+    "お隣の天使様にいつの間にか駄目人間にされていた件",
+    "1",
+    "novel",
+  );
+  assert.equal(manual[0]?.sourceId, "700");
+});
+
+test("direct card activation applies once and closes immediately", async () => {
   const candidate = { provider: "Bangumi", sourceId: "14", title: "無職転生 (14)", coverUrl: "14.jpg", infoUrl: "", score: 200 };
-  const selection = new SerialCoverSelection([candidate]);
-  await assert.rejects(selection.apply(async () => { throw new Error("download failed"); }), /download failed/);
-  assert.equal(selection.isApplying, false);
-  assert.equal(selection.canApply, true);
+  const action = new SerialCoverDirectApply();
+  const events: string[] = [];
+  const result = await directlyApplySerialCover(
+    action,
+    candidate,
+    async (selected) => {
+      events.push(`load:${selected.sourceId}`);
+      return "saved-cover";
+    },
+    (cover) => events.push(`apply:${cover}`),
+    () => events.push("close"),
+  );
+  assert.equal(result, true);
+  assert.deepEqual(events, ["load:14", "apply:saved-cover", "close"]);
+  assert.equal(action.isApplying, false);
+});
+
+test("direct card activation stays open after a download error and permits retry", async () => {
+  const candidate = { provider: "Bangumi", sourceId: "14", title: "無職転生 (14)", coverUrl: "14.jpg", infoUrl: "", score: 200 };
+  const action = new SerialCoverDirectApply();
+  let closed = false;
+  await assert.rejects(directlyApplySerialCover(
+    action,
+    candidate,
+    async () => { throw new Error("download failed"); },
+    () => undefined,
+    () => { closed = true; },
+  ), /download failed/);
+  assert.equal(closed, false);
+  assert.equal(action.isApplying, false);
 });

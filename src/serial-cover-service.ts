@@ -13,7 +13,7 @@ import {
   missingSerialCoverEntryCount,
   type MissingSerialCoverRecord,
 } from "./serial-cover-migration";
-import { searchSerialCovers } from "./serial-cover-provider";
+import { searchManualSerialCovers, searchSerialCovers } from "./serial-cover-provider";
 import { serialCoverText } from "./serial-cover-text";
 import type { ExternalMediaResult, MediaType } from "./types";
 
@@ -161,9 +161,16 @@ export async function findSerialCoverCandidates(
       return query ? { query, title: context.originalTitle } : null;
     })()
     : normalizeManualSerialCoverQuery(queryInput, label);
-  return normalized
+  if (!normalized) return [];
+  return queryInput === undefined
     ? searchSerialCovers(normalized.query, normalized.title, label, context.mediaType)
-    : [];
+    : searchManualSerialCovers(
+      normalized.query,
+      normalized.title,
+      context.originalTitle,
+      label,
+      context.mediaType,
+    );
 }
 
 export async function downloadSelectedSerialCover(
