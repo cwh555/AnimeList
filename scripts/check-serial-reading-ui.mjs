@@ -9,7 +9,6 @@ const [
   progressEditorSource,
   pickerSource,
   coverFeatureSource,
-  coverSettingsSource,
   migrationModalSource,
   pluginEntrySource,
   packageSource,
@@ -21,7 +20,6 @@ const [
   readFile("src/additional-progress-units-ui.ts", "utf8"),
   readFile("src/serial-cover-picker.ts", "utf8"),
   readFile("src/serial-cover-feature.ts", "utf8"),
-  readFile("src/serial-cover-settings.ts", "utf8"),
   readFile("src/serial-cover-migration-modal.ts", "utf8"),
   readFile("src/plugin-entry.ts", "utf8"),
   readFile("package.json", "utf8"),
@@ -69,10 +67,7 @@ assert.match(coverFeatureSource, /directlyApplySerialCover\([\s\S]*downloadSelec
 assert.doesNotMatch(coverFeatureSource, /applyButton|SerialCoverSelection|this\.selection/);
 assert.doesNotMatch(pluginEntrySource, /installSerialCoverPickerEvents/);
 
-// The settings action opens a dedicated modal instead of rendering an inline
-// progress/report block inside the settings row.
-assert.match(coverSettingsSource, /new SerialCoverMigrationModal\(this\.plugin\)\.open\(\)/);
-assert.doesNotMatch(coverSettingsSource, /createEl\("progress"/);
+// Settings control behavior is covered by tests/serial-cover-settings.test.ts.
 assert.match(migrationModalSource, /class SerialCoverMigrationModal extends Modal/);
 assert.match(migrationModalSource, /createEl\("progress",\s*\{[\s\S]*al-serial-cover-migration-progress/);
 assert.match(migrationModalSource, /new AbortController\(\)/);
