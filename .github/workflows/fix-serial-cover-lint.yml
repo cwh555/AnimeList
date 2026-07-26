@@ -1,0 +1,151 @@
+name: Fix serial cover lint
+
+on:
+  push:
+    branches:
+      - feature/fix-serial-cover-lint
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/fix-serial-cover-lint
+          fetch-depth: 2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify branch baseline
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "a1c5d56772aaede02dcfbd3bf2e030e3e66f7f07"
+          test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/fix-serial-cover-lint.yml"
+      - name: Apply typed settings and method fixes
+        run: |
+          set -euo pipefail
+          cat > src/serial-cover-settings.ts <<'EOF'
+          import { type Setting } from "obsidian";
+          import { SerialCoverMigrationModal } from "./serial-cover-migration-modal";
+          import { configureSerialCoverProvider } from "./serial-cover-provider";
+          import type { SerialCoverPlugin } from "./serial-cover-service";
+          import { serialCoverText } from "./serial-cover-text";
+          import {
+            registerSettingsSectionExtension,
+            type SettingsSection,
+          } from "./settings";
+
+          const SETTINGS_EXTENSION_ID = "serial-cover";
+
+          function createSerialCoverSettingsSection(
+            plugin: SerialCoverPlugin,
+          ): SettingsSection {
+            return {
+              heading: serialCoverText("settings.heading"),
+              definitions: [{
+                name: serialCoverText("settings.apiKeyName"),
+                desc: serialCoverText("settings.apiKeyDesc"),
+                render: (setting: Setting) => {
+                  setting.addText((input) => {
+                    input.setPlaceholder(serialCoverText("settings.apiKeyPlaceholder"));
+                    input.setValue(plugin.settings.googleBooksApiKey ?? "");
+                    input.onChange(async (value) => {
+                      plugin.settings.googleBooksApiKey = value.trim();
+                      configureSerialCoverProvider({
+                        apiKey: plugin.settings.googleBooksApiKey,
+                      });
+                      await plugin.saveSettings();
+                    });
+                  });
+                },
+              }, {
+                name: serialCoverText("settings.name"),
+                desc: serialCoverText("settings.desc"),
+                render: (setting: Setting) => {
+                  setting.addButton((button) => {
+                    button.setButtonText(serialCoverText("settings.button"));
+                    button.setCta();
+                    button.onClick(() => {
+                      new SerialCoverMigrationModal(plugin).open();
+                    });
+                  });
+                },
+              }],
+            };
+          }
+
+          export function installSerialCoverSettings(
+            plugin: SerialCoverPlugin,
+          ): void {
+            registerSettingsSectionExtension(
+              SETTINGS_EXTENSION_ID,
+              () => createSerialCoverSettingsSection(plugin),
+            );
+          }
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/serial-cover-feature.ts")
+          source = path.read_text(encoding="utf-8")
+
+          anchor = '''function list(value: unknown): unknown[] {
+            return Array.isArray(value) ? value : [];
+          }
+          '''
+          addition = '''function list(value: unknown): unknown[] {
+            return Array.isArray(value) ? value : [];
+          }
+
+          function bindOpenAddModal(
+            plugin: SerialCoverPlugin,
+          ): (initialType?: MediaType) => void {
+            const method: unknown = Reflect.get(plugin, "openAddModal");
+            if (typeof method !== "function") {
+              throw new TypeError("AnimeList openAddModal must be a function");
+            }
+            return (initialType: MediaType = "anime"): void => {
+              Reflect.apply(method, plugin, [initialType]);
+            };
+          }
+          '''
+          if source.count(anchor) != 1:
+              raise SystemExit("list helper anchor mismatch")
+          source = source.replace(anchor, addition, 1)
+
+          old = '  const originalOpenAdd = plugin.openAddModal.bind(plugin);\n'
+          new = '  const originalOpenAdd = bindOpenAddModal(plugin);\n'
+          if source.count(old) != 1:
+              raise SystemExit("openAddModal binding anchor mismatch")
+          source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          rm .github/workflows/fix-serial-cover-lint.yml
+      - name: Validate
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check
+          npm run release:check
+          ANIMELIST_TEST_VAULT_NO_OPEN=1 npm run test-vault
+          git diff --check
+          ! grep -q 'AnimeListSettingTab.prototype' src/serial-cover-settings.ts
+          ! grep -q 'plugin.openAddModal.bind' src/serial-cover-feature.ts
+          test "$(node -p "require('./package.json').version")" = "1.2.0"
+      - name: Commit validated fix
+        env:
+          BRANCH: feature/fix-serial-cover-lint
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/serial-cover-settings.ts src/serial-cover-feature.ts .github/workflows/fix-serial-cover-lint.yml
+          git commit -m "fix: tighten serial cover typing"
+          git push origin "HEAD:${BRANCH}"
