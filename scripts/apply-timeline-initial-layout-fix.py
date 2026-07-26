@@ -43,6 +43,27 @@ replace_once(
 )
 replace_once("src/legacy.ts", "        state.latestItemCenterY,\n", "        state.axisY,\n")
 
+replace_once(
+    "tests/core.test.ts",
+    '} from "../src/timeline-scale";\n',
+    '} from "../src/timeline-scale";\nimport { timelineSerialEventTitle } from "../src/timeline-entry";\n',
+)
+replace_once(
+    "tests/core.test.ts",
+    '    const novelSource = readFileSync(path.join(process.cwd(), "src/novel-progress.ts"), "utf8");\n',
+    "",
+)
+replace_once(
+    "tests/core.test.ts",
+    "    const runtimeSources = [legacySource, mainSource, templateSource, novelSource, settingsSource];\n",
+    "    const runtimeSources = [legacySource, mainSource, templateSource, settingsSource];\n",
+)
+replace_once(
+    "tests/core.test.ts",
+    '    assert.match(novelSource, /uiText\\("timeline\\.novelEventTitle"/);\n',
+    '    assert.equal(\n      timelineSerialEventTitle({ title: "作品", mediaType: "manga", unit: "chapter" }, "12"),\n      "作品 — 第 12 話",\n    );\n',
+)
+
 replace_test(
     "tests/timeline-scale.test.ts",
     "initializes and restores the latest timeline card at viewport center",
