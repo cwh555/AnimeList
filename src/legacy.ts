@@ -32,7 +32,6 @@ import {
   MIN_TIMELINE_DAY_SPACING,
   MIN_TIMELINE_VIEW_SCALE,
   calculateDefaultTimelineView,
-  centerTimelinePoint,
   normalizeTimelineMaxStackDepth,
   preserveTimelineAxisScreenY,
 } from "./timeline-scale";
