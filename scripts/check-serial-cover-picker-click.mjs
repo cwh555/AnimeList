@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { access, mkdir, readFile, rm } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
+import { build, stop } from "esbuild";
 
 const root = process.cwd();
 const output = path.join(root, ".tmp", "serial-cover-picker-click");
@@ -11,103 +12,144 @@ const profile = path.join(output, "chrome-profile");
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 
-const tsc = path.join(
-  root,
-  "node_modules",
-  ".bin",
-  process.platform === "win32" ? "tsc.cmd" : "tsc",
-);
-const compiled = spawnSync(tsc, [
-  "src/serial-cover-picker-events.ts",
-  "--target", "ES2022",
-  "--module", "ES2022",
-  "--moduleResolution", "Bundler",
-  "--lib", "ES2022,DOM,DOM.Iterable",
-  "--types", "obsidian",
-  "--skipLibCheck",
-  "--rootDir", "src",
-  "--outDir", output,
-], { cwd: root, encoding: "utf8" });
-assert.equal(compiled.status, 0, compiled.stderr || compiled.stdout);
-
-let pickerBundle = await readFile(path.join(output, "serial-cover-picker-events.js"), "utf8");
-pickerBundle = `${pickerBundle.replaceAll("export function ", "function ")}\n`
-  + "globalThis.SerialCoverPicker = { installSerialCoverPickerEvents, synchronizeSerialCoverApply };\n";
+await build({
+  absWorkingDir: root,
+  entryPoints: ["src/serial-cover-picker.ts"],
+  outfile: path.join(output, "serial-cover-picker.js"),
+  bundle: true,
+  platform: "browser",
+  format: "iife",
+  globalName: "SerialCoverPicker",
+  target: "es2022",
+  logLevel: "warning",
+});
+const pickerBundle = await readFile(path.join(output, "serial-cover-picker.js"), "utf8");
 
 const html = `<!doctype html>
 <html>
 <body data-result="pending">
   <section class="al-serial-cover-modal">
-    <div class="al-modal-search-row"><input type="search"><button type="button">Search</button></div>
-    <div class="al-search-results">
-      <button type="button" class="al-search-result is-selected" data-id="first">
-        <span class="al-search-result-use">選用</span>
-      </button>
-      <button type="button" class="al-search-result" data-id="second">
-        <span class="al-search-result-use">選用</span>
-      </button>
-    </div>
-    <div class="al-modal-actions">
-      <button type="button">Cancel</button>
-      <button type="button" class="mod-cta" disabled>Apply</button>
-    </div>
+    <div class="al-search-results" role="listbox"></div>
+    <div class="al-modal-actions"><button type="button" class="mod-cta" disabled>Apply</button></div>
   </section>
+  <script>
+    function applyInfo(element, info) {
+      if (typeof info === "string") element.className = info;
+      else if (info) {
+        if (info.cls) element.className = info.cls;
+        if (info.text !== undefined) element.textContent = info.text;
+      }
+      return element;
+    }
+    HTMLElement.prototype.createDiv = function(info) {
+      const element = applyInfo(document.createElement("div"), info);
+      this.append(element);
+      return element;
+    };
+    HTMLElement.prototype.createSpan = function(info) {
+      const element = applyInfo(document.createElement("span"), info);
+      this.append(element);
+      return element;
+    };
+    HTMLElement.prototype.createEl = function(tag, info) {
+      const element = applyInfo(document.createElement(tag), info);
+      this.append(element);
+      return element;
+    };
+  </script>
   <script>${pickerBundle}</script>
   <script>
-    const modal = document.querySelector(".al-serial-cover-modal");
-    const apply = modal.querySelector(".al-modal-actions .mod-cta");
-    let selected = "first";
+    const candidates = [
+      { provider: "Bangumi", sourceId: "first", title: "Volume 1", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 100 },
+      { provider: "Bangumi", sourceId: "second", title: "Volume 2", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 99 },
+    ];
+    const results = document.querySelector(".al-search-results");
+    const apply = document.querySelector(".al-modal-actions .mod-cta");
+    let selected = candidates[0];
     let applied = "";
 
-    for (const row of modal.querySelectorAll(".al-search-result")) {
-      row.addEventListener("click", () => {
-        selected = row.dataset.id;
-        for (const candidate of modal.querySelectorAll(".al-search-result")) {
-          candidate.classList.toggle("is-selected", candidate === row);
-        }
-      });
-    }
-    apply.addEventListener("click", () => { applied = selected; });
-    SerialCoverPicker.installSerialCoverPickerEvents({ register() {} });
+    const updateApply = () => { apply.disabled = selected === null; };
+    const render = () => {
+      results.replaceChildren();
+      for (const candidate of candidates) {
+        SerialCoverPicker.renderSerialCoverCandidateRow(results, candidate, {
+          selected: selected?.sourceId === candidate.sourceId,
+          selectLabel: "選用",
+          matchLabel: "Match score " + candidate.score,
+          onSelect: () => {
+            selected = candidate;
+            render();
+            updateApply();
+          },
+        });
+      }
+    };
+    apply.addEventListener("click", () => { applied = selected?.sourceId || ""; });
+    render();
+    updateApply();
 
-    Promise.resolve().then(() => {
-      const initialEnabled = !apply.disabled;
-      const secondSelect = modal.querySelectorAll(".al-search-result-use")[1];
-      const roleReady = secondSelect.getAttribute("role") === "button" && secondSelect.tabIndex === 0;
-      secondSelect.click();
-      return Promise.resolve().then(() => {
-        apply.click();
-        const secondRow = modal.querySelector('[data-id="second"]');
-        const passed = initialEnabled
-          && roleReady
-          && selected === "second"
-          && secondRow.classList.contains("is-selected")
-          && !apply.disabled
-          && applied === "second";
-        document.body.dataset.result = passed ? "pass" : "fail";
-        document.body.dataset.selected = selected;
-        document.body.dataset.applied = applied;
-        document.body.dataset.initialEnabled = String(initialEnabled);
-      });
-    });
+    const initialEnabled = !apply.disabled;
+    const secondSelect = results.querySelectorAll("button.al-search-result-use")[1];
+    const nativeButton = secondSelect instanceof HTMLButtonElement && secondSelect.type === "button";
+    secondSelect.click();
+    apply.click();
+    const secondRow = results.querySelector('[data-source-id="second"]');
+    const passed = initialEnabled
+      && nativeButton
+      && selected?.sourceId === "second"
+      && secondRow?.classList.contains("is-selected")
+      && secondRow?.getAttribute("aria-selected") === "true"
+      && !apply.disabled
+      && applied === "second";
+    document.body.dataset.result = passed ? "pass" : "fail";
+    document.body.dataset.selected = selected?.sourceId || "";
+    document.body.dataset.applied = applied;
+    document.body.dataset.initialEnabled = String(initialEnabled);
+    document.body.dataset.nativeButton = String(nativeButton);
   </script>
 </body>
 </html>`;
 
-const browserNames = process.platform === "win32"
+async function executable(pathname) {
+  try {
+    await access(pathname);
+    return pathname;
+  } catch {
+    return "";
+  }
+}
+
+const commandNames = process.platform === "win32"
   ? ["chrome.exe", "msedge.exe"]
-  : ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser"];
+  : ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser", "microsoft-edge"];
 let browser = "";
-for (const name of browserNames) {
-  const found = spawnSync(process.platform === "win32" ? "where" : "which", [name], {
-    encoding: "utf8",
-  });
+for (const name of commandNames) {
+  const found = spawnSync(process.platform === "win32" ? "where" : "which", [name], { encoding: "utf8" });
   if (found.status === 0) {
     browser = found.stdout.trim().split(/\r?\n/)[0];
     break;
   }
 }
-assert.ok(browser, "A Chromium-compatible browser is required for the serial-cover picker click test.");
+if (!browser && process.platform === "darwin") {
+  for (const pathname of [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ]) {
+    browser = await executable(pathname);
+    if (browser) break;
+  }
+}
+
+if (!browser) {
+  await rm(output, { recursive: true, force: true });
+  stop();
+  if (process.env.ANIMELIST_REQUIRE_CHROMIUM === "1") {
+    assert.fail("A Chromium-compatible browser is required for the serial-cover picker click test.");
+  }
+  console.log("Serial cover Chromium click test skipped: no compatible browser found.");
+  process.exit(0);
+}
 
 const debugPort = await new Promise((resolve, reject) => {
   const reservation = net.createServer();
@@ -195,10 +237,21 @@ try {
     selected: "second",
     applied: "second",
     initialEnabled: "true",
+    nativeButton: "true",
   });
-  console.log("Serial cover Select and Apply Chromium click test passed.");
+  console.log("Serial cover native Select and Apply Chromium click test passed.");
 } finally {
   socket?.close();
-  chrome.kill("SIGKILL");
-  await rm(output, { recursive: true, force: true });
+  if (chrome.exitCode === null && chrome.signalCode === null) {
+    const exited = new Promise((resolve) => chrome.once("exit", resolve));
+    chrome.kill("SIGKILL");
+    await Promise.race([exited, sleep(3000)]);
+  }
+  stop();
+  await rm(output, {
+    recursive: true,
+    force: true,
+    maxRetries: 8,
+    retryDelay: 100,
+  });
 }

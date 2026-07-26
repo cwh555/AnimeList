@@ -1,37 +1,18 @@
-import { Notice, type Plugin, type Setting } from "obsidian";
-import { AnimeListSettingTab, type SettingsSection } from "./settings";
-import type {
-  SerialCoverMigrationProgress,
-  SerialCoverMigrationSummary,
-} from "./serial-cover-service";
+import { type Plugin, type Setting } from "obsidian";
+import { SerialCoverMigrationModal, type SerialCoverMigrationHost } from "./serial-cover-migration-modal";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
 import { serialCoverText } from "./serial-cover-text";
+import { AnimeListSettingTab, type SettingsSection } from "./settings";
 
 const SETTINGS_MARKER = Symbol.for("animelist.serial-cover-settings");
 
-interface SerialCoverSettingsHost extends Plugin {
+interface SerialCoverSettingsHost extends SerialCoverMigrationHost {
   settings: { googleBooksApiKey?: string };
   saveSettings(): Promise<void>;
-  loadMissingSerialCovers?: (
-    onProgress?: (progress: SerialCoverMigrationProgress) => void,
-    signal?: AbortSignal,
-  ) => Promise<SerialCoverMigrationSummary>;
 }
 
 interface SerialCoverSettingTab extends AnimeListSettingTab {
   plugin: AnimeListSettingTab["plugin"] & SerialCoverSettingsHost;
-}
-
-function summaryVariables(summary: SerialCoverMigrationSummary): Record<string, number> {
-  return { scanned: summary.scanned, loaded: summary.loaded, notFound: summary.notFound, failed: summary.failed, skipped: summary.skipped };
-}
-
-function report(summary: SerialCoverMigrationSummary): string {
-  const lines = [serialCoverText("settings.summary", summaryVariables(summary))];
-  for (const detail of summary.details) {
-    lines.push(`${detail.status.toUpperCase()} · ${detail.title} · ${detail.label} · ${detail.message}`);
-  }
-  return lines.join("\n");
 }
 
 export function installSerialCoverSettings(plugin: Plugin): void {
@@ -46,60 +27,26 @@ export function installSerialCoverSettings(plugin: Plugin): void {
         name: serialCoverText("settings.apiKeyName"),
         desc: serialCoverText("settings.apiKeyDesc"),
         render: (setting: Setting) => {
-setting.addText((input) => {
-  input.setPlaceholder(serialCoverText("settings.apiKeyPlaceholder"));
-  input.setValue(this.plugin.settings.googleBooksApiKey ?? "");
-  input.onChange(async (value) => {
-    this.plugin.settings.googleBooksApiKey = value.trim();
-    configureSerialCoverProvider({ apiKey: this.plugin.settings.googleBooksApiKey });
-    await this.plugin.saveSettings();
-  });
-});
+          setting.addText((input) => {
+            input.setPlaceholder(serialCoverText("settings.apiKeyPlaceholder"));
+            input.setValue(this.plugin.settings.googleBooksApiKey ?? "");
+            input.onChange(async (value) => {
+              this.plugin.settings.googleBooksApiKey = value.trim();
+              configureSerialCoverProvider({ apiKey: this.plugin.settings.googleBooksApiKey });
+              await this.plugin.saveSettings();
+            });
+          });
         },
       }, {
         name: serialCoverText("settings.name"),
         desc: serialCoverText("settings.desc"),
         render: (setting: Setting) => {
-          const progress = setting.controlEl.createEl("progress", { cls: "al-serial-cover-migration-progress" });
-          progress.hidden = true;
-          const status = setting.controlEl.createEl("small");
-          const reportEl = setting.controlEl.createEl("pre", { cls: "al-serial-cover-report" });
-          reportEl.hidden = true;
-          let controller: AbortController | null = null;
           setting.addButton((button) => {
             button.setButtonText(serialCoverText("settings.button"));
-            button.onClick(async () => {
-              if (!this.plugin.loadMissingSerialCovers) return;
-              controller = new AbortController();
-              button.buttonEl.disabled = true;
-              button.setButtonText(serialCoverText("settings.running"));
-              progress.hidden = false;
-              progress.removeAttribute("value");
-              reportEl.hidden = true;
-              try {
-                const summary = await this.plugin.loadMissingSerialCovers((value) => {
-                  progress.max = Math.max(1, value.total);
-                  progress.value = value.completed;
-                  status.setText(value.message);
-                }, controller.signal);
-                const output = report(summary);
-                reportEl.setText(output);
-                reportEl.hidden = false;
-                status.setText(serialCoverText("settings.summary", summaryVariables(summary)));
-                new Notice(serialCoverText("settings.summary", summaryVariables(summary)));
-              } catch (error) {
-                console.error("AnimeList serial cover migration failed", error);
-                new Notice(serialCoverText("settings.failed"));
-              } finally {
-                controller = null;
-                button.buttonEl.disabled = false;
-                button.setButtonText(serialCoverText("settings.button"));
-              }
+            button.setCta();
+            button.onClick(() => {
+              new SerialCoverMigrationModal(this.plugin).open();
             });
-          });
-          setting.addButton((button) => {
-            button.setButtonText(serialCoverText("settings.cancel"));
-            button.onClick(() => controller?.abort());
           });
         },
       }],
