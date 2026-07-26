@@ -1,4 +1,4 @@
-name: Validate serial progress persistence fix
+name: Validate serial cover UI ordering and timeline
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  validate-and-stage:
+  validate-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,68 +17,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Prepare isolated staging branch
+      - name: Prepare isolated feature staging branch
         env:
-          EXPECTED_HEAD: b86a2044b62635a4e72d94150900c5f4d523c84c
+          EXPECTED_FEATURE_HEAD: fcb280bb3e3f32c3b669f5d749c3bb62dedb1da1
+          EXPECTED_STAGING_HEAD: 573c58c93d5fc99c5296ec6b3f5ca1591d398ec7
         run: |
-          git fetch origin feature/serial-entry-covers chore/serial-progress-persistence-fix
-          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_HEAD"
-          test "$(git rev-parse origin/chore/serial-progress-persistence-fix)" = "$EXPECTED_HEAD"
-          git checkout -B chore/serial-progress-persistence-fix origin/chore/serial-progress-persistence-fix
-      - name: Apply duplicate-editor and persistence fix
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path: Path, old: str, new: str) -> None:
-              source = path.read_text(encoding="utf-8")
-              assert source.count(old) == 1, f"expected one anchor in {path}: {old!r}"
-              path.write_text(source.replace(old, new), encoding="utf-8")
-
-          ui = Path("src/additional-progress-units-ui.ts")
-          replace_once(ui, '  serializeSerialLog,\n', '')
-          replace_once(
-              ui,
-              'import type { ReadingProgressUnit } from "./progress-units";\n',
-              'import type { ReadingProgressUnit } from "./progress-units";\nimport { applyReadingProgressSnapshot } from "./reading-progress-persistence";\n',
-          )
-          replace_once(
-              ui,
-              '''    entries.push({\n      label,\n      startedAt: entry.startedAt,\n      completedAt: entry.completedAt || todayString(),\n    });\n''',
-              '''    entries.push({\n      ...entry,\n      label,\n      startedAt: entry.startedAt,\n      completedAt: entry.completedAt || todayString(),\n    });\n''',
-          )
-          replace_once(
-              ui,
-              '''function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {\n  frontmatter.progress_unit = state.unit;\n  frontmatter.progress = state.preparedProgress;\n  const entries = serializeSerialLog(state.entries, state.unit);\n  // Retain the existing key so older novel notes remain compatible.\n  if (entries.length) frontmatter.volume_log = entries;\n  else delete frontmatter.volume_log;\n}\n''',
-              '''function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {\n  applyReadingProgressSnapshot(frontmatter, {\n    unit: state.unit,\n    progress: state.preparedProgress,\n    entries: state.entries,\n  });\n}\n''',
-          )
-          replace_once(
-              ui,
-              '''    const originalEditor = form.querySelector<HTMLElement>(".al-volume-editor");\n    if (originalEditor) {\n      originalEditor.hidden = true;\n      originalEditor.setAttribute("aria-hidden", "true");\n    }\n''',
-              '''    form.querySelectorAll<HTMLElement>(".al-volume-editor:not(.al-progress-unit-editor)")\n      .forEach((originalEditor) => originalEditor.remove());\n''',
-          )
-          replace_once(
-              ui,
-              '    const button = event.target.closest<HTMLButtonElement>("button.mod-cta");\n',
-              '    const button = event.target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta");\n',
-          )
-
-          Path("src/reading-progress-persistence.ts").write_text('''import { serializeSerialLog, type ReadingProgressUnit } from "./progress-units";\nimport type { NovelVolumeEntry, ProgressValue } from "./types";\n\nexport interface ReadingProgressSnapshot {\n  unit: ReadingProgressUnit;\n  progress: ProgressValue;\n  entries: NovelVolumeEntry[];\n}\n\nexport function applyReadingProgressSnapshot(\n  frontmatter: Record<string, unknown>,\n  snapshot: ReadingProgressSnapshot,\n): void {\n  frontmatter.progress_unit = snapshot.unit;\n  frontmatter.progress = snapshot.progress;\n  const entries = serializeSerialLog(snapshot.entries, snapshot.unit);\n  if (entries.length) frontmatter.volume_log = entries;\n  else delete frontmatter.volume_log;\n}\n''', encoding="utf-8")
-
-          tests_path = Path("tests/progress-units.test.ts")
-          tests = tests_path.read_text(encoding="utf-8")
-          assert 'reading-progress-persistence' not in tests
-          tests = tests.replace(
-              'import { describe, it } from "node:test";\n',
-              'import { describe, it } from "node:test";\nimport { applyReadingProgressSnapshot } from "../src/reading-progress-persistence";\n',
-              1,
-          )
-          assert tests.rstrip().endswith('});')
-          tests = tests.rstrip()[:-3] + '''\n\n  it("persists the single reading log and reloads edited entries with metadata", () => {\n    const frontmatter: Record<string, unknown> = {\n      title: "無職転生",\n      volume_log: [{ label: "1", completed_at: "2026-01-01" }],\n      unrelated: "keep",\n    };\n\n    applyReadingProgressSnapshot(frontmatter, {\n      unit: "volume",\n      progress: 2,\n      entries: [{\n        label: "2",\n        startedAt: "2026-02-01",\n        completedAt: "2026-02-02",\n        cover: "volume-2.jpg",\n        coverProvider: "Bangumi",\n        coverSourceId: "volume-2",\n        extra: { isbn: "9780000000002" },\n      }],\n    });\n\n    assert.equal(frontmatter.progress_unit, "volume");\n    assert.equal(frontmatter.progress, 2);\n    assert.equal(frontmatter.unrelated, "keep");\n    assert.deepEqual(frontmatter.volume_log, [{\n      isbn: "9780000000002",\n      label: "2",\n      started_at: "2026-02-01",\n      completed_at: "2026-02-02",\n      cover: "volume-2.jpg",\n      cover_provider: "Bangumi",\n      cover_source_id: "volume-2",\n    }]);\n    assert.deepEqual(normalizeSerialLog(frontmatter.volume_log, "volume"), [{\n      label: "2",\n      startedAt: "2026-02-01",\n      completedAt: "2026-02-02",\n      cover: "volume-2.jpg",\n      coverProvider: "Bangumi",\n      coverSourceId: "volume-2",\n      extra: { isbn: "9780000000002" },\n    }]);\n  });\n\n});\n'''
-          tests_path.write_text(tests, encoding="utf-8")
-
-          Path("scripts/check-serial-reading-ui.mjs").write_text('''import assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\nconst [serialStyles, coverStyles, progressStyles, buildConfig, progressEditorSource] = await Promise.all([\n  readFile("styles.serial-reading.css", "utf8"),\n  readFile("styles.serial-cover.css", "utf8"),\n  readFile("styles.progress.css", "utf8"),\n  readFile("esbuild.config.mjs", "utf8"),\n  readFile("src/additional-progress-units-ui.ts", "utf8"),\n]);\n\nassert.match(serialStyles, /\\.animelist-modal \\.al-volume-editor \\{[\\s\\S]*grid-column:\\s*1\\s*\\/\\s*-1;/);\nassert.match(serialStyles, /grid-template-areas:[\\s\\S]*"copy"[\\s\\S]*"rows"[\\s\\S]*"add"/);\nassert.match(serialStyles, /\\.al-volume-editor-header\\s*\\{[\\s\\S]*display:\\s*contents;/);\nassert.match(serialStyles, /\\.al-volume-editor-header > \\.al-secondary-button\\s*\\{[\\s\\S]*grid-area:\\s*add;/);\nassert.match(serialStyles, /\\.al-volume-row-fields\\s*\\{[\\s\\S]*minmax\\(96px,[\\s\\S]*repeat\\(2,\\s*minmax\\(190px,/);\nassert.match(serialStyles, /\\.al-grid\\.is-list \\.al-progress\\s*\\{[\\s\\S]*width:\\s*100%;[\\s\\S]*max-width:\\s*none;/);\nassert.doesNotMatch(serialStyles, /\\.al-progress:not\\(:has\\(/);\nassert.doesNotMatch(serialStyles, /\\.status-(?:watching|reading|on_hold)/);\n\nassert.match(coverStyles, /\\.animelist-modal \\.al-volume-row\\s*\\{[\\s\\S]*grid-template-columns:\\s*minmax\\(0, 1fr\\) auto auto;/);\nassert.match(coverStyles, /\\.al-serial-cover-button\\s*\\{[\\s\\S]*height:\\s*102px;[\\s\\S]*width:\\s*72px;/);\nassert.match(coverStyles, /\\.al-serial-cover-results\\s*\\{[\\s\\S]*grid-template-columns:/);\n\nassert.match(progressStyles, /\\.al-progress\\.is-state-progress \\.al-progress-fill/);\nassert.match(progressStyles, /\\.al-detail-progress/);\n\nassert.match(progressEditorSource, /\\.al-volume-editor:not\\(\\.al-progress-unit-editor\\)/);\nassert.match(progressEditorSource, /originalEditor\\) => originalEditor\\.remove\\(\\)/);\nassert.doesNotMatch(progressEditorSource, /originalEditor\\.hidden/);\nassert.match(progressEditorSource, /\\.al-modal-actions > button\\.mod-cta/);\n\nassert.match(buildConfig, /readFile\\("styles\\.serial-reading\\.css", "utf8"\\)/);\nassert.match(buildConfig, /readFile\\("styles\\.serial-cover\\.css", "utf8"\\)/);\nassert.match(buildConfig, /readFile\\("styles\\.progress\\.css", "utf8"\\)/);\nassert.match(buildConfig, /currentStyles\\.indexOf\\(GENERATED_STYLE_START\\)/);\nassert.match(buildConfig, /writeFile\\("styles\\.css", outputStyles, "utf8"\\)/);\n\nconsole.log("Serial reading, cover, and progress UI checks passed.");\n''', encoding="utf-8")
-          PY
+          git fetch origin feature/serial-entry-covers chore/serial-cover-ui-order-timeline-fix
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE_HEAD"
+          test "$(git rev-parse origin/chore/serial-cover-ui-order-timeline-fix)" = "$EXPECTED_STAGING_HEAD"
+          git checkout -B chore/serial-cover-ui-order-timeline-fix origin/chore/serial-cover-ui-order-timeline-fix
+          git merge-base --is-ancestor "$EXPECTED_FEATURE_HEAD" HEAD
       - name: Run npm ci
         run: npm ci
       - name: Run npm run check
@@ -89,12 +37,15 @@ jobs:
         env:
           ANIMELIST_TEST_VAULT_NO_OPEN: "1"
         run: npm run test-vault
-      - name: Publish validated staging branch
+      - name: Verify generated stylesheet and publish staging branch
         env:
-          EXPECTED_HEAD: b86a2044b62635a4e72d94150900c5f4d523c84c
+          EXPECTED_STAGING_HEAD: 573c58c93d5fc99c5296ec6b3f5ca1591d398ec7
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/additional-progress-units-ui.ts src/reading-progress-persistence.ts tests/progress-units.test.ts scripts/check-serial-reading-ui.mjs
-          git commit -m "fix: keep a single persistent reading log"
-          git push --force-with-lease=refs/heads/chore/serial-progress-persistence-fix:$EXPECTED_HEAD origin HEAD:chore/serial-progress-persistence-fix
+          if ! git diff --quiet -- styles.css; then
+            git add styles.css
+            git commit -m "build: refresh generated serial cover styles"
+            git push --force-with-lease=refs/heads/chore/serial-cover-ui-order-timeline-fix:$EXPECTED_STAGING_HEAD origin HEAD:chore/serial-cover-ui-order-timeline-fix
+          fi
+          git status --short
