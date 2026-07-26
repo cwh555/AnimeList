@@ -23,6 +23,7 @@ describe("timeline default layout corrections", () => {
       placements.slice(0, 6).map((placement) => placement.x),
       [300, 300, 300, 300, 300, 300],
     );
+    assert.ok(placements.every((placement) => placement.anchorX === 300));
     assert.ok(placements.slice(6).every((placement) => placement.x > placement.anchorX));
   });
 
