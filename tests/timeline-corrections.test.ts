@@ -49,6 +49,34 @@ describe("timeline default spacing capacity", () => {
     assert.ok(spacing >= MINIMUM_CARD_DISTANCE);
     assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 5);
   });
+
+  it("separates a later date from an unavoidable ten-work same-day stack", () => {
+    const times = [
+      ...Array.from({ length: 10 }, () => 0),
+      DAY_MS,
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 1, 3);
+    const points = times.map((time) => (time / DAY_MS) * spacing);
+
+    assert.ok(spacing >= MINIMUM_CARD_DISTANCE);
+    assert.equal(laneCount(points, MINIMUM_CARD_DISTANCE), 10);
+  });
+
+  it("does not let distant same-day overflow relax another dense region", () => {
+    const denseRegion = Array.from(
+      { length: 7 },
+      (_, index) => (200 + index) * DAY_MS,
+    );
+    const times = [
+      ...Array.from({ length: 10 }, () => 0),
+      ...denseRegion,
+    ];
+    const spacing = calculateDefaultTimelineDaySpacing(times, 206, 3);
+    const densePoints = denseRegion.map((time) => (time / DAY_MS) * spacing);
+
+    assert.ok(spacing > 6);
+    assert.ok(laneCount(densePoints, MINIMUM_CARD_DISTANCE) <= 6);
+  });
 });
 
 describe("timeline default centering correction", () => {
