@@ -8,7 +8,7 @@ import {
 } from "../src/timeline-corrections";
 
 describe("timeline default centering correction", () => {
-  it("centers the newest card on x and the timeline axis on y", () => {
+  it("keeps newest-card x centering independent from axis y centering", () => {
     assert.deepEqual(
       centerLatestTimelineAxis(1200, 800, 950, 464, 0.5),
       { x: 125, y: 168 },
