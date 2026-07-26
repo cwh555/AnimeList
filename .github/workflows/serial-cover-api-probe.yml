@@ -30,7 +30,21 @@ jobs:
       - name: Run npm ci
         run: npm ci
       - name: Run npm run check
-        run: npm run check
+        id: check
+        shell: bash
+        run: |
+          set +e
+          npm run check 2>&1 | tee serial-cover-check.log
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload validation log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: serial-cover-check-log
+          path: serial-cover-check.log
+          retention-days: 1
       - name: Run npm run release:check
         run: npm run release:check
       - name: Build production Test Vault
