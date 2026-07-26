@@ -76,18 +76,10 @@ function findProgressInput(form: Element): HTMLInputElement | null {
 }
 
 function makeField(label: string, control: HTMLElement, hint = ""): HTMLLabelElement {
-  const field = document.createElement("label");
-  field.className = "al-form-field";
-  const labelElement = document.createElement("span");
-  labelElement.className = "al-form-label";
-  labelElement.textContent = label;
-  field.append(labelElement, control);
-  if (hint) {
-    const hintElement = document.createElement("small");
-    hintElement.className = "al-form-hint";
-    hintElement.textContent = hint;
-    field.appendChild(hintElement);
-  }
+  const field = createEl("label", { cls: "al-form-field" });
+  field.createSpan({ cls: "al-form-label", text: label });
+  field.appendChild(control);
+  if (hint) field.createEl("small", { cls: "al-form-hint", text: hint });
   return field;
 }
 
@@ -99,9 +91,7 @@ function replaceUnitOptions(
   const options = progressUnitsFor(mediaType)
     .filter((unit): unit is ReadingProgressUnit => unit !== "episode")
     .map((unit) => {
-      const option = document.createElement("option");
-      option.value = unit;
-      option.textContent = progressUnitLabel(unit);
+      const option = createEl("option", { value: unit, text: progressUnitLabel(unit) });
       option.selected = unit === selected;
       return option;
     });
@@ -113,7 +103,7 @@ function createUnitSelect(
   mediaType: "manga" | "novel",
   selected: ReadingProgressUnit,
 ): HTMLSelectElement {
-  const select = document.createElement("select");
+  const select = createEl("select");
   replaceUnitOptions(select, mediaType, selected);
   return select;
 }
@@ -136,42 +126,35 @@ function textForUnit(
 
 function renderEditor(state: ProgressEditorState): void {
   state.editor.replaceChildren();
-  const header = document.createElement("div");
-  header.className = "al-volume-editor-header";
-  const copy = document.createElement("div");
-  const title = document.createElement("strong");
-  title.textContent = textForUnit("editorTitle", state.unit);
-  const description = document.createElement("small");
-  description.textContent = progressUnitFeatureText(
-    state.unit === "volume" ? "editorDescriptionVolume" : "editorDescriptionInteger",
-    { unit: progressUnitLabel(state.unit) },
-  );
-  copy.append(title, description);
-  const add = document.createElement("button");
+  const header = state.editor.createDiv({ cls: "al-volume-editor-header" });
+  const copy = header.createDiv();
+  copy.createEl("strong", { text: textForUnit("editorTitle", state.unit) });
+  copy.createEl("small", {
+    text: progressUnitFeatureText(
+      state.unit === "volume" ? "editorDescriptionVolume" : "editorDescriptionInteger",
+      { unit: progressUnitLabel(state.unit) },
+    ),
+  });
+  const rows = state.editor.createDiv({ cls: "al-volume-editor-rows" });
+  const add = state.editor.createEl("button", {
+    cls: "al-secondary-button",
+    text: textForUnit("addEntry", state.unit),
+  });
   add.type = "button";
-  add.className = "al-secondary-button";
-  add.textContent = textForUnit("addEntry", state.unit);
-  header.append(copy, add);
-
-  const rows = document.createElement("div");
-  rows.className = "al-volume-editor-rows";
-  state.editor.append(header, rows);
   state.entries.sort((left, right) => compareSerialLabels(left.label, right.label, state.unit));
 
   if (!state.entries.length) {
-    const empty = document.createElement("p");
-    empty.className = "al-volume-editor-empty";
-    empty.textContent = textForUnit("empty", state.unit);
-    rows.appendChild(empty);
+    rows.createEl("p", {
+      cls: "al-volume-editor-empty",
+      text: textForUnit("empty", state.unit),
+    });
   }
 
   state.entries.forEach((entry, index) => {
-    const row = document.createElement("div");
-    row.className = "al-volume-row";
-    const fields = document.createElement("div");
-    fields.className = "al-volume-row-fields";
+    const row = rows.createDiv({ cls: "al-volume-row" });
+    const fields = row.createDiv({ cls: "al-volume-row-fields" });
 
-    const labelInput = document.createElement("input");
+    const labelInput = createEl("input");
     labelInput.type = "text";
     labelInput.inputMode = state.unit === "volume" ? "decimal" : "numeric";
     labelInput.value = entry.label;
@@ -183,12 +166,12 @@ function renderEditor(state: ProgressEditorState): void {
       ),
     ));
 
-    const startedAt = document.createElement("input");
+    const startedAt = createEl("input");
     startedAt.type = "date";
     startedAt.value = entry.startedAt;
     fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
 
-    const completedAt = document.createElement("input");
+    const completedAt = createEl("input");
     completedAt.type = "date";
     completedAt.value = entry.completedAt || todayString();
     entry.completedAt = completedAt.value;
@@ -198,15 +181,11 @@ function renderEditor(state: ProgressEditorState): void {
       progressUnitFeatureText("completedHint"),
     ));
 
-    const actions = document.createElement("div");
-    actions.className = "al-volume-row-actions";
-    const remove = document.createElement("button");
+    const actions = row.createDiv({ cls: "al-volume-row-actions" });
+    const remove = actions.createEl("button");
     remove.type = "button";
     remove.className = "al-delete-button";
     remove.textContent = progressUnitFeatureText("remove");
-    actions.appendChild(remove);
-    row.append(fields, actions);
-    rows.appendChild(row);
 
     labelInput.addEventListener("input", () => { entry.label = labelInput.value; });
     startedAt.addEventListener("input", () => { entry.startedAt = startedAt.value; });
@@ -334,7 +313,7 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
     });
   };
 
-  const configureForm = (form: HTMLElement): void => {
+  const configureForm = (form: Element): void => {
     const modal = form.closest<HTMLElement>(".animelist-modal");
     if (!modal || states.has(modal)) return;
 
@@ -377,8 +356,7 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
       originalEditor.hidden = true;
       originalEditor.setAttribute("aria-hidden", "true");
     }
-    const editor = document.createElement("section");
-    editor.className = "al-volume-editor al-progress-unit-editor";
+    const editor = createEl("section", { cls: "al-volume-editor al-progress-unit-editor" });
     const favorite = form.querySelector(".al-form-checkbox");
     if (favorite) favorite.insertAdjacentElement("beforebegin", editor);
     else form.appendChild(editor);
@@ -406,7 +384,7 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
   };
 
   const configureWithin = (root: ParentNode): void => {
-    if (isElement(root) && root.matches(".al-media-form")) configureForm(root as HTMLElement);
+    if (isElement(root) && root.matches(".al-media-form")) configureForm(root);
     root.querySelectorAll<HTMLElement>(".al-media-form").forEach(configureForm);
   };
 

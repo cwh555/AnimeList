@@ -1,33 +1,49 @@
 # AnimeList
 
-AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It adds a native library, metadata search, local covers, progress and rating controls, templates, favorites, filters, and a completion timeline.
+AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a native library, metadata search, local covers, progress tracking, ratings, templates, a Score Dashboard, and a completion timeline.
 
 Your Markdown notes remain the source of truth. Removing the plugin does not remove your records, notes, or images.
 
-![AnimeList list view](docs/images/library-list.png)
-
-![AnimeList completion timeline](docs/images/timeline.png)
+<table>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="docs/images/library-card.webp" alt="AnimeList library in card view" width="100%"><br>
+      <sub><b>Library</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
+      <sub><b>Score Dashboard</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/timeline.webp" alt="AnimeList completion timeline"><br>
+      <sub><b>Timeline</b></sub>
+    </td>
+  </tr>
+</table>
 
 > [!NOTE]
-> **What's new in 1.1.0**
+> **What's new in 1.2.0**
 >
-> - Manga and novels now use explicit reading status without relying on unreliable latest chapter or volume totals. Score and completion date are required only after completion.
-> - Novel history supports whole, half (`.5`), and `EX` volumes, with normalized sorting and completion dates that default to today.
-> - Novel volumes appear as separate timeline events. The timeline avoids card collisions and can filter by all records, anime, manga, or novels.
+> - Added a Score Dashboard for organizing titles across all 0–10 ratings, with drag-and-drop and batch editing.
+> - Added an optional Masterpiece mode with reusable categories and support for assigning a title to multiple categories.
+> - Added chapter, season, and volume tracking for manga and novels, including dated progress entries.
+> - Standardized ratings to 0.5-point increments and simplified library statuses to Ongoing, Completed, Wishlist, and Dropped.
+> - Improved multilingual search, result ranking, provider coverage, and conservative duplicate-title warnings.
+> - Improved timeline scaling, progress presentation, and interface terminology.
 
 ## Features
 
-- One library for anime, manga, and novels.
-- Metadata search through Bangumi, AniList, and Open Library, with broader-title fallback for localized season and subtitle names.
-- Local cover downloads with remote-image fallback.
-- Card, list, and compact library views.
-- Search, media-type, status, genre, favorite, and sorting controls.
-- Media-specific progress and completion rules.
-- Per-volume novel reading history.
-- Built-in and custom Markdown templates.
+- One Markdown-based library for anime, manga, and novels.
+- Metadata search through Bangumi, AniList, and Open Library.
+- Card, list, and poster views with search, filters, and sorting.
+- Media-specific progress tracking and dated serial entries.
+- A Score Dashboard for direct and batch rating changes.
+- Favorite mode or reusable Masterpiece categories.
 - A pannable and zoomable completion timeline.
-- Desktop and mobile support.
-- No Dataview dependency or private media database.
+- Local covers and built-in or custom Markdown templates.
+- Desktop and mobile support without a Dataview dependency.
 
 ## Installation
 
@@ -40,110 +56,27 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 ### Manual installation
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the matching GitHub release.
-2. Copy them into:
-
-   ```text
-   <vault>/.obsidian/plugins/animelist/
-   ```
-
+2. Copy them into `<vault>/.obsidian/plugins/animelist/`.
 3. Reload Obsidian and enable **AnimeList** under **Community plugins**.
 
 ## Quick start
 
 1. Open AnimeList from the ribbon or run **AnimeList: Open library** from the command palette.
-2. Select **收錄** and choose anime, manga, or novel.
-3. Search for a work, review the imported metadata, and save it.
-4. Update status, progress, dates, rating, favorite state, or novel volumes from the library.
+2. Select **收錄**, choose anime, manga, or novel, and search for a title.
+3. Review the imported metadata and save the note.
+4. Update its status, progress, dates, rating, or special label from the library.
 
-The interface uses Traditional Chinese. Text returned by metadata providers may remain in its original language.
+The interface uses Traditional Chinese. Provider metadata may remain in its original language.
 
-## Library data
+## Documentation
 
-AnimeList reads and writes ordinary Markdown with YAML frontmatter. It can use either a managed library or an existing folder structure.
-
-### Managed library
-
-The default layout is:
-
-```text
-AnimeList/
-├── Anime/
-├── Manga/
-├── Novel/
-├── Covers/
-│   ├── anime/
-│   ├── manga/
-│   └── novel/
-└── Templates/
-    ├── Anime/
-    ├── Manga/
-    ├── Novel/
-    └── Common/
-```
-
-Flat-folder mode stores all media notes in one configured folder. **Additional scan folders** can include existing notes without moving them.
-
-A note is discoverable when it contains a supported `media_type`:
-
-```yaml
----
-title: Example work
-media_type: anime
-status: ongoing
-progress: 3
-progress_total: 12
-progress_unit: episode
----
-```
-
-Supported media types are `anime`, `manga`, and `novel`. Existing published 1.0.x notes remain readable; editing writes the current schema while preserving unrelated frontmatter and note content.
-
-## Progress and completion rules
-
-- **Anime:** completed progress synchronizes to a known episode total.
-- **Manga:** progress records the current chapter; completion is selected explicitly.
-- **Novel:** progress records the current volume and accepts whole numbers, `.5`, and `EX`.
-- **Completed works:** personal score and completion date are required.
-- **Ongoing or planned works:** score and completion date may be empty.
-
-Novel notes can additionally keep local per-volume history:
-
-```yaml
-volume_log:
-  - label: "1"
-    completed_at: "2026-01-08"
-  - label: "2.5"
-    started_at: "2026-02-01"
-    completed_at: "2026-02-08"
-  - label: "EX"
-    completed_at: "2026-03-14"
-```
-
-Each completed volume becomes its own timeline event while reusing the series cover.
-
-## Templates
-
-AnimeList always includes a minimal built-in template. Custom Markdown templates can be placed under the configured template folder in `Anime`, `Manga`, `Novel`, or `Common` subfolders.
-
-Supported variables include:
-
-```text
-{{title}}
-{{date}}
-{{time}}
-{{original_title}}
-{{media_type}}
-{{cover}}
-{{summary}}
-{{source_url}}
-```
+See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, search, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
 
 ## Metadata and privacy
 
-- Bangumi and AniList provide anime, manga, and light-novel metadata.
-- Open Library provides general novel and book metadata.
-- Search terms are sent only to enabled providers.
-- Personal scores, progress, dates, favorites, and note bodies stay in the vault.
+- Search terms are sent only to enabled metadata providers.
+- Personal ratings, progress, dates, labels, and note content stay in the vault.
+- Covers are stored locally when available, with remote-image fallback.
 
 ## Development
 
@@ -160,7 +93,7 @@ For a production bundle:
 npm run build
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), the [manual test checklist](docs/MANUAL_TEST_CHECKLIST.md), and [CHANGELOG.md](CHANGELOG.md) for project and release details.
+See [CONTRIBUTING.md](CONTRIBUTING.md), the [manual test checklist](docs/MANUAL_TEST_CHECKLIST.md), [CHANGELOG.md](CHANGELOG.md), and [ROADMAP.md](ROADMAP.md) for project details.
 
 ## License
 

@@ -22,7 +22,6 @@ export default defineConfig([
   {
     files: ["src/additional-progress-units-ui.ts"],
     rules: {
-      "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
@@ -31,13 +30,10 @@ export default defineConfig([
   },
   {
     files: [
-      "src/masterpiece-ui.ts",
-      "src/masterpiece-grouped-view.ts",
       "src/masterpiece-edit-ui.ts",
       "src/masterpiece-operation-ui.ts",
     ],
     rules: {
-      "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
@@ -54,7 +50,6 @@ export default defineConfig([
       "src/score-dashboard-drag-preview.ts",
     ],
     rules: {
-      "obsidianmd/prefer-create-el": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-argument": "off",

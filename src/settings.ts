@@ -69,6 +69,19 @@ export interface SettingsSection {
   definitions: SettingDefinition[];
 }
 
+export type SettingsSectionExtension = (
+  tab: AnimeListSettingTab,
+) => SettingsSection | SettingsSection[];
+
+const SETTINGS_SECTION_EXTENSIONS = new Map<string, SettingsSectionExtension>();
+
+export function registerSettingsSectionExtension(
+  id: string,
+  extension: SettingsSectionExtension,
+): void {
+  SETTINGS_SECTION_EXTENSIONS.set(id, extension);
+}
+
 function splitFolders(value: string): string[] {
   return value
     .split(/[\n,]/)
@@ -181,7 +194,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
 
   getSettingSections(): SettingsSection[] {
     const base = this.getSettingDefinitions();
-    return [
+    const sections: SettingsSection[] = [
       { definitions: base.slice(0, 6) },
       {
         heading: uiText("settings.timeline.heading"),
@@ -201,6 +214,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
         definitions: base.slice(10),
       },
     ];
+    const extensions = [...SETTINGS_SECTION_EXTENSIONS.values()]
+      .flatMap((extension) => extension(this));
+    sections.splice(1, 0, ...extensions);
+    return sections;
   }
 
   display(): void {

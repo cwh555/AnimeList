@@ -143,6 +143,8 @@ detailPrototype.render = function renderUnifiedDetailProgress(): void {
   summaryProgress?.remove();
 
   const progressContainer = this.containerEl.createDiv({ cls: "al-progress al-detail-progress" });
+  this.containerEl.querySelector<HTMLElement>(".al-detail-actions")
+    ?.addClass("has-detail-progress");
   renderProgress(progressContainer, {
     mediaType,
     status: normalizeMediaStatus(frontmatter.status),

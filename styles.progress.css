@@ -20,7 +20,7 @@
   background: var(--background-secondary);
 }
 
-.al-detail-actions:has(+ .al-detail-progress) {
+.al-detail-actions.has-detail-progress {
   margin-bottom: 0;
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;

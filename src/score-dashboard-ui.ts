@@ -48,7 +48,7 @@ const TYPE_OPTIONS: Array<[ScoreDashboardMediaType, string]> = [
 const DRAG_DATA_TYPE = "application/x-animelist-score-path";
 
 function create<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", label = ""): HTMLElementTagNameMap[K] {
-  const element = document.createElement(tag);
+  const element = createEl(tag);
   if (className) element.className = className;
   if (label) element.textContent = label;
   return element;
@@ -468,8 +468,7 @@ export function renderScoreDashboard(
     updateUnratedControl(data.unrated.length);
     updateBatchControls();
 
-    const fragment = document.createDocumentFragment();
-    data.groups.forEach((group) => {
+    const groupElements = data.groups.map((group) => {
       const groupElement = create("section", "al-score-group");
       groupElement.dataset.majorScore = String(group.major);
       const major = create("div", "al-score-major");
@@ -481,7 +480,7 @@ export function renderScoreDashboard(
       const lanes = create("div", "al-score-group-lanes");
       group.lanes.forEach((scoreLane) => lanes.appendChild(renderLane(scoreLane.score, scoreLane.items)));
       groupElement.append(major, lanes);
-      fragment.appendChild(groupElement);
+      return groupElement;
     });
     if (state.showUnrated) {
       const groupElement = create("section", "al-score-group is-unrated");
@@ -490,9 +489,9 @@ export function renderScoreDashboard(
       const lanes = create("div", "al-score-group-lanes");
       lanes.appendChild(renderLane(null, data.unrated));
       groupElement.append(major, lanes);
-      fragment.appendChild(groupElement);
+      groupElements.push(groupElement);
     }
-    board.replaceChildren(fragment);
+    board.replaceChildren(...groupElements);
     container.scrollTop = scrollTop;
   };
 
