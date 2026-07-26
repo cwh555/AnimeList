@@ -1,0 +1,97 @@
+name: Apply timeline initial layout fix
+
+on:
+  pull_request:
+    branches:
+      - preview
+    paths:
+      - .github/workflows/apply-timeline-initial-layout-fix.yml
+      - scripts/apply-timeline-initial-layout-fix.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.head_ref == 'fix/timeline-initial-layout-and-units'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/timeline-initial-layout-and-units
+          fetch-depth: 0
+
+      - name: Apply thin timeline UI integration
+        run: |
+          python scripts/apply-timeline-initial-layout-fix.py
+          rm scripts/apply-timeline-initial-layout-fix.py
+          rm .github/workflows/apply-timeline-initial-layout-fix.yml
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Node behavior tests
+        shell: bash
+        run: |
+          set +e
+          node scripts/run-tests.mjs > node-test.log 2>&1
+          status=$?
+          cat node-test.log
+          exit "$status"
+
+      - name: Upload Node test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timeline-node-test-log
+          path: node-test.log
+          if-no-files-found: error
+
+      - name: Serial reading UI checks
+        run: node scripts/check-serial-reading-ui.mjs
+
+      - name: Test Vault fixture checks
+        run: node scripts/check-test-vault-fixtures.mjs
+
+      - name: Community preflight
+        run: npm run community:check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Release checks
+        run: npm run release:check
+
+      - name: Build production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: node scripts/test-vault.mjs production
+
+      - name: Publish validated product commit
+        shell: bash
+        run: |
+          git diff --check
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/legacy.ts \
+            src/novel-progress.ts \
+            src/progress-unit-feature-text.ts \
+            src/timeline-entry.ts \
+            src/timeline-scale.ts \
+            tests/core.test.ts \
+            tests/progress-units.test.ts \
+            tests/timeline-scale.test.ts \
+            tests/timeline-scale-work-items.test.ts \
+            scripts/apply-timeline-initial-layout-fix.py \
+            .github/workflows/apply-timeline-initial-layout-fix.yml
+          git commit -m "fix: restore timeline initialization behavior"
+          git push origin HEAD:fix/timeline-initial-layout-and-units
