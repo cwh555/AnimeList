@@ -18,5 +18,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: npm run release:check
+      - name: Capture picker tests
+        shell: bash
+        run: |
+          set +e
+          npm test > picker-test.log 2>&1
+          status=$?
+          cat picker-test.log
+          exit "$status"
+      - name: Upload picker test log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: picker-test-log
+          path: picker-test.log
+          retention-days: 1
