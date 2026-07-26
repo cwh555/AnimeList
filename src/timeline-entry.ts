@@ -2,15 +2,16 @@ import {
   defaultProgressUnit,
   isReadingProgressUnit,
 } from "./progress-units";
+import type { ReadingProgressUnit } from "./progress-units";
 import {
   progressUnitFeatureText,
   progressUnitLabel,
 } from "./progress-unit-feature-text";
 import type { MediaItem } from "./types";
 
-interface TimelineReadingItem extends Pick<MediaItem, "mediaType" | "unit" | "title"> {}
+type TimelineReadingItem = Pick<MediaItem, "mediaType" | "unit" | "title">;
 
-function readingUnit(item: TimelineReadingItem) {
+function readingUnit(item: TimelineReadingItem): ReadingProgressUnit | null {
   const unit = defaultProgressUnit(item.mediaType, item.unit);
   return isReadingProgressUnit(unit) ? unit : null;
 }
