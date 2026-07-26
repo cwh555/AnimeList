@@ -1,0 +1,89 @@
+name: Sync serial cover feature with preview
+run-name: Inspect serial cover preview rebase
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  rebase-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: rebase/serial-entry-covers-preview-sync
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify refs and rebase
+        id: rebase
+        shell: bash
+        run: |
+          set -uo pipefail
+          EXPECTED_FEATURE=c50e88fc0ca5078c0e2d6a039e40f26ab543999d
+          EXPECTED_PREVIEW=00027a57bbabd64c0939ea73980c8973c3e95cd2
+          git fetch origin preview feature/serial-entry-covers rebase/serial-entry-covers-preview-sync
+          test "$(git rev-parse origin/feature/serial-entry-covers)" = "$EXPECTED_FEATURE"
+          test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_FEATURE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rebase origin/preview; then
+            echo success=true >> "$GITHUB_OUTPUT"
+            printf 'rebase=success\nhead=%s\n' "$(git rev-parse HEAD)" > rebase-report.txt
+          else
+            status=$?
+            echo success=false >> "$GITHUB_OUTPUT"
+            {
+              echo 'rebase=conflict'
+              echo 'unmerged-files:'
+              git diff --name-only --diff-filter=U
+              echo
+              echo 'status:'
+              git status --short
+            } > rebase-report.txt
+            mkdir -p rebase-conflicts
+            while IFS= read -r file; do
+              [ -n "$file" ] || continue
+              mkdir -p "rebase-conflicts/$(dirname "$file")"
+              cp "$file" "rebase-conflicts/$file" 2>/dev/null || true
+              git show ":1:$file" > "rebase-conflicts/${file}.base" 2>/dev/null || true
+              git show ":2:$file" > "rebase-conflicts/${file}.ours" 2>/dev/null || true
+              git show ":3:$file" > "rebase-conflicts/${file}.theirs" 2>/dev/null || true
+            done < <(git diff --name-only --diff-filter=U)
+            exit "$status"
+          fi
+      - name: Install dependencies
+        if: steps.rebase.outputs.success == 'true'
+        run: npm ci
+      - name: Run standard checks
+        if: steps.rebase.outputs.success == 'true'
+        run: npm run check
+      - name: Run required Chromium interaction
+        if: steps.rebase.outputs.success == 'true'
+        run: npm run test:browser
+      - name: Run release check
+        if: steps.rebase.outputs.success == 'true'
+        run: npm run release:check
+      - name: Build production Test Vault
+        if: steps.rebase.outputs.success == 'true'
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: npm run test-vault
+      - name: Publish validated staging rebase
+        if: steps.rebase.outputs.success == 'true'
+        run: |
+          git push --force-with-lease=refs/heads/rebase/serial-entry-covers-preview-sync:c50e88fc0ca5078c0e2d6a039e40f26ab543999d origin HEAD:rebase/serial-entry-covers-preview-sync
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: serial-cover-preview-rebase-report
+          path: |
+            rebase-report.txt
+            rebase-conflicts
+          if-no-files-found: warn
+          retention-days: 1
