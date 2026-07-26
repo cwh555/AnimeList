@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - name: Pack exact checkout
         run: |
-          tar --exclude=.git --exclude=.tmp -czf serial-cover-fix-env.tar.gz .
+          tar --exclude=.git --exclude=.tmp --exclude=serial-cover-fix-env.tar.gz -czf serial-cover-fix-env.tar.gz .
       - uses: actions/upload-artifact@v6
         with:
           name: serial-cover-fix-env
