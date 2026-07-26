@@ -48,6 +48,18 @@ function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function bindOpenAddModal(
+  plugin: SerialCoverPlugin,
+): (initialType?: MediaType) => void {
+  const method: unknown = Reflect.get(plugin, "openAddModal");
+  if (typeof method !== "function") {
+    throw new TypeError("AnimeList openAddModal must be a function");
+  }
+  return (initialType: MediaType = "anime"): void => {
+    Reflect.apply(method, plugin, [initialType]);
+  };
+}
+
 function refreshRows(context: EditorContext): void {
   for (const [input, render] of context.rowRenders) {
     if (!input.isConnected) {
@@ -383,7 +395,7 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
     configureRows(plugin, context);
   };
 
-  const originalOpenAdd = plugin.openAddModal.bind(plugin);
+  const originalOpenAdd = bindOpenAddModal(plugin);
   plugin.openAddModal = (initialType: MediaType = "anime"): void => {
     const modalOpen = Modal.prototype.open;
     const captured: Array<Modal & { renderDetails?: (result: ExternalMediaResult) => Promise<void> }> = [];
