@@ -23,7 +23,7 @@ jobs:
         id: rebase
         shell: bash
         run: |
-          set -uo pipefail
+          set -o pipefail
           EXPECTED_FEATURE=c50e88fc0ca5078c0e2d6a039e40f26ab543999d
           EXPECTED_PREVIEW=00027a57bbabd64c0939ea73980c8973c3e95cd2
           git fetch origin preview feature/serial-entry-covers rebase/serial-entry-covers-preview-sync
@@ -33,7 +33,37 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          capture_failure() {
+            local reason="$1"
+            shift
+            echo success=false >> "$GITHUB_OUTPUT"
+            {
+              echo "rebase=$reason"
+              echo "generated-style-conflicts-resolved=$resolved_styles"
+              echo "empty-generated-commits-skipped=$skipped_empty"
+              echo 'unmerged-files:'
+              printf '%s\n' "$@"
+              echo
+              echo 'status:'
+              git status --short
+              echo
+              echo 'rebase-state:'
+              find .git/rebase-merge .git/rebase-apply -maxdepth 1 -type f -print -exec sh -c 'echo "--- $1"; cat "$1"' _ {} \; 2>/dev/null || true
+            } > rebase-report.txt
+            mkdir -p rebase-conflicts
+            for file in "$@"; do
+              [ -n "$file" ] || continue
+              mkdir -p "rebase-conflicts/$(dirname "$file")"
+              cp "$file" "rebase-conflicts/$file" 2>/dev/null || true
+              git show ":1:$file" > "rebase-conflicts/${file}.base" 2>/dev/null || true
+              git show ":2:$file" > "rebase-conflicts/${file}.ours" 2>/dev/null || true
+              git show ":3:$file" > "rebase-conflicts/${file}.theirs" 2>/dev/null || true
+            done
+            exit 1
+          }
+
           resolved_styles=0
+          skipped_empty=0
           git rebase origin/preview
           status=$?
           while [ "$status" -ne 0 ]; do
@@ -49,32 +79,24 @@ jobs:
               continue
             fi
 
-            echo success=false >> "$GITHUB_OUTPUT"
-            {
-              echo 'rebase=conflict'
-              echo "generated-style-conflicts-resolved=$resolved_styles"
-              echo 'unmerged-files:'
-              printf '%s\n' "${conflicts[@]}"
-              echo
-              echo 'status:'
-              git status --short
-            } > rebase-report.txt
-            mkdir -p rebase-conflicts
-            for file in "${conflicts[@]}"; do
-              [ -n "$file" ] || continue
-              mkdir -p "rebase-conflicts/$(dirname "$file")"
-              cp "$file" "rebase-conflicts/$file" 2>/dev/null || true
-              git show ":1:$file" > "rebase-conflicts/${file}.base" 2>/dev/null || true
-              git show ":2:$file" > "rebase-conflicts/${file}.ours" 2>/dev/null || true
-              git show ":3:$file" > "rebase-conflicts/${file}.theirs" 2>/dev/null || true
-            done
-            exit "$status"
+            if [ "${#conflicts[@]}" -eq 0 ] \
+              && { [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; } \
+              && git diff --quiet \
+              && git diff --cached --quiet; then
+              git rebase --skip
+              status=$?
+              skipped_empty=$((skipped_empty + 1))
+              continue
+            fi
+
+            capture_failure conflict "${conflicts[@]}"
           done
 
           echo success=true >> "$GITHUB_OUTPUT"
           {
             echo 'rebase=success'
             echo "generated-style-conflicts-resolved=$resolved_styles"
+            echo "empty-generated-commits-skipped=$skipped_empty"
             echo "head=$(git rev-parse HEAD)"
           } > rebase-report.txt
       - name: Install dependencies
