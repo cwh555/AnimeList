@@ -342,6 +342,34 @@ describe("timeline scale DOM integration", () => {
     assert.equal(Math.max(...lanes), 1);
   });
 
+
+it("renders dated entries with their configured reading units", () => {
+  installFakeDom();
+  const container = new FakeElement("div");
+  const chapter = {
+    ...timelineItem(0), title: "Chapter work", mediaType: "manga", unit: "chapter",
+    status: "ongoing", completedAt: "",
+    volumeLog: [{ label: "10", startedAt: "", completedAt: "2026-07-01" }],
+  };
+  const season = {
+    ...timelineItem(1), title: "Season work", mediaType: "novel", unit: "season",
+    status: "ongoing", completedAt: "",
+    volumeLog: [{ label: "2", startedAt: "", completedAt: "2026-07-02" }],
+  };
+  const volume = {
+    ...timelineItem(2), title: "Volume work", mediaType: "novel", unit: "volume",
+    status: "ongoing", completedAt: "",
+    volumeLog: [{ label: "3", startedAt: "", completedAt: "2026-07-03" }],
+  };
+
+  legacyTest.TimelineUI.render(container, [chapter, season, volume], { maxStackDepth: 3 });
+
+  assert.deepEqual(
+    descendantsByClass(container, "al-timeline-volume-label").map((label) => label.textContent),
+    ["第 10 話", "第 2 季", "第 3 卷"],
+  );
+});
+
   it("keeps the timeline axis at the same screen y while wheel-scaling time", () => {
     installFakeDom();
     const container = new FakeElement("div");
@@ -371,31 +399,39 @@ describe("timeline scale DOM integration", () => {
     assert.ok(Math.abs(nextAxisScreenY - initialAxisScreenY) < 1e-6);
   });
 
-  it("initializes and restores the latest timeline card at viewport center", () => {
-    installFakeDom();
-    const container = new FakeElement("div");
-    legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
-      maxStackDepth: 3,
-    });
-
-    const viewport = descendantsByClass(container, "al-timeline-viewport")[0];
-    const scene = descendantsByClass(container, "al-timeline-scene")[0];
-    const latest = descendantsByClass(container, "al-timeline-card")
-      .find((card) => card.title.includes("Newest"));
-    assert.ok(latest);
-
-    const initialCenter = screenCenter(latest, scene);
-    assert.equal(initialCenter.x, viewport.clientWidth / 2);
-    assert.equal(initialCenter.y, viewport.clientHeight / 2);
-
-    descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
-    descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
-
-    const restoredLatest = descendantsByClass(container, "al-timeline-card")
-      .find((card) => card.title.includes("Newest"));
-    assert.ok(restoredLatest);
-    const restoredCenter = screenCenter(restoredLatest, scene);
-    assert.equal(restoredCenter.x, viewport.clientWidth / 2);
-    assert.equal(restoredCenter.y, viewport.clientHeight / 2);
+it("centers the latest date horizontally and the timeline axis vertically", () => {
+  installFakeDom();
+  const container = new FakeElement("div");
+  legacyTest.TimelineUI.render(container, Array.from({ length: 9 }, (_, index) => timelineItem(index)), {
+    maxStackDepth: 3,
   });
+
+  const viewport = descendantsByClass(container, "al-timeline-viewport")[0];
+  const scene = descendantsByClass(container, "al-timeline-scene")[0];
+  const latest = descendantsByClass(container, "al-timeline-card")
+    .find((card) => card.title.includes("Newest"));
+  const initialAxis = descendantsByClass(container, "al-timeline-axis")[0];
+  assert.ok(latest);
+
+  const initialCenter = screenCenter(latest, scene);
+  const initialTransform = parseTransform(scene.style.transform);
+  const initialAxisScreenY = initialTransform.y
+    + Number.parseFloat(initialAxis.style.top) * initialTransform.scale;
+  assert.equal(initialCenter.x, viewport.clientWidth / 2);
+  assert.equal(initialAxisScreenY, viewport.clientHeight / 2);
+
+  descendantByAttribute(container, "aria-label", uiText("timeline.fit")).dispatch("click");
+  descendantByAttribute(container, "aria-label", uiText("timeline.reset")).dispatch("click");
+
+  const restoredLatest = descendantsByClass(container, "al-timeline-card")
+    .find((card) => card.title.includes("Newest"));
+  const restoredAxis = descendantsByClass(container, "al-timeline-axis")[0];
+  assert.ok(restoredLatest);
+  const restoredCenter = screenCenter(restoredLatest, scene);
+  const restoredTransform = parseTransform(scene.style.transform);
+  const restoredAxisScreenY = restoredTransform.y
+    + Number.parseFloat(restoredAxis.style.top) * restoredTransform.scale;
+  assert.equal(restoredCenter.x, viewport.clientWidth / 2);
+  assert.equal(restoredAxisScreenY, viewport.clientHeight / 2);
+});
 });
