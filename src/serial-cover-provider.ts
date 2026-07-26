@@ -7,8 +7,15 @@ import {
 
 const SUCCESS_CACHE_TTL_MS = 30 * 60 * 1000;
 const EMPTY_CACHE_TTL_MS = 2 * 60 * 1000;
-const REQUEST_INTERVAL_MS = 1500;
+const REQUEST_INTERVAL_MS = 750;
 const MAX_ATTEMPTS = 5;
+const BANGUMI_SEARCH_URL = "https://api.bgm.tv/v0/search/subjects";
+const GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes";
+const USER_AGENT = "AnimeList/1.1.2 (https://github.com/cwh555/AnimeList)";
+
+type SerialMediaType = "manga" | "novel";
+type RequestOptions = Parameters<typeof requestUrl>[0];
+
 const resultCache = new Map<string, { expiresAt: number; value: RankedSerialCoverCandidate[] }>();
 const inFlight = new Map<string, Promise<RankedSerialCoverCandidate[]>>();
 let queueTail: Promise<void> = Promise.resolve();
@@ -17,13 +24,77 @@ let sleep = (milliseconds: number): Promise<void> => new Promise((resolve) => wi
 let random = (): number => Math.random();
 let apiKey = "";
 
-function asArray(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
 }
-function text(value: unknown): string { return typeof value === "string" ? value : ""; }
+
+function text(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function comparable(value: unknown): string {
+  return text(value).normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+}
+
+function mediaTypeFromPlatform(value: unknown): SerialMediaType | undefined {
+  const platform = text(value).normalize("NFKC").toLocaleLowerCase();
+  if (/漫画|manga|comic|コミック/.test(platform)) return "manga";
+  if (/小说|小説|轻小说|輕小說|light\s*novel|novel|文庫|文库/.test(platform)) return "novel";
+  return undefined;
+}
+
+function infoboxValues(value: unknown, keys: string[]): string[] {
+  const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
+  const output: string[] = [];
+  for (const raw of asArray(value)) {
+    const row = record(raw);
+    if (!row || !wanted.has(text(row.key).toLocaleLowerCase())) continue;
+    const rawValue = row.value;
+    for (const entry of Array.isArray(rawValue) ? rawValue : [rawValue]) {
+      const nested = record(entry);
+      const candidate = nested ? text(nested.v ?? nested.k) : text(entry);
+      if (candidate && !output.includes(candidate)) output.push(candidate);
+    }
+  }
+  return output;
+}
+
+function bangumiCandidate(value: unknown): SerialCoverCandidate | null {
+  const item = record(value);
+  const images = record(item?.images);
+  const sourceId = text(item?.id);
+  const title = text(item?.name).trim();
+  const coverUrl = text(images?.large)
+    || text(images?.common)
+    || text(images?.medium)
+    || text(images?.small)
+    || text(images?.grid);
+  if (!item || !sourceId || !title || !coverUrl) return null;
+  const platform = text(item.platform);
+  const metaTags = asArray(item.meta_tags).map(text).filter(Boolean);
+  const formatMetadata = [
+    platform,
+    ...metaTags,
+    ...infoboxValues(item.infobox, ["书系", "書系", "文库", "文庫", "连载杂志", "連載雑誌"]),
+  ].filter(Boolean).join(" ");
+  return {
+    provider: "Bangumi",
+    sourceId,
+    title,
+    coverUrl: coverUrl.replace(/^http:/, "https:"),
+    infoUrl: `https://bgm.tv/subject/${sourceId}`,
+    categories: [platform, ...metaTags].filter(Boolean),
+    authors: infoboxValues(item.infobox, ["作者", "原作", "作画", "插图", "插畫"]),
+    publisher: infoboxValues(item.infobox, ["出版社"])[0] ?? "",
+    mediaTypeHint: mediaTypeFromPlatform(formatMetadata),
+  };
+}
 
 function googleBookCandidate(value: unknown): SerialCoverCandidate | null {
   const item = record(value);
@@ -82,16 +153,12 @@ function enqueue<T>(operation: () => Promise<T>): Promise<T> {
   return previous.then(operation).finally(release);
 }
 
-async function requestWithBackoff(url: string): Promise<unknown> {
+async function requestWithBackoff(options: RequestOptions): Promise<unknown> {
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     await waitForRequestSlot();
     try {
-      const response = await requestUrl({
-        url,
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
+      const response = await requestUrl(options);
       return response.json ?? JSON.parse(response.text || "{}");
     } catch (error) {
       lastError = error;
@@ -99,19 +166,50 @@ async function requestWithBackoff(url: string): Promise<unknown> {
       if (status !== 429 && (status === null || status < 500 || status >= 600)) throw error;
       if (attempt === MAX_ATTEMPTS - 1) break;
       const serverDelay = retryAfterMilliseconds(error);
-      const exponentialDelay = Math.min(30_000, 1500 * (2 ** attempt));
+      const exponentialDelay = Math.min(30_000, 1000 * (2 ** attempt));
       await sleep(serverDelay ?? exponentialDelay + Math.floor(random() * 500));
     }
   }
   throw lastError;
 }
 
-async function requestSerialCovers(
-  query: string,
-  originalTitle: string,
-  label: string,
-  mediaType: "manga" | "novel",
-): Promise<RankedSerialCoverCandidate[]> {
+function deduplicateCandidates(candidates: SerialCoverCandidate[]): SerialCoverCandidate[] {
+  const seen = new Set<string>();
+  const output: SerialCoverCandidate[] = [];
+  for (const candidate of candidates) {
+    const key = `${candidate.mediaTypeHint ?? "unknown"}:${comparable(candidate.title)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(candidate);
+  }
+  return output;
+}
+
+async function searchBangumi(query: string, mediaType: SerialMediaType): Promise<SerialCoverCandidate[]> {
+  const payload = record(await requestWithBackoff({
+    url: `${BANGUMI_SEARCH_URL}?limit=50&offset=0`,
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+    },
+    body: JSON.stringify({ keyword: query, sort: "match", filter: { type: [1] } }),
+  }));
+  const candidates = asArray(payload?.data)
+    .map(bangumiCandidate)
+    .filter((candidate): candidate is SerialCoverCandidate => (
+      candidate !== null && candidate.mediaTypeHint !== (mediaType === "novel" ? "manga" : "novel")
+    ))
+    .sort((left, right) => Number(right.mediaTypeHint === mediaType) - Number(left.mediaTypeHint === mediaType))
+    .map((candidate) => candidate.mediaTypeHint
+      ? candidate
+      : { ...candidate, mediaTypeHint: mediaType });
+  return deduplicateCandidates(candidates);
+}
+
+async function searchGoogleBooks(query: string): Promise<SerialCoverCandidate[]> {
+  if (!apiKey) return [];
   const parameters = new URLSearchParams({
     q: query,
     maxResults: "20",
@@ -119,20 +217,49 @@ async function requestSerialCovers(
     langRestrict: "ja",
     projection: "lite",
     fields: "items(id,volumeInfo(title,subtitle,authors,publisher,categories,infoLink,imageLinks))",
+    key: apiKey,
   });
-  if (apiKey) parameters.set("key", apiKey);
-  const payload = record(await requestWithBackoff(`https://www.googleapis.com/books/v1/volumes?${parameters.toString()}`));
-  const candidates = asArray(payload?.items)
+  const payload = record(await requestWithBackoff({
+    url: `${GOOGLE_BOOKS_URL}?${parameters.toString()}`,
+    method: "GET",
+    headers: { Accept: "application/json" },
+  }));
+  return deduplicateCandidates(asArray(payload?.items)
     .map(googleBookCandidate)
-    .filter((candidate): candidate is SerialCoverCandidate => candidate !== null);
-  return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
+    .filter((candidate): candidate is SerialCoverCandidate => candidate !== null));
+}
+
+async function requestSerialCovers(
+  query: string,
+  originalTitle: string,
+  label: string,
+  mediaType: SerialMediaType,
+): Promise<RankedSerialCoverCandidate[]> {
+  let bangumiCandidates: SerialCoverCandidate[] = [];
+  let bangumiError: unknown;
+  try {
+    bangumiCandidates = await searchBangumi(query, mediaType);
+  } catch (error) {
+    bangumiError = error;
+  }
+  if (bangumiCandidates.length > 0) {
+    return rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
+  }
+  if (apiKey) {
+    const googleCandidates = await searchGoogleBooks(query);
+    if (googleCandidates.length > 0) {
+      return rankSerialCoverCandidates(googleCandidates, originalTitle, label, mediaType);
+    }
+  }
+  if (bangumiError !== undefined) throw bangumiError;
+  return [];
 }
 
 export async function searchSerialCovers(
   query: string,
   originalTitle: string,
   label: string,
-  mediaType: "manga" | "novel",
+  mediaType: SerialMediaType,
 ): Promise<RankedSerialCoverCandidate[]> {
   const key = `${mediaType}:${query.normalize("NFKC").trim()}`;
   const cached = resultCache.get(key);
@@ -168,14 +295,9 @@ export function configureSerialCoverProviderForTests(options: {
   if (options.random) random = options.random;
 }
 
-
 export function configureSerialCoverProvider(options: { apiKey?: string }): void {
   const nextKey = options.apiKey?.trim() ?? "";
   if (nextKey === apiKey) return;
   apiKey = nextKey;
   clearSerialCoverProviderCache();
-}
-
-export function hasSerialCoverApiKey(): boolean {
-  return Boolean(apiKey);
 }
