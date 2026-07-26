@@ -13,6 +13,10 @@ describe("timeline default centering correction", () => {
       centerLatestTimelineAxis(1200, 800, 950, 464, 0.5),
       { x: 125, y: 168 },
     );
+    assert.deepEqual(
+      centerLatestTimelineAxis(1200, 800, 950, 200, 0.5),
+      { x: 125, y: 300 },
+    );
   });
 });
 
