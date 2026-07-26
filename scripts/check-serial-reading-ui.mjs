@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [serialStyles, coverStyles, progressStyles, buildConfig] = await Promise.all([
+const [serialStyles, coverStyles, progressStyles, buildConfig, progressEditorSource] = await Promise.all([
   readFile("styles.serial-reading.css", "utf8"),
   readFile("styles.serial-cover.css", "utf8"),
   readFile("styles.progress.css", "utf8"),
   readFile("esbuild.config.mjs", "utf8"),
+  readFile("src/additional-progress-units-ui.ts", "utf8"),
 ]);
 
 assert.match(serialStyles, /\.animelist-modal \.al-volume-editor \{[\s\S]*grid-column:\s*1\s*\/\s*-1;/);
@@ -25,6 +26,11 @@ assert.match(progressStyles, /\.al-progress\.is-state-progress \.al-progress-fil
 assert.match(progressStyles, /\.al-detail-progress/);
 assert.match(progressStyles, /\.al-detail-actions\.has-detail-progress/);
 assert.doesNotMatch(progressStyles, /:has\(/);
+
+assert.match(progressEditorSource, /\.al-volume-editor:not\(\.al-progress-unit-editor\)/);
+assert.match(progressEditorSource, /originalEditor\) => originalEditor\.remove\(\)/);
+assert.doesNotMatch(progressEditorSource, /originalEditor\.hidden/);
+assert.match(progressEditorSource, /\.al-modal-actions > button\.mod-cta/);
 
 assert.match(buildConfig, /readFile\("styles\.serial-reading\.css", "utf8"\)/);
 assert.match(buildConfig, /readFile\("styles\.serial-cover\.css", "utf8"\)/);
