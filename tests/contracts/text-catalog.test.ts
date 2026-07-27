@@ -9,6 +9,11 @@ import { RATING_FEATURE_TEXT, ratingFeatureText } from "../../src/rating-feature
 import { scoreDashboardText } from "../../src/score-dashboard-text";
 import { searchFeatureText } from "../../src/search-feature-text";
 import { SERIAL_COVER_TEXT, serialCoverText } from "../../src/serial-cover-text";
+import {
+  registerLocaleMessages,
+  resetLocaleForTests,
+  setActiveLocale,
+} from "../../src/i18n/catalog";
 import { UI_TEXT, uiText } from "../../src/ui-text";
 
 function assertNonEmptyCatalog(catalog: Record<string, unknown>): void {
@@ -52,4 +57,32 @@ describe("user-visible text catalog compatibility", () => {
     assert.equal(masterpieceFeatureText("modal.save"), "儲存");
     assert.equal(scoreDashboardText.selected(3), "已選 3 部");
   });
+
+  it("supports partial locale registration with per-key fallback", () => {
+    registerLocaleMessages("core", "en", {
+      "action.delete": "Delete",
+    });
+    registerLocaleMessages("core", "en", {
+      "library.resultMeta": "Showing {shown} of {total}{genre}",
+    });
+    registerLocaleMessages("rating", "en", {
+      adjusted: "Rating {original} was rounded to {rounded}.",
+    });
+    setActiveLocale("en");
+    try {
+      assert.equal(uiText("action.delete"), "Delete");
+      assert.equal(
+        uiText("library.resultMeta", { shown: 2, total: 5, genre: "" }),
+        "Showing 2 of 5",
+      );
+      assert.equal(uiText("action.collect"), UI_TEXT["action.collect"]);
+      assert.equal(
+        ratingFeatureText("adjusted", { original: 8.2, rounded: 8 }),
+        "Rating 8.2 was rounded to 8.",
+      );
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
 });

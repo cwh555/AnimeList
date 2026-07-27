@@ -85,3 +85,33 @@ describe("settings compatibility", () => {
     assert.equal(normalizeSpecialLabelMode("legacy-value"), "favorite");
   });
 });
+
+it("preserves unknown feature settings through the shared settings store", async () => {
+  const saved: unknown[] = [];
+  const storage = {
+    async loadData(): Promise<unknown> {
+      return {
+        libraryRoot: "Library",
+        futureFeature: { enabled: true, mode: "compact" },
+        providers: { bangumi: false, futureProvider: true },
+        migrations: { mediaStatus: 2, futureMigration: 7 },
+        uiState: { genre: "科幻", futureLayout: "dense" },
+      };
+    },
+    async saveData(value: unknown): Promise<void> {
+      saved.push(value);
+    },
+  };
+  const { AnimeListSettingsStore } = await import("../../src/settings-store");
+  const store = new AnimeListSettingsStore(storage);
+  const settings = await store.load();
+  await store.save(settings);
+
+  const persisted = saved[0] as Record<string, unknown>;
+  assert.deepEqual(persisted.futureFeature, { enabled: true, mode: "compact" });
+  assert.equal((persisted.providers as Record<string, unknown>).futureProvider, true);
+  assert.equal((persisted.migrations as Record<string, unknown>).futureMigration, 7);
+  assert.equal((persisted.uiState as Record<string, unknown>).futureLayout, "dense");
+  assert.equal(settings.searchLanguages.original, true);
+  assert.equal(settings.specialLabelMode, "favorite");
+});
