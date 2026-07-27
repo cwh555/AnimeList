@@ -23,3 +23,17 @@ jobs:
       - name: Run full tests in Asia/Taipei
         run: TZ=Asia/Taipei npm test
       - run: npm run release:check
+
+  export-stage3-base:
+    if: github.event_name == 'pull_request' && github.head_ref == 'refactor/stage-3-feature-composition'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Package exact checkout
+        run: tar --exclude=.git --exclude=node_modules -czf /tmp/animelist-stage3-base.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: animelist-stage3-base
+          path: /tmp/animelist-stage3-base.tar.gz
+          if-no-files-found: error
+          retention-days: 1
