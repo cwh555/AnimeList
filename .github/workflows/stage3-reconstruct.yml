@@ -16,25 +16,37 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Reconstruct patch archive
+      - name: Capture patch chunks
         shell: bash
         run: |
-          set -euo pipefail
-          for file in .stage3/chunk-*; do
-            echo "$(git hash-object "$file")  $file"
-            wc -c "$file"
-          done
-          cat .stage3/chunk-* > /tmp/stage3.patch.gz
-          gzip -t /tmp/stage3.patch.gz
-          gzip -dc /tmp/stage3.patch.gz > /tmp/stage3.patch
-          sha256sum /tmp/stage3.patch.gz /tmp/stage3.patch | tee /tmp/stage3.sha256
-          wc -c /tmp/stage3.patch.gz /tmp/stage3.patch
-          sed -n '1,80p' /tmp/stage3.patch
+          set -u
+          mkdir -p /tmp/stage3-chunks
+          cp .stage3/chunk-* /tmp/stage3-chunks/
+          {
+            for file in /tmp/stage3-chunks/chunk-*; do
+              echo "$(git hash-object "$file")  $file"
+              wc -c "$file"
+              xxd -l 16 "$file"
+              tail -c 16 "$file" | xxd
+            done
+            cat /tmp/stage3-chunks/chunk-* > /tmp/stage3.patch.gz
+            sha256sum /tmp/stage3.patch.gz
+            wc -c /tmp/stage3.patch.gz
+            gzip -t /tmp/stage3.patch.gz
+            echo "gzip_status=$?"
+            gzip -dc /tmp/stage3.patch.gz > /tmp/stage3.patch
+            echo "decompress_status=$?"
+            wc -c /tmp/stage3.patch
+            sha256sum /tmp/stage3.patch
+          } | tee /tmp/stage3-reconstruction.txt
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: stage3-reconstructed-patch
           path: |
+            /tmp/stage3-chunks/
             /tmp/stage3.patch.gz
             /tmp/stage3.patch
-            /tmp/stage3.sha256
+            /tmp/stage3-reconstruction.txt
+          if-no-files-found: warn
           retention-days: 1
