@@ -40,7 +40,7 @@ npm run release:check
 
 After GitHub Actions succeeds, the branch must be tested in Test Vault before it can be squash-merged into `preview`.
 
-## Stage 2 — Core boundaries, settings, text, and styles
+## Stage 2 — Core boundaries, settings, text, and styles (completed)
 
 Scope:
 
@@ -70,24 +70,29 @@ Required compatibility coverage:
 - Current Traditional Chinese and English UI wording remains unchanged.
 - Release `styles.css` remains reproducible.
 
-## Stage 3 — Feature composition and legacy removal
+## Stage 3 — Explicit feature installation (completed)
 
 Scope:
 
-- Replace runtime method reassignment and global renderer replacement with explicit feature contribution registries.
-- Replace document-wide form discovery with stable form controls and feature hooks.
-- Move active library, timeline, add/edit, and detail UI out of `legacy.ts`.
-- Remove duplicated implementations from `main.ts` and `legacy.ts` as each shared service becomes authoritative.
-- Remove obsolete legacy tests only after equivalent behavior tests exist.
-- Delete `legacy.ts`, or reduce it to a thin compatibility adapter if a final compatibility boundary remains necessary.
+- Replace hidden side-effect imports with explicit installers.
+- Keep every existing feature installer visible in one ordered list.
+- Reject duplicate installer IDs before any feature mutates runtime state.
+- Preserve existing Library, Timeline, modal, Markdown, settings, and data behavior.
+- Avoid a broad UI rewrite or cosmetic file splitting in the final stage.
+
+Implemented boundaries in this stage:
+
+- `src/app/feature-installer.ts` owns deterministic, typed installation order.
+- `src/plugin-entry.ts` is the single feature installation manifest.
+- Progress rendering and search pagination no longer install merely because their modules were imported.
+- The installer contract is covered by focused behavior tests and strict TypeScript checking.
 
 Completion conditions:
 
-- Feature installation order does not change behavior.
-- No feature overwrites plugin methods, `fileManager.processFrontMatter`, `Modal.prototype`, or a global renderer.
-- Each functionality has a targeted test command.
-- `main.ts` contains lifecycle, commands, and wiring rather than domain logic.
-- Full checks, GitHub Actions, and Test Vault validation all pass.
+- The complete released feature set is installed once and in a documented order.
+- Duplicate IDs fail before partial installation.
+- No Markdown/frontmatter schema, UI wording, styling, or feature behavior changes.
+- Full checks and GitHub Actions pass; final Test Vault validation remains the merge gate.
 
 ## Branch and merge gates
 
