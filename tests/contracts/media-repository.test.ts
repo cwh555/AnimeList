@@ -92,6 +92,20 @@ describe("media repository compatibility", () => {
     assert.equal(repository.findBySource(["AnimeList"], "AniList", "42"), anime);
   });
 
+  it("formats modified labels in the active local timezone", () => {
+    const previousTimezone = process.env.TZ;
+    try {
+      process.env.TZ = "UTC";
+      assert.equal(formatFileModifiedTime(1_700_000_000_000), "2023-11-14 22:13");
+
+      process.env.TZ = "Asia/Taipei";
+      assert.equal(formatFileModifiedTime(1_700_000_000_000), "2023-11-15 06:13");
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
+  });
+
   it("updates only favorite metadata and preserves unrelated fields", async () => {
     const media = markdownFile("AnimeList/Anime/example.md");
     const frontmatter: Record<string, unknown> = {
