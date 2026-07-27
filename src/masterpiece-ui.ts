@@ -297,10 +297,7 @@ export async function installMasterpieceLabels(plugin: AnimeListPlugin): Promise
   if (installedPlugins.has(plugin)) return;
   installedPlugins.add(plugin);
   const host = plugin as unknown as MasterpiecePlugin;
-  const loaded = await host.loadData();
-  host.settings.specialLabelMode = normalizeSpecialLabelMode(
-    isRecord(loaded) ? loaded.specialLabelMode : undefined,
-  );
+  host.settings.specialLabelMode = normalizeSpecialLabelMode(host.settings.specialLabelMode);
   installSettingsIntegration(host);
   installPluginAdapters(host);
   installRenderer(host);

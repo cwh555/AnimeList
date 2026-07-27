@@ -1,3 +1,5 @@
+import { defineTextCatalog } from "./i18n/catalog";
+
 export const SERIAL_COVER_TEXT = {
   search: "Search cover",
   searchAgain: "Search again",
@@ -11,6 +13,7 @@ export const SERIAL_COVER_TEXT = {
   series: "Using series cover",
   notFound: "No confident cover match",
   selectorTitle: "Select cover for {unit} {label}",
+  entryUnit: "entry",
   selectorDescription: "Search by title, then click a result to use its cover immediately.",
   query: "Search query",
   searchPlaceholder: "Enter the original or alternate title",
@@ -53,11 +56,11 @@ export const SERIAL_COVER_TEXT = {
   "settings.failed": "Serial cover loading failed. Check the developer console for details.",
 } as const;
 
+const CATALOG = defineTextCatalog("serial-cover", SERIAL_COVER_TEXT);
+
 export function serialCoverText(
   key: keyof typeof SERIAL_COVER_TEXT,
   variables: Record<string, string | number> = {},
 ): string {
-  return SERIAL_COVER_TEXT[key].replace(/\{([A-Za-z0-9_.-]+)\}/g, (match, name: string) => (
-    Object.prototype.hasOwnProperty.call(variables, name) ? String(variables[name]) : match
-  ));
+  return CATALOG.text(key, variables);
 }

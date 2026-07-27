@@ -1,4 +1,5 @@
 import type { MediaType } from "./types";
+import { defineTextCatalog } from "./i18n/catalog";
 import {
   MEDIA_STATUS_FILTER_ORDER,
   MEDIA_STATUS_VALUES,
@@ -269,6 +270,8 @@ export const UI_TEXT = {
   "notice.statusMigrationFailed": "無法完成清單狀態更新：{error}"
 } as const;
 
+const UI_CATALOG = defineTextCatalog("core", UI_TEXT);
+
 export type UiMediaType = "all" | MediaType;
 export type UiStatusFilter = MediaStatusFilter;
 export type UiTextKey = keyof typeof UI_TEXT;
@@ -282,10 +285,7 @@ const STATUS_TEXT_KEYS = {
 } as const satisfies Record<MediaStatus, UiTextKey>;
 
 export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string {
-  const template = UI_TEXT[key];
-  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name: string) => (
-    Object.prototype.hasOwnProperty.call(variables, name) ? String(variables[name]) : match
-  ));
+  return UI_CATALOG.text(key, variables);
 }
 
 export function completedStatusLabel(_mediaType: MediaType): string {
