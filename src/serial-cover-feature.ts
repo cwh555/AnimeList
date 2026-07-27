@@ -397,16 +397,19 @@ export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
 
   const originalOpenAdd = bindOpenAddModal(plugin);
   plugin.openAddModal = (initialType: MediaType = "anime"): void => {
-    const modalOpen = Modal.prototype.open;
+    const modalOpen: unknown = Reflect.get(Modal.prototype, "open");
+    if (typeof modalOpen !== "function") {
+      throw new TypeError("Obsidian Modal.open must be a function");
+    }
     const captured: Array<Modal & { renderDetails?: (result: ExternalMediaResult) => Promise<void> }> = [];
     Modal.prototype.open = function capture(this: Modal): void {
-      modalOpen.call(this);
+      Reflect.apply(modalOpen, this, []);
       if (this.modalEl.classList.contains("animelist-modal")) captured.push(this);
     };
     try {
       originalOpenAdd(initialType);
     } finally {
-      Modal.prototype.open = modalOpen;
+      Reflect.set(Modal.prototype, "open", modalOpen);
     }
     const modal = captured.at(-1);
     if (!modal || typeof modal.renderDetails !== "function") return;
