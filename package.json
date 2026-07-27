@@ -9,7 +9,7 @@
     "build": "tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
-    "test": "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs && node scripts/check-library-list-layout.mjs && node scripts/check-test-vault-fixtures.mjs",
+    "test": "node scripts/run-tests.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
@@ -17,7 +17,13 @@
     "release:check": "node scripts/check-release.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
     "community:check": "node scripts/check-community-review.mjs",
-    "test:browser": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs"
+    "test:browser": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs",
+    "test:unit": "node scripts/run-tests.mjs --suite unit",
+    "test:integration": "node scripts/run-tests.mjs --suite integration",
+    "test:contract": "node scripts/run-tests.mjs --suite contract",
+    "test:legacy": "node scripts/run-tests.mjs --suite legacy",
+    "test:feature": "node scripts/run-tests.mjs --feature",
+    "test:list": "node scripts/run-tests.mjs --list"
   },
   "keywords": [
     "obsidian",
