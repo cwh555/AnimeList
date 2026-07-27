@@ -1,5 +1,6 @@
 import { Notice, TFile } from "obsidian";
 import type AnimeListPlugin from "./main";
+import { createSegmentedDateInput } from "./segmented-date-input";
 import {
   compareSerialLabels,
   defaultProgressUnit,
@@ -166,14 +167,10 @@ function renderEditor(state: ProgressEditorState): void {
       ),
     ));
 
-    const startedAt = createEl("input");
-    startedAt.type = "date";
-    startedAt.value = entry.startedAt;
+    const startedAt = createSegmentedDateInput(entry.startedAt);
     fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
 
-    const completedAt = createEl("input");
-    completedAt.type = "date";
-    completedAt.value = entry.completedAt || todayString();
+    const completedAt = createSegmentedDateInput(entry.completedAt || todayString());
     entry.completedAt = completedAt.value;
     fields.appendChild(makeField(
       progressUnitFeatureText("completedAt"),
