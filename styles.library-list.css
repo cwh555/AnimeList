@@ -1,0 +1,44 @@
+/* Library list-mode layout overrides.
+ * Keep the list-specific behavior isolated from the established base stylesheet.
+ */
+
+/* A list row may grow when it contains dates, tags, or progress metadata. Remove
+ * the poster aspect-ratio constraint so the cover column stretches with the row;
+ * the image keeps filling that column through the shared object-fit: cover rule. */
+.al-grid.is-list .al-card {
+  align-items: stretch;
+}
+
+.al-grid.is-list .al-cover-wrap {
+  width: 116px;
+  min-height: 176px;
+  align-self: stretch;
+  aspect-ratio: auto;
+}
+
+/* Keep cover metadata on one line. When actions or progress consume the
+ * available width, truncate the affected label instead of increasing its height. */
+.al-grid.is-list .al-cover-top,
+.al-grid.is-list .al-cover-bottom,
+.al-grid.is-list .al-cover-badges {
+  flex-wrap: nowrap;
+}
+
+.al-grid.is-list .al-cover-badges,
+.al-grid.is-list .al-status-group,
+.al-grid.is-list .al-progress-on-cover {
+  min-width: 0;
+}
+
+.al-grid.is-list .al-card-top-actions {
+  flex: 0 0 auto;
+}
+
+.al-grid.is-list .al-format-badge,
+.al-grid.is-list .al-score-badge,
+.al-grid.is-list .al-status,
+.al-grid.is-list .al-progress-on-cover {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
