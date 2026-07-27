@@ -1,5 +1,6 @@
 import { Notice, TFile } from "obsidian";
 import type AnimeListPlugin from "./main";
+import { findMediaFormInput } from "./ui/media-form-field";
 import { createSegmentedDateInput } from "./segmented-date-input";
 import {
   compareSerialLabels,
@@ -69,11 +70,7 @@ function findUnitSelect(form: Element): HTMLSelectElement | null {
 }
 
 function findProgressInput(form: Element): HTMLInputElement | null {
-  const field = [...form.querySelectorAll<HTMLElement>(".al-form-field")].find((candidate) => {
-    const label = fieldLabel(candidate)?.textContent ?? "";
-    return label.includes("目前進度") || label.includes("目前閱讀");
-  });
-  return field?.querySelector<HTMLInputElement>("input") ?? null;
+  return findMediaFormInput(form, "progress");
 }
 
 function makeField(label: string, control: HTMLElement, hint = ""): HTMLLabelElement {
@@ -343,7 +340,7 @@ export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void 
 
     if (!unitSelect) {
       unitSelect = createUnitSelect(mediaType, selected);
-      progressField?.insertAdjacentElement("afterend", makeField("進度單位", unitSelect));
+      progressField?.insertAdjacentElement("afterend", makeField(progressUnitFeatureText("unitField"), unitSelect));
     } else {
       replaceUnitOptions(unitSelect, mediaType, selected);
     }

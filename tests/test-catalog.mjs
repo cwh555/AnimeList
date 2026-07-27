@@ -12,6 +12,7 @@ export const TEST_FEATURES = [
   "search",
   "serial-covers",
   "settings",
+  "styles",
   "test-infrastructure",
   "test-vault",
   "text",
@@ -51,7 +52,11 @@ export const TEST_TARGETS = [
   { path: "tests/timeline-corrections.test.ts", kind: "test", suite: "unit", features: ["timeline", "progress"] },
 
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },
+  { path: "tests/contracts/media-note-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "library", "covers"] },
+  { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
+  { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },
   { path: "tests/contracts/settings-compatibility.test.ts", kind: "test", suite: "contract", features: ["settings", "search", "masterpiece"] },
+  { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release"] },
   { path: "tests/contracts/text-catalog.test.ts", kind: "test", suite: "contract", features: ["text", "settings"] },
   { path: "tests/contracts/test-catalog.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
 

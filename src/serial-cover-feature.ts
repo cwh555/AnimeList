@@ -89,7 +89,7 @@ class CoverSelector extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("animelist-modal", "al-serial-cover-modal");
-    this.titleEl.setText(serialCoverText("selectorTitle", { unit: "entry", label: this.label }));
+    this.titleEl.setText(serialCoverText("selectorTitle", { unit: serialCoverText("entryUnit"), label: this.label }));
     this.contentEl.empty();
 
     this.contentEl.createEl("p", {

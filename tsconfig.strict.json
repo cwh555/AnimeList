@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/data/**/*.ts",
+    "src/i18n/**/*.ts",
+    "src/ui/**/*.ts",
+    "src/settings-model.ts",
+    "src/settings-store.ts",
+    "types/**/*.d.ts"
+  ]
+}

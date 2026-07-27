@@ -1,3 +1,4 @@
+import { defineTextCatalog } from "./i18n/catalog";
 import type { SpecialLabelMode } from "./masterpiece-labels";
 
 const TEXT = {
@@ -28,10 +29,11 @@ const TEXT = {
   "notice.failed": "Unable to update masterpiece categories.",
 } as const;
 
+const CATALOG = defineTextCatalog("masterpiece", TEXT);
 export type MasterpieceFeatureTextKey = keyof typeof TEXT;
 
 export function masterpieceFeatureText(key: MasterpieceFeatureTextKey): string {
-  return TEXT[key];
+  return CATALOG.text(key);
 }
 
 export function masterpieceActionText(favorite: boolean): string {

@@ -2,6 +2,7 @@
 // @ts-nocheck
 import { MarkdownRenderChild, Modal, Notice, Plugin, requestUrl, normalizePath, setIcon } from "obsidian";
 import { getScopedMarkdownFiles } from "./vault-scope";
+import { USER_AGENT } from "./app-metadata";
 import {
   completedRequirementMessage,
   completedStatusLabel,
@@ -36,12 +37,30 @@ import {
   preserveTimelineAxisScreenY,
 } from "./timeline-scale";
 import { centerLatestTimelineAxis } from "./timeline-corrections";
+import { MediaRepository } from "./data/media-repository";
+import { markMediaFormField } from "./ui/media-form-field";
+import {
+  dedupeSearchResults,
+  normalizeAniListMedia,
+  normalizeBangumiSubject,
+  normalizeOpenLibraryBook,
+} from "./data/provider-normalizers";
+import {
+  applyTemplateVariables,
+  buildMediaMarkdown,
+  completedProgress,
+  ensureDetailBlock,
+} from "./data/media-note-codec";
+import { normalizeGenres } from "./domain/media-metadata";
+import {
+  formatFileModifiedTime,
+  sanitizePathPart,
+  slugify,
+} from "./domain/value-normalization";
 
-const PLUGIN_VERSION = "1.2.1";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";
-const USER_AGENT = `AnimeList-Obsidian/${PLUGIN_VERSION} (local personal media library)`;
 
 const LABEL = {
   type: {
@@ -66,45 +85,9 @@ const LABEL = {
   },
 };
 
-const GENRE_ALIASES = new Map(Object.entries({
-  "romance": "戀愛", "love": "戀愛", "恋爱": "戀愛", "戀愛": "戀愛", "爱情": "戀愛",
-  "comedy": "喜劇", "喜剧": "喜劇", "喜劇": "喜劇", "搞笑": "喜劇",
-  "fantasy": "奇幻", "奇幻": "奇幻", "魔法": "魔法",
-  "adventure": "冒險", "冒险": "冒險", "冒險": "冒險",
-  "action": "動作", "动作": "動作", "動作": "動作", "戰鬥": "動作", "战斗": "動作",
-  "drama": "劇情", "剧情": "劇情", "劇情": "劇情",
-  "slice of life": "日常", "slice-of-life": "日常", "日常": "日常",
-  "school": "校園", "school life": "校園", "校园": "校園", "校園": "校園",
-  "psychological": "心理", "心理": "心理", "心理戰": "心理",
-  "mystery": "懸疑", "悬疑": "懸疑", "推理": "懸疑", "懸疑": "懸疑",
-  "thriller": "驚悚", "惊悚": "驚悚", "驚悚": "驚悚",
-  "horror": "恐怖", "恐怖": "恐怖",
-  "sci-fi": "科幻", "science fiction": "科幻", "科幻": "科幻",
-  "supernatural": "超自然", "超自然": "超自然",
-  "sports": "運動", "运动": "運動", "運動": "運動",
-  "music": "音樂", "音乐": "音樂", "音樂": "音樂",
-  "historical": "歷史", "历史": "歷史", "歷史": "歷史",
-  "mecha": "機器人", "機器人": "機器人", "机器人": "機器人",
-  "isekai": "異世界", "异世界": "異世界", "異世界": "異世界",
-  "healing": "療癒", "治癒": "療癒", "治愈": "療癒", "療癒": "療癒",
-  "family": "家庭", "家庭": "家庭",
-  "workplace": "職場", "职场": "職場", "職場": "職場",
-  "food": "美食", "美食": "美食",
-  "military": "軍事", "军事": "軍事", "軍事": "軍事",
-  "crime": "犯罪", "犯罪": "犯罪",
-  "girls love": "百合", "yuri": "百合", "百合": "百合",
-  "boys love": "BL", "boy's love": "BL", "bl": "BL",
-}));
-
 function asArray(value) {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
-}
-
-function stringValue(value, fallback = "") {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return fallback;
 }
 
 function numeric(value, fallback = 0) {
@@ -127,53 +110,6 @@ function todayString() {
   return `${year}-${month}-${day}`;
 }
 
-function currentTimeString() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-}
-
-function formatFileModifiedTime(value) {
-  const date = new Date(Number(value));
-  if (!Number.isFinite(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hour}:${minute}`;
-}
-
-function stripHtml(value) {
-  return String(value || "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .trim();
-}
-
-function sanitizePathPart(value, fallback = "untitled") {
-  const cleaned = String(value || "")
-    .normalize("NFKC")
-    .replace(/[\\/:*?"<>|#[\]^]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[. ]+$/g, "")
-    .slice(0, 90);
-  return cleaned || fallback;
-}
-
-function slugify(value, fallback = "media") {
-  return sanitizePathPart(value, fallback).toLocaleLowerCase().replace(/\s+/g, "-").replace(/-+/g, "-") || fallback;
-}
-
-function normalizeComparable(value) {
-  return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
-}
-
 const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
 
 function compareTimelineEntries(left, right) {
@@ -189,269 +125,6 @@ function compareTimelineEntries(left, right) {
   } else if (leftVolume) return 1;
   else if (rightVolume) return -1;
   return timelineTitleCollator.compare(String(left?.title || ""), String(right?.title || ""));
-}
-
-function normalizeGenre(value) {
-  const clean = String(value || "").normalize("NFKC").trim().replace(/^#/, "");
-  if (!clean) return "";
-  const key = clean.toLocaleLowerCase().replace(/[_/]+/g, " ").replace(/\s+/g, " ");
-  return GENRE_ALIASES.get(key) || clean;
-}
-
-function normalizeGenres(values, limit = 12) {
-  const output = [];
-  const seen = new Set();
-  for (const raw of asArray(values)) {
-    const value = normalizeGenre(typeof raw === "string" ? raw : raw?.name);
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    output.push(value);
-    if (output.length >= limit) break;
-  }
-  return output;
-}
-
-function yamlScalar(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "boolean") return value ? "true" : "false";
-  return JSON.stringify(String(value ?? ""));
-}
-
-function yamlArray(lines, key, values) {
-  const clean = asArray(values).map((value) => String(value || "").trim()).filter(Boolean);
-  if (!clean.length) return;
-  lines.push(`${key}:`);
-  clean.forEach((value) => lines.push(`  - ${yamlScalar(value)}`));
-}
-
-function yamlVolumeLog(lines, entries) {
-  const serialized = serializeVolumeLog(entries);
-  if (!serialized.length) return;
-  lines.push("volume_log:");
-  for (const entry of serialized) {
-    lines.push(`  - label: ${yamlScalar(entry.label)}`);
-    Object.entries(entry).forEach(([key, value]) => {
-      if (key === "label" || value === "") return;
-      lines.push(`    ${key}: ${yamlScalar(value)}`);
-    });
-  }
-}
-
-function mapFormat(value, mediaType) {
-  const format = String(value || "").toUpperCase();
-  const map = { TV: "tv", TV_SHORT: "tv", MOVIE: "movie", OVA: "ova", ONA: "ona", SPECIAL: "special", MUSIC: "music", MANGA: "manga", ONE_SHOT: "one_shot", NOVEL: "light_novel" };
-  if (map[format]) return map[format];
-  if (mediaType === "anime") return "tv";
-  if (mediaType === "manga") return "manga";
-  return "novel";
-}
-
-function bangumiInfoboxValues(infobox, keys) {
-  const wanted = new Set(keys.map((key) => String(key).toLocaleLowerCase()));
-  const values = [];
-  for (const row of asArray(infobox)) {
-    if (!row || !wanted.has(String(row.key || "").toLocaleLowerCase())) continue;
-    const raw = row.value;
-    if (Array.isArray(raw)) {
-      raw.forEach((entry) => values.push(typeof entry === "string" ? entry : entry?.v || entry?.k || ""));
-    } else if (raw && typeof raw === "object") values.push(raw.v || raw.k || "");
-    else values.push(raw || "");
-  }
-  return [...new Set(values.map((v) => String(v).trim()).filter(Boolean))];
-}
-
-function normalizeBangumiSubject(subject, mediaType) {
-  const originalTitle = String(subject?.name || "").trim();
-  const localTitle = String(subject?.name_cn || originalTitle || uiText("media.untitled")).trim();
-  const images = subject?.images || {};
-  const people = mediaType === "anime"
-    ? bangumiInfoboxValues(subject?.infobox, ["动画制作", "動畫製作", "制作", "製作"])
-    : bangumiInfoboxValues(subject?.infobox, ["作者", "原作", "作画", "作畫"]);
-  const platform = String(subject?.platform || "").trim();
-  let format = mediaType === "anime" ? "tv" : mediaType === "manga" ? "manga" : "light_novel";
-  if (/剧场|劇場|movie/i.test(platform)) format = "movie";
-  else if (/ova/i.test(platform)) format = "ova";
-  else if (/web|ona/i.test(platform)) format = "ona";
-  const date = String(subject?.date || "");
-  const total = mediaType === "anime" ? numeric(subject?.eps || subject?.total_episodes) : 0;
-  const rawGenres = asArray(subject?.tags).slice(0, 16).map((tag) => typeof tag === "string" ? tag : tag?.name).filter(Boolean);
-  return {
-    provider: "bangumi", sourceId: String(subject?.id ?? ""), sourceUrl: subject?.id ? `https://bgm.tv/subject/${subject.id}` : "",
-    mediaType, title: localTitle, originalTitle, romajiTitle: "", format, year: numeric(date.slice(0, 4), ""),
-    coverUrl: images.large || images.common || images.medium || images.small || images.grid || "",
-    genres: normalizeGenres(rawGenres), rawGenres, people, platforms: platform ? [platform] : [], total,
-    unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
-    summary: String(subject?.summary || "").trim(), externalScore: numeric(subject?.rating?.score, null), releaseStatus: "unknown",
-    searchTitles: [...new Set([
-      localTitle,
-      originalTitle,
-      ...bangumiInfoboxValues(subject?.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
-    ].map((title) => String(title || "").trim()).filter(Boolean))],
-  };
-}
-
-function normalizeAniListMedia(media, selectedType) {
-  const title = media?.title || {};
-  const localTitle = String(title.english || title.romaji || title.native || uiText("media.untitled")).trim();
-  const originalTitle = String(title.native || title.romaji || "").trim();
-  const staff = asArray(media?.staff?.edges)
-    .filter((edge) => /creator|story|art|author|original/i.test(String(edge?.role || "")))
-    .map((edge) => edge?.node?.name?.native || edge?.node?.name?.full).filter(Boolean);
-  const studios = asArray(media?.studios?.nodes).map((node) => node?.name).filter(Boolean);
-  const mediaType = selectedType;
-  const releaseStatus = ({ RELEASING: "releasing", FINISHED: "finished", HIATUS: "hiatus", CANCELLED: "cancelled" })[String(media?.status || "").toUpperCase()] || "unknown";
-  const total = mediaType === "anime" ? numeric(media?.episodes) : 0;
-  const rawGenres = asArray(media?.genres).slice(0, 12);
-  return {
-    provider: "anilist", sourceId: String(media?.id ?? ""),
-    sourceUrl: String(media?.siteUrl || (media?.id ? `https://anilist.co/${mediaType === "anime" ? "anime" : "manga"}/${media.id}` : "")),
-    mediaType, title: localTitle, originalTitle, romajiTitle: String(title.romaji || ""), format: mapFormat(media?.format, mediaType),
-    year: numeric(media?.startDate?.year, ""), coverUrl: media?.coverImage?.extraLarge || media?.coverImage?.large || media?.coverImage?.medium || "",
-    genres: normalizeGenres(rawGenres), rawGenres, people: mediaType === "anime" ? studios : staff, platforms: [], total,
-    unit: mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume",
-    summary: stripHtml(media?.description), externalScore: media?.averageScore == null ? null : numeric(media.averageScore) / 10, releaseStatus,
-    searchTitles: [...new Set([
-      localTitle,
-      originalTitle,
-      title.romaji,
-      title.english,
-      title.native,
-      ...asArray(media?.synonyms),
-    ].map((entry) => String(entry || "").trim()).filter(Boolean))],
-  };
-}
-
-function normalizeOpenLibraryBook(book) {
-  const key = String(book?.key || "").replace(/^\/works\//, "");
-  const rawGenres = asArray(book?.subject).slice(0, 16);
-  return {
-    provider: "openlibrary", sourceId: key, sourceUrl: key ? `https://openlibrary.org/works/${key}` : "", mediaType: "novel",
-    title: String(book?.title || uiText("media.untitled")), originalTitle: String(book?.title || ""), romajiTitle: "", format: "novel",
-    year: numeric(book?.first_publish_year, ""), coverUrl: book?.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "",
-    genres: normalizeGenres(rawGenres), rawGenres, people: asArray(book?.author_name).slice(0, 6), platforms: [], total: 0, unit: "volume", summary: "", externalScore: null, releaseStatus: "unknown",
-  };
-}
-
-function dedupeSearchResults(results) {
-  const seenSource = new Set();
-  const titleOwners = new Map();
-  const output = [];
-  for (const result of results) {
-    const sourceKey = `${result.provider}:${result.sourceId}`;
-    if (seenSource.has(sourceKey)) continue;
-    seenSource.add(sourceKey);
-
-    const comparableTitle = normalizeComparable(result.title || result.originalTitle);
-    const titleKey = comparableTitle
-      ? `${result.mediaType}:${comparableTitle}:${result.year || ""}:${result.format || ""}`
-      : "";
-    const titleOwner = titleKey ? titleOwners.get(titleKey) : undefined;
-    if (titleOwner && titleOwner !== result.provider) continue;
-    if (titleKey && !titleOwner) titleOwners.set(titleKey, result.provider);
-    output.push(result);
-  }
-  return output;
-}
-
-function stripTemplateFrontmatter(content) {
-  const text = String(content || "").replace(/^\uFEFF/, "");
-  if (!text.startsWith("---\n") && !text.startsWith("---\r\n")) return text;
-  return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
-}
-
-function applyTemplateVariables(content, context) {
-  const values = {
-    title: context.title || "",
-    date: todayString(),
-    time: currentTimeString(),
-    original_title: context.originalTitle || "",
-    media_type: context.mediaType || "",
-    cover: context.cover || context.coverUrl || "",
-    summary: context.summary || "",
-    source_url: context.sourceUrl || "",
-  };
-  return String(content || "").replace(/\{\{\s*([a-zA-Z_]+)(?::[^}]*)?\s*\}\}/g, (match, key) => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match);
-}
-
-function ensureDetailBlock(body, title) {
-  const detail = "```animelist-detail\n```";
-  let text = String(body || "").trim();
-  if (!text) text = `# ${title}\n\n> Added on ${todayString()} at ${currentTimeString()}.`;
-  if (text.includes("```animelist-detail")) return text;
-  const lines = text.split(/\r?\n/);
-  const headingIndex = lines.findIndex((line) => /^#\s+/.test(line));
-  if (headingIndex >= 0) lines.splice(headingIndex + 1, 0, "", detail);
-  else lines.unshift(`# ${title}`, "", detail, "");
-  return lines.join("\n");
-}
-
-function completedProgress(status, total, current, mediaType = "anime") {
-  const safeCurrent = mediaType === "novel" ? normalizeProgressValue(current) : Math.max(0, numeric(current));
-  if (mediaType !== "anime") return safeCurrent;
-  const safeTotal = Math.max(0, numeric(total));
-  return status === "completed" && safeTotal > 0 ? safeTotal : safeCurrent;
-}
-
-function buildMediaMarkdown(result, form, coverPath, templateContent = "") {
-  const title = String(form.title || "").trim();
-  const hasScore = form.score !== "" && form.score != null;
-  const score = hasScore ? Number(form.score) : null;
-  const completedAt = String(form.completedAt || "").trim();
-  const status = normalizeMediaStatus(form.status);
-  if (!title) throw new Error(uiText("validation.titleRequired"));
-  if (status === "completed" && !hasScore) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
-  if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
-    throw new Error(uiText("validation.scoreRange"));
-  }
-  if (status === "completed" && !completedAt) throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
-  const total = result.mediaType === "anime"
-    ? Math.max(0, numeric(form.total ?? result.total))
-    : 0;
-  const progress = completedProgress(status, total, form.progress, result.mediaType);
-  const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
-  const releaseStatus = result.mediaType === "anime"
-    ? "unknown"
-    : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
-  const volumeLog = result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [];
-  const lines = ["---", `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`];
-  lines.push(`title: ${yamlScalar(title)}`);
-  if (result.originalTitle) lines.push(`title_original: ${yamlScalar(result.originalTitle)}`);
-  if (result.romajiTitle && result.romajiTitle !== result.originalTitle) lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
-  lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
-  lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
-  lines.push(`status: ${yamlScalar(status)}`);
-  if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
-  lines.push(`progress: ${yamlScalar(progress)}`);
-  if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
-  lines.push(`progress_unit: ${yamlScalar(form.unit || result.unit)}`);
-  if (score != null) lines.push(`score: ${score}`);
-  lines.push(`favorite: ${form.favorite === true ? "true" : "false"}`);
-  if (result.year) lines.push(`year: ${numeric(result.year)}`);
-  if (form.startedAt) lines.push(`started_at: ${yamlScalar(form.startedAt)}`);
-  if (completedAt) lines.push(`completed_at: ${yamlScalar(completedAt)}`);
-  yamlVolumeLog(lines, volumeLog);
-  if (coverPath || result.coverUrl) lines.push(`cover: ${yamlScalar(coverPath || result.coverUrl)}`);
-  if (result.coverUrl) lines.push(`cover_remote: ${yamlScalar(result.coverUrl)}`);
-  yamlArray(lines, "genres", genres);
-  const rawGenres = asArray(result.rawGenres).map(String).filter((value) => value && !genres.includes(value));
-  yamlArray(lines, "source_genres", rawGenres);
-  if (result.mediaType === "anime") yamlArray(lines, "studios", result.people); else yamlArray(lines, "authors", result.people);
-  yamlArray(lines, "platforms", result.platforms);
-  lines.push(`source_provider: ${yamlScalar(result.provider)}`);
-  if (result.sourceId) lines.push(`source_id: ${yamlScalar(result.sourceId)}`);
-  yamlArray(lines, "source_urls", result.sourceUrl ? [result.sourceUrl] : []);
-  if (result.externalScore != null) lines.push(`source_score: ${numeric(result.externalScore)}`);
-  if (form.templatePath) lines.push(`note_template: ${yamlScalar(form.templatePath)}`);
-  lines.push("---", "");
-  const applied = applyTemplateVariables(stripTemplateFrontmatter(templateContent), {
-    title, originalTitle: result.originalTitle, mediaType: result.mediaType, cover: coverPath, coverUrl: result.coverUrl,
-    summary: result.summary, sourceUrl: result.sourceUrl,
-  });
-  let body = ensureDetailBlock(applied, title);
-  if (coverPath && !body.includes(coverPath)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![[${coverPath}|260]]`);
-  else if (!coverPath && result.coverUrl && !body.includes(result.coverUrl)) body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![${uiText("library.coverAlt", { title })}](${result.coverUrl})`);
-  lines.push(body.trim(), "");
-  return lines.join("\n");
 }
 
 function parseConfig(source) {
@@ -1805,6 +1478,7 @@ class AddMediaModal extends Modal {
     const progressType = result.mediaType === "novel" ? "text" : "number";
     const progressLabel = result.mediaType === "manga" ? uiText("add.progressManga") : result.mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
     const progress = createLabeledField(form, progressLabel, createTextInput(progressType, "0"), result.mediaType === "novel" ? uiText("add.progressNovelHint") : "");
+    markMediaFormField(progress, "progress");
     if (result.mediaType !== "novel") { progress.min = "0"; progress.step = "1"; }
     const total = result.mediaType === "anime"
       ? createLabeledField(form, uiText("add.total"), createTextInput("number", result.total || ""))
@@ -1959,6 +1633,7 @@ class EditMediaModal extends Modal {
     const progressType = mediaType === "novel" ? "text" : "number";
     const progressLabel = mediaType === "manga" ? uiText("add.progressManga") : mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
     const progress = createLabeledField(form, progressLabel, createTextInput(progressType, frontmatter.progress ?? 0), mediaType === "novel" ? uiText("add.progressNovelHint") : "");
+    markMediaFormField(progress, "progress");
     if (mediaType !== "novel") progress.min = "0";
     const total = mediaType === "anime"
       ? createLabeledField(form, uiText("add.total"), createTextInput("number", frontmatter.progress_total ?? ""))
@@ -2216,41 +1891,18 @@ export class LegacyAnimeListPlugin extends Plugin {
     new TimelineModal(this, this.collectMediaItems(MEDIA_ROOT)).open();
   }
 
+  getMediaRepository() {
+    if (!this.mediaRepository) this.mediaRepository = new MediaRepository(this.app);
+    return this.mediaRepository;
+  }
+
   collectMediaItems(source = MEDIA_ROOT) {
     const root = String(source || MEDIA_ROOT).replace(/^\/+|\/+$/g, "");
-    return getScopedMarkdownFiles(this.app, [root])
-      .map((file) => {
-        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-        if (!fm || !fm.media_type) return null;
-        const coverPath = stringValue(fm.cover).replace(/^!\[\[/, "").replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0];
-        let cover = "";
-        if (/^https?:\/\//i.test(coverPath)) cover = coverPath;
-        else if (coverPath) {
-          const coverFile = this.app.metadataCache.getFirstLinkpathDest(coverPath, file.path) || this.app.vault.getAbstractFileByPath(coverPath);
-          if (coverFile) cover = this.app.vault.getResourcePath(coverFile);
-        }
-        const people = asArray(fm.studios).length ? asArray(fm.studios) : asArray(fm.authors).length ? asArray(fm.authors) : asArray(fm.creators);
-        return {
-          title: stringValue(fm.title, file.basename), originalTitle: stringValue(fm.title_original, stringValue(fm.title_romaji)),
-          mediaType: stringValue(fm.media_type), format: stringValue(fm.format, stringValue(fm.media_type)), status: stringValue(fm.status, "planned"),
-          releaseStatus: normalizeReleaseStatus(fm.release_status), progress: normalizeProgressValue(fm.progress), total: stringValue(fm.media_type) === "anime" ? normalizeProgressValue(fm.progress_total) : 0, unit: stringValue(fm.progress_unit), score: fm.score,
-          favorite: fm.favorite === true, year: fm.year || "", genres: normalizeGenres(fm.genres), people,
-          platforms: asArray(fm.platforms), sourceUrls: asArray(fm.source_urls), cover, filePath: file.path,
-          updated: Number(file.stat?.mtime || 0), updatedLabel: file.stat?.mtime ? uiText("library.updatedAt", { date: formatFileModifiedTime(file.stat.mtime) }) : "",
-          startedAt: fm.started_at || "", completedAt: fm.completed_at || "",
-          volumeLog: normalizeVolumeLog(fm.volume_log),
-        };
-      }).filter(Boolean);
+    return this.getMediaRepository().collect([root]);
   }
 
   async setFavorite(path, next) {
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) throw new Error(uiText("validation.mediaNoteMissing"));
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      fm.favorite = next === true;
-      delete fm.updated_at;
-      delete fm.metadata_updated_at;
-    });
+    await this.getMediaRepository().setFavorite(path, next === true);
     new Notice(uiText(next ? "notice.favoriteAdded" : "notice.favoriteRemoved"));
   }
 
@@ -2351,10 +2003,11 @@ export class LegacyAnimeListPlugin extends Plugin {
   }
 
   findExistingBySource(provider, sourceId) {
-    return getScopedMarkdownFiles(this.app, [MEDIA_ROOT]).find((file) => {
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      return fm && stringValue(fm.source_provider) === String(provider) && stringValue(fm.source_id) === String(sourceId);
-    });
+    return this.getMediaRepository().findBySource(
+      [MEDIA_ROOT],
+      String(provider),
+      String(sourceId),
+    );
   }
 
   async uniqueFilePath(folder, baseName, extension) {

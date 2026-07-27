@@ -1,6 +1,12 @@
 import { Modal, Notice, requestUrl } from "obsidian";
-import LegacyAnimeListPlugin, { legacyTest } from "./legacy";
+import LegacyAnimeListPlugin from "./legacy";
 import { rankSearchResults } from "./search";
+import {
+  dedupeSearchResults,
+  normalizeAniListMedia,
+  normalizeBangumiSubject,
+  normalizeOpenLibraryBook,
+} from "./data/provider-normalizers";
 import { uiText } from "./ui-text";
 import type { ExternalMediaResult, MediaType, ProviderSettings } from "./types";
 
@@ -62,18 +68,6 @@ interface LegacyPluginPrototype extends Record<PropertyKey, unknown> {
 
 const PATCH_MARKER = Symbol.for("animelist.search-pagination.native-append");
 const USER_AGENT = "AnimeList-Obsidian (local personal media library)";
-const {
-  normalizeBangumiSubject,
-  normalizeAniListMedia,
-  normalizeOpenLibraryBook,
-  dedupeSearchResults,
-} = legacyTest as {
-  normalizeBangumiSubject: (value: unknown, mediaType: MediaType) => ExternalMediaResult;
-  normalizeAniListMedia: (value: unknown, mediaType: MediaType) => ExternalMediaResult;
-  normalizeOpenLibraryBook: (value: unknown) => ExternalMediaResult;
-  dedupeSearchResults: (values: ExternalMediaResult[]) => ExternalMediaResult[];
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

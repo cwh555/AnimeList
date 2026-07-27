@@ -73,10 +73,15 @@ requirePairedLintScope(legacy, [
   "@typescript-eslint/no-misused-promises",
 ], "legacy compatibility");
 requirePairedLintScope(main, [
+  "@typescript-eslint/no-misused-promises",
+], "Obsidian callback adapter");
+for (const rule of [
   "@typescript-eslint/no-unsafe-member-access",
   "@typescript-eslint/no-unsafe-assignment",
-  "@typescript-eslint/no-misused-promises",
-], "typed legacy adapter");
+]) {
+  const escaped = rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  rejectMatch(main, new RegExp(`eslint-disable[^\n]*${escaped}`), `src/main.ts must not disable ${rule}`);
+}
 
 requireMatch(releaseWorkflow, /actions\/attest@v4/, "release artifact attestation is missing");
 requireMatch(releaseWorkflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/, "all release assets must be attested");

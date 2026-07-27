@@ -2,8 +2,6 @@ import { Modal, TFile } from "obsidian";
 import LegacyAnimeListPlugin from "./legacy";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import {
-  DEFAULT_SEARCH_LANGUAGES,
-  normalizeSearchLanguageSettings,
   searchMultilingualProviders,
   type SearchProviderAdapter,
 } from "./multilingual-search";
@@ -12,12 +10,7 @@ import type { AnimeListSettings, ExternalMediaResult, MediaNoteForm, MediaType }
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 const PATCH_MARKER = Symbol.for("animelist.search-enhancements.modal-details");
-const INSTANCE_STATES = new WeakMap<object, EnhancementState>();
-
-interface EnhancementState {
-  languagesHydrated: boolean;
-  languageHydration: Promise<void> | null;
-}
+const INSTALLED_PLUGINS = new WeakSet<object>();
 
 type SearchEnhancedPlugin = LegacyAnimeListPlugin & {
   settings: AnimeListSettings;
@@ -54,10 +47,6 @@ function createMediaNoteMethod(plugin: SearchEnhancedPlugin): CreateMediaNoteMet
   const method: unknown = Reflect.get(plugin, "createMediaNote");
   if (typeof method !== "function") throw new Error("AnimeList createMediaNote is unavailable.");
   return method as CreateMediaNoteMethod;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string {
@@ -137,39 +126,16 @@ function aliasesFor(result: ExternalMediaResult): string[] {
   return output;
 }
 
-async function hydrateSearchLanguages(
-  plugin: SearchEnhancedPlugin,
-  state: EnhancementState,
-): Promise<void> {
-  if (state.languagesHydrated) return;
-  if (state.languageHydration === null) {
-    state.languageHydration = (async () => {
-      const loaded = await plugin.loadData();
-      const rawLanguages = isRecord(loaded) ? loaded.searchLanguages : undefined;
-      plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawLanguages);
-      state.languagesHydrated = true;
-    })().finally(() => {
-      state.languageHydration = null;
-    });
-  }
-  await state.languageHydration;
-}
-
 function installInstanceEnhancements(plugin: SearchEnhancedPlugin): void {
-  if (INSTANCE_STATES.has(plugin)) return;
-  const state: EnhancementState = {
-    languagesHydrated: false,
-    languageHydration: null,
-  };
-  INSTANCE_STATES.set(plugin, state);
+  if (INSTALLED_PLUGINS.has(plugin)) return;
+  INSTALLED_PLUGINS.add(plugin);
   const methods = runtimeMethods(plugin);
 
   methods.searchExternal = async (mediaType, query) => {
-    await hydrateSearchLanguages(plugin, state);
     const response = await searchMultilingualProviders({
       query,
       providers: providersFor(plugin, mediaType),
-      languages: plugin.settings.searchLanguages ?? DEFAULT_SEARCH_LANGUAGES,
+      languages: plugin.settings.searchLanguages,
       maxResults: 24,
     });
     return { results: response.results, warnings: response.warnings };

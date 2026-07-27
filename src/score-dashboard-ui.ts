@@ -249,7 +249,7 @@ export function renderScoreDashboard(
     unratedButton.classList.toggle("is-active", state.showUnrated);
     unratedButton.setAttribute("aria-pressed", String(state.showUnrated));
     unratedButton.title = state.showUnrated ? text.hideUnrated : text.showUnrated;
-    unratedButton.setAttribute("aria-label", `${unratedButton.title}，${count} 部作品`);
+    unratedButton.setAttribute("aria-label", text.unratedControlLabel(unratedButton.title, count));
     setToolButton(unratedButton, state.showUnrated ? "eye" : "eye-off", text.unrated, String(count));
   };
 
@@ -299,7 +299,7 @@ export function renderScoreDashboard(
     targetPosters.querySelector(".al-score-lane-empty")?.remove();
     insertPosterByTitle(targetPosters, poster);
     poster.dataset.score = change.nextScore == null ? "unrated" : change.nextScore.toFixed(1);
-    poster.setAttribute("aria-label", `${poster.title}，${change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)}`);
+    poster.setAttribute("aria-label", text.posterAria(poster.title, change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)));
     updateLanePlaceholder(sourceLane);
     updateLanePlaceholder(targetLane);
     updateGroupCount(sourceGroup);
@@ -362,7 +362,7 @@ export function renderScoreDashboard(
     button.draggable = !batchMode;
     button.setAttribute("role", "option");
     button.setAttribute("aria-selected", String(selectedPaths.has(item.filePath)));
-    button.setAttribute("aria-label", `${item.title}，${item.score == null ? text.unrated : item.score.toFixed(1)}`);
+    button.setAttribute("aria-label", text.posterAria(item.title, item.score == null ? text.unrated : item.score.toFixed(1)));
     button.classList.toggle("is-selected", selectedPaths.has(item.filePath));
     const check = create("span", "al-score-poster-check");
     setIcon(check, selectedPaths.has(item.filePath) ? "check" : "circle");
@@ -415,7 +415,7 @@ export function renderScoreDashboard(
     const lane = create("div", "al-score-lane");
     lane.dataset.score = score == null ? "unrated" : score.toFixed(1);
     lane.setAttribute("role", "listbox");
-    lane.setAttribute("aria-label", score == null ? text.unrated : `${score.toFixed(1)} 分`);
+    lane.setAttribute("aria-label", score == null ? text.unrated : text.scoreLaneAria(score.toFixed(1)));
     lane.addEventListener("dragover", (event) => {
       if (batchMode || !event.dataTransfer?.types.includes(DRAG_DATA_TYPE)) return;
       event.preventDefault();

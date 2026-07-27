@@ -1,0 +1,130 @@
+import { App, TFile } from "obsidian";
+import { normalizeGenres } from "../domain/media-metadata";
+import type { CoverSources, MediaItem } from "../domain/media-types";
+import {
+  formatFileModifiedTime,
+  mediaTypeOf,
+  normalizedCoverPath,
+  optionalScore,
+  stringArray,
+  stringValue,
+} from "../domain/value-normalization";
+import { normalizeMediaStatus } from "../media-status";
+import {
+  normalizeProgressValue,
+  normalizeReleaseStatus,
+  normalizeVolumeLog,
+} from "../novel-progress";
+import { uiText } from "../ui-text";
+import { getScopedMarkdownFiles } from "../vault-scope";
+
+export type CoverSourcesResolver = (file: TFile) => CoverSources | undefined;
+
+function frontmatterRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+export class MediaRepository {
+  constructor(
+    private readonly app: App,
+    private readonly coverSourcesFor?: CoverSourcesResolver,
+  ) {}
+
+  resolveCoverFile(value: unknown, sourcePath: string): TFile | null {
+    const coverPath = normalizedCoverPath(value);
+    if (!coverPath || /^https?:\/\//i.test(coverPath)) return null;
+    const coverFile = this.app.metadataCache.getFirstLinkpathDest(coverPath, sourcePath)
+      ?? this.app.vault.getAbstractFileByPath(coverPath);
+    return coverFile instanceof TFile ? coverFile : null;
+  }
+
+  resolveCoverPath(value: unknown, sourcePath: string): string {
+    const coverPath = normalizedCoverPath(value);
+    if (/^https?:\/\//i.test(coverPath)) return coverPath;
+    const coverFile = this.resolveCoverFile(value, sourcePath);
+    return coverFile ? this.app.vault.getResourcePath(coverFile) : "";
+  }
+
+  collect(roots: string[]): MediaItem[] {
+    return getScopedMarkdownFiles(this.app, roots)
+      .map((file): MediaItem | null => {
+        const frontmatter = frontmatterRecord(
+          this.app.metadataCache.getFileCache(file)?.frontmatter,
+        );
+        if (!frontmatter) return null;
+        const mediaType = mediaTypeOf(frontmatter.media_type);
+        if (!mediaType) return null;
+
+        const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
+        const studios = stringArray(frontmatter.studios);
+        const authors = stringArray(frontmatter.authors);
+        const people = studios.length
+          ? studios
+          : authors.length
+            ? authors
+            : stringArray(frontmatter.creators);
+        const modified = Number(file.stat?.mtime || 0);
+        const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
+
+        return {
+          title: stringValue(frontmatter.title, file.basename),
+          originalTitle: stringValue(
+            frontmatter.title_original,
+            stringValue(frontmatter.title_romaji),
+          ),
+          mediaType,
+          format: stringValue(frontmatter.format, mediaType),
+          status: normalizeMediaStatus(frontmatter.status),
+          releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
+          progress: normalizeProgressValue(frontmatter.progress),
+          total: mediaType === "anime"
+            ? normalizeProgressValue(frontmatter.progress_total)
+            : 0,
+          unit: stringValue(frontmatter.progress_unit),
+          score: optionalScore(frontmatter.score),
+          favorite: frontmatter.favorite === true,
+          year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string"
+            ? frontmatter.year
+            : "",
+          genres: normalizeGenres(frontmatter.genres),
+          people,
+          platforms: stringArray(frontmatter.platforms),
+          sourceUrls: stringArray(frontmatter.source_urls),
+          cover: this.resolveCoverPath(frontmatter.cover, file.path),
+          coverSources: coverFile ? this.coverSourcesFor?.(coverFile) : undefined,
+          filePath: file.path,
+          updated: modified,
+          updatedLabel: modifiedLabel
+            ? uiText("library.updatedAt", { date: modifiedLabel })
+            : "",
+          startedAt: stringValue(frontmatter.started_at),
+          completedAt: stringValue(frontmatter.completed_at),
+          volumeLog: normalizeVolumeLog(frontmatter.volume_log),
+        };
+      })
+      .filter((item): item is MediaItem => item !== null);
+  }
+
+  findBySource(roots: string[], provider: string, sourceId: string): TFile | undefined {
+    return getScopedMarkdownFiles(this.app, roots).find((file) => {
+      const frontmatter = frontmatterRecord(
+        this.app.metadataCache.getFileCache(file)?.frontmatter,
+      );
+      return frontmatter !== null
+        && stringValue(frontmatter.source_provider) === provider
+        && stringValue(frontmatter.source_id) === sourceId;
+    });
+  }
+
+  async setFavorite(path: string, next: boolean): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error(uiText("validation.mediaNoteMissing"));
+    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+      frontmatter.favorite = next;
+      delete frontmatter.updated_at;
+      delete frontmatter.metadata_updated_at;
+    });
+  }
+}
