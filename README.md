@@ -24,15 +24,12 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new in 1.2.0**
+> **What's new in 1.2.1**
 >
-> - Added a Score Dashboard for organizing titles across all 0–10 ratings, with drag-and-drop and batch editing.
-> - Added an optional Masterpiece mode with reusable categories and support for assigning a title to multiple categories.
-> - Added chapter, season, and volume tracking for manga and novels, including dated progress entries.
-> - Added optional covers for individual manga and novel progress entries, with automatic lookup, direct card-based manual selection, and timeline support.
-> - Standardized ratings to 0.5-point increments and simplified library statuses to Ongoing, Completed, Wishlist, and Dropped.
-> - Improved multilingual search, result ranking, provider coverage, and conservative duplicate-title warnings.
-> - Improved timeline scaling, progress presentation, and interface terminology.
+> - Fixed manga and novel serial-entry date layout and standardized date input behavior.
+> - Prevented newly added chapter, season, or volume rows from causing scroll jumps.
+> - Fixed the serial-cover modal method binding warning without changing modal behavior.
+> - Corrected list-mode cover sizing and kept cover status text on one line.
 
 ## Features
 

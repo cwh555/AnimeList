@@ -37,7 +37,7 @@ import {
 } from "./timeline-scale";
 import { centerLatestTimelineAxis } from "./timeline-corrections";
 
-const PLUGIN_VERSION = "1.2.0";
+const PLUGIN_VERSION = "1.2.1";
 const MEDIA_ROOT = "Media";
 const COVER_ROOT = "Assets/Covers";
 const TEMPLATE_ROOT = "Templates";

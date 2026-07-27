@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1 - 2026-07-27
+
+### Fixed
+
+- Aligned manga and novel serial-entry start and completion date fields with the shared segmented date input and full-width editor layout.
+- Prevented adding a chapter, season, or volume entry from jumping the modal or page before focusing the new unit field.
+- Preserved the correct modal receiver when temporarily intercepting serial-cover modal opening, eliminating the unbound-method warning.
+- Made list-mode covers and placeholders fill the complete row height while keeping cover metadata on one line.
+
+### Compatibility
+
+- No Markdown, frontmatter, progress-unit, serial-cover, or media-status schema changes are introduced in this patch release.
+
 ## 1.2.0 - 2026-07-26
 
 ### Added

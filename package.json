@@ -1,6 +1,6 @@
 {
   "name": "animelist",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "An Obsidian plugin for managing anime, manga, and novel lists in Markdown.",
   "main": "main.js",
   "type": "module",
@@ -9,7 +9,7 @@
     "build": "tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
-    "test": "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs && node scripts/check-test-vault-fixtures.mjs",
+    "test": "node scripts/run-tests.mjs && node scripts/check-serial-reading-ui.mjs && node scripts/check-library-list-layout.mjs && node scripts/check-test-vault-fixtures.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
