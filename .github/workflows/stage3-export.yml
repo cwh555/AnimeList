@@ -1,0 +1,22 @@
+name: Stage 3 Recovered Export
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/stage3-export.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Package exact checkout
+        run: tar --exclude=.git -czf /tmp/animelist-stage3-recovered.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: animelist-stage3-recovered
+          path: /tmp/animelist-stage3-recovered.tar.gz
+          retention-days: 1
