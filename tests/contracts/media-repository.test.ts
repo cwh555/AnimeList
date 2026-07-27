@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App, TFile, TFolder } from "obsidian";
 import { MediaRepository } from "../../src/data/media-repository";
+import { formatFileModifiedTime } from "../../src/domain/value-normalization";
 
 function markdownFile(path: string, mtime = 0): TFile {
   const file = new TFile();
@@ -15,7 +16,8 @@ function markdownFile(path: string, mtime = 0): TFile {
 
 describe("media repository compatibility", () => {
   it("normalizes one authoritative library representation", () => {
-    const anime = markdownFile("AnimeList/Anime/example.md", 1_700_000_000_000);
+    const modified = 1_700_000_000_000;
+    const anime = markdownFile("AnimeList/Anime/example.md", modified);
     const ignored = markdownFile("AnimeList/Notes/readme.md");
     const cover = new TFile();
     cover.path = "AnimeList/Covers/example.jpg";
@@ -81,8 +83,8 @@ describe("media repository compatibility", () => {
       cover: `app://${cover.path}`,
       coverSources: undefined,
       filePath: anime.path,
-      updated: 1_700_000_000_000,
-      updatedLabel: "更新於 2023-11-14 22:13",
+      updated: modified,
+      updatedLabel: `更新於 ${formatFileModifiedTime(modified)}`,
       startedAt: "",
       completedAt: "",
       volumeLog: [],
