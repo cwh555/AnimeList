@@ -1,0 +1,47 @@
+name: Publish validated stage 2 commits
+
+on:
+  push:
+    branches:
+      - chore/publish-stage2-20260727
+    paths:
+      - ".github/workflows/publish-stage2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify and publish validated commits
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat .github/stage2-patch/part-* > /tmp/stage2.patch.gz.b64
+          echo "ac883f3fc582d6a389f13fe017a4f474e27379b1704b1658cf74ab2e77d6d7dd  /tmp/stage2.patch.gz.b64" | sha256sum --check --strict
+
+          base64 --decode /tmp/stage2.patch.gz.b64 > /tmp/stage2.patch.gz
+          echo "bdb9681a31573fb3636467dc2a1e3bc3455c52842d28a7c9e72b51d74edda6c2  /tmp/stage2.patch.gz" | sha256sum --check --strict
+
+          gzip --decompress --stdout /tmp/stage2.patch.gz > /tmp/stage2.patch
+          echo "59ad9c54fa015dd8ca8ba8769f7c143d84c7d72bbc68e5739e8ff3b87db5a3d5  /tmp/stage2.patch" | sha256sum --check --strict
+
+          git fetch origin preview refactor/stage-2-core-boundaries
+          test "$(git rev-parse origin/preview)" = "80fe767974624fb5e05ce2d75d713f5cd67cddf7"
+          test "$(git rev-parse origin/refactor/stage-2-core-boundaries)" = "80fe767974624fb5e05ce2d75d713f5cd67cddf7"
+
+          git config user.name "AnimeList GitHub Agent"
+          git config user.email "agent@users.noreply.github.com"
+          git switch --force-create refactor/stage-2-core-boundaries origin/preview
+          git am /tmp/stage2.patch
+
+          test "$(git rev-list --count origin/preview..HEAD)" = "4"
+          git diff --check origin/preview...HEAD
+          git push \
+            --force-with-lease=refs/heads/refactor/stage-2-core-boundaries:80fe767974624fb5e05ce2d75d713f5cd67cddf7 \
+            origin HEAD:refs/heads/refactor/stage-2-core-boundaries
