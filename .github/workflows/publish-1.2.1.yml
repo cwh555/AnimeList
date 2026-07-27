@@ -1,0 +1,130 @@
+name: Publish AnimeList 1.2.1
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: github.head_ref == 'publish/1.2.1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 3581a9a72a72ec0a3666eb33a21c980dd7d6ab09
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify main, tag, and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: 3581a9a72a72ec0a3666eb33a21c980dd7d6ab09
+          TAG: 1.2.1
+          PUBLISH_BRANCH: publish/1.2.1
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [[ "$remote_main" != "$TARGET_SHA" ]]; then
+            echo "main moved: expected $TARGET_SHA, found $remote_main" >&2
+            exit 1
+          fi
+
+          main_run_id=""
+          for attempt in $(seq 1 120); do
+            runs="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=30")"
+            candidate="$(jq -c --arg sha "$TARGET_SHA" '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)] | sort_by(.created_at) | last // empty' <<<"$runs")"
+            if [[ -n "$candidate" ]]; then
+              status="$(jq -r '.status' <<<"$candidate")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$candidate")"
+              main_run_id="$(jq -r '.id' <<<"$candidate")"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then
+                  echo "main CI run ${main_run_id} concluded ${conclusion}" >&2
+                  exit 1
+                fi
+                echo "main CI run ${main_run_id} succeeded"
+                break
+              fi
+            fi
+            sleep 5
+          done
+          if [[ -z "$main_run_id" ]]; then
+            echo "no push-triggered main CI run found for $TARGET_SHA" >&2
+            exit 1
+          fi
+
+          npm ci
+          npm run check
+          npm run release:check
+
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+          if (manifest.version !== '1.2.1') throw new Error(`unexpected manifest version: ${manifest.version}`);
+          NODE
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "tag ${TAG} already exists" >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release ${TAG} already exists" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$TARGET_SHA" -m "AnimeList ${TAG}"
+          git push origin "refs/tags/${TAG}"
+
+          peeled="$(git ls-remote origin "refs/tags/${TAG}^{}" | awk '{print $1}')"
+          if [[ "$peeled" != "$TARGET_SHA" ]]; then
+            echo "tag ${TAG} points to ${peeled:-unknown}, expected ${TARGET_SHA}" >&2
+            exit 1
+          fi
+
+          release_run_id=""
+          for attempt in $(seq 1 180); do
+            runs="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=30")"
+            candidate="$(jq -c --arg sha "$TARGET_SHA" '[.workflow_runs[] | select(.name == "Release Obsidian plugin" and .event == "push" and .head_sha == $sha)] | sort_by(.created_at) | last // empty' <<<"$runs")"
+            if [[ -n "$candidate" ]]; then
+              status="$(jq -r '.status' <<<"$candidate")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$candidate")"
+              release_run_id="$(jq -r '.id' <<<"$candidate")"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then
+                  echo "release workflow ${release_run_id} concluded ${conclusion}" >&2
+                  exit 1
+                fi
+                echo "release workflow ${release_run_id} succeeded"
+                break
+              fi
+            fi
+            sleep 5
+          done
+          if [[ -z "$release_run_id" ]]; then
+            echo "release workflow was not found for ${TAG}" >&2
+            exit 1
+          fi
+
+          release="$(gh release view "$TAG" --json tagName,name,isDraft,isPrerelease,assets,url)"
+          jq -e --arg tag "$TAG" '.tagName == $tag and .name == ("AnimeList " + $tag) and (.isDraft | not) and (.isPrerelease | not)' <<<"$release" >/dev/null
+          asset_names="$(jq -r '.assets[].name' <<<"$release" | sort)"
+          expected_assets="$(printf '%s\n' main.js manifest.json styles.css | sort)"
+          if [[ "$asset_names" != "$expected_assets" ]]; then
+            echo "unexpected release assets:" >&2
+            printf '%s\n' "$asset_names" >&2
+            exit 1
+          fi
+
+          echo "$release" | jq '{tagName, name, isDraft, isPrerelease, url, assets: [.assets[].name]}'
+          git push origin --delete "$PUBLISH_BRANCH"
