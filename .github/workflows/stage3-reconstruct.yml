@@ -1,0 +1,40 @@
+name: Stage 3 Patch Reconstruction
+
+on:
+  pull_request:
+    paths:
+      - '.stage3/**'
+      - '.github/workflows/stage3-reconstruct.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Reconstruct patch archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in .stage3/chunk-*; do
+            echo "$(git hash-object "$file")  $file"
+            wc -c "$file"
+          done
+          cat .stage3/chunk-* > /tmp/stage3.patch.gz
+          gzip -t /tmp/stage3.patch.gz
+          gzip -dc /tmp/stage3.patch.gz > /tmp/stage3.patch
+          sha256sum /tmp/stage3.patch.gz /tmp/stage3.patch | tee /tmp/stage3.sha256
+          wc -c /tmp/stage3.patch.gz /tmp/stage3.patch
+          sed -n '1,80p' /tmp/stage3.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage3-reconstructed-patch
+          path: |
+            /tmp/stage3.patch.gz
+            /tmp/stage3.patch
+            /tmp/stage3.sha256
+          retention-days: 1
