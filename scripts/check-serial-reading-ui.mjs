@@ -7,6 +7,7 @@ const [
   progressStyles,
   buildConfig,
   progressEditorSource,
+  segmentedDateSource,
   pickerSource,
   coverFeatureSource,
   migrationModalSource,
@@ -18,6 +19,7 @@ const [
   readFile("styles.progress.css", "utf8"),
   readFile("esbuild.config.mjs", "utf8"),
   readFile("src/additional-progress-units-ui.ts", "utf8"),
+  readFile("src/segmented-date-input.ts", "utf8"),
   readFile("src/serial-cover-picker.ts", "utf8"),
   readFile("src/serial-cover-feature.ts", "utf8"),
   readFile("src/serial-cover-migration-modal.ts", "utf8"),
@@ -29,7 +31,8 @@ assert.match(serialStyles, /\.animelist-modal \.al-volume-editor \{[\s\S]*grid-c
 assert.match(serialStyles, /\.al-volume-editor > \.al-secondary-button\s*\{[\s\S]*justify-self:\s*start;/);
 assert.doesNotMatch(serialStyles, /display:\s*contents/);
 assert.doesNotMatch(serialStyles, /grid-template-areas/);
-assert.match(serialStyles, /\.al-volume-row-fields\s*\{[\s\S]*minmax\(96px,[\s\S]*repeat\(2,\s*minmax\(190px,/);
+assert.match(serialStyles, /\.al-volume-row-fields\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+assert.match(serialStyles, /@media \(max-width:\s*620px\)[\s\S]*\.al-volume-row-fields\s*\{[\s\S]*grid-template-columns:\s*1fr;/);
 assert.match(serialStyles, /\.al-grid\.is-list \.al-progress\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*none;/);
 assert.doesNotMatch(serialStyles, /\.al-progress:not\(:has\(/);
 assert.doesNotMatch(serialStyles, /\.status-(?:watching|reading|on_hold)/);
@@ -56,6 +59,13 @@ assert.match(progressEditorSource, /\.al-volume-editor:not\(\.al-progress-unit-e
 assert.match(progressEditorSource, /originalEditor\) => originalEditor\.remove\(\)/);
 assert.doesNotMatch(progressEditorSource, /originalEditor\.hidden/);
 assert.match(progressEditorSource, /\.al-modal-actions > button\.mod-cta/);
+assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.startedAt\)/);
+assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.completedAt \|\| todayString\(\)\)/);
+assert.doesNotMatch(progressEditorSource, /\.type\s*=\s*"date"/);
+assert.match(segmentedDateSource, /createDiv\(\{ cls: "al-date-input" \}\)/);
+assert.match(segmentedDateSource, /bindSegment\(year, 4, month\)/);
+assert.match(segmentedDateSource, /bindSegment\(month, 2, day\)/);
+assert.match(segmentedDateSource, /bindSegment\(day, 2\)/);
 
 // The whole candidate card is the only action. There is no Select affordance or
 // secondary Apply button/state; clicking a card downloads, commits, and closes.

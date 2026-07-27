@@ -13,6 +13,7 @@ await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 await writeFile(entryFile, [
   'import "../../tests/core.test.ts";',
+  'import "../../tests/segmented-date-input.test.ts";',
   'import "../../tests/media-status.test.ts";',
   'import "../../tests/schema-migration.test.ts";',
   'import "../../tests/progress-display.test.ts";',

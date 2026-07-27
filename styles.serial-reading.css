@@ -3,7 +3,7 @@
  * isolated and the production build can append the rules idempotently.
  */
 
-/* The novel volume editor belongs to the whole form, not one half of its grid. */
+/* The serial editor belongs to the whole form, not one half of its grid. */
 .animelist-modal .al-volume-editor {
   grid-column: 1 / -1;
 }
@@ -13,8 +13,9 @@
   justify-self: start;
 }
 
-/* Use the full modal width: compact volume label, two comfortable date fields,
- * and a content-sized remove action. */
+/* Use the full modal width. The unit label occupies its own row through the
+ * shared first-field rule, then start and completion dates split the next row
+ * into the same balanced two-column layout as the main media form. */
 .animelist-modal .al-volume-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -22,7 +23,7 @@
 }
 
 .animelist-modal .al-volume-row-fields {
-  grid-template-columns: minmax(96px, 0.42fr) repeat(2, minmax(190px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
 }
 
@@ -32,16 +33,6 @@
   max-width: none;
 }
 
-@media (max-width: 900px) {
-  .animelist-modal .al-volume-row-fields {
-    grid-template-columns: minmax(90px, 0.55fr) minmax(0, 1fr);
-  }
-
-  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
-    grid-column: 1 / -1;
-  }
-}
-
 @media (max-width: 620px) {
   .animelist-modal .al-volume-row {
     grid-template-columns: 1fr;
@@ -49,10 +40,6 @@
 
   .animelist-modal .al-volume-row-fields {
     grid-template-columns: 1fr;
-  }
-
-  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
-    grid-column: auto;
   }
 
   .animelist-modal .al-volume-row-actions {
