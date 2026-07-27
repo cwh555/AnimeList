@@ -13,7 +13,7 @@ The plan follows patterns used by established TypeScript and Obsidian projects w
 
 These references support the direction, but AnimeList keeps its current local-first Markdown model and avoids introducing unnecessary framework or dependency layers.
 
-## Stage 1 — Test foundation
+## Stage 1 — Test foundation (completed)
 
 Scope:
 
@@ -52,6 +52,15 @@ Scope:
 - Keep `main.ts` focused on lifecycle, commands, and wiring.
 
 Meaningful modules must own a coherent responsibility. Long files will not be split merely to reduce line count, and no third copy of existing domain logic may be created.
+
+Implemented boundaries in this stage:
+
+- `AnimeListSettingsStore` and `normalizeAnimeListSettings` are the single settings load/normalize/save path.
+- `MediaRepository`, `media-note-codec`, `LibraryStorage`, `ExternalMediaSearchService`, and `MediaNoteService` own shared persistence and provider workflows.
+- Core and feature text helpers use locale-ready catalogs with fallback and incremental locale registration.
+- Domain, data, i18n, and shared UI modules pass an additional strict TypeScript configuration.
+- Base and feature styles are independent sources; ordinary builds verify rather than rewrite `styles.css`.
+- `main.ts` keeps compatibility method adapters while provider, Markdown, folder, and settings rules live in typed services.
 
 Required compatibility coverage:
 
