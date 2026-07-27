@@ -18,5 +18,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run full checks in UTC
+        run: TZ=UTC npm run check
+      - name: Run full tests in Asia/Taipei
+        run: TZ=Asia/Taipei npm test
       - run: npm run release:check
