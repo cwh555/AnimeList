@@ -6,43 +6,10 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prepare-release:
-    if: github.event_name == 'pull_request' && github.head_ref == 'release/1.2.1'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - name: Prepare and validate 1.2.1
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm version 1.2.1 --no-git-tag-version
-          node scripts/prepare-release-1.2.1.mjs
-          npm ci
-          npm run check
-          npm run release:check
-          git fetch origin preview
-          git show origin/preview:.github/workflows/ci.yml > .github/workflows/ci.yml
-          rm .github/workflows/prepare-1.2.1.yml
-          rm scripts/prepare-release-1.2.1.mjs
-          git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: prepare 1.2.1 release"
-          git push origin HEAD:release/1.2.1
-
   check:
-    if: github.event_name != 'pull_request' || github.head_ref != 'release/1.2.1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
