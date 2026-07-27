@@ -386,18 +386,24 @@ function installNativePagination(modal: LegacyAddMediaModal): void {
   renderPagination(modal, state);
 }
 
-const prototype = LegacyAnimeListPlugin.prototype as unknown as LegacyPluginPrototype;
-if (prototype[PATCH_MARKER] !== true) {
-  const originalOpenAddModal = prototype.openAddModal;
-  prototype.openAddModal = function openAddModalWithNativePagination(
-    this: LegacyAnimeListPlugin,
-    initialType = "anime",
-  ): void {
-    const mediaType: MediaType = initialType === "manga" || initialType === "novel" ? initialType : "anime";
-    const modal = captureLegacyModal(() => {
-      originalOpenAddModal.call(this, mediaType);
-    });
-    if (modal) installNativePagination(modal);
-  };
-  Object.defineProperty(prototype, PATCH_MARKER, { value: true });
+let searchPaginationInstalled = false;
+
+export function installSearchPagination(): void {
+  if (searchPaginationInstalled) return;
+  searchPaginationInstalled = true;
+  const prototype = LegacyAnimeListPlugin.prototype as unknown as LegacyPluginPrototype;
+  if (prototype[PATCH_MARKER] !== true) {
+    const originalOpenAddModal = prototype.openAddModal;
+    prototype.openAddModal = function openAddModalWithNativePagination(
+      this: LegacyAnimeListPlugin,
+      initialType = "anime",
+    ): void {
+      const mediaType: MediaType = initialType === "manga" || initialType === "novel" ? initialType : "anime";
+      const modal = captureLegacyModal(() => {
+        originalOpenAddModal.call(this, mediaType);
+      });
+      if (modal) installNativePagination(modal);
+    };
+    Object.defineProperty(prototype, PATCH_MARKER, { value: true });
+  }
 }
