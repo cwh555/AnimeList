@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - chore/export-stage1-env-20260727
+  pull_request:
+    branches:
+      - preview
 
 permissions:
   contents: read
