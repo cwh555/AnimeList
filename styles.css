@@ -561,7 +561,7 @@
  * isolated and the production build can append the rules idempotently.
  */
 
-/* The novel volume editor belongs to the whole form, not one half of its grid. */
+/* The serial editor belongs to the whole form, not one half of its grid. */
 .animelist-modal .al-volume-editor {
   grid-column: 1 / -1;
 }
@@ -571,8 +571,9 @@
   justify-self: start;
 }
 
-/* Use the full modal width: compact volume label, two comfortable date fields,
- * and a content-sized remove action. */
+/* Use the full modal width. The unit label occupies its own row through the
+ * shared first-field rule, then start and completion dates split the next row
+ * into the same balanced two-column layout as the main media form. */
 .animelist-modal .al-volume-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -580,7 +581,7 @@
 }
 
 .animelist-modal .al-volume-row-fields {
-  grid-template-columns: minmax(96px, 0.42fr) repeat(2, minmax(190px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
 }
 
@@ -590,16 +591,6 @@
   max-width: none;
 }
 
-@media (max-width: 900px) {
-  .animelist-modal .al-volume-row-fields {
-    grid-template-columns: minmax(90px, 0.55fr) minmax(0, 1fr);
-  }
-
-  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
-    grid-column: 1 / -1;
-  }
-}
-
 @media (max-width: 620px) {
   .animelist-modal .al-volume-row {
     grid-template-columns: 1fr;
@@ -607,10 +598,6 @@
 
   .animelist-modal .al-volume-row-fields {
     grid-template-columns: 1fr;
-  }
-
-  .animelist-modal .al-volume-row-fields .al-form-field:last-child {
-    grid-column: auto;
   }
 
   .animelist-modal .al-volume-row-actions {
@@ -1034,5 +1021,50 @@
   .al-serial-cover-migration-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Library list-mode layout overrides.
+ * Keep the list-specific behavior isolated from the established base stylesheet.
+ */
+
+/* A list row may grow when it contains dates, tags, or progress metadata. Remove
+ * the poster aspect-ratio constraint so the cover column stretches with the row;
+ * the image keeps filling that column through the shared object-fit: cover rule. */
+.al-grid.is-list .al-card {
+  align-items: stretch;
+}
+
+.al-grid.is-list .al-cover-wrap {
+  width: 116px;
+  min-height: 176px;
+  align-self: stretch;
+  aspect-ratio: auto;
+}
+
+/* Keep cover metadata on one line. When actions or progress consume the
+ * available width, truncate the affected label instead of increasing its height. */
+.al-grid.is-list .al-cover-top,
+.al-grid.is-list .al-cover-bottom,
+.al-grid.is-list .al-cover-badges {
+  flex-wrap: nowrap;
+}
+
+.al-grid.is-list .al-cover-badges,
+.al-grid.is-list .al-status-group,
+.al-grid.is-list .al-progress-on-cover {
+  min-width: 0;
+}
+
+.al-grid.is-list .al-card-top-actions {
+  flex: 0 0 auto;
+}
+
+.al-grid.is-list .al-format-badge,
+.al-grid.is-list .al-score-badge,
+.al-grid.is-list .al-status,
+.al-grid.is-list .al-progress-on-cover {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* END GENERATED FEATURE STYLES */
