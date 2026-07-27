@@ -38,10 +38,33 @@ ANIMELIST_TEST_VAULT=/absolute/path/to/vault npm run test-vault
 
 Use `-- --no-open` when the vault should be prepared without launching Obsidian.
 
+## Targeted automated tests
+
+The complete test command remains:
+
+```bash
+npm test
+```
+
+Tests are cataloged by layer and functionality, so a branch can run the smallest relevant suite while developing:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:contract
+npm run test:legacy
+npm run test:feature -- timeline
+npm run test:feature -- serial-covers
+npm run test:list
+```
+
+`tests/legacy-characterization.test.ts` contains characterization and source-structure checks that protect the current compatibility implementation and is catalogued in the `legacy` suite. New behavior tests belong in dedicated feature-named files or `tests/contracts`; do not add new product behavior only to the legacy suite.
+
 Before opening a pull request, run:
 
 ```bash
 npm run check
+npm run release:check
 ```
 
 Do not commit the test vault, its media data, generated fixtures, or Obsidian workspace state.
