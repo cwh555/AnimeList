@@ -7,6 +7,7 @@
     "noUnusedParameters": true
   },
   "include": [
+    "src/app/**/*.ts",
     "src/domain/**/*.ts",
     "src/data/**/*.ts",
     "src/i18n/**/*.ts",

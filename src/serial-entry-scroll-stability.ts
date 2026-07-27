@@ -1,5 +1,3 @@
-import type AnimeListPlugin from "./main";
-
 export interface ScrollPositionSnapshot {
   restore(): void;
 }
@@ -10,12 +8,6 @@ interface ElementScrollPosition {
   top: number;
 }
 
-function isElement(value: unknown): value is Element {
-  return typeof value === "object"
-    && value !== null
-    && "closest" in value
-    && typeof Reflect.get(value, "closest") === "function";
-}
 
 /**
  * Capture every scroll container that can be affected when an editor rebuilds
@@ -68,7 +60,7 @@ export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElemen
   ) ?? null;
 }
 
-function scheduleStableFocus(editor: HTMLElement, snapshot: ScrollPositionSnapshot): void {
+export function stabilizeSerialEntryFocus(editor: HTMLElement, snapshot: ScrollPositionSnapshot): void {
   let focused = false;
   const stabilize = (): void => {
     if (!editor.isConnected) return;
@@ -88,26 +80,4 @@ function scheduleStableFocus(editor: HTMLElement, snapshot: ScrollPositionSnapsh
   if (view?.requestAnimationFrame) {
     view.requestAnimationFrame(() => view.requestAnimationFrame(stabilize));
   }
-}
-
-/**
- * Stabilize both the current progress-unit editor and the legacy novel editor.
- * The capture listener runs before their existing click handlers rebuild rows
- * or request smooth scrolling; restoration happens before paint and again after
- * the legacy double-requestAnimationFrame reveal path.
- */
-export function installSerialEntryScrollStability(plugin: AnimeListPlugin): void {
-  const handleAddClick = (event: MouseEvent): void => {
-    if (!isElement(event.target)) return;
-    const button = event.target.closest<HTMLButtonElement>(
-      ".al-progress-unit-editor > .al-secondary-button, "
-      + ".al-volume-editor-header > .al-secondary-button",
-    );
-    const editor = button?.closest<HTMLElement>(".al-volume-editor");
-    if (!button || !editor) return;
-    scheduleStableFocus(editor, captureScrollPosition(editor));
-  };
-
-  document.addEventListener("click", handleAddClick, true);
-  plugin.register(() => document.removeEventListener("click", handleAddClick, true));
 }

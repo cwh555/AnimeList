@@ -1,52 +1,25 @@
-import { Modal, TFile } from "obsidian";
-import LegacyAnimeListPlugin from "./legacy";
+import { TFile } from "obsidian";
+import type { AddMediaModalContext } from "./app/feature-registry";
+import type { AnimeListPluginHost } from "./app/plugin-host";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import {
   searchMultilingualProviders,
   type SearchProviderAdapter,
 } from "./multilingual-search";
 import { searchFeatureText } from "./search-feature-text";
-import type { AnimeListSettings, ExternalMediaResult, MediaNoteForm, MediaType } from "./types";
+import type {
+  AnimeListSettings,
+  ExternalMediaResult,
+  MediaType,
+} from "./types";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
-const PATCH_MARKER = Symbol.for("animelist.search-enhancements.modal-details");
-const INSTALLED_PLUGINS = new WeakSet<object>();
-
-type SearchEnhancedPlugin = LegacyAnimeListPlugin & {
+interface SearchEnhancedPlugin extends AnimeListPluginHost {
   settings: AnimeListSettings;
-  getScanFolders?(): string[];
-};
-
-interface SearchRuntimeMethods {
-  searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }>;
+  getScanFolders(): string[];
   searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
-  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
-}
-
-type CreateMediaNoteMethod = (
-  this: SearchEnhancedPlugin,
-  result: ExternalMediaResult,
-  form: MediaNoteForm,
-) => Promise<unknown>;
-
-interface LegacyAddMediaModal extends Modal {
-  renderDetails: (result: ExternalMediaResult) => Promise<void>;
-}
-
-interface AddModalPrototype extends Record<PropertyKey, unknown> {
-  openAddModal: (this: SearchEnhancedPlugin, initialType?: MediaType) => void;
-}
-
-function runtimeMethods(plugin: SearchEnhancedPlugin): SearchRuntimeMethods {
-  return plugin as unknown as SearchRuntimeMethods;
-}
-
-function createMediaNoteMethod(plugin: SearchEnhancedPlugin): CreateMediaNoteMethod {
-  const method: unknown = Reflect.get(plugin, "createMediaNote");
-  if (typeof method !== "function") throw new Error("AnimeList createMediaNote is unavailable.");
-  return method as CreateMediaNoteMethod;
 }
 
 function stringValue(value: unknown): string {
@@ -66,8 +39,7 @@ function numberValue(value: unknown): number {
 }
 
 function collectStoredMedia(plugin: SearchEnhancedPlugin): StoredMediaIdentity[] {
-  const roots = typeof plugin.getScanFolders === "function" ? plugin.getScanFolders() : ["Media"];
-  return getScopedMarkdownFiles(plugin.app, roots).flatMap((file) => {
+  return getScopedMarkdownFiles(plugin.app, plugin.getScanFolders()).flatMap((file) => {
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
     const mediaType = frontmatter?.media_type;
     if (mediaType !== "anime" && mediaType !== "manga" && mediaType !== "novel") return [];
@@ -90,24 +62,23 @@ function collectStoredMedia(plugin: SearchEnhancedPlugin): StoredMediaIdentity[]
 
 function providersFor(plugin: SearchEnhancedPlugin, mediaType: MediaType): SearchProviderAdapter[] {
   const providers: SearchProviderAdapter[] = [];
-  const methods = runtimeMethods(plugin);
   if (plugin.settings.providers.bangumi) {
     providers.push({
       label: "Bangumi",
       supportsChineseDiscovery: true,
-      search: (query) => methods.searchBangumi(mediaType, query),
+      search: (query) => plugin.searchBangumi(mediaType, query),
     });
   }
   if (plugin.settings.providers.anilist) {
     providers.push({
       label: "AniList",
-      search: (query) => methods.searchAniList(mediaType, query),
+      search: (query) => plugin.searchAniList(mediaType, query),
     });
   }
   if (mediaType === "novel" && plugin.settings.providers.openlibrary) {
     providers.push({
       label: "Open Library",
-      search: (query) => methods.searchOpenLibrary(query),
+      search: (query) => plugin.searchOpenLibrary(query),
     });
   }
   return providers;
@@ -126,43 +97,9 @@ function aliasesFor(result: ExternalMediaResult): string[] {
   return output;
 }
 
-function installInstanceEnhancements(plugin: SearchEnhancedPlugin): void {
-  if (INSTALLED_PLUGINS.has(plugin)) return;
-  INSTALLED_PLUGINS.add(plugin);
-  const methods = runtimeMethods(plugin);
-
-  methods.searchExternal = async (mediaType, query) => {
-    const response = await searchMultilingualProviders({
-      query,
-      providers: providersFor(plugin, mediaType),
-      languages: plugin.settings.searchLanguages,
-      maxResults: 24,
-    });
-    return { results: response.results, warnings: response.warnings };
-  };
-
-  const originalCreateMediaNote = createMediaNoteMethod(plugin);
-  methods.createMediaNote = async (result, form) => {
-    const created: unknown = await originalCreateMediaNote.call(plugin, result, form);
-    if (!(created instanceof TFile)) throw new Error("AnimeList createMediaNote returned an invalid file.");
-    const aliases = aliasesFor(result);
-    if (aliases.length) {
-      try {
-        await plugin.app.fileManager.processFrontMatter(created, (frontmatter) => {
-          const existing = stringArray(frontmatter.title_aliases);
-          frontmatter.title_aliases = [...new Set([...existing, ...aliases])];
-        });
-      } catch (error) {
-        console.warn("AnimeList could not persist title aliases", error);
-      }
-    }
-    return created;
-  };
-}
-
 function renderDuplicateWarning(
   plugin: SearchEnhancedPlugin,
-  modal: LegacyAddMediaModal,
+  modal: AddMediaModalContext["modal"],
   result: ExternalMediaResult,
 ): void {
   modal.contentEl.querySelector(".al-duplicate-warning")?.remove();
@@ -188,49 +125,43 @@ function renderDuplicateWarning(
   form.insertAdjacentElement("beforebegin", warning);
 }
 
-function captureLegacyModal(openLegacyModal: () => void): LegacyAddMediaModal | null {
-  const openDescriptor = Object.getOwnPropertyDescriptor(Modal.prototype, "open");
-  const originalModalOpen: unknown = openDescriptor?.value;
-  if (!openDescriptor || typeof originalModalOpen !== "function") return null;
-  let captured: LegacyAddMediaModal | null = null;
-  Modal.prototype.open = function openAndCapture(this: Modal): void {
-    Reflect.apply(originalModalOpen, this, []);
-    const candidate = this as Partial<LegacyAddMediaModal>;
-    if (this.modalEl.classList.contains("animelist-modal") && typeof candidate.renderDetails === "function") {
-      captured = candidate as LegacyAddMediaModal;
-    }
-  };
-  try {
-    openLegacyModal();
-  } finally {
-    Object.defineProperty(Modal.prototype, "open", openDescriptor);
-  }
-  return captured;
-}
+export function installSearchEnhancements(plugin: SearchEnhancedPlugin): void {
+  plugin.features.registerExternalSearch({
+    id: "multilingual-search",
+    order: 0,
+    search: async ({ mediaType, query }) => {
+      const response = await searchMultilingualProviders({
+        query,
+        providers: providersFor(plugin, mediaType),
+        languages: plugin.settings.searchLanguages,
+        maxResults: 24,
+      });
+      return { results: response.results, warnings: response.warnings };
+    },
+  });
 
-function installDuplicateWarning(
-  plugin: SearchEnhancedPlugin,
-  modal: LegacyAddMediaModal,
-): void {
-  const originalRenderDetails = modal.renderDetails;
-  modal.renderDetails = async (result) => {
-    await originalRenderDetails.call(modal, result);
-    renderDuplicateWarning(plugin, modal, result);
-  };
-}
+  plugin.features.registerMediaForm({
+    id: "search-title-aliases",
+    afterCreate: async (context, created) => {
+      if (!(created instanceof TFile) || !context.result) return;
+      const aliases = aliasesFor(context.result);
+      if (!aliases.length) return;
+      try {
+        await plugin.app.fileManager.processFrontMatter(created, (frontmatter) => {
+          const existing = stringArray(frontmatter.title_aliases);
+          frontmatter.title_aliases = [...new Set([...existing, ...aliases])];
+        });
+      } catch (error) {
+        console.warn("AnimeList could not persist title aliases", error);
+      }
+    },
+  });
 
-const prototype = LegacyAnimeListPlugin.prototype as unknown as AddModalPrototype;
-if (prototype[PATCH_MARKER] !== true) {
-  const originalOpenAddModal = prototype.openAddModal;
-  prototype.openAddModal = function openAddModalWithSearchEnhancements(
-    this: SearchEnhancedPlugin,
-    initialType = "anime",
-  ): void {
-    installInstanceEnhancements(this);
-    const modal = captureLegacyModal(() => {
-      originalOpenAddModal.call(this, initialType);
-    });
-    if (modal) installDuplicateWarning(this, modal);
-  };
-  Object.defineProperty(prototype, PATCH_MARKER, { value: true });
+  plugin.features.registerAddMedia({
+    id: "duplicate-warning",
+    order: 20,
+    afterDetailsRender: ({ modal }, result) => {
+      renderDuplicateWarning(plugin, modal, result);
+    },
+  });
 }

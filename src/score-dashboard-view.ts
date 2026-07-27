@@ -1,4 +1,5 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { ScoreDashboardDragAutoScroller } from "./score-dashboard-drag-scroll";
 import { renderScoreDashboardWithBatchDrag } from "./score-dashboard-batch-drag";
 import { normalizeScoreDashboardScale, SCORE_DASHBOARD_DEFAULT_SCALE } from "./score-dashboard-model";
 import type { ScoreDashboardScoreChange } from "./score-dashboard-move";
@@ -28,16 +29,49 @@ export class ScoreDashboardView extends ItemView {
   private state: ScoreDashboardUiState = { type: "all", scale: SCORE_DASHBOARD_DEFAULT_SCALE, showUnrated: false };
   private refreshTimer: number | null = null;
   private pendingScrollTop = 0;
+  private dragScroller: ScoreDashboardDragAutoScroller | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: ScoreDashboardPluginHost) { super(leaf); }
   getViewType(): string { return SCORE_DASHBOARD_VIEW_TYPE; }
   getDisplayText(): string { return text.title; }
   getIcon(): string { return "table-properties"; }
 
-  async onOpen(): Promise<void> { this.render(); }
+  private readonly handleDragStart = (event: DragEvent): void => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const poster = target.closest<HTMLButtonElement>(".al-score-poster");
+    if (!poster?.draggable) return;
+    this.stopDragScroll();
+    this.dragScroller = new ScoreDashboardDragAutoScroller(this.contentEl);
+    this.dragScroller.start();
+  };
+
+  private readonly handleDragOver = (event: DragEvent): void => {
+    this.dragScroller?.update(event.clientY);
+  };
+
+  private readonly handleDragEnd = (): void => this.stopDragScroll();
+
+  async onOpen(): Promise<void> {
+    this.contentEl.addEventListener("dragstart", this.handleDragStart);
+    this.contentEl.addEventListener("dragover", this.handleDragOver);
+    this.contentEl.addEventListener("drop", this.handleDragEnd);
+    this.contentEl.addEventListener("dragend", this.handleDragEnd);
+    this.render();
+  }
   async onClose(): Promise<void> {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+    this.contentEl.removeEventListener("dragstart", this.handleDragStart);
+    this.contentEl.removeEventListener("dragover", this.handleDragOver);
+    this.contentEl.removeEventListener("drop", this.handleDragEnd);
+    this.contentEl.removeEventListener("dragend", this.handleDragEnd);
+    this.stopDragScroll();
     this.contentEl.empty();
+  }
+
+  private stopDragScroll(): void {
+    this.dragScroller?.stop();
+    this.dragScroller = null;
   }
 
   getState(): PersistedState {

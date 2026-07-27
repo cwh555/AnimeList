@@ -1,6 +1,5 @@
-import { Notice, TFile } from "obsidian";
-import type AnimeListPlugin from "./main";
-import { findMediaFormInput } from "./ui/media-form-field";
+import type { AnimeListPluginHost } from "./app/plugin-host";
+import type { MediaFormContext } from "./app/feature-registry";
 import { createSegmentedDateInput } from "./segmented-date-input";
 import {
   compareSerialLabels,
@@ -13,17 +12,17 @@ import {
   progressUnitsFor,
 } from "./progress-units";
 import type { ReadingProgressUnit } from "./progress-units";
-import { applyReadingProgressSnapshot } from "./reading-progress-persistence";
 import {
   progressUnitFeatureText,
   progressUnitLabel,
 } from "./progress-unit-feature-text";
-import type { MediaType, NovelVolumeEntry, ProgressValue } from "./types";
+import type { NovelVolumeEntry, ProgressValue } from "./types";
+import { captureScrollPosition, stabilizeSerialEntryFocus } from "./serial-entry-scroll-stability";
 
 interface ProgressEditorState {
-  modal: HTMLElement;
+  plugin: AnimeListPluginHost;
+  formContext: MediaFormContext;
   mediaType: "manga" | "novel";
-  editPath: string | null;
   unit: ReadingProgressUnit;
   unitSelect: HTMLSelectElement;
   progressInput: HTMLInputElement;
@@ -39,38 +38,12 @@ function todayString(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-function isElement(value: unknown): value is Element {
-  return typeof value === "object"
-    && value !== null
-    && "closest" in value
-    && typeof Reflect.get(value, "closest") === "function";
-}
-
-function mediaTypeValue(value: unknown): MediaType | null {
-  return value === "anime" || value === "manga" || value === "novel" ? value : null;
-}
-
 function fieldLabel(field: Element): HTMLElement | null {
   return field.querySelector<HTMLElement>(".al-form-label");
 }
 
 function fieldHint(field: Element): HTMLElement | null {
   return field.querySelector<HTMLElement>(".al-form-hint");
-}
-
-function findUnitSelect(form: Element): HTMLSelectElement | null {
-  return [...form.querySelectorAll<HTMLSelectElement>("select")].find((select) => (
-    [...select.options].some((option) => (
-      option.value === "episode"
-      || option.value === "chapter"
-      || option.value === "season"
-      || option.value === "volume"
-    ))
-  )) ?? null;
-}
-
-function findProgressInput(form: Element): HTMLInputElement | null {
-  return findMediaFormInput(form, "progress");
 }
 
 function makeField(label: string, control: HTMLElement, hint = ""): HTMLLabelElement {
@@ -192,20 +165,24 @@ function renderEditor(state: ProgressEditorState): void {
       state.entries.splice(index, 1);
       renderEditor(state);
     });
+    void state.plugin.features.decorateSerialEntry({
+      form: state.formContext,
+      row,
+      entry,
+      index,
+      refresh: () => renderEditor(state),
+    });
   });
 
   add.addEventListener("click", () => {
+    const snapshot = captureScrollPosition(state.editor);
     state.entries.push({
       label: nextSerialLabel(state.entries, state.unit),
       startedAt: "",
       completedAt: todayString(),
     });
     renderEditor(state);
-    const inputs = state.editor.querySelectorAll<HTMLInputElement>('.al-volume-row input[type="text"]');
-    const newest = inputs.item(inputs.length - 1);
-    newest?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    newest?.focus({ preventScroll: true });
-    newest?.select();
+    stabilizeSerialEntryFocus(state.editor, snapshot);
   });
 }
 
@@ -263,156 +240,69 @@ function validateAndPrepare(state: ProgressEditorState): void {
   state.progressInput.value = String(state.preparedProgress);
 }
 
-function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {
-  applyReadingProgressSnapshot(frontmatter, {
-    unit: state.unit,
-    progress: state.preparedProgress,
-    entries: state.entries,
-  });
-}
+export function installAdditionalProgressUnitsUi(plugin: AnimeListPluginHost): void {
+  plugin.features.registerMediaForm({
+    id: "reading-progress-units",
+    order: 10,
+    render: (context) => {
+      if (context.mediaType !== "manga" && context.mediaType !== "novel") return;
+      const mediaType = context.mediaType;
+      const selected = defaultProgressUnit(
+        mediaType,
+        context.frontmatter.progress_unit ?? context.fields.unit?.value,
+      );
+      if (selected === "episode") return;
 
-export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void {
-  const states = new WeakMap<HTMLElement, ProgressEditorState>();
-  let activeEditPath: string | null = null;
-  let pendingCreate: ProgressEditorState | null = null;
-  let pendingEdit: ProgressEditorState | null = null;
-
-  const originalOpenEditModal = plugin.openEditModal.bind(plugin);
-  plugin.openEditModal = (path: string): void => {
-    activeEditPath = path;
-    originalOpenEditModal(path);
-  };
-
-  const originalCreateMediaNote = plugin.createMediaNote.bind(plugin);
-  plugin.createMediaNote = async (result, form) => {
-    const state = pendingCreate;
-    pendingCreate = null;
-    const file = await originalCreateMediaNote(result, form);
-    if (state) {
-      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        applyState(frontmatter, state);
-      });
-    }
-    return file;
-  };
-
-  const fileManager = plugin.app.fileManager;
-  const originalProcessFrontMatter = fileManager.processFrontMatter.bind(fileManager);
-  fileManager.processFrontMatter = async (file, callback): Promise<void> => {
-    const state = pendingEdit && file.path === pendingEdit.editPath ? pendingEdit : null;
-    if (state) pendingEdit = null;
-    await originalProcessFrontMatter(file, (frontmatter) => {
-      callback(frontmatter);
-      if (state) applyState(frontmatter, state);
-    });
-  };
-
-  const configureForm = (form: Element): void => {
-    const modal = form.closest<HTMLElement>(".animelist-modal");
-    if (!modal || states.has(modal)) return;
-
-    let unitSelect = findUnitSelect(form);
-    let mediaType: MediaType | null = null;
-    let editPath: string | null = null;
-    let frontmatter: Record<string, unknown> = {};
-
-    if (modal.classList.contains("animelist-edit-modal")) {
-      editPath = activeEditPath;
-      const file = editPath ? plugin.app.vault.getAbstractFileByPath(editPath) : null;
-      if (file instanceof TFile) {
-        frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+      const progressInput = context.fields.progress;
+      const progressField = progressInput.closest<HTMLElement>(".al-form-field");
+      let unitSelect = context.fields.unit;
+      if (!unitSelect) {
+        unitSelect = createUnitSelect(mediaType, selected);
+        progressField?.insertAdjacentElement(
+          "afterend",
+          makeField(progressUnitFeatureText("unitField"), unitSelect),
+        );
+      } else {
+        replaceUnitOptions(unitSelect, mediaType, selected);
       }
-      mediaType = mediaTypeValue(frontmatter.media_type);
-    } else if (unitSelect) {
-      mediaType = unitSelect.value === "episode"
-        ? "anime"
-        : unitSelect.value === "chapter"
-          ? "manga"
-          : "novel";
-    }
 
-    if (mediaType !== "manga" && mediaType !== "novel") return;
-    const selected = defaultProgressUnit(mediaType, frontmatter.progress_unit ?? unitSelect?.value);
-    if (selected === "episode") return;
-    const progressInput = findProgressInput(form);
-    if (!progressInput) return;
-    const progressField = progressInput.closest<HTMLElement>(".al-form-field");
+      const editor = createEl("section", { cls: "al-volume-editor al-progress-unit-editor" });
+      const favorite = context.container.querySelector(".al-form-checkbox");
+      if (favorite) favorite.insertAdjacentElement("beforebegin", editor);
+      else context.container.appendChild(editor);
 
-    if (!unitSelect) {
-      unitSelect = createUnitSelect(mediaType, selected);
-      progressField?.insertAdjacentElement("afterend", makeField(progressUnitFeatureText("unitField"), unitSelect));
-    } else {
-      replaceUnitOptions(unitSelect, mediaType, selected);
-    }
-
-    form.querySelectorAll<HTMLElement>(".al-volume-editor:not(.al-progress-unit-editor)")
-      .forEach((originalEditor) => originalEditor.remove());
-    const editor = createEl("section", { cls: "al-volume-editor al-progress-unit-editor" });
-    const favorite = form.querySelector(".al-form-checkbox");
-    if (favorite) favorite.insertAdjacentElement("beforebegin", editor);
-    else form.appendChild(editor);
-
-    const state: ProgressEditorState = {
-      modal,
-      mediaType,
-      editPath,
-      unit: selected,
-      unitSelect,
-      progressInput,
-      progressLabel: progressField ? fieldLabel(progressField) : null,
-      progressHint: progressField ? fieldHint(progressField) : null,
-      entries: normalizeSerialLog(frontmatter.volume_log, selected),
-      editor,
-      preparedProgress: normalizeSerialProgress(progressInput.value, selected) ?? 0,
-    };
-    states.set(modal, state);
-    updatePresentation(state);
-    unitSelect.addEventListener("change", () => {
-      if (!isReadingProgressUnit(unitSelect.value)) return;
-      state.unit = unitSelect.value;
+      const state: ProgressEditorState = {
+        plugin,
+        formContext: context,
+        mediaType,
+        unit: selected,
+        unitSelect,
+        progressInput,
+        progressLabel: progressField ? fieldLabel(progressField) : null,
+        progressHint: progressField ? fieldHint(progressField) : null,
+        entries: normalizeSerialLog(context.frontmatter.volume_log, selected),
+        editor,
+        preparedProgress: normalizeSerialProgress(progressInput.value, selected) ?? 0,
+      };
+      context.extensions.set("reading-progress", state);
       updatePresentation(state);
-    });
-  };
-
-  const configureWithin = (root: ParentNode): void => {
-    if (isElement(root) && root.matches(".al-media-form")) configureForm(root);
-    root.querySelectorAll<HTMLElement>(".al-media-form").forEach(configureForm);
-  };
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (isElement(node)) configureWithin(node);
-      }
-    }
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  configureWithin(document);
-
-  const handleClick = (event: MouseEvent): void => {
-    if (!isElement(event.target)) return;
-    const button = event.target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta");
-    const modal = button?.closest<HTMLElement>(".animelist-modal");
-    if (!button || !modal) return;
-    const state = states.get(modal);
-    if (!state) return;
-    try {
-      validateAndPrepare(state);
-      if (state.editPath) pendingEdit = state;
-      else pendingCreate = state;
-    } catch (error) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
-  };
-  document.addEventListener("click", handleClick, true);
-
-  plugin.register(() => {
-    observer.disconnect();
-    document.removeEventListener("click", handleClick, true);
-    plugin.openEditModal = originalOpenEditModal;
-    plugin.createMediaNote = originalCreateMediaNote;
-    fileManager.processFrontMatter = originalProcessFrontMatter;
+      unitSelect.addEventListener("change", () => {
+        if (!isReadingProgressUnit(unitSelect.value)) return;
+        state.unit = unitSelect.value;
+        updatePresentation(state);
+      });
+    },
+    validate: (context) => {
+      const state = context.extensions.get("reading-progress");
+      if (state) validateAndPrepare(state as ProgressEditorState);
+    },
+    collect: (context, form) => {
+      const state = context.extensions.get("reading-progress");
+      if (!state) return;
+      const progress = state as ProgressEditorState;
+      form.unit = progress.unit;
+      form.progress = progress.preparedProgress;
+      form.volumeLog = progress.entries.map((entry) => ({ ...entry }));
+    },
   });
 }

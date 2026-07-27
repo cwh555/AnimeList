@@ -1,14 +1,9 @@
 import { type Setting } from "obsidian";
+import type { SettingsSection } from "./app/feature-registry";
 import { SerialCoverMigrationModal } from "./serial-cover-migration-modal";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
 import type { SerialCoverPlugin } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
-import {
-  registerSettingsSectionExtension,
-  type SettingsSection,
-} from "./settings";
-
-const SETTINGS_EXTENSION_ID = "serial-cover";
 
 export function createSerialCoverSettingsSection(
   plugin: SerialCoverPlugin,
@@ -50,8 +45,9 @@ export function createSerialCoverSettingsSection(
 export function installSerialCoverSettings(
   plugin: SerialCoverPlugin,
 ): void {
-  registerSettingsSectionExtension(
-    SETTINGS_EXTENSION_ID,
-    () => createSerialCoverSettingsSection(plugin),
-  );
+  plugin.features.registerSettings({
+    id: "serial-cover",
+    order: 10,
+    sections: () => createSerialCoverSettingsSection(plugin),
+  });
 }

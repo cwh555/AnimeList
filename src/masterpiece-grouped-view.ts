@@ -1,23 +1,13 @@
-import type AnimeListPlugin from "./main";
-import type { MediaItem } from "./types";
-import {
-  legacyLibraryRenderer,
-  type LibraryRenderAdapters,
-  type LibraryRenderState,
-} from "./legacy-library-renderer";
+import type {
+  LibraryRenderAdapters,
+  LibraryRenderState,
+} from "./app/feature-registry";
+import type { MediaItem } from "./domain/media-types";
 import {
   SPECIAL_LABEL_FILTER,
   groupMasterpieceItems,
   normalizeSpecialLabelMode,
 } from "./masterpiece-labels";
-
-interface MasterpieceSettings {
-  specialLabelMode?: "favorite" | "masterpiece";
-}
-
-interface MasterpiecePlugin {
-  settings: MasterpieceSettings;
-}
 
 interface GroupedMediaItem extends MediaItem {
   masterpieceLabels?: unknown;
@@ -25,18 +15,6 @@ interface GroupedMediaItem extends MediaItem {
 
 interface GroupedCardItem extends GroupedMediaItem {
   card: HTMLElement;
-}
-
-const installedRenderers = new WeakSet<object>();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isMediaItem(value: unknown): value is GroupedMediaItem {
-  return isRecord(value)
-    && typeof value.filePath === "string"
-    && typeof value.title === "string";
 }
 
 function itemIdentity(item: MediaItem): string {
@@ -106,14 +84,14 @@ function cloneCard(card: HTMLElement): HTMLElement | null {
   return cloned.nodeType === Node.ELEMENT_NODE ? cloned as HTMLElement : null;
 }
 
-function renderGroupedCards(
+export function renderMasterpieceGroups(
   container: HTMLElement,
   inputItems: GroupedMediaItem[],
   adapters: LibraryRenderAdapters,
   state: LibraryRenderState,
-  plugin: MasterpiecePlugin,
+  mode: unknown,
 ): void {
-  if (normalizeSpecialLabelMode(plugin.settings.specialLabelMode) !== "masterpiece") return;
+  if (normalizeSpecialLabelMode(mode) !== "masterpiece") return;
   if (state.status !== SPECIAL_LABEL_FILTER) return;
 
   const root = container.querySelector<HTMLElement>(".al-grid");
@@ -140,46 +118,17 @@ function renderGroupedCards(
     const grid = section.createDiv({
       cls: `al-grid is-${state.view ?? "grid"} al-masterpiece-group-grid`,
     });
-    group.items.forEach((entry) => {
+    for (const entry of group.items) {
       let card = entry.card;
       if (usedPaths.has(entry.filePath)) {
         const cloned = cloneCard(entry.card);
-        if (!cloned) return;
+        if (!cloned) continue;
         card = cloned;
         bindClonedCard(card, entry, adapters);
       } else {
         usedPaths.add(entry.filePath);
       }
       grid.appendChild(card);
-    });
+    }
   }
-}
-
-export function installMasterpieceGroupedView(plugin: AnimeListPlugin): void {
-  if (installedRenderers.has(legacyLibraryRenderer)) return;
-  installedRenderers.add(legacyLibraryRenderer);
-  const original = legacyLibraryRenderer.renderLibrary;
-  const host = plugin as unknown as MasterpiecePlugin;
-
-  legacyLibraryRenderer.renderLibrary = (
-    container: HTMLElement,
-    rawItems: unknown[],
-    rawAdapters: LibraryRenderAdapters = {},
-  ): void => {
-    const inputItems = rawItems.filter(isMediaItem);
-    const upstreamStateChange = rawAdapters.onStateChange;
-    let renderVersion = 0;
-    const forwardedAdapters: LibraryRenderAdapters = {
-      ...rawAdapters,
-      onStateChange: (state) => {
-        upstreamStateChange?.(state);
-        const version = ++renderVersion;
-        queueMicrotask(() => {
-          if (version !== renderVersion) return;
-          renderGroupedCards(container, inputItems, forwardedAdapters, state, host);
-        });
-      },
-    };
-    original(container, rawItems, forwardedAdapters);
-  };
 }
