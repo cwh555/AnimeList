@@ -5,7 +5,8 @@ const [
   serialStyles,
   coverStyles,
   progressStyles,
-  buildConfig,
+  styleBundleSource,
+  releaseStyles,
   progressEditorSource,
   segmentedDateSource,
   pickerSource,
@@ -17,7 +18,8 @@ const [
   readFile("styles.serial-reading.css", "utf8"),
   readFile("styles.serial-cover.css", "utf8"),
   readFile("styles.progress.css", "utf8"),
-  readFile("esbuild.config.mjs", "utf8"),
+  readFile("scripts/style-bundle.mjs", "utf8"),
+  readFile("styles.css", "utf8"),
   readFile("src/additional-progress-units-ui.ts", "utf8"),
   readFile("src/segmented-date-input.ts", "utf8"),
   readFile("src/serial-cover-picker.ts", "utf8"),
@@ -91,10 +93,12 @@ assert.equal(
   "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs",
 );
 
-assert.match(buildConfig, /readFile\("styles\.serial-reading\.css", "utf8"\)/);
-assert.match(buildConfig, /readFile\("styles\.serial-cover\.css", "utf8"\)/);
-assert.match(buildConfig, /readFile\("styles\.progress\.css", "utf8"\)/);
-assert.match(buildConfig, /currentStyles\.indexOf\(GENERATED_STYLE_START\)/);
-assert.match(buildConfig, /writeFile\("styles\.css", outputStyles, "utf8"\)/);
+assert.match(styleBundleSource, /"styles\/base\.css"/);
+assert.match(styleBundleSource, /"styles\.serial-reading\.css"/);
+assert.match(styleBundleSource, /"styles\.serial-cover\.css"/);
+assert.match(styleBundleSource, /"styles\.progress\.css"/);
+assert.ok(releaseStyles.includes(serialStyles.trim()));
+assert.ok(releaseStyles.includes(coverStyles.trim()));
+assert.ok(releaseStyles.includes(progressStyles.trim()));
 
 console.log("Serial reading, native cover picker, migration modal, and progress UI checks passed.");

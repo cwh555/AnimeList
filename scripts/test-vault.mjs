@@ -59,7 +59,6 @@ function linkOrCopy(source, target) {
 
 function prepareDevelopmentFiles() {
   linkOrCopy(path.join(repoRoot, "manifest.json"), path.join(pluginRoot, "manifest.json"));
-  linkOrCopy(path.join(repoRoot, "styles.css"), path.join(pluginRoot, "styles.css"));
 }
 
 function enablePlugin() {
@@ -108,27 +107,48 @@ function printSummary(fixtures) {
 
 async function runDevelopmentWatcher() {
   const esbuildConfig = path.join(repoRoot, "esbuild.config.mjs");
-  const outfile = path.join(pluginRoot, "main.js");
+  const styleBuilder = path.join(repoRoot, "scripts", "build-styles.mjs");
+  const javascriptOutput = path.join(pluginRoot, "main.js");
+  const styleOutput = path.join(pluginRoot, "styles.css");
   requireFile(esbuildConfig);
-  const env = { ...process.env, ANIMELIST_BUILD_OUTFILE: outfile };
-  const initialBuild = spawnSync(process.execPath, [esbuildConfig, "production"], {
-    cwd: repoRoot,
-    env,
-    stdio: "inherit",
-  });
-  if (initialBuild.status !== 0) process.exit(initialBuild.status || 1);
+  requireFile(styleBuilder);
+
+  const env = { ...process.env, ANIMELIST_BUILD_OUTFILE: javascriptOutput };
+  const initialCommands = [
+    [esbuildConfig, "production"],
+    [styleBuilder, "--output", styleOutput],
+  ];
+  for (const arguments_ of initialCommands) {
+    const result = spawnSync(process.execPath, arguments_, {
+      cwd: repoRoot,
+      env,
+      stdio: "inherit",
+    });
+    if (result.status !== 0) process.exit(result.status || 1);
+  }
+
   openVault();
-  const watcher = spawn(process.execPath, [esbuildConfig], {
-    cwd: repoRoot,
-    env,
-    stdio: "inherit",
-  });
-  const forwardSignal = (signal) => watcher.kill(signal);
+  const watchers = [
+    spawn(process.execPath, [esbuildConfig], { cwd: repoRoot, env, stdio: "inherit" }),
+    spawn(process.execPath, [styleBuilder, "--output", styleOutput, "--watch"], {
+      cwd: repoRoot,
+      env,
+      stdio: "inherit",
+    }),
+  ];
+  const forwardSignal = (signal) => watchers.forEach((watcher) => watcher.kill(signal));
   process.once("SIGINT", forwardSignal);
   process.once("SIGTERM", forwardSignal);
-  const [code, signal] = await once(watcher, "exit");
-  if (signal) process.kill(process.pid, signal);
-  process.exit(code || 0);
+
+  const result = await Promise.race(watchers.map(async (watcher, index) => {
+    const [code, signal] = await once(watcher, "exit");
+    return { index, code, signal };
+  }));
+  watchers.forEach((watcher, index) => {
+    if (index !== result.index && !watcher.killed) watcher.kill("SIGTERM");
+  });
+  if (result.signal) process.kill(process.pid, result.signal);
+  process.exit(result.code || 0);
 }
 
 fs.mkdirSync(pluginsRoot, { recursive: true });

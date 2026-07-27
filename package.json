@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit --pretty false && node esbuild.config.mjs production",
+    "build": "npm run styles:check && tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
     "test": "node scripts/run-tests.mjs",
-    "check": "npm run typecheck && npm run lint && npm test && npm run community:check && npm run build",
+    "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
     "test-vault:fixtures": "node scripts/test-vault-fixtures.mjs",
@@ -23,7 +23,11 @@
     "test:contract": "node scripts/run-tests.mjs --suite contract",
     "test:legacy": "node scripts/run-tests.mjs --suite legacy",
     "test:feature": "node scripts/run-tests.mjs --feature",
-    "test:list": "node scripts/run-tests.mjs --list"
+    "test:list": "node scripts/run-tests.mjs --list",
+    "styles:build": "node scripts/build-styles.mjs --write",
+    "styles:check": "node scripts/build-styles.mjs --check",
+    "styles:dev": "node scripts/build-styles.mjs --output .tmp/dev/styles.css --watch",
+    "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json"
   },
   "keywords": [
     "obsidian",
