@@ -34,7 +34,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/stage2-patch/part-* > /tmp/stage2.patch.gz.b64
+          cat \
+            .github/stage2-patch/part-00 \
+            .github/stage2-patch/part-01a \
+            .github/stage2-patch/part-01b \
+            .github/stage2-patch/part-02 \
+            .github/stage2-patch/part-03 \
+            .github/stage2-patch/part-04 \
+            > /tmp/stage2.patch.gz.b64
           echo "ac883f3fc582d6a389f13fe017a4f474e27379b1704b1658cf74ab2e77d6d7dd  /tmp/stage2.patch.gz.b64" | sha256sum --check --strict
       - name: Decode patch archive
         shell: bash
