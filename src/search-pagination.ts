@@ -33,7 +33,7 @@ export interface PaginationState {
   loads: number;
   hasMore: boolean;
   loading: boolean;
-  initialSearchPending: boolean;
+  sourceResults: ExternalMediaResult[] | null;
 }
 
 function resultKey(result: ExternalMediaResult): string {
@@ -78,7 +78,7 @@ function freshState(): PaginationState {
     loads: 0,
     hasMore: false,
     loading: false,
-    initialSearchPending: false,
+    sourceResults: null,
   };
 }
 
@@ -89,7 +89,17 @@ function resetFromInitialSearch(modal: PaginatedSearchModal, state: PaginationSt
   state.loads = 0;
   state.hasMore = modal.results.length > 0;
   state.loading = false;
-  state.initialSearchPending = false;
+  state.sourceResults = modal.results;
+}
+
+export function synchronizePaginationState(
+  modal: PaginatedSearchModal,
+  state: PaginationState,
+): void {
+  const currentSignature = searchSignature(modal.mediaType, modal.query);
+  if (state.sourceResults !== modal.results || state.signature !== currentSignature) {
+    resetFromInitialSearch(modal, state);
+  }
 }
 
 function canLoadMore(state: PaginationState): boolean {
@@ -117,6 +127,7 @@ export async function appendNextSearchPage(
     state.results = merged;
     state.warnings = [...new Set([...state.warnings, ...response.warnings])];
     state.hasMore = response.hasMore && appended.length > 0;
+    state.sourceResults = merged;
     modal.results = merged;
     modal.warnings = [...state.warnings];
 
@@ -135,15 +146,7 @@ function renderPagination(
   state: PaginationState,
 ): void {
   modal.contentEl.querySelector(".al-search-pagination")?.remove();
-  if (state.initialSearchPending) resetFromInitialSearch(modal, state);
-  const currentSignature = searchSignature(modal.mediaType, modal.query);
-  if (state.signature !== currentSignature || modal.results.length === 0) {
-    state.signature = currentSignature;
-    state.results = [...modal.results];
-    state.warnings = [...modal.warnings];
-    state.loads = 0;
-    state.hasMore = modal.results.length > 0;
-  }
+  synchronizePaginationState(modal, state);
   if (!canLoadMore(state)) return;
 
   const resultsEl = modal.contentEl.querySelector<HTMLElement>(".al-search-results");

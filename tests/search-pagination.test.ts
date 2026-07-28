@@ -6,6 +6,7 @@ import {
   appendNextSearchPage,
   appendSearchResultRows,
   mergeSearchPages,
+  synchronizePaginationState,
 } from "../src/search-pagination";
 import type { ExternalMediaResult } from "../src/types";
 
@@ -101,6 +102,7 @@ describe("search pagination", () => {
       return { json: aniListPayload(2, true), text: "", headers: {} };
     });
 
+    const initialResults = [result(1)];
     const contentEl = { scrollTop: 640 };
     const rows = {
       children: ["1"],
@@ -113,7 +115,7 @@ describe("search pagination", () => {
       },
       mediaType: "anime",
       query: "Title",
-      results: [result(1)],
+      results: initialResults,
       warnings: [],
       contentEl,
       renderSearch() { renderCalls += 1; },
@@ -122,12 +124,12 @@ describe("search pagination", () => {
     };
     const state = {
       signature: "anime\u0000Title",
-      results: [result(1)],
+      results: [...initialResults],
       warnings: [],
       loads: 0,
       hasMore: true,
       loading: false,
-      initialSearchPending: false,
+      sourceResults: initialResults,
     };
 
     try {
@@ -143,6 +145,62 @@ describe("search pagination", () => {
       assert.equal(contentEl.scrollTop, 640);
       assert.deepEqual(rows.children, ["1", "2"]);
       assert.deepEqual(modal.results.map((item) => item.sourceId), ["1", "2"]);
+      assert.equal(state.sourceResults, modal.results);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("resets loaded pages when the same query is searched again", async () => {
+    let requestedPage = 0;
+    setRequestUrlMock((options: { body?: string }) => {
+      const body = JSON.parse(options.body ?? "{}") as { variables?: { page?: number } };
+      requestedPage = body.variables?.page ?? 0;
+      return { json: aniListPayload(3, false), text: "", headers: {} };
+    });
+
+    const previousResults = [result(1), result(2)];
+    const refreshedResults = [result(1)];
+    const modal = {
+      mediaType: "anime",
+      query: "Title",
+      results: refreshedResults,
+      warnings: [],
+      contentEl: { scrollTop: 0 },
+      renderSearch() {},
+      async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title",
+      results: [...previousResults],
+      warnings: ["old warning"],
+      loads: 1,
+      hasMore: true,
+      loading: false,
+      sourceResults: previousResults,
+    };
+    const rows = {
+      children: ["1"],
+      appendChild(node: string) { this.children.push(node); },
+    };
+
+    try {
+      synchronizePaginationState(modal as never, state);
+      assert.equal(state.loads, 0);
+      assert.deepEqual(state.results.map((item) => item.sourceId), ["1"]);
+      assert.deepEqual(state.warnings, []);
+      assert.equal(state.sourceResults, refreshedResults);
+
+      const appended = await appendNextSearchPage(
+        { providers: { bangumi: false, anilist: true, openlibrary: false } } as never,
+        modal as never,
+        state,
+        rows as never,
+      );
+      assert.equal(appended, 1);
+      assert.equal(requestedPage, 2);
+      assert.deepEqual(rows.children, ["1", "3"]);
     } finally {
       setRequestUrlMock(null);
     }
@@ -154,11 +212,12 @@ describe("search pagination", () => {
       requests += 1;
       return { json: aniListPayload(3, true), text: "", headers: {} };
     });
+    const initialResults = [result(1)];
     const modal = {
       plugin: { settings: { providers: { bangumi: false, anilist: true, openlibrary: false } } },
       mediaType: "anime",
       query: "Title",
-      results: [result(1)],
+      results: initialResults,
       warnings: [],
       contentEl: { scrollTop: 0 },
       renderSearch() {},
@@ -167,12 +226,12 @@ describe("search pagination", () => {
     };
     const state = {
       signature: "anime\u0000Title",
-      results: [result(1)],
+      results: [...initialResults],
       warnings: [],
       loads: SEARCH_PAGINATION_LIMITS.maxLoads,
       hasMore: true,
       loading: false,
-      initialSearchPending: false,
+      sourceResults: initialResults,
     };
     const rows = { appendChild() {} };
 
