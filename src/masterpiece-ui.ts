@@ -42,16 +42,7 @@ async function writeState(
   favorite: boolean,
   labels: string[],
 ): Promise<void> {
-  const file = plugin.app.vault.getAbstractFileByPath(path);
-  if (!(file instanceof TFile)) throw new Error("Media note not found");
-  await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-    frontmatter.favorite = favorite;
-    if (labels.length) frontmatter.masterpiece_labels = labels;
-    else delete frontmatter.masterpiece_labels;
-    delete frontmatter.updated_at;
-    delete frontmatter.metadata_updated_at;
-  });
-  plugin.refreshViews();
+  await plugin.updateSpecialLabelState(path, favorite, labels);
 }
 
 function categoryNames(plugin: AnimeListFeatureHost): string[] {

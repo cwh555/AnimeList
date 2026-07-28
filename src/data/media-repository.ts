@@ -120,14 +120,4 @@ export class MediaRepository {
         && stringValue(frontmatter.source_id) === sourceId;
     });
   }
-
-  async setFavorite(path: string, next: boolean): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile)) throw new Error(uiText("validation.mediaNoteMissing"));
-    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      frontmatter.favorite = next;
-      delete frontmatter.updated_at;
-      delete frontmatter.metadata_updated_at;
-    });
-  }
 }

@@ -5,6 +5,7 @@ import { LibraryStorage } from "../data/library-storage";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
+import { SpecialLabelStateService } from "../data/special-label-state-service";
 import type { AnimeListSettings, ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -27,6 +28,7 @@ export class AnimeListApplicationServices {
   private searchService?: ExternalMediaSearchService;
   private noteService?: MediaNoteService;
   private updateService?: MediaUpdateService;
+  private specialLabelService?: SpecialLabelStateService;
 
   constructor(
     private readonly app: App,
@@ -86,6 +88,14 @@ export class AnimeListApplicationServices {
     return this.updateService;
   }
 
+  private specialLabels(): SpecialLabelStateService {
+    this.specialLabelService ??= new SpecialLabelStateService(
+      this.app,
+      { refreshViews: () => this.callbacks.refreshViews() },
+    );
+    return this.specialLabelService;
+  }
+
   getManagedMediaFolder(mediaType: MediaType): string { return this.libraryStorage().managedMediaFolder(mediaType); }
   getMediaFolder(mediaType: MediaType): string { return this.libraryStorage().mediaFolder(mediaType); }
   getScanFolders(): string[] { return this.libraryStorage().scanFolders(); }
@@ -123,7 +133,10 @@ export class AnimeListApplicationServices {
     return this.coverCache.clear();
   }
 
-  async setFavorite(path: string, next: boolean): Promise<void> { await this.repository().setFavorite(path, next); }
+  async setFavorite(path: string, next: boolean): Promise<void> { await this.specialLabels().setFavorite(path, next); }
+  async updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void> {
+    await this.specialLabels().update(path, { favorite, masterpieceLabels: labels });
+  }
   async deleteMediaFile(file: TFile): Promise<void> { await this.app.fileManager.trashFile(file); }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }

@@ -23,6 +23,13 @@ const joined = sources.map(({ path: file, content }) => `// ${file}\n${content}`
 const main = fs.readFileSync(path.join(root, "src/main.ts"), "utf8");
 const entry = fs.readFileSync(path.join(root, "src/plugin-entry.ts"), "utf8");
 const legacy = fs.readFileSync(path.join(root, "src/legacy.ts"), "utf8");
+const featureAndUiSources = sources
+  .filter(({ path: file }) => (
+    !file.startsWith("src/data/")
+    && !/(?:-service|-persistence|schema-migration)\.ts$/.test(file)
+  ))
+  .map(({ content }) => content)
+  .join("\n");
 
 function reject(pattern, message, value = joined) {
   if (pattern.test(value)) failures.push(message);
@@ -34,6 +41,11 @@ function require(pattern, message, value) {
 reject(/\bModal\.prototype\b/, "Modal.prototype patching is forbidden");
 reject(/\.prototype\.[A-Za-z_$][\w$]*\s*=/, "prototype method replacement is forbidden");
 reject(/fileManager\.processFrontMatter\s*=/, "processFrontMatter replacement is forbidden");
+reject(
+  /fileManager\.processFrontMatter\s*\(/,
+  "feature and UI modules must delegate frontmatter persistence to typed services",
+  featureAndUiSources,
+);
 reject(/\.(?:openAddModal|openEditModal|collectMediaItems|createMediaNote|setFavorite|renderLibrary)\s*=/, "plugin or renderer method replacement is forbidden");
 reject(/new\s+MutationObserver\b/, "feature integration must not discover forms through MutationObserver");
 reject(/^import\s+["'][^"']+["'];?\s*$/m, "side-effect-only feature imports are forbidden", entry);

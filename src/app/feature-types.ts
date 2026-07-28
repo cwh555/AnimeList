@@ -38,6 +38,7 @@ export interface AnimeListFeatureHost extends Pick<
   downloadCover(result: ExternalMediaResult): Promise<string>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   setFavoriteDirect(path: string, next: boolean): Promise<void>;
+  updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void>;
 }
 
 export interface FavoriteActionContext<Host extends AnimeListFeatureHost> {
@@ -119,4 +120,3 @@ export function defineFeature<Host extends AnimeListFeatureHost>(
 ): AnimeListFeature<Host> {
   return feature;
 }
-

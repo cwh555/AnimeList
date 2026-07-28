@@ -218,7 +218,10 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async setFavoriteDirect(path: string, next: boolean): Promise<void> {
     await this.services().setFavorite(path, next);
     new Notice(uiText(next ? "notice.favoriteAdded" : "notice.favoriteRemoved"));
-    this.refreshViews();
+  }
+
+  async updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void> {
+    await this.services().updateSpecialLabelState(path, favorite, labels);
   }
 
   async setFavorite(path: string, next: boolean): Promise<void> {
