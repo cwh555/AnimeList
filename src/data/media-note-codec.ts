@@ -13,12 +13,15 @@ import {
   stringValue,
   todayString,
 } from "../domain/value-normalization";
+import { normalizeReleaseStatus } from "../novel-progress";
 import {
-  normalizeProgressValue,
-  normalizeReleaseStatus,
-  normalizeVolumeLog,
-  serializeVolumeLog,
-} from "../novel-progress";
+  defaultProgressUnit,
+  isReadingProgressUnit,
+  normalizeSerialLog,
+  normalizeSerialProgress,
+  serializeSerialLog,
+  type ReadingProgressUnit,
+} from "../progress-units";
 import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
 import { completedRequirementMessage, uiText } from "../ui-text";
 
@@ -45,8 +48,12 @@ function yamlArray(lines: string[], key: string, values: unknown): void {
   clean.forEach((value) => lines.push(`  - ${yamlScalar(value)}`));
 }
 
-function yamlVolumeLog(lines: string[], entries: unknown): void {
-  const serialized = serializeVolumeLog(normalizeVolumeLog(entries));
+function yamlSerialLog(
+  lines: string[],
+  entries: unknown,
+  unit: ReadingProgressUnit,
+): void {
+  const serialized = serializeSerialLog(normalizeSerialLog(entries, unit), unit);
   if (!serialized.length) return;
   lines.push("volume_log:");
   for (const entry of serialized) {
@@ -98,9 +105,10 @@ export function completedProgress(
   total: unknown,
   current: unknown,
   mediaType: MediaType = "anime",
+  unit: unknown = defaultProgressUnit(mediaType, undefined),
 ): ProgressValue {
-  const safeCurrent = mediaType === "novel"
-    ? normalizeProgressValue(current)
+  const safeCurrent = mediaType !== "anime" && isReadingProgressUnit(unit)
+    ? normalizeSerialProgress(current, unit) ?? 0
     : Math.max(0, numeric(current));
   if (mediaType !== "anime") return safeCurrent;
   const safeTotal = Math.max(0, numeric(total));
@@ -114,8 +122,8 @@ export interface ValidatedMediaNoteForm {
   completedAt: string;
 }
 
-export function validateMediaNoteForm(
-  result: ExternalMediaResult,
+function validateMediaNoteFormForType(
+  mediaType: MediaType,
   form: MediaNoteForm,
 ): ValidatedMediaNoteForm {
   const title = stringValue(form.title).trim();
@@ -125,15 +133,64 @@ export function validateMediaNoteForm(
   const status = normalizeMediaStatus(form.status);
   if (!title) throw new Error(uiText("validation.titleRequired"));
   if (status === "completed" && !hasScore) {
-    throw new Error(completedRequirementMessage(result.mediaType, uiText("field.score")));
+    throw new Error(completedRequirementMessage(mediaType, uiText("field.score")));
   }
   if (hasScore && (score == null || !Number.isFinite(score) || score < 0 || score > 10)) {
     throw new Error(uiText("validation.scoreRange"));
   }
   if (status === "completed" && !completedAt) {
-    throw new Error(completedRequirementMessage(result.mediaType, uiText("field.completedAt")));
+    throw new Error(completedRequirementMessage(mediaType, uiText("field.completedAt")));
   }
   return { title, status, score, completedAt };
+}
+
+export function validateMediaNoteForm(
+  result: ExternalMediaResult,
+  form: MediaNoteForm,
+): ValidatedMediaNoteForm {
+  return validateMediaNoteFormForType(result.mediaType, form);
+}
+
+export function applyEditableMediaForm(
+  frontmatter: Record<string, unknown>,
+  mediaType: MediaType,
+  form: MediaNoteForm,
+): void {
+  const validated = validateMediaNoteFormForType(mediaType, form);
+  const unit = defaultProgressUnit(mediaType, form.unit);
+  const total = mediaType === "anime" ? Math.max(0, numeric(form.total)) : 0;
+  const progress = completedProgress(validated.status, total, form.progress, mediaType, unit);
+
+  frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
+  frontmatter.title = validated.title;
+  frontmatter.status = validated.status;
+  if (mediaType === "anime") {
+    frontmatter.progress_total = total;
+    delete frontmatter.release_status;
+  } else {
+    delete frontmatter.progress_total;
+    frontmatter.release_status = normalizeReleaseStatus(form.releaseStatus);
+  }
+  frontmatter.progress = progress;
+  frontmatter.progress_unit = unit;
+  frontmatter.favorite = form.favorite === true;
+  frontmatter.genres = normalizeGenres(form.genres);
+  if (validated.score != null) frontmatter.score = validated.score;
+  else delete frontmatter.score;
+  if (form.startedAt) frontmatter.started_at = form.startedAt;
+  else delete frontmatter.started_at;
+  if (validated.completedAt) frontmatter.completed_at = validated.completedAt;
+  else delete frontmatter.completed_at;
+
+  if (mediaType !== "anime" && isReadingProgressUnit(unit)) {
+    const serial = serializeSerialLog(normalizeSerialLog(form.volumeLog, unit), unit);
+    if (serial.length) frontmatter.volume_log = serial;
+    else delete frontmatter.volume_log;
+  } else {
+    delete frontmatter.volume_log;
+  }
+  delete frontmatter.updated_at;
+  delete frontmatter.metadata_updated_at;
 }
 
 export function buildMediaMarkdown(
@@ -147,12 +204,15 @@ export function buildMediaMarkdown(
   const total = result.mediaType === "anime"
     ? Math.max(0, numeric(form.total ?? result.total))
     : 0;
-  const progress = completedProgress(status, total, form.progress, result.mediaType);
+  const unit = defaultProgressUnit(result.mediaType, form.unit || result.unit);
+  const progress = completedProgress(status, total, form.progress, result.mediaType, unit);
   const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
     : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
-  const volumeLog = result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [];
+  const serialLog = result.mediaType !== "anime" && isReadingProgressUnit(unit)
+    ? normalizeSerialLog(form.volumeLog, unit)
+    : [];
   const lines = ["---", `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`];
 
   lines.push(`title: ${yamlScalar(title)}`);
@@ -166,13 +226,15 @@ export function buildMediaMarkdown(
   if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
   lines.push(`progress: ${yamlScalar(progress)}`);
   if (result.mediaType === "anime") lines.push(`progress_total: ${yamlScalar(total)}`);
-  lines.push(`progress_unit: ${yamlScalar(form.unit || result.unit)}`);
+  lines.push(`progress_unit: ${yamlScalar(unit)}`);
   if (score != null) lines.push(`score: ${score}`);
   lines.push(`favorite: ${form.favorite === true ? "true" : "false"}`);
   if (result.year) lines.push(`year: ${numeric(result.year)}`);
   if (form.startedAt) lines.push(`started_at: ${yamlScalar(form.startedAt)}`);
   if (completedAt) lines.push(`completed_at: ${yamlScalar(completedAt)}`);
-  yamlVolumeLog(lines, volumeLog);
+  if (result.mediaType !== "anime" && isReadingProgressUnit(unit)) {
+    yamlSerialLog(lines, serialLog, unit);
+  }
   if (coverPath || result.coverUrl) lines.push(`cover: ${yamlScalar(coverPath || result.coverUrl)}`);
   if (result.coverUrl) lines.push(`cover_remote: ${yamlScalar(result.coverUrl)}`);
   yamlArray(lines, "genres", genres);
@@ -180,6 +242,7 @@ export function buildMediaMarkdown(
     .map(String)
     .filter((value) => value && !genres.includes(value));
   yamlArray(lines, "source_genres", rawGenres);
+  yamlArray(lines, "title_aliases", result.searchTitles ?? []);
   if (result.mediaType === "anime") yamlArray(lines, "studios", result.people);
   else yamlArray(lines, "authors", result.people);
   yamlArray(lines, "platforms", result.platforms);

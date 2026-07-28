@@ -1,37 +1,29 @@
+import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
+import { additionalProgressUnitsFeature } from "./additional-progress-units-ui";
 import AnimeListPlugin from "./main";
-import type { FeatureInstaller } from "./app/feature-installer";
-import { installFeatureSet } from "./app/feature-installer";
-import { installAdditionalProgressUnitsUi } from "./additional-progress-units-ui";
-import { installMasterpieceEditUi } from "./masterpiece-edit-ui";
-import { installMasterpieceGroupedView } from "./masterpiece-grouped-view";
-import { installMasterpieceOperationUi } from "./masterpiece-operation-ui";
-import { installMasterpieceLabels } from "./masterpiece-ui";
-import { installProgressUi } from "./progress-ui";
-import { installRatingUi } from "./rating-ui";
-import { installScoreDashboard } from "./score-dashboard-feature";
-import { installSearchPagination } from "./search-pagination";
-import { installSerialEntryCovers } from "./serial-cover-feature";
-import { installSerialEntryScrollStability } from "./serial-entry-scroll-stability";
-import { installSerialCoverSettings } from "./serial-cover-settings";
+import { masterpieceFeature } from "./masterpiece-ui";
+import { progressUiFeature } from "./progress-ui";
+import { ratingFeature } from "./rating-ui";
+import { scoreDashboardFeature } from "./score-dashboard-feature";
+import { searchEnhancementsFeature } from "./search-enhancements";
+import { searchPaginationFeature } from "./search-pagination";
+import { serialEntryCoversFeature } from "./serial-cover-feature";
+import { serialCoverSettingsFeature } from "./serial-cover-settings";
 
-const FEATURE_INSTALLERS: readonly FeatureInstaller<AnimeListPlugin>[] = [
-  { id: "progress-display", install: installProgressUi },
-  { id: "search-pagination", install: installSearchPagination },
-  { id: "rating", install: installRatingUi },
-  { id: "progress-units", install: installAdditionalProgressUnitsUi },
-  { id: "serial-entry-covers", install: installSerialEntryCovers },
-  { id: "serial-entry-scroll", install: installSerialEntryScrollStability },
-  { id: "serial-cover-settings", install: installSerialCoverSettings },
-  { id: "masterpiece-labels", install: installMasterpieceLabels },
-  { id: "masterpiece-operations", install: installMasterpieceOperationUi },
-  { id: "masterpiece-edit", install: installMasterpieceEditUi },
-  { id: "masterpiece-grouped-view", install: installMasterpieceGroupedView },
-  { id: "score-dashboard", install: installScoreDashboard },
+const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
+  progressUiFeature,
+  searchPaginationFeature,
+  searchEnhancementsFeature,
+  ratingFeature,
+  additionalProgressUnitsFeature,
+  serialEntryCoversFeature,
+  serialCoverSettingsFeature,
+  masterpieceFeature,
+  scoreDashboardFeature,
 ];
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
-  async onload(): Promise<void> {
-    await super.onload();
-    await installFeatureSet(this, FEATURE_INSTALLERS);
+  protected featureManifest(): readonly AnimeListFeature<AnimeListFeatureHost>[] {
+    return FEATURES;
   }
 }
