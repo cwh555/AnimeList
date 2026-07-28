@@ -492,22 +492,10 @@ describe("serial progress and novel volume records", () => {
 
 
 describe("serial-entry cover UI", () => {
-  it("keeps cover logic outside legacy and places the thumbnail on the row right side", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
+  it("places the thumbnail panel on the row right side", () => {
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.serial-cover.css"), "utf8");
-
-    assert.doesNotMatch(legacySource, /searchSerialCovers|SerialCover/);
-    assert.match(featureSource, /serialCoverQuery\(context\.originalTitle, label\)/);
     assert.match(stylesheet, /\.animelist-modal \.al-volume-row \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
     assert.match(stylesheet, /\.al-serial-cover-panel/);
-  });
-
-  it("stores the user-provided Google Books key in plugin settings, not frontmatter", () => {
-    assert.equal(PathExists(path.join(process.cwd(), "src/serial-cover-provider.ts")), true);
-    assert.equal(DEFAULT_SETTINGS.googleBooksApiKey, "");
-    const featureSource = readFileSync(path.join(process.cwd(), "src/serial-cover-feature.ts"), "utf8");
-    assert.doesNotMatch(featureSource, /frontmatter\.googleBooksApiKey|google_books_api_key/);
   });
 });
 
@@ -626,40 +614,18 @@ describe("tracked UI wording", () => {
     assert.deepEqual(statusFilterOptions("novel").map(([, label]) => label), expected);
     assert.deepEqual(statusFilterOptions("all").map(([, label]) => label), expected);
     assert.equal(Object.values(UI_TEXT).some((label) => label.includes("/") || label.includes("／")), false);
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.doesNotMatch(legacySource, /plannedAnime|plannedReading|pausedAnime|pausedReading|droppedAnime|droppedReading/);
-    assert.doesNotMatch(legacySource, /\["on_hold"|\["watching"|\["reading"/);
   });
 
 
-  it("keeps user-visible wording in one tracked source file", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    const templateSource = readFileSync(path.join(process.cwd(), "src/builtin-templates.ts"), "utf8");
-    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    const runtimeSources = [legacySource, mainSource, templateSource, settingsSource];
-
-    for (const source of runtimeSources) {
-      assert.doesNotMatch(source, /new Notice\(\s*["'`][^\n)]*[\u3400-\u9fff]/);
-      assert.doesNotMatch(source, /throw new Error\(\s*["'`][^\n)]*[\u3400-\u9fff]/);
-      assert.doesNotMatch(source, /\.textContent\s*=\s*["'`][^\n;]*[\u3400-\u9fff]/);
-      assert.doesNotMatch(source, /\.placeholder\s*=\s*["'`][^\n;]*[\u3400-\u9fff]/);
-    }
-
-
-    assert.doesNotMatch(legacySource, /TV 動畫|動畫電影|手動建立|簡潔筆記（內建）/);
-    assert.doesNotMatch(mainSource, /Create library folders|已收進最愛|已從最愛中移除/);
-    assert.match(templateSource, /uiText\("template\.builtinPlain"\)/);
-    assert.doesNotMatch(settingsSource, /\.setName\(["'`]|\.setDesc\(["'`]|\.setButtonText\(["'`]/);
+  it("keeps shared format, provider, and template wording in the tracked catalog", () => {
     assert.equal(mediaFormatLabel("light_novel"), UI_TEXT["media.format.lightNovel"]);
     assert.equal(mediaProviderLabel("bangumi"), UI_TEXT["media.provider.bangumi"]);
+    assert.equal(getBuiltInTemplateOptions("anime")[0]?.name, UI_TEXT["template.builtinPlain"]);
   });
 
-  it("does not ship runtime wording overrides", () => {
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
+  it("does not ship runtime wording override artifacts", () => {
     assert.equal(PathExists(path.join(process.cwd(), "ui-text.example.json")), false);
     assert.equal(PathExists(path.join(process.cwd(), "docs/UI_TEXT_OVERRIDES.md")), false);
-    assert.doesNotMatch(mainSource, /reload-ui-text|create-ui-text-file|ui-text\.local\.json/);
   });
 });
 
@@ -819,12 +785,6 @@ describe("version documentation", () => {
 });
 
 describe("timeline modal and Traditional Chinese labels", () => {
-  it("opens the timeline through an Obsidian modal instead of replacing the library view", () => {
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    assert.match(mainSource, /new TimelineModal\(this, this\.collectMediaItems\(\)\)\.open\(\)/);
-    assert.doesNotMatch(mainSource, /showSection\("timeline"\)/);
-  });
-
   it("preserves serial-entry labels and tracked timeline styling", () => {
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
     const entries = expandTimelineEntries([{
@@ -850,21 +810,7 @@ describe("timeline modal and Traditional Chinese labels", () => {
 });
 
 describe("Obsidian community review compliance", () => {
-  it("uses safe DOM construction in the active UI boundary", () => {
-    const helpers = readFileSync(path.join(process.cwd(), "src/ui/ui-helpers.ts"), "utf8");
-    assert.doesNotMatch(helpers, /\.innerHTML\s*=/);
-    assert.match(helpers, /setIcon\(/);
-  });
-
-  it("preserves custom view placement during plugin unload", () => {
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    assert.doesNotMatch(mainSource, /detachLeavesOfType/);
-  });
-
-  it("uses native setting headings", () => {
-    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    assert.doesNotMatch(settingsSource, /createEl\("h[23]"/);
-
+  it("exposes settings as native section definitions", () => {
     const host = {
       app: new App(),
       settings: structuredClone(DEFAULT_SETTINGS),

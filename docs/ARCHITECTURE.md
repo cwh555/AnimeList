@@ -31,15 +31,16 @@ Application wiring may compose services, but it must not implement provider norm
 `src/data/` owns persistent and external boundaries:
 
 - `media-note-codec.ts`: the only Markdown/YAML note writer.
-- `media-repository.ts`: the only library frontmatter reader and favorite updater.
+- `media-repository.ts`: the authoritative library frontmatter reader and source-identity lookup.
 - `library-storage.ts`: folder, scan-root, template, and unique-path policy.
 - `provider-normalizers.ts`: provider payload normalization and result deduplication.
 - `external-media-service.ts`: provider orchestration, query variants, warnings, and ranking.
 - `external-media-pagination.ts`: provider pagination requests and merge policy.
 - `media-note-service.ts`: note creation and cover-download workflow.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
+- `special-label-state-service.ts`: the single favorite/masterpiece metadata writer and compatibility cleanup path.
 
-Features and compatibility UI may call these services. They must not create another copy of their rules.
+Features and compatibility UI may call these services through narrow host ports. They must not call `processFrontMatter` directly or create another copy of persistence rules.
 
 ### Settings
 
@@ -68,7 +69,7 @@ Styles have independent sources:
 
 ## Compatibility boundary
 
-`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module imports the compatibility barrel.
+`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module imports the compatibility barrel. Add and edit modals share `createMediaEditorFields` so common fields, ordering, validation bindings, and date controls have one implementation.
 
 - do not add implementations or domain rules to `legacy.ts`;
 - do not copy typed services back into `main.ts` or feature modules;

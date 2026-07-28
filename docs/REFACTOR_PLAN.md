@@ -77,7 +77,7 @@ Scope:
 - Replace runtime method/prototype/renderer reassignment with typed feature capability instances.
 - Replace document-wide form discovery with explicit form contexts and submit contributions.
 - Move active Library, Timeline, add/edit, detail, and Markdown UI out of `src/legacy.ts`.
-- Keep provider, pagination, create, and update persistence in single typed service paths.
+- Keep provider, pagination, create, update, favorite, and masterpiece persistence in single typed service paths.
 - Make `src/main.ts` an Obsidian lifecycle and wiring adapter rather than an application-service container.
 
 Implemented boundaries:
@@ -85,9 +85,11 @@ Implemented boundaries:
 - `src/plugin-entry.ts` is the only feature manifest.
 - `src/app/feature-types.ts` defines lifecycle, media-item, Library, search, form, favorite, settings, and detail capabilities.
 - `src/app/feature-registry.ts` validates IDs and dependencies before any feature activates.
-- `src/app/anime-list-application.ts` owns service construction and data operations.
+- `src/app/anime-list-application.ts` owns service construction and data operations, including the dedicated special-label state service.
 - Active UI lives in typed modules under `src/ui/`; `src/legacy.ts` is a thin compatibility barrel.
-- Architecture checks reject prototype patches, plugin method replacement, persistence replacement, import-time installation, form-discovery observers, and active imports from the legacy barrel.
+- Add and edit modals use one typed field builder instead of duplicating title, status, score, date, progress, unit, genre, template, and favorite controls.
+- Architecture checks reject prototype patches, plugin method replacement, direct feature/UI frontmatter persistence, import-time installation, form-discovery observers, and active imports from the legacy barrel.
+- Runtime behavior tests replace source-location assertions; static checks remain only where architecture or release artifacts are the behavior under test.
 
 Completion conditions:
 

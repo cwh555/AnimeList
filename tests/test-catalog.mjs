@@ -57,6 +57,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },
+  { path: "tests/contracts/plugin-workflows.test.ts", kind: "test", suite: "contract", features: ["timeline", "library"] },
   { path: "tests/contracts/settings-compatibility.test.ts", kind: "test", suite: "contract", features: ["settings", "search", "masterpiece"] },
   { path: "tests/contracts/special-label-state-service.test.ts", kind: "test", suite: "contract", features: ["masterpiece", "library"] },
   { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release"] },
