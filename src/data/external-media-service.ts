@@ -1,9 +1,9 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../app-metadata";
-import type { ProviderSettings } from "../domain/settings-types";
+import type { ProviderSettings, SearchLanguageSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, stringValue } from "../domain/value-normalization";
-import { rankSearchResults, searchQueryVariants } from "../search";
+import { searchMultilingualProviders, type SearchProviderAdapter } from "../multilingual-search";
 import { searchFeatureText } from "../search-feature-text";
 import {
   dedupeSearchResults,
@@ -17,10 +17,6 @@ function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-}
-
-function errorMessage(value: unknown): string {
-  return value instanceof Error ? value.message : stringValue(value, "Unknown error");
 }
 
 export interface MetadataProviderClient {
@@ -100,16 +96,15 @@ export class HttpMetadataProviderClient implements MetadataProviderClient {
   }
 }
 
-interface ProviderTaskResult {
-  provider: string;
-  items?: ExternalMediaResult[];
-  error?: unknown;
-}
-
 export class ExternalMediaSearchService {
   constructor(
     private readonly providers: () => ProviderSettings,
     private readonly client: MetadataProviderClient,
+    private readonly languages: () => SearchLanguageSettings = () => ({
+      chinese: true,
+      english: true,
+      original: true,
+    }),
   ) {}
 
   async search(mediaType: MediaType, query: string): Promise<{
@@ -117,33 +112,37 @@ export class ExternalMediaSearchService {
     warnings: string[];
   }> {
     const settings = this.providers();
-    const queries = searchQueryVariants(query);
-    const tasks: Array<Promise<ProviderTaskResult>> = [];
-    const runProvider = (
-      provider: string,
-      search: (candidate: string) => Promise<ExternalMediaResult[]>,
-    ): Promise<ProviderTaskResult> => Promise.all(queries.map(search))
-      .then((groups) => ({ provider, items: dedupeSearchResults(groups.flat()) }))
-      .catch((error: unknown) => ({ provider, error }));
-
+    const providers: SearchProviderAdapter[] = [];
     if (settings.bangumi) {
-      tasks.push(runProvider("Bangumi", (candidate) => this.client.searchBangumi(mediaType, candidate)));
+      providers.push({
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        search: (candidate) => this.client.searchBangumi(mediaType, candidate),
+      });
     }
     if (settings.anilist) {
-      tasks.push(runProvider("AniList", (candidate) => this.client.searchAniList(mediaType, candidate)));
+      providers.push({
+        label: "AniList",
+        search: (candidate) => this.client.searchAniList(mediaType, candidate),
+      });
     }
     if (mediaType === "novel" && settings.openlibrary) {
-      tasks.push(runProvider("Open Library", (candidate) => this.client.searchOpenLibrary(candidate)));
+      providers.push({
+        label: "Open Library",
+        search: (candidate) => this.client.searchOpenLibrary(candidate),
+      });
     }
-    if (!tasks.length) {
+    if (!providers.length) {
       return { results: [], warnings: [searchFeatureText("provider.noneEnabled")] };
     }
 
-    const settled = await Promise.all(tasks);
-    const warnings = settled
-      .filter((entry) => entry.error !== undefined)
-      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
-    const results = dedupeSearchResults(settled.flatMap((entry) => entry.items ?? []));
-    return { results: rankSearchResults(results, query).slice(0, 24), warnings };
+    const response = await searchMultilingualProviders({
+      query,
+      providers,
+      languages: this.languages(),
+      dedupe: dedupeSearchResults,
+      maxResults: 24,
+    });
+    return { results: response.results, warnings: response.warnings };
   }
 }

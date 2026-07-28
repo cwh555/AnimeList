@@ -19,6 +19,8 @@ declare global {
   }
 
   function createEl<K extends keyof HTMLElementTagNameMap>(tag: K, options?: string | DomElementInfo): HTMLElementTagNameMap[K];
+  function createDiv(options?: string | DomElementInfo): HTMLDivElement;
+  function createSpan(options?: string | DomElementInfo): HTMLSpanElement;
 }
 
 declare module "obsidian" {
@@ -45,6 +47,25 @@ declare module "obsidian" {
     addChild<T extends Component>(component: T): T;
     removeChild<T extends Component>(component: T): T;
     register(callback: () => void): void;
+    registerEvent(eventRef: EventRef): void;
+    registerDomEvent<K extends keyof DocumentEventMap>(
+      element: Document,
+      type: K,
+      callback: (event: DocumentEventMap[K]) => unknown,
+      options?: boolean | AddEventListenerOptions,
+    ): void;
+    registerDomEvent<K extends keyof WindowEventMap>(
+      element: Window,
+      type: K,
+      callback: (event: WindowEventMap[K]) => unknown,
+      options?: boolean | AddEventListenerOptions,
+    ): void;
+    registerDomEvent<K extends keyof HTMLElementEventMap>(
+      element: HTMLElement,
+      type: K,
+      callback: (event: HTMLElementEventMap[K]) => unknown,
+      options?: boolean | AddEventListenerOptions,
+    ): void;
   }
 
   export class MarkdownRenderChild extends Component {

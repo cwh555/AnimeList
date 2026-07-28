@@ -4,7 +4,7 @@ import type { AnimeListSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, MediaNoteForm } from "../domain/media-types";
 import { slugify, stringValue } from "../domain/value-normalization";
 import { normalizeMediaStatus } from "../media-status";
-import { normalizeVolumeLog } from "../novel-progress";
+import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../progress-units";
 import { uiText } from "../ui-text";
 import { buildMediaMarkdown, validateMediaNoteForm } from "./media-note-codec";
 import { MediaRepository } from "./media-repository";
@@ -89,10 +89,14 @@ export class MediaNoteService {
     if (folder) await this.storage.ensureFolder(folder);
     const path = await this.storage.uniqueFilePath(folder, form.title || result.title, "md");
     const templateContent = await this.storage.readTemplate(form.templatePath);
+    const unit = defaultProgressUnit(result.mediaType, form.unit);
     const preparedForm: MediaNoteForm = {
       ...form,
       status: normalizeMediaStatus(form.status),
-      volumeLog: result.mediaType === "novel" ? normalizeVolumeLog(form.volumeLog) : [],
+      unit,
+      volumeLog: result.mediaType !== "anime" && isReadingProgressUnit(unit)
+        ? normalizeSerialLog(form.volumeLog, unit)
+        : [],
     };
     const markdown = buildMediaMarkdown(result, preparedForm, coverPath, templateContent);
     const file = await this.app.vault.create(path, markdown);
