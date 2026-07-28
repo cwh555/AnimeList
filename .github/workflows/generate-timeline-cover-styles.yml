@@ -3,6 +3,8 @@ name: Generate timeline cover stylesheet
 on:
   push:
     branches: [tmp/generate-timeline-cover-styles]
+  pull_request:
+    branches: [preview]
 
 permissions:
   contents: write
