@@ -1,6 +1,4 @@
-import { Notice, TFile } from "obsidian";
-import type AnimeListPlugin from "./main";
-import { findMediaFormInput } from "./ui/media-form-field";
+import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { createSegmentedDateInput } from "./segmented-date-input";
 import {
   compareSerialLabels,
@@ -11,66 +9,33 @@ import {
   normalizeSerialLog,
   normalizeSerialProgress,
   progressUnitsFor,
+  type ReadingProgressUnit,
 } from "./progress-units";
-import type { ReadingProgressUnit } from "./progress-units";
-import { applyReadingProgressSnapshot } from "./reading-progress-persistence";
 import {
   progressUnitFeatureText,
   progressUnitLabel,
 } from "./progress-unit-feature-text";
-import type { MediaType, NovelVolumeEntry, ProgressValue } from "./types";
+import type { MediaFormContext, MediaFormSubmitContext } from "./ui/media-form-contracts";
+import type { NovelVolumeEntry, ProgressValue } from "./types";
 
-interface ProgressEditorState {
-  modal: HTMLElement;
-  mediaType: "manga" | "novel";
-  editPath: string | null;
+export const READING_EDITOR_STATE_KEY = "reading-progress-editor";
+
+type RowListener = (state: ReadingProgressEditorState) => void;
+
+export interface ReadingProgressEditorState {
+  context: MediaFormContext<AnimeListFeatureHost>;
   unit: ReadingProgressUnit;
-  unitSelect: HTMLSelectElement;
-  progressInput: HTMLInputElement;
-  progressLabel: HTMLElement | null;
-  progressHint: HTMLElement | null;
   entries: NovelVolumeEntry[];
   editor: HTMLElement;
   preparedProgress: ProgressValue;
+  originalTitle: string;
+  listeners: Set<RowListener>;
+  render(): void;
 }
 
 function todayString(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-function isElement(value: unknown): value is Element {
-  return typeof value === "object"
-    && value !== null
-    && "closest" in value
-    && typeof Reflect.get(value, "closest") === "function";
-}
-
-function mediaTypeValue(value: unknown): MediaType | null {
-  return value === "anime" || value === "manga" || value === "novel" ? value : null;
-}
-
-function fieldLabel(field: Element): HTMLElement | null {
-  return field.querySelector<HTMLElement>(".al-form-label");
-}
-
-function fieldHint(field: Element): HTMLElement | null {
-  return field.querySelector<HTMLElement>(".al-form-hint");
-}
-
-function findUnitSelect(form: Element): HTMLSelectElement | null {
-  return [...form.querySelectorAll<HTMLSelectElement>("select")].find((select) => (
-    [...select.options].some((option) => (
-      option.value === "episode"
-      || option.value === "chapter"
-      || option.value === "season"
-      || option.value === "volume"
-    ))
-  )) ?? null;
-}
-
-function findProgressInput(form: Element): HTMLInputElement | null {
-  return findMediaFormInput(form, "progress");
 }
 
 function makeField(label: string, control: HTMLElement, hint = ""): HTMLLabelElement {
@@ -97,15 +62,6 @@ function replaceUnitOptions(
   select.value = selected;
 }
 
-function createUnitSelect(
-  mediaType: "manga" | "novel",
-  selected: ReadingProgressUnit,
-): HTMLSelectElement {
-  const select = createEl("select");
-  replaceUnitOptions(select, mediaType, selected);
-  return select;
-}
-
 function nextSerialLabel(entries: NovelVolumeEntry[], unit: ReadingProgressUnit): string {
   const values = entries
     .map((entry) => normalizeSerialLabel(entry.label, unit))
@@ -122,7 +78,11 @@ function textForUnit(
   return progressUnitFeatureText(key, { unit: progressUnitLabel(unit) });
 }
 
-function renderEditor(state: ProgressEditorState): void {
+function notifyRows(state: ReadingProgressEditorState): void {
+  for (const listener of state.listeners) listener(state);
+}
+
+function renderEditor(state: ReadingProgressEditorState): void {
   state.editor.replaceChildren();
   const header = state.editor.createDiv({ cls: "al-volume-editor-header" });
   const copy = header.createDiv();
@@ -142,10 +102,7 @@ function renderEditor(state: ProgressEditorState): void {
   state.entries.sort((left, right) => compareSerialLabels(left.label, right.label, state.unit));
 
   if (!state.entries.length) {
-    rows.createEl("p", {
-      cls: "al-volume-editor-empty",
-      text: textForUnit("empty", state.unit),
-    });
+    rows.createEl("p", { cls: "al-volume-editor-empty", text: textForUnit("empty", state.unit) });
   }
 
   state.entries.forEach((entry, index) => {
@@ -159,9 +116,7 @@ function renderEditor(state: ProgressEditorState): void {
     fields.appendChild(makeField(
       textForUnit("label", state.unit),
       labelInput,
-      progressUnitFeatureText(
-        state.unit === "volume" ? "labelPlaceholderVolume" : "labelPlaceholderInteger",
-      ),
+      progressUnitFeatureText(state.unit === "volume" ? "labelPlaceholderVolume" : "labelPlaceholderInteger"),
     ));
 
     const startedAt = createSegmentedDateInput(entry.startedAt);
@@ -176,10 +131,11 @@ function renderEditor(state: ProgressEditorState): void {
     ));
 
     const actions = row.createDiv({ cls: "al-volume-row-actions" });
-    const remove = actions.createEl("button");
+    const remove = actions.createEl("button", {
+      cls: "al-delete-button",
+      text: progressUnitFeatureText("remove"),
+    });
     remove.type = "button";
-    remove.className = "al-delete-button";
-    remove.textContent = progressUnitFeatureText("remove");
 
     labelInput.addEventListener("input", () => { entry.label = labelInput.value; });
     startedAt.addEventListener("input", () => { entry.startedAt = startedAt.value; });
@@ -190,40 +146,45 @@ function renderEditor(state: ProgressEditorState): void {
     });
     remove.addEventListener("click", () => {
       state.entries.splice(index, 1);
-      renderEditor(state);
+      state.render();
     });
   });
 
   add.addEventListener("click", () => {
+    const scrollTop = state.context.modalEl.scrollTop;
     state.entries.push({
       label: nextSerialLabel(state.entries, state.unit),
       startedAt: "",
       completedAt: todayString(),
     });
-    renderEditor(state);
+    state.render();
+    state.context.modalEl.scrollTop = scrollTop;
     const inputs = state.editor.querySelectorAll<HTMLInputElement>('.al-volume-row input[type="text"]');
     const newest = inputs.item(inputs.length - 1);
-    newest?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     newest?.focus({ preventScroll: true });
     newest?.select();
   });
+  notifyRows(state);
 }
 
-function updatePresentation(state: ProgressEditorState): void {
-  state.progressInput.type = "text";
-  state.progressInput.inputMode = state.unit === "volume" ? "decimal" : "numeric";
-  state.progressInput.removeAttribute("min");
-  state.progressInput.removeAttribute("step");
-  if (state.progressLabel) state.progressLabel.textContent = textForUnit("progressLabel", state.unit);
-  if (state.progressHint) {
-    state.progressHint.textContent = progressUnitFeatureText(
+function updatePresentation(state: ReadingProgressEditorState): void {
+  const { fields } = state.context;
+  fields.progress.type = "text";
+  fields.progress.inputMode = state.unit === "volume" ? "decimal" : "numeric";
+  fields.progress.removeAttribute("min");
+  fields.progress.removeAttribute("step");
+  const progressField = fields.progress.closest<HTMLElement>(".al-form-field");
+  progressField?.querySelector<HTMLElement>(".al-form-label")?.setText(textForUnit("progressLabel", state.unit));
+  const hint = progressField?.querySelector<HTMLElement>(".al-form-hint");
+  if (hint) {
+    hint.setText(progressUnitFeatureText(
       state.unit === "volume" ? "progressHintVolume" : "progressHintInteger",
-    );
+    ));
   }
   renderEditor(state);
 }
 
-function validateAndPrepare(state: ProgressEditorState): void {
+function validateAndPrepare(state: ReadingProgressEditorState): void {
   const unitLabel = progressUnitLabel(state.unit);
   const seen = new Set<string>();
   const entries: NovelVolumeEntry[] = [];
@@ -235,20 +196,13 @@ function validateAndPrepare(state: ProgressEditorState): void {
         { unit: unitLabel },
       ));
     }
-    if (seen.has(label)) {
-      throw new Error(progressUnitFeatureText("duplicate", { unit: unitLabel, label }));
-    }
+    if (seen.has(label)) throw new Error(progressUnitFeatureText("duplicate", { unit: unitLabel, label }));
     seen.add(label);
-    entries.push({
-      ...entry,
-      label,
-      startedAt: entry.startedAt,
-      completedAt: entry.completedAt || todayString(),
-    });
+    entries.push({ ...entry, label, completedAt: entry.completedAt || todayString() });
   }
   state.entries = entries.sort((left, right) => compareSerialLabels(left.label, right.label, state.unit));
 
-  const progress = normalizeSerialProgress(state.progressInput.value, state.unit);
+  const progress = normalizeSerialProgress(state.context.fields.progress.value, state.unit);
   if (progress === null) {
     throw new Error(progressUnitFeatureText(
       state.unit === "volume" ? "invalidVolume" : "invalidInteger",
@@ -256,163 +210,67 @@ function validateAndPrepare(state: ProgressEditorState): void {
     ));
   }
   const completed = highestCompletedSerialLabel(state.entries, state.unit);
-  state.preparedProgress = completed !== null
-    && compareSerialLabels(progress, completed, state.unit) < 0
+  state.preparedProgress = completed !== null && compareSerialLabels(progress, completed, state.unit) < 0
     ? completed === "EX" ? completed : Number(completed)
     : progress;
-  state.progressInput.value = String(state.preparedProgress);
+  state.context.fields.progress.value = String(state.preparedProgress);
 }
 
-function applyState(frontmatter: Record<string, unknown>, state: ProgressEditorState): void {
-  applyReadingProgressSnapshot(frontmatter, {
-    unit: state.unit,
-    progress: state.preparedProgress,
-    entries: state.entries,
-  });
+function originalTitle(context: MediaFormContext<AnimeListFeatureHost>): string {
+  const value = context.result?.originalTitle
+    || context.result?.romajiTitle
+    || context.frontmatter.title_original
+    || context.frontmatter.title_romaji
+    || context.frontmatter.title;
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
-export function installAdditionalProgressUnitsUi(plugin: AnimeListPlugin): void {
-  const states = new WeakMap<HTMLElement, ProgressEditorState>();
-  let activeEditPath: string | null = null;
-  let pendingCreate: ProgressEditorState | null = null;
-  let pendingEdit: ProgressEditorState | null = null;
+function configureReadingEditor(context: MediaFormContext<AnimeListFeatureHost>): void {
+  if (context.mediaType !== "manga" && context.mediaType !== "novel") return;
+  const selected = defaultProgressUnit(context.mediaType, context.frontmatter.progress_unit ?? context.fields.unit.value);
+  if (!isReadingProgressUnit(selected)) return;
+  replaceUnitOptions(context.fields.unit, context.mediaType, selected);
 
-  const originalOpenEditModal = plugin.openEditModal.bind(plugin);
-  plugin.openEditModal = (path: string): void => {
-    activeEditPath = path;
-    originalOpenEditModal(path);
+  const editor = createEl("section", { cls: "al-volume-editor al-progress-unit-editor" });
+  const favoriteRow = context.fields.favorite.closest(".al-form-checkbox");
+  if (favoriteRow) favoriteRow.insertAdjacentElement("beforebegin", editor);
+  else context.formEl.appendChild(editor);
+
+  const state: ReadingProgressEditorState = {
+    context,
+    unit: selected,
+    entries: normalizeSerialLog(context.frontmatter.volume_log, selected),
+    editor,
+    preparedProgress: normalizeSerialProgress(context.fields.progress.value, selected) ?? 0,
+    originalTitle: originalTitle(context),
+    listeners: new Set(),
+    render: () => renderEditor(state),
   };
-
-  const originalCreateMediaNote = plugin.createMediaNote.bind(plugin);
-  plugin.createMediaNote = async (result, form) => {
-    const state = pendingCreate;
-    pendingCreate = null;
-    const file = await originalCreateMediaNote(result, form);
-    if (state) {
-      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        applyState(frontmatter, state);
-      });
-    }
-    return file;
-  };
-
-  const fileManager = plugin.app.fileManager;
-  const originalProcessFrontMatter = fileManager.processFrontMatter.bind(fileManager);
-  fileManager.processFrontMatter = async (file, callback): Promise<void> => {
-    const state = pendingEdit && file.path === pendingEdit.editPath ? pendingEdit : null;
-    if (state) pendingEdit = null;
-    await originalProcessFrontMatter(file, (frontmatter) => {
-      callback(frontmatter);
-      if (state) applyState(frontmatter, state);
-    });
-  };
-
-  const configureForm = (form: Element): void => {
-    const modal = form.closest<HTMLElement>(".animelist-modal");
-    if (!modal || states.has(modal)) return;
-
-    let unitSelect = findUnitSelect(form);
-    let mediaType: MediaType | null = null;
-    let editPath: string | null = null;
-    let frontmatter: Record<string, unknown> = {};
-
-    if (modal.classList.contains("animelist-edit-modal")) {
-      editPath = activeEditPath;
-      const file = editPath ? plugin.app.vault.getAbstractFileByPath(editPath) : null;
-      if (file instanceof TFile) {
-        frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-      }
-      mediaType = mediaTypeValue(frontmatter.media_type);
-    } else if (unitSelect) {
-      mediaType = unitSelect.value === "episode"
-        ? "anime"
-        : unitSelect.value === "chapter"
-          ? "manga"
-          : "novel";
-    }
-
-    if (mediaType !== "manga" && mediaType !== "novel") return;
-    const selected = defaultProgressUnit(mediaType, frontmatter.progress_unit ?? unitSelect?.value);
-    if (selected === "episode") return;
-    const progressInput = findProgressInput(form);
-    if (!progressInput) return;
-    const progressField = progressInput.closest<HTMLElement>(".al-form-field");
-
-    if (!unitSelect) {
-      unitSelect = createUnitSelect(mediaType, selected);
-      progressField?.insertAdjacentElement("afterend", makeField(progressUnitFeatureText("unitField"), unitSelect));
-    } else {
-      replaceUnitOptions(unitSelect, mediaType, selected);
-    }
-
-    form.querySelectorAll<HTMLElement>(".al-volume-editor:not(.al-progress-unit-editor)")
-      .forEach((originalEditor) => originalEditor.remove());
-    const editor = createEl("section", { cls: "al-volume-editor al-progress-unit-editor" });
-    const favorite = form.querySelector(".al-form-checkbox");
-    if (favorite) favorite.insertAdjacentElement("beforebegin", editor);
-    else form.appendChild(editor);
-
-    const state: ProgressEditorState = {
-      modal,
-      mediaType,
-      editPath,
-      unit: selected,
-      unitSelect,
-      progressInput,
-      progressLabel: progressField ? fieldLabel(progressField) : null,
-      progressHint: progressField ? fieldHint(progressField) : null,
-      entries: normalizeSerialLog(frontmatter.volume_log, selected),
-      editor,
-      preparedProgress: normalizeSerialProgress(progressInput.value, selected) ?? 0,
-    };
-    states.set(modal, state);
+  context.state.set(READING_EDITOR_STATE_KEY, state);
+  updatePresentation(state);
+  context.fields.unit.addEventListener("change", () => {
+    if (!isReadingProgressUnit(context.fields.unit.value)) return;
+    state.unit = context.fields.unit.value;
+    state.entries = normalizeSerialLog(state.entries, state.unit);
     updatePresentation(state);
-    unitSelect.addEventListener("change", () => {
-      if (!isReadingProgressUnit(unitSelect.value)) return;
-      state.unit = unitSelect.value;
-      updatePresentation(state);
-    });
-  };
-
-  const configureWithin = (root: ParentNode): void => {
-    if (isElement(root) && root.matches(".al-media-form")) configureForm(root);
-    root.querySelectorAll<HTMLElement>(".al-media-form").forEach(configureForm);
-  };
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (isElement(node)) configureWithin(node);
-      }
-    }
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  configureWithin(document);
-
-  const handleClick = (event: MouseEvent): void => {
-    if (!isElement(event.target)) return;
-    const button = event.target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta");
-    const modal = button?.closest<HTMLElement>(".animelist-modal");
-    if (!button || !modal) return;
-    const state = states.get(modal);
-    if (!state) return;
-    try {
-      validateAndPrepare(state);
-      if (state.editPath) pendingEdit = state;
-      else pendingCreate = state;
-    } catch (error) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
-  };
-  document.addEventListener("click", handleClick, true);
-
-  plugin.register(() => {
-    observer.disconnect();
-    document.removeEventListener("click", handleClick, true);
-    plugin.openEditModal = originalOpenEditModal;
-    plugin.createMediaNote = originalCreateMediaNote;
-    fileManager.processFrontMatter = originalProcessFrontMatter;
   });
 }
+
+function prepareReadingSubmit(context: MediaFormSubmitContext<AnimeListFeatureHost>): void {
+  const state = context.state.get(READING_EDITOR_STATE_KEY);
+  if (!state || typeof state !== "object" || !("entries" in state)) return;
+  const editor = state as ReadingProgressEditorState;
+  validateAndPrepare(editor);
+  context.form.unit = editor.unit;
+  context.form.progress = editor.preparedProgress;
+  context.form.volumeLog = editor.entries;
+}
+
+export const additionalProgressUnitsFeature = defineFeature<AnimeListFeatureHost>({
+  id: "progress-units",
+  contributions: [{
+    kind: "media-form",
+    configure: configureReadingEditor,
+    prepareSubmit: prepareReadingSubmit,
+  }],
+});
