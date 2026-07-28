@@ -6,7 +6,8 @@ AnimeList is a local-first Obsidian plugin. Markdown notes and YAML frontmatter 
 
 ### Application wiring
 
-- `src/plugin-entry.ts` installs feature integrations in one place.
+- `src/plugin-entry.ts` declares the ordered feature installation manifest.
+- `src/app/feature-installer.ts` validates unique installer IDs and runs installers deterministically.
 - `src/main.ts` owns plugin lifecycle, commands, Obsidian views, and compatibility-facing method adapters.
 - `src/app-metadata.ts` is the single runtime version and user-agent source.
 
@@ -63,7 +64,7 @@ Styles have independent sources:
 
 ## Compatibility boundary
 
-`src/legacy.ts` still contains the active compatibility UI. During Stage 2 it delegates shared persistence and normalization to the typed domain/data services. Stage 3 will replace runtime method reassignment and move active UI composition out of this file. Until then:
+`src/legacy.ts` still contains the active compatibility UI. It delegates shared persistence and normalization to the typed domain/data services. The focused Stage 3 intentionally leaves this released UI boundary in place rather than combining feature installation cleanup with a broad UI rewrite. Continue to follow these rules:
 
 - do not add new domain rules to `legacy.ts`;
 - do not copy a typed service back into `main.ts`;
