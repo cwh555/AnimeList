@@ -1,0 +1,184 @@
+name: Apply final architecture cleanup
+
+on:
+  pull_request:
+    branches: [preview]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'chore/apply-final-architecture-20260728'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify and decode exact source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '8e2c1ab7c81b23efc017553f8ac263db186f65135cbe92440f382050dd76fd65  .tmp/final-architecture/part-00' | sha256sum -c -
+          echo '13cba30287a2666f726ef559d71353dc213d0e7ffae57d777c337401b4bdaf1c  .tmp/final-architecture/part-01' | sha256sum -c -
+          echo '037f90ff035443ffca9d37d63b48710cd2a5cd90b73f4cdf84481113ed9fd4e8  .tmp/final-architecture/part-02' | sha256sum -c -
+          cat .tmp/final-architecture/part-00 .tmp/final-architecture/part-01 .tmp/final-architecture/part-02 > /tmp/final-architecture.diff.xz.b64
+          echo 'a8192698c097e2587a8976bdbeeaa7c8616e935e8ea4c94c63addd43ee792e37  /tmp/final-architecture.diff.xz.b64' | sha256sum -c -
+          base64 -d /tmp/final-architecture.diff.xz.b64 > /tmp/final-architecture.diff.xz
+          echo 'b9c158676a803b7370e65a1595f0cdbcaf6f8b760520f4f0fc22fb42478e2a6c  /tmp/final-architecture.diff.xz' | sha256sum -c -
+
+      - name: Materialize validated final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global user.name 'cwh555'
+          git config --global user.email 'noreply@github.com'
+          git fetch origin --prune
+          git worktree add --detach /tmp/final-source b46e455b62c297d10f9ad54678ded48870e4d20a
+          cd /tmp/final-source
+          xz -dc /tmp/final-architecture.diff.xz | git apply --check --whitespace=nowarn -
+          xz -dc /tmp/final-architecture.diff.xz | git apply --whitespace=nowarn -
+          git add -A
+          git commit -m 'chore: materialize validated final source'
+          git status --short
+
+      - name: Build three responsibility-based commits from preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --prune
+          git worktree add --detach /tmp/formal origin/preview
+          git -C /tmp/formal switch -C refactor/final-architecture-cleanup
+
+          copy_paths() {
+            (cd /tmp/final-source && tar -cf - "$@") | (cd /tmp/formal && tar -xf -)
+          }
+
+          commit1=(
+            src/app/anime-list-application.ts
+            src/app/feature-registry.ts
+            src/app/feature-types.ts
+            src/data/external-media-pagination.ts
+            src/data/external-media-service.ts
+            src/data/media-note-codec.ts
+            src/data/media-note-service.ts
+            src/data/media-repository.ts
+            src/data/media-update-service.ts
+            src/ui/library-contracts.ts
+            src/ui/media-form-contracts.ts
+            src/ui/plugin-host.ts
+            src/ui/search-contracts.ts
+            types/obsidian.d.ts
+          )
+          copy_paths "${commit1[@]}"
+          git -C /tmp/formal add -- "${commit1[@]}"
+          git -C /tmp/formal commit -m 'refactor: add typed feature and application services'
+
+          commit2=(
+            src/additional-progress-units-ui.ts
+            src/compat/legacy-ui.ts
+            src/legacy.ts
+            src/library-navigation.ts
+            src/main.ts
+            src/masterpiece-ui.ts
+            src/plugin-entry.ts
+            src/progress-ui.ts
+            src/rating-ui.ts
+            src/score-dashboard-feature.ts
+            src/search-enhancements.ts
+            src/search-pagination.ts
+            src/segmented-date-input.ts
+            src/serial-cover-feature.ts
+            src/serial-cover-migration-modal.ts
+            src/serial-cover-service.ts
+            src/serial-cover-settings.ts
+            src/serial-entry-scroll-stability.ts
+            src/settings.ts
+            src/ui/library-renderer.ts
+            src/ui/library-view.ts
+            src/ui/markdown-config.ts
+            src/ui/markdown-renderers.ts
+            src/ui/media-form-controls.ts
+            src/ui/media-modals.ts
+            src/ui/timeline-modal.ts
+            src/ui/timeline-renderer.ts
+            src/ui/ui-helpers.ts
+          )
+          copy_paths "${commit2[@]}"
+          rm -f \
+            /tmp/formal/src/app/feature-installer.ts \
+            /tmp/formal/src/legacy-library-renderer.ts \
+            /tmp/formal/src/masterpiece-edit-ui.ts \
+            /tmp/formal/src/masterpiece-grouped-view.ts \
+            /tmp/formal/src/masterpiece-operation-ui.ts
+          git -C /tmp/formal add -A -- \
+            "${commit2[@]}" \
+            src/app/feature-installer.ts \
+            src/legacy-library-renderer.ts \
+            src/masterpiece-edit-ui.ts \
+            src/masterpiece-grouped-view.ts \
+            src/masterpiece-operation-ui.ts
+          git -C /tmp/formal commit -m 'refactor: replace runtime patches with typed UI contributions'
+
+          commit3=(
+            docs/ARCHITECTURE.md
+            docs/REFACTOR_PLAN.md
+            eslint.config.mjs
+            package.json
+            scripts/check-architecture.mjs
+            scripts/check-community-review.mjs
+            scripts/check-serial-reading-ui.mjs
+            tests/contracts/external-media-service.test.ts
+            tests/contracts/feature-installer.test.ts
+            tests/legacy-characterization.test.ts
+            tests/library-navigation.test.ts
+            tests/search-pagination.test.ts
+            tests/serial-entry-scroll.test.ts
+            tests/test-catalog.mjs
+            tsconfig.strict.json
+          )
+          copy_paths "${commit3[@]}"
+          git -C /tmp/formal add -- "${commit3[@]}"
+          git -C /tmp/formal commit -m 'test: enforce architecture and compatibility contracts'
+
+          final_tree=$(git -C /tmp/final-source rev-parse HEAD^{tree})
+          formal_tree=$(git -C /tmp/formal rev-parse HEAD^{tree})
+          test "$final_tree" = "$formal_tree"
+          test "$(git -C /tmp/formal rev-list --count origin/preview..HEAD)" = '3'
+          git -C /tmp/formal log --oneline --decorate -4
+
+      - name: Validate exact formal branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/formal
+          npm ci
+          TZ=UTC npm run check
+          TZ=Asia/Taipei npm test
+          npm run release:check
+
+      - name: Push formal branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/formal
+          git push origin HEAD:refs/heads/refactor/final-architecture-cleanup
+          {
+            echo "preview=$(git rev-parse origin/preview)"
+            echo "commit1=$(git rev-parse HEAD~2)"
+            echo "commit2=$(git rev-parse HEAD~1)"
+            echo "commit3=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse HEAD^{tree})"
+          } | tee /tmp/final-architecture-evidence.txt
+
+      - name: Upload commit evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: final-architecture-commit-evidence
+          path: /tmp/final-architecture-evidence.txt
+          if-no-files-found: error
