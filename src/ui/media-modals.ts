@@ -1,11 +1,8 @@
 import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
-import { normalizeGenres } from "../domain/media-metadata";
-import { normalizeMediaStatus } from "../media-status";
-import { completedStatusLabel, mediaFormatLabel, mediaProviderLabel, mediaStatusOptions, uiText } from "../ui-text";
-import { markMediaFormField } from "./media-form-field";
+import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
-import { baseUnitOptions, bindCompletionBehavior, bindScoreRequirement, createLabeledField, createMediaFormContext, createSelect, createTextInput, mediaFormValues, releaseStatusOptions } from "./media-form-controls";
+import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 
 export class AddMediaModal extends Modal {
@@ -180,38 +177,27 @@ export class AddMediaModal extends Modal {
     const templates = await this.plugin.getTemplates(result.mediaType);
     const form = createDiv();
     form.className = "al-media-form";
-    const title = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", result.title), uiText("add.required"));
-    title.required = true;
-    const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(mediaStatusOptions(), "planned"));
-    const releaseStatus = result.mediaType === "anime" ? null : createLabeledField(form, uiText("add.releaseStatusLabel"), releaseStatusOptions(result.releaseStatus));
-    const score = createLabeledField(form, uiText("add.scoreLabel"), createTextInput("number", ""), uiText("add.scoreHint", { status: completedStatusLabel(result.mediaType) }));
-    score.min = "0"; score.max = "10"; score.step = "0.5";
-    bindScoreRequirement(status, score, result.mediaType);
-    const startedAt = createLabeledField(form, uiText("add.startedAt"), createTextInput("date", ""), uiText("add.startedHint"));
-    const completedAt = createLabeledField(form, uiText("add.completedAt"), createTextInput("date", ""), uiText("add.completedHint", { status: completedStatusLabel(result.mediaType) }));
-    const progressType = result.mediaType === "anime" ? "number" : "text";
-    const progressLabel = result.mediaType === "manga" ? uiText("add.progressManga") : result.mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime");
-    const progress = createLabeledField(form, progressLabel, createTextInput(progressType, "0"), result.mediaType === "novel" ? uiText("add.progressNovelHint") : "");
-    markMediaFormField(progress, "progress");
-    if (result.mediaType === "anime") { progress.min = "0"; progress.step = "1"; }
-    const total = result.mediaType === "anime" ? createLabeledField(form, uiText("add.total"), createTextInput("number", result.total || "")) : null;
-    if (total) { total.min = "0"; total.step = "1"; }
-    const unitValues = baseUnitOptions(result.mediaType, result.unit);
-    const unit = createLabeledField(form, uiText("add.unit"), createSelect(unitValues, unitValues[0][0]));
-    const genres = createLabeledField(form, uiText("add.genres"), createTextInput("text", normalizeGenres(result.genres).join("、")), uiText("add.genresHint"));
     const templateOptions: Array<[string, string]> = templates.length
       ? templates.map((template): [string, string] => [template.path, template.name])
       : [["", uiText("add.noTemplate")]];
-    const template = createLabeledField(form, uiText("add.template"), createSelect(templateOptions, templateOptions[0][0]), uiText("add.templateHint"));
-    const completionNote = makeEl("div", "al-completion-note");
-    form.appendChild(completionNote);
-    bindCompletionBehavior(status, total, progress, completedAt, completionNote, result.mediaType);
-    const favoriteWrap = createEl("label");
-    favoriteWrap.className = "al-form-checkbox";
-    const favorite = createEl("input");
-    favorite.type = "checkbox";
-    favoriteWrap.append(favorite, ` ${uiText("add.favorite")}`);
-    form.appendChild(favoriteWrap);
+    const fields = createMediaEditorFields({
+      parent: form,
+      mediaType: result.mediaType,
+      values: {
+        title: result.title,
+        status: "planned",
+        releaseStatus: result.releaseStatus,
+        score: "",
+        startedAt: "",
+        completedAt: "",
+        progress: 0,
+        total: result.total || "",
+        unit: result.unit,
+        genres: result.genres,
+        favorite: false,
+      },
+      templateOptions,
+    });
     this.contentEl.appendChild(form);
 
     const context = createMediaFormContext({
@@ -223,7 +209,7 @@ export class AddMediaModal extends Modal {
       result,
       file: null,
       frontmatter: {},
-      fields: { title, status, releaseStatus, score, startedAt, completedAt, progress, total, unit, genres, template, favorite },
+      fields,
     });
     this.plugin.configureMediaForm(context);
 
@@ -329,33 +315,26 @@ export class EditMediaModal extends Modal {
       : "anime";
     const form = createDiv();
     form.className = "al-media-form";
-    const title = createLabeledField(form, uiText("add.titleLabel"), createTextInput("text", formValue(frontmatter.title, this.file.basename)), uiText("add.required"));
-    title.required = true;
-    const status = createLabeledField(form, uiText("add.statusLabel"), createSelect(mediaStatusOptions(), normalizeMediaStatus(frontmatter.status)));
-    const releaseStatus = mediaType === "anime" ? null : createLabeledField(form, uiText("add.releaseStatusLabel"), releaseStatusOptions(frontmatter.release_status));
-    const score = createLabeledField(form, uiText("add.scoreLabel"), createTextInput("number", formValue(frontmatter.score)), uiText("add.scoreHint", { status: completedStatusLabel(mediaType) }));
-    score.min = "0"; score.max = "10"; score.step = "0.5";
-    bindScoreRequirement(status, score, mediaType);
-    const progress = createLabeledField(form, mediaType === "manga" ? uiText("add.progressManga") : mediaType === "novel" ? uiText("add.progressNovel") : uiText("add.progressAnime"), createTextInput(mediaType === "anime" ? "number" : "text", formValue(frontmatter.progress, 0)), mediaType === "novel" ? uiText("add.progressNovelHint") : "");
-    markMediaFormField(progress, "progress");
-    if (mediaType === "anime") { progress.min = "0"; progress.step = "1"; }
-    const total = mediaType === "anime" ? createLabeledField(form, uiText("add.total"), createTextInput("number", formValue(frontmatter.progress_total))) : null;
-    if (total) { total.min = "0"; total.step = "1"; }
-    const startedAt = createLabeledField(form, uiText("add.startedAt"), createTextInput("date", String(formValue(frontmatter.started_at))), uiText("add.startedHint"));
-    const completedAt = createLabeledField(form, uiText("add.completedAt"), createTextInput("date", String(formValue(frontmatter.completed_at))), uiText("add.completedHint", { status: completedStatusLabel(mediaType) }));
-    const unitValues = baseUnitOptions(mediaType, frontmatter.progress_unit);
-    const unit = createLabeledField(form, uiText("add.unit"), createSelect(unitValues, typeof frontmatter.progress_unit === "string" ? frontmatter.progress_unit : unitValues[0][0]));
-    const genres = createLabeledField(form, uiText("add.genres"), createTextInput("text", normalizeGenres(frontmatter.genres).join("、")), uiText("add.genresHint"));
-    const completionNote = makeEl("div", "al-completion-note");
-    form.appendChild(completionNote);
-    bindCompletionBehavior(status, total, progress, completedAt, completionNote, mediaType);
-    const favoriteWrap = createEl("label");
-    favoriteWrap.className = "al-form-checkbox";
-    const favorite = createEl("input");
-    favorite.type = "checkbox";
-    favorite.checked = frontmatter.favorite === true;
-    favoriteWrap.append(favorite, ` ${uiText("add.favorite")}`);
-    form.appendChild(favoriteWrap);
+    const fields = createMediaEditorFields({
+      parent: form,
+      mediaType,
+      values: {
+        title: formValue(frontmatter.title, this.file.basename),
+        status: frontmatter.status,
+        releaseStatus: frontmatter.release_status,
+        score: frontmatter.score,
+        startedAt: frontmatter.started_at,
+        completedAt: frontmatter.completed_at,
+        progress: formValue(frontmatter.progress, 0),
+        total: frontmatter.progress_total,
+        unit: frontmatter.progress_unit,
+        genres: frontmatter.genres,
+        favorite: frontmatter.favorite === true,
+      },
+      selectedUnit: typeof frontmatter.progress_unit === "string"
+        ? frontmatter.progress_unit
+        : undefined,
+    });
     this.contentEl.appendChild(form);
 
     const context = createMediaFormContext({
@@ -367,7 +346,7 @@ export class EditMediaModal extends Modal {
       result: null,
       file: this.file,
       frontmatter,
-      fields: { title, status, releaseStatus, score, startedAt, completedAt, progress, total, unit, genres, template: null, favorite },
+      fields,
     });
     this.plugin.configureMediaForm(context);
 
@@ -402,4 +381,3 @@ export class EditMediaModal extends Modal {
     this.contentEl.appendChild(actions);
   }
 }
-
