@@ -1,8 +1,6 @@
 name: Generate timeline cover stylesheet
 
 on:
-  push:
-    branches: [tmp/generate-timeline-cover-styles]
   pull_request:
     branches: [preview]
 
@@ -24,11 +22,11 @@ jobs:
       - run: npm ci
       - run: npm run styles:build
       - run: npm run test:feature -- styles
-      - name: Commit generated stylesheet
+      - name: Commit generated stylesheet to temporary output
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add styles.css
           git diff --cached --quiet && { echo "Expected styles.css to change"; exit 1; }
           git commit -m "build: update timeline stylesheet bundle"
-          git push origin HEAD:feature/timeline-cover-fit
+          git push origin HEAD:tmp/timeline-cover-style-output
