@@ -1,0 +1,367 @@
+name: Update serial entry keyboard flow
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'tmp/update-serial-entry-keyboard-flow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/serial-entry-keyboard-flow
+          fetch-depth: 0
+      - name: Verify guarded feature head
+        run: test "$(git rev-parse HEAD)" = "c060e4b678381264bf7c281cfadd43d7f78ed364"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply serial entry keyboard flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          def block(value: str) -> str:
+              return dedent(value).lstrip("\n")
+
+          def replace_once(source: str, old: str, new: str, label: str) -> str:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return source.replace(old, new, 1)
+
+          segmented = Path("src/segmented-date-input.ts")
+          source = segmented.read_text(encoding="utf-8")
+          source = replace_once(
+              source,
+              block("""
+              export interface SegmentedDateInputElement extends HTMLDivElement {
+                value: string;
+                required: boolean;
+              }
+
+              export const SEGMENTED_DATE_PARTS = {
+              """),
+              block("""
+              export interface SegmentedDateInputElement extends HTMLDivElement {
+                value: string;
+                required: boolean;
+              }
+
+              export type SegmentedDateCompletionTarget = HTMLElement | (() => HTMLElement | null);
+
+              export interface SegmentedDateInputOptions {
+                completionTarget?: SegmentedDateCompletionTarget;
+              }
+
+              export const SEGMENTED_DATE_PARTS = {
+              """),
+              "segmented date options",
+          )
+          source = replace_once(
+              source,
+              block("""
+              function focusNextFormControl(control: HTMLElement): void {
+                const scope = control.closest(".modal-content") ?? control.ownerDocument.body;
+                const controls = [...scope.querySelectorAll<HTMLElement>("input, select, textarea, button, [tabindex]")]
+                  .filter((candidate) => !candidate.hasAttribute("disabled")
+                    && candidate.tabIndex >= 0
+                    && candidate.offsetParent !== null);
+                const index = controls.indexOf(control);
+                controls[index + 1]?.focus();
+              }
+
+              function dateSegment(length: number, placeholder: string, label: string): HTMLInputElement {
+              """),
+              block("""
+              function focusNextFormControl(control: HTMLElement): void {
+                const scope = control.closest(".modal-content") ?? control.ownerDocument.body;
+                const controls = [...scope.querySelectorAll<HTMLElement>("input, select, textarea, button, [tabindex]")]
+                  .filter((candidate) => !candidate.hasAttribute("disabled")
+                    && candidate.tabIndex >= 0
+                    && candidate.offsetParent !== null);
+                const index = controls.indexOf(control);
+                controls[index + 1]?.focus();
+              }
+
+              export function focusSegmentedDateCompletion(
+                source: HTMLElement,
+                completionTarget: SegmentedDateCompletionTarget | undefined,
+                fallback: (control: HTMLElement) => void = focusNextFormControl,
+              ): void {
+                const target = typeof completionTarget === "function" ? completionTarget() : completionTarget;
+                if (target && !target.hasAttribute("disabled")) {
+                  target.focus();
+                  return;
+                }
+                fallback(source);
+              }
+
+              function dateSegment(length: number, placeholder: string, label: string): HTMLInputElement {
+              """),
+              "segmented date completion focus",
+          )
+          source = replace_once(
+              source,
+              'export function createSegmentedDateInput(value = ""): SegmentedDateInputElement {',
+              block("""
+              export function createSegmentedDateInput(
+                value = "",
+                options: SegmentedDateInputOptions = {},
+              ): SegmentedDateInputElement {
+              """).rstrip("\n"),
+              "segmented date function signature",
+          )
+          source = replace_once(
+              source,
+              block("""
+                    } else {
+                      focusNextFormControl(input);
+                    }
+              """),
+              block("""
+                    } else {
+                      focusSegmentedDateCompletion(input, options.completionTarget);
+                    }
+              """),
+              "segmented date final segment focus",
+          )
+          segmented.write_text(source, encoding="utf-8")
+
+          scroll = Path("src/serial-entry-scroll-stability.ts")
+          source = scroll.read_text(encoding="utf-8")
+          source = replace_once(
+              source,
+              block("""
+              export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElement | null {
+                const rows = editor.querySelectorAll<HTMLElement>(".al-volume-row");
+                const newest = rows.item(rows.length - 1);
+                return newest?.querySelector<HTMLInputElement>(
+                  ".al-volume-row-fields > .al-form-field:first-child > input",
+                ) ?? null;
+              }
+
+              export function scheduleStableSerialEntryFocus(
+              """),
+              block("""
+              export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElement | null {
+                const rows = editor.querySelectorAll<HTMLElement>(".al-volume-row");
+                const newest = rows.item(rows.length - 1);
+                return newest?.querySelector<HTMLInputElement>(
+                  ".al-volume-row-fields > .al-form-field:first-child > input",
+                ) ?? null;
+              }
+
+              export function findNewestSerialCompletedYearInput(editor: HTMLElement): HTMLInputElement | null {
+                const rows = editor.querySelectorAll<HTMLElement>(".al-volume-row");
+                const newest = rows.item(rows.length - 1);
+                return newest?.querySelector<HTMLInputElement>(
+                  '.al-volume-row-fields > .al-form-field[data-serial-field="completed-at"] .al-date-year',
+                ) ?? null;
+              }
+
+              export function scheduleStableSerialEntryFocus(
+              """),
+              "serial completed year finder",
+          )
+          source = replace_once(
+              source,
+              "      const input = findNewestSerialLabelInput(editor);",
+              "      const input = findNewestSerialCompletedYearInput(editor);",
+              "stable serial focus target",
+          )
+          scroll.write_text(source, encoding="utf-8")
+
+          editor = Path("src/additional-progress-units-ui.ts")
+          source = editor.read_text(encoding="utf-8")
+          source = replace_once(
+              source,
+              block("""
+                  const completedAt = createSegmentedDateInput(entry.completedAt || todayString());
+                  entry.completedAt = completedAt.value;
+                  fields.appendChild(makeField(
+                    progressUnitFeatureText("completedAt"),
+                    completedAt,
+                    progressUnitFeatureText("completedHint"),
+                  ));
+              """),
+              block("""
+                  const completedAt = createSegmentedDateInput(entry.completedAt || todayString(), {
+                    completionTarget: add,
+                  });
+                  entry.completedAt = completedAt.value;
+                  const completedAtField = makeField(
+                    progressUnitFeatureText("completedAt"),
+                    completedAt,
+                    progressUnitFeatureText("completedHint"),
+                  );
+                  completedAtField.dataset.serialField = "completed-at";
+                  fields.appendChild(completedAtField);
+              """),
+              "serial completed date field",
+          )
+          editor.write_text(source, encoding="utf-8")
+
+          scroll_test = Path("tests/serial-entry-scroll.test.ts")
+          source = scroll_test.read_text(encoding="utf-8")
+          source = replace_once(
+              source,
+              "  findNewestSerialLabelInput,\n",
+              "  findNewestSerialCompletedYearInput,\n",
+              "serial focus test import",
+          )
+          source = replace_once(
+              source,
+              block("""
+                it("selects the unit input from the newest row, not a segmented date input", () => {
+                  const previousInput = { value: "1" } as HTMLInputElement;
+                  const newestInput = { value: "2" } as HTMLInputElement;
+                  const previousRow = {
+                    querySelector: () => previousInput,
+                  } as unknown as HTMLElement;
+                  const newestRow = {
+                    querySelector: (selector: string) => {
+                      assert.equal(
+                        selector,
+                        ".al-volume-row-fields > .al-form-field:first-child > input",
+                      );
+                      return newestInput;
+                    },
+                  } as unknown as HTMLElement;
+                  const rows = [previousRow, newestRow] as unknown as NodeListOf<HTMLElement>;
+                  Reflect.set(rows, "item", (index: number) => rows[index] ?? null);
+                  const editor = {
+                    querySelectorAll: () => rows,
+                  } as unknown as HTMLElement;
+
+                  assert.equal(findNewestSerialLabelInput(editor), newestInput);
+                });
+              """),
+              block("""
+                it("selects the completed-date year from the newest serial row", () => {
+                  const previousInput = { value: "2025" } as HTMLInputElement;
+                  const newestInput = { value: "2026" } as HTMLInputElement;
+                  const previousRow = {
+                    querySelector: () => previousInput,
+                  } as unknown as HTMLElement;
+                  const newestRow = {
+                    querySelector: (selector: string) => {
+                      assert.equal(
+                        selector,
+                        '.al-volume-row-fields > .al-form-field[data-serial-field="completed-at"] .al-date-year',
+                      );
+                      return newestInput;
+                    },
+                  } as unknown as HTMLElement;
+                  const rows = [previousRow, newestRow] as unknown as NodeListOf<HTMLElement>;
+                  Reflect.set(rows, "item", (index: number) => rows[index] ?? null);
+                  const editor = {
+                    querySelectorAll: () => rows,
+                  } as unknown as HTMLElement;
+
+                  assert.equal(findNewestSerialCompletedYearInput(editor), newestInput);
+                });
+              """),
+              "serial newest completed year test",
+          )
+          source = replace_once(
+              source,
+              'it("restores the viewport while focusing the newly added serial label", async () => {',
+              'it("restores the viewport while focusing the newly added completed-date year", async () => {',
+              "serial stable focus test title",
+          )
+          scroll_test.write_text(source, encoding="utf-8")
+
+          date_test = Path("tests/segmented-date-input.test.ts")
+          source = date_test.read_text(encoding="utf-8")
+          source = replace_once(
+              source,
+              'import { normalizeDateParts } from "../src/segmented-date-input";',
+              'import { focusSegmentedDateCompletion, normalizeDateParts } from "../src/segmented-date-input";',
+              "segmented date test import",
+          )
+          source = replace_once(
+              source,
+              block("""
+                it("accepts only complete real calendar dates", () => {
+                  assert.equal(normalizeDateParts("2026", "07", "27"), "2026-07-27");
+                  assert.equal(normalizeDateParts("2026", "02", "29"), "");
+                  assert.equal(normalizeDateParts("2024", "02", "29"), "2024-02-29");
+                  assert.equal(normalizeDateParts("2026", "7", "27"), "");
+                  assert.equal(normalizeDateParts("", "", ""), "");
+                });
+              });
+              """),
+              block("""
+                it("accepts only complete real calendar dates", () => {
+                  assert.equal(normalizeDateParts("2026", "07", "27"), "2026-07-27");
+                  assert.equal(normalizeDateParts("2026", "02", "29"), "");
+                  assert.equal(normalizeDateParts("2024", "02", "29"), "2024-02-29");
+                  assert.equal(normalizeDateParts("2026", "7", "27"), "");
+                  assert.equal(normalizeDateParts("", "", ""), "");
+                });
+
+                it("moves a completed date to its explicit next control", () => {
+                  let focusCount = 0;
+                  let fallbackCount = 0;
+                  const sourceControl = {} as HTMLElement;
+                  const addButton = {
+                    hasAttribute: () => false,
+                    focus: () => { focusCount += 1; },
+                  } as unknown as HTMLElement;
+
+                  focusSegmentedDateCompletion(
+                    sourceControl,
+                    () => addButton,
+                    () => { fallbackCount += 1; },
+                  );
+
+                  assert.equal(focusCount, 1);
+                  assert.equal(fallbackCount, 0);
+                });
+
+                it("falls back when the explicit completion target is disabled", () => {
+                  let fallbackControl: HTMLElement | null = null;
+                  const sourceControl = {} as HTMLElement;
+                  const disabledButton = {
+                    hasAttribute: (name: string) => name === "disabled",
+                    focus: () => { throw new Error("disabled target must not receive focus"); },
+                  } as unknown as HTMLElement;
+
+                  focusSegmentedDateCompletion(
+                    sourceControl,
+                    disabledButton,
+                    (control) => { fallbackControl = control; },
+                  );
+
+                  assert.equal(fallbackControl, sourceControl);
+                });
+              });
+              """),
+              "segmented date completion behavior tests",
+          )
+          date_test.write_text(source, encoding="utf-8")
+          PY
+      - run: npm run typecheck
+      - run: npm run typecheck:strict
+      - run: npm run lint
+      - run: npm run architecture:check
+      - run: npm run test:feature -- progress
+      - name: Commit feature update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/segmented-date-input.ts src/serial-entry-scroll-stability.ts src/additional-progress-units-ui.ts tests/serial-entry-scroll.test.ts tests/segmented-date-input.test.ts
+          git diff --cached --quiet && { echo "Expected serial entry keyboard changes"; exit 1; }
+          git commit -m "fix: streamline serial entry keyboard flow"
+          git push origin HEAD:feature/serial-entry-keyboard-flow
+      - name: Delete temporary branch
+        if: always()
+        run: git push origin --delete tmp/update-serial-entry-keyboard-flow || true
