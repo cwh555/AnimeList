@@ -1,0 +1,142 @@
+name: Update timeline card height
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'tmp/update-timeline-card-height'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/timeline-cover-fit
+          fetch-depth: 0
+      - name: Verify guarded feature head
+        run: test "$(git rev-parse HEAD)" = "5b45dd3ca3fa00de149e193a380bebf50bf2e52b"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply taller timeline card geometry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          renderer = Path('src/ui/timeline-renderer.ts')
+          source = renderer.read_text(encoding='utf-8')
+          marker = 'export const TIMELINE_MEDIA_FILTERS: readonly LibraryMediaFilter[] = ['
+          geometry = '''export const TIMELINE_CARD_GEOMETRY = Object.freeze({
+            width: 120,
+            coverHeight: 180,
+            cardHeight: 242,
+            gapX: 16,
+            gapY: 18,
+            stemGap: 44,
+          });
+
+          export const TIMELINE_MEDIA_FILTERS: readonly LibraryMediaFilter[] = ['''
+          if marker not in source:
+              raise SystemExit('timeline geometry insertion point changed')
+          source = source.replace(marker, geometry, 1)
+          old_constants = '''  const CARD_WIDTH = 120;
+            const CARD_HEIGHT = 146;
+            const CARD_GAP_X = 16;
+            const CARD_GAP_Y = 18;
+            const STEM_GAP = 44;'''
+          new_constants = '''  const CARD_WIDTH = TIMELINE_CARD_GEOMETRY.width;
+            const CARD_HEIGHT = TIMELINE_CARD_GEOMETRY.cardHeight;
+            const CARD_GAP_X = TIMELINE_CARD_GEOMETRY.gapX;
+            const CARD_GAP_Y = TIMELINE_CARD_GEOMETRY.gapY;
+            const STEM_GAP = TIMELINE_CARD_GEOMETRY.stemGap;'''
+          if old_constants not in source:
+              raise SystemExit('timeline card constants changed')
+          renderer.write_text(source.replace(old_constants, new_constants, 1), encoding='utf-8')
+
+          Path('styles.timeline.css').write_text('''/* Timeline cards use a full-width portrait frame so cover artwork remains prominent. */
+          .al-timeline-card {
+            height: 242px;
+          }
+
+          .al-timeline-card img {
+            width: 100%;
+            height: 180px;
+            flex: none;
+            object-fit: contain;
+            object-position: center;
+            background: var(--background-primary-alt, #202026);
+          }
+          ''', encoding='utf-8')
+
+          contract = Path('tests/contracts/style-bundle.test.ts')
+          source = contract.read_text(encoding='utf-8')
+          old = '''    const timelineImageRules = [...generated.matchAll(/\\.al-timeline-card img\\s*\\{([^}]*)\\}/g)];
+              const finalTimelineImageRule = timelineImageRules.at(-1)?.[1] ?? "";
+              assert.match(finalTimelineImageRule, /object-fit:\\s*contain/);
+              assert.match(finalTimelineImageRule, /object-position:\\s*center/);
+              assert.match(finalTimelineImageRule, /background:\\s*var\\(--background-primary-alt/);'''
+          new = '''    const timelineCardRules = [...generated.matchAll(/\\.al-timeline-card\\s*\\{([^}]*)\\}/g)];
+              const finalTimelineCardRule = timelineCardRules.at(-1)?.[1] ?? "";
+              assert.match(finalTimelineCardRule, /height:\\s*242px/);
+
+              const timelineImageRules = [...generated.matchAll(/\\.al-timeline-card img\\s*\\{([^}]*)\\}/g)];
+              const finalTimelineImageRule = timelineImageRules.at(-1)?.[1] ?? "";
+              assert.match(finalTimelineImageRule, /width:\\s*100%/);
+              assert.match(finalTimelineImageRule, /height:\\s*180px/);
+              assert.match(finalTimelineImageRule, /object-fit:\\s*contain/);
+              assert.match(finalTimelineImageRule, /object-position:\\s*center/);
+              assert.match(finalTimelineImageRule, /background:\\s*var\\(--background-primary-alt/);'''
+          if old not in source:
+              raise SystemExit('timeline stylesheet contract changed')
+          contract.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          scale_test = Path('tests/timeline-scale.test.ts')
+          source = scale_test.read_text(encoding='utf-8')
+          import_marker = 'import { uiText } from "../src/ui-text";\n'
+          if import_marker not in source:
+              raise SystemExit('timeline test import marker changed')
+          source = source.replace(
+              import_marker,
+              import_marker + 'import { TIMELINE_CARD_GEOMETRY } from "../src/ui/timeline-renderer";\n',
+              1,
+          )
+          describe_marker = 'describe("timeline scale defaults", () => {\n'
+          geometry_test = '''describe("timeline scale defaults", () => {
+            it("uses a full-width portrait cover frame in the taller timeline card geometry", () => {
+              assert.deepEqual(TIMELINE_CARD_GEOMETRY, {
+                width: 120,
+                coverHeight: 180,
+                cardHeight: 242,
+                gapX: 16,
+                gapY: 18,
+                stemGap: 44,
+              });
+              assert.equal(TIMELINE_CARD_GEOMETRY.coverHeight / TIMELINE_CARD_GEOMETRY.width, 1.5);
+              assert.ok(TIMELINE_CARD_GEOMETRY.cardHeight > TIMELINE_CARD_GEOMETRY.coverHeight);
+            });
+          '''
+          if describe_marker not in source:
+              raise SystemExit('timeline test suite marker changed')
+          scale_test.write_text(source.replace(describe_marker, geometry_test, 1), encoding='utf-8')
+          PY
+      - run: npm run styles:build
+      - run: npm run typecheck
+      - run: npm run typecheck:strict
+      - run: npm run lint
+      - run: npm run architecture:check
+      - run: npm run test:feature -- styles
+      - name: Commit feature update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ui/timeline-renderer.ts styles.timeline.css styles.css tests/contracts/style-bundle.test.ts tests/timeline-scale.test.ts
+          git diff --cached --quiet && { echo "Expected timeline card changes"; exit 1; }
+          git commit -m "fix: use taller timeline cover cards"
+          git push origin HEAD:feature/timeline-cover-fit
+      - name: Delete temporary branch
+        if: always()
+        run: git push origin --delete tmp/update-timeline-card-height || true
