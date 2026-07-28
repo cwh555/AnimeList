@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Package exact recovery source
+        run: tar --exclude=.git --exclude=node_modules -czf /tmp/animelist-final-architecture-recovery.tar.gz .
+      - name: Upload exact recovery source
+        uses: actions/upload-artifact@v6
+        with:
+          name: animelist-final-architecture-recovery
+          path: /tmp/animelist-final-architecture-recovery.tar.gz
+          if-no-files-found: error
       - uses: actions/setup-node@v7
         with:
           node-version: 24
