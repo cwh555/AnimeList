@@ -14,7 +14,7 @@ import { installSerialEntryCovers } from "./serial-cover-feature";
 import { installSerialEntryScrollStability } from "./serial-entry-scroll-stability";
 import { installSerialCoverSettings } from "./serial-cover-settings";
 
-const FEATURE_INSTALLERS = [
+const FEATURE_INSTALLERS: readonly FeatureInstaller<AnimeListPlugin>[] = [
   { id: "progress-display", install: installProgressUi },
   { id: "search-pagination", install: installSearchPagination },
   { id: "rating", install: installRatingUi },
@@ -27,7 +27,7 @@ const FEATURE_INSTALLERS = [
   { id: "masterpiece-edit", install: installMasterpieceEditUi },
   { id: "masterpiece-grouped-view", install: installMasterpieceGroupedView },
   { id: "score-dashboard", install: installScoreDashboard },
-] satisfies readonly FeatureInstaller<AnimeListPlugin>[];
+];
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
   async onload(): Promise<void> {
