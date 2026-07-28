@@ -6,12 +6,14 @@ AnimeList is a local-first Obsidian plugin. Markdown notes and YAML frontmatter 
 
 ### Application wiring
 
-- `src/plugin-entry.ts` declares the ordered feature installation manifest.
-- `src/app/feature-installer.ts` validates unique installer IDs and runs installers deterministically.
-- `src/main.ts` owns plugin lifecycle, commands, Obsidian views, and compatibility-facing method adapters.
+- `src/plugin-entry.ts` declares the single ordered feature manifest.
+- `src/app/feature-types.ts` defines the supported feature capabilities and structural host contract.
+- `src/app/feature-registry.ts` validates duplicate IDs, dependencies, declaration order, and one-time activation before dispatching capabilities.
+- `src/app/anime-list-application.ts` is the single owner of storage, repository, provider, search, note/update, and cover-cache services.
+- `src/main.ts` owns only Obsidian lifecycle, commands, view/Markdown registration, feature dispatch, and thin host delegation.
 - `src/app-metadata.ts` is the single runtime version and user-agent source.
 
-Application wiring may compose services, but it must not implement provider normalization, Markdown serialization, settings normalization, or file-path policy.
+Application wiring may compose services, but it must not implement provider normalization, Markdown serialization, settings normalization, or file-path policy. Features declare capabilities; they do not replace plugin methods, prototypes, renderers, or Obsidian persistence methods.
 
 ### Domain
 
@@ -33,7 +35,9 @@ Application wiring may compose services, but it must not implement provider norm
 - `library-storage.ts`: folder, scan-root, template, and unique-path policy.
 - `provider-normalizers.ts`: provider payload normalization and result deduplication.
 - `external-media-service.ts`: provider orchestration, query variants, warnings, and ranking.
+- `external-media-pagination.ts`: provider pagination requests and merge policy.
 - `media-note-service.ts`: note creation and cover-download workflow.
+- `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
 
 Features and compatibility UI may call these services. They must not create another copy of their rules.
 
@@ -64,12 +68,12 @@ Styles have independent sources:
 
 ## Compatibility boundary
 
-`src/legacy.ts` still contains the active compatibility UI. It delegates shared persistence and normalization to the typed domain/data services. The focused Stage 3 intentionally leaves this released UI boundary in place rather than combining feature installation cleanup with a broad UI rewrite. Continue to follow these rules:
+`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module imports the compatibility barrel.
 
-- do not add new domain rules to `legacy.ts`;
-- do not copy a typed service back into `main.ts`;
-- preserve its public methods used by existing modals and feature adapters;
-- replace source-shape tests with behavior contracts whenever a responsibility moves.
+- do not add implementations or domain rules to `legacy.ts`;
+- do not copy typed services back into `main.ts` or feature modules;
+- preserve only stable exports still required by characterization tests or downstream compatibility;
+- protect moved responsibilities with behavior contracts rather than source-location assertions.
 
 ## Verification boundaries
 
@@ -79,4 +83,4 @@ Styles have independent sources:
 - Legacy characterization tests only freeze compatibility behavior that has not yet moved.
 - Test Vault validation covers real Obsidian lifecycle and DOM behavior.
 
-New modules under `src/domain`, `src/data`, `src/i18n`, and `src/ui` must pass `tsconfig.strict.json` in addition to the repository-wide TypeScript and lint checks.
+All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.strict.json` in addition to repository-wide TypeScript, lint, architecture, and compatibility checks.

@@ -132,6 +132,7 @@ describe("search pagination", () => {
 
     try {
       const appended = await appendNextSearchPage(
+        { providers: { bangumi: false, anilist: true, openlibrary: false } } as never,
         modal as never,
         state,
         rows as never,
@@ -176,7 +177,12 @@ describe("search pagination", () => {
     const rows = { appendChild() {} };
 
     try {
-      assert.equal(await appendNextSearchPage(modal as never, state, rows as never), 0);
+      assert.equal(await appendNextSearchPage(
+        { providers: { bangumi: false, anilist: true, openlibrary: false } } as never,
+        modal as never,
+        state,
+        rows as never,
+      ), 0);
       assert.equal(requests, 0);
     } finally {
       setRequestUrlMock(null);

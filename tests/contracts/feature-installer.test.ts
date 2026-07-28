@@ -1,27 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { installFeatureSet, type FeatureInstaller } from "../../src/app/feature-installer";
+import { AnimeListFeatureRegistry } from "../../src/app/feature-registry";
+import { defineFeature, type AnimeListFeatureHost } from "../../src/app/feature-types";
 
-test("feature installers run in manifest declaration order", async () => {
+const host = {} as AnimeListFeatureHost;
+
+test("feature lifecycle contributions run in manifest declaration order", async () => {
   const calls: string[] = [];
-  const installers: FeatureInstaller<object>[] = [
-    { id: "first", install: () => { calls.push("first"); } },
-    { id: "second", install: async () => { calls.push("second"); } },
-    { id: "third", install: () => { calls.push("third"); } },
-  ];
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  registry.load([
+    defineFeature({ id: "first", contributions: [{ kind: "lifecycle", activate: () => { calls.push("first"); } }] }),
+    defineFeature({ id: "second", contributions: [{ kind: "lifecycle", activate: async () => { calls.push("second"); } }] }),
+    defineFeature({ id: "third", contributions: [{ kind: "lifecycle", activate: () => { calls.push("third"); } }] }),
+  ]);
 
-  await installFeatureSet({}, installers);
+  await registry.activate(host);
   assert.deepEqual(calls, ["first", "second", "third"]);
 });
 
-test("feature installers reject duplicate ids before any installer runs", async () => {
-  const calls: string[] = [];
-  await assert.rejects(
-    installFeatureSet({}, [
-      { id: "duplicate", install: () => { calls.push("first"); } },
-      { id: "duplicate", install: () => { calls.push("second"); } },
-    ]),
-    /Duplicate feature installer: duplicate/,
-  );
-  assert.deepEqual(calls, []);
+test("feature manifests reject duplicate ids before activation", () => {
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  assert.throws(() => registry.load([
+    defineFeature({ id: "duplicate", contributions: [] }),
+    defineFeature({ id: "duplicate", contributions: [] }),
+  ]), /Duplicate feature: duplicate/);
+});
+
+test("feature manifests validate dependencies and declaration order", () => {
+  const missing = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  assert.throws(() => missing.load([
+    defineFeature({ id: "dependent", dependsOn: ["base"], contributions: [] }),
+  ]), /depends on missing feature: base/);
+
+  const reversed = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  assert.throws(() => reversed.load([
+    defineFeature({ id: "dependent", dependsOn: ["base"], contributions: [] }),
+    defineFeature({ id: "base", contributions: [] }),
+  ]), /must appear earlier/);
+});
+
+test("feature registry cannot be loaded twice", () => {
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  registry.load([]);
+  assert.throws(() => registry.load([]), /already loaded/);
+});
+
+
+test("feature lifecycle cannot activate twice", async () => {
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  registry.load([]);
+  await registry.activate(host);
+  await assert.rejects(registry.activate(host), /already activated/);
 });

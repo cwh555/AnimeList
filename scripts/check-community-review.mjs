@@ -6,41 +6,36 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const failures = [];
 
+function walk(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(full) : [full];
+  });
+}
+
 const manifest = JSON.parse(read("manifest.json"));
 const packageJson = JSON.parse(read("package.json"));
 const versions = JSON.parse(read("versions.json"));
-const legacy = read("src/legacy.ts");
+const sourceFiles = walk(path.join(root, "src"))
+  .filter((file) => file.endsWith(".ts"))
+  .map((file) => fs.readFileSync(file, "utf8"))
+  .join("\n");
 const main = read("src/main.ts");
 const settings = read("src/settings.ts");
 const scopedVault = read("src/vault-scope.ts");
-const novelProgress = read("src/novel-progress.ts");
-const uiText = read("src/ui-text.ts");
 const shim = read("types/obsidian.d.ts");
 const styles = read("styles.css");
 const releaseWorkflow = read(".github/workflows/release.yml");
-const sourceFiles = [legacy, main, settings, scopedVault, novelProgress, uiText].join("\n");
 
 function requireMatch(value, pattern, message) {
   if (!pattern.test(value)) failures.push(message);
 }
-
 function rejectMatch(value, pattern, message) {
   if (pattern.test(value)) failures.push(message);
 }
 
-function requirePairedLintScope(value, rules, label) {
-  const escaped = rules.map((rule) => rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const sequence = escaped.join(",\\s*");
-  requireMatch(value, new RegExp(`/\\* eslint-disable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-disable scope is missing or changed`);
-  requireMatch(value, new RegExp(`/\\* eslint-enable\\s+${sequence}\\s+--[^*]+\\*/`), `${label} eslint-enable scope is missing or changed`);
-}
-
-if (manifest.version !== packageJson.version) {
-  failures.push("manifest.json and package.json versions must match");
-}
-if (versions[manifest.version] !== manifest.minAppVersion) {
-  failures.push(`versions.json must map ${manifest.version} to manifest minAppVersion`);
-}
+if (manifest.version !== packageJson.version) failures.push("manifest.json and package.json versions must match");
+if (versions[manifest.version] !== manifest.minAppVersion) failures.push(`versions.json must map ${manifest.version} to manifest minAppVersion`);
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");
 rejectMatch(sourceFiles, /document\.create(?:Element|DocumentFragment|TextNode)\s*\(/, "native DOM creation remains; use Obsidian createEl helpers");
@@ -48,41 +43,11 @@ rejectMatch(main, /detachLeavesOfType\s*\(/, "custom views must not be detached 
 rejectMatch(settings, /setName\(["']AnimeList["']\)\.setHeading\(\)/, "plugin name must not be a settings heading");
 rejectMatch(sourceFiles, /\.getMarkdownFiles\s*\(|\.getFiles\s*\(/, "whole-vault file enumeration remains");
 rejectMatch(scopedVault, /\bas\s+(?:TAbstractFile|TFile|TFolder)\b/, "vault traversal must use instanceof narrowing instead of file casts");
-
-const forbiddenDisabledRules = [
-  "@typescript-eslint/no-explicit-any",
-  "obsidianmd/prefer-create-el",
-  "obsidianmd/settings-tab/prefer-setting-definitions",
-];
-for (const rule of forbiddenDisabledRules) {
-  const escaped = rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  rejectMatch([legacy, main, settings, shim].join("\n"), new RegExp(`eslint-disable[^\\n]*${escaped}`), `forbidden lint suppression remains: ${rule}`);
-}
+rejectMatch(sourceFiles, /eslint-disable/, "source lint suppressions remain");
 rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
 rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
 requireMatch(settings, /getSettingDefinitions\(\):\s*SettingDefinition\[\]/, "declarative settings definitions are missing");
-rejectMatch(styles, /!important\b/, "CSS !important remains");
-
-requirePairedLintScope(legacy, [
-  "@typescript-eslint/no-unsafe-return",
-  "@typescript-eslint/no-unsafe-member-access",
-  "@typescript-eslint/no-unsafe-call",
-  "@typescript-eslint/no-unsafe-argument",
-  "@typescript-eslint/no-unsafe-assignment",
-  "@typescript-eslint/no-floating-promises",
-  "@typescript-eslint/no-misused-promises",
-], "legacy compatibility");
-requirePairedLintScope(main, [
-  "@typescript-eslint/no-misused-promises",
-], "Obsidian callback adapter");
-for (const rule of [
-  "@typescript-eslint/no-unsafe-member-access",
-  "@typescript-eslint/no-unsafe-assignment",
-]) {
-  const escaped = rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  rejectMatch(main, new RegExp(`eslint-disable[^\n]*${escaped}`), `src/main.ts must not disable ${rule}`);
-}
-
+rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
 requireMatch(releaseWorkflow, /actions\/attest@v4/, "release artifact attestation is missing");
 requireMatch(releaseWorkflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/, "all release assets must be attested");
 
@@ -91,5 +56,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-
 console.log("Community review preflight passed.");

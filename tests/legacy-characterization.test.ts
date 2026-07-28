@@ -8,6 +8,9 @@ import { PLUGIN_VERSION } from "../src/app-metadata";
 import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/builtin-templates";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/settings";
 import { legacyTest } from "../src/legacy";
+import { SEGMENTED_DATE_PARTS } from "../src/segmented-date-input";
+import { libraryCoverSizes, libraryEagerCoverCount } from "../src/ui/library-renderer";
+import { TIMELINE_MEDIA_FILTERS, timelineStemGeometry } from "../src/ui/timeline-renderer";
 import { getScopedMarkdownFiles } from "../src/vault-scope";
 import {
   compareVolumeLabels,
@@ -176,17 +179,13 @@ describe("segmented date input", () => {
     assert.equal(normalizeDateParts("2026", "7", "21"), "");
   });
 
-  it("advances year, month, and day segments at consistent lengths", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+  it("uses the released year, month, and day segment policy", () => {
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-
-    assert.match(legacySource, /\[year, 4, "YYYY", uiText\("date\.year"\)\]/);
-    assert.match(legacySource, /\[month, 2, "MM", uiText\("date\.month"\)\]/);
-    assert.match(legacySource, /\[day, 2, "DD", uiText\("date\.day"\)\]/);
-    assert.match(legacySource, /bindSegment\(year, 4, month\)/);
-    assert.match(legacySource, /bindSegment\(month, 2, day\)/);
-    assert.match(legacySource, /bindSegment\(day, 2\)/);
-    assert.match(legacySource, /if \(type === "date"\) return createDateInput\(value\)/);
+    assert.deepEqual(SEGMENTED_DATE_PARTS, {
+      year: { length: 4, placeholder: "YYYY" },
+      month: { length: 2, placeholder: "MM" },
+      day: { length: 2, placeholder: "DD" },
+    });
     assert.match(stylesheet, /\.al-date-input \{/);
   });
 });
@@ -521,31 +520,25 @@ describe("modal scrolling", () => {
 });
 
 describe("compact library rendering", () => {
-  it("keeps compact rows at cover height and bounds eager cover loading", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+  it("keeps released cover loading policies and compact poster styles", () => {
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-
-    assert.match(legacySource, /image\.loading = "lazy"/);
-    assert.match(legacySource, /const eagerCoverCount = \(view\) => view === "poster" \? 10 : view === "list" \? 4 : 6/);
-    assert.match(legacySource, /image\.loading = index < eagerCount \? "eager" : "lazy"/);
-    assert.match(legacySource, /image\.fetchPriority = index < 2 \? "high" : "auto"/);
-    assert.match(legacySource, /image\.sizes = coverSizes\(state\.view\)/);
-    assert.match(legacySource, /image\.decoding = "async"/);
+    assert.equal(libraryEagerCoverCount("poster"), 10);
+    assert.equal(libraryEagerCoverCount("list"), 4);
+    assert.equal(libraryEagerCoverCount("grid"), 6);
+    assert.equal(libraryCoverSizes("list"), "116px");
+    assert.equal(libraryCoverSizes("poster"), "(max-width: 440px) 50vw, 180px");
+    assert.match(libraryCoverSizes("grid"), /240px$/);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card \{[^}]*height: 138px[^}]*max-height: 138px/s);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-card-body \{[^}]*max-height: 138px[^}]*overflow: hidden/s);
     assert.match(stylesheet, /\.al-grid\.is-poster \.al-original-title \{[^}]*text-overflow:ellipsis/);
-    assert.match(stylesheet, /\.al-grid\.is-poster \.al-facts span,[\s\S]*text-overflow:ellipsis/);
   });
 });
 
 describe("timeline connector geometry", () => {
   it("connects every card lane back to the main axis behind cards", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-
-    assert.match(legacySource, /const stemStart = aboveAxis \? cardY \+ CARD_HEIGHT : axisY/);
-    assert.match(legacySource, /const stemEnd = aboveAxis \? axisY : cardY/);
-    assert.match(legacySource, /stem\.style\.height = `\$\{Math\.max\(1, stemEnd - stemStart\)\}px`/);
+    assert.deepEqual(timelineStemGeometry(true, 100, 300, 146), { start: 246, end: 300, height: 54 });
+    assert.deepEqual(timelineStemGeometry(false, 400, 300, 146), { start: 300, end: 400, height: 100 });
     assert.match(stylesheet, /\.al-timeline-stem \{[^}]*z-index:0[^}]*pointer-events:none/);
     assert.match(stylesheet, /\.al-timeline-card \{[^}]*z-index:3/);
   });
@@ -570,16 +563,12 @@ describe("timeline media filters", () => {
   });
 
   it("renders the approved all, anime, manga, and novel filter buttons", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-
-    assert.ok(UI_TEXT["timeline.filterAll"].trim());
+    assert.deepEqual(TIMELINE_MEDIA_FILTERS, ["all", "anime", "manga", "novel"]);
     assert.equal(uiText("timeline.filterAll"), UI_TEXT["timeline.filterAll"]);
-    assert.match(legacySource, /\["all", uiText\("timeline\.filterAll"\)\]/);
-    assert.match(legacySource, /\["anime", uiText\("media\.type\.anime"\)\]/);
-    assert.match(legacySource, /\["manga", uiText\("media\.type\.manga"\)\]/);
-    assert.match(legacySource, /\["novel", uiText\("media\.type\.novel"\)\]/);
-    assert.match(legacySource, /render\(container, inputItems, \{ \.\.\.adapters, typeFilter: type \}\)/);
+    assert.ok(uiText("media.type.anime").trim());
+    assert.ok(uiText("media.type.manga").trim());
+    assert.ok(uiText("media.type.novel").trim());
     assert.match(stylesheet, /\.al-timeline-type-filter\.is-active/);
   });
 
@@ -836,44 +825,35 @@ describe("timeline modal and Traditional Chinese labels", () => {
     assert.doesNotMatch(mainSource, /showSection\("timeline"\)/);
   });
 
-  it("shows novel volume labels through the tracked timeline classes", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
+  it("preserves serial-entry labels and tracked timeline styling", () => {
     const stylesheet = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-    assert.match(legacySource, /al-timeline-volume-label/);
-    assert.match(legacySource, /aboveAxis = lane % 2 === 0/);
+    const entries = expandTimelineEntries([{
+      mediaType: "novel",
+      title: "Series",
+      filePath: "Media/Novel/Series.md",
+      completedAt: "",
+      volumeLog: [{ label: "2", completedAt: "2026-01-02" }],
+      unit: "volume",
+    }]);
+    assert.equal(entries[0]?.serialEntryLabel, "第 2 卷");
     assert.match(stylesheet, /\.al-timeline-volume-label/);
   });
 
-  it("reuses the same UI_TEXT keys for the same operation", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    assert.match(legacySource, /save\.textContent = uiText\("action\.save"\)/);
-    assert.match(legacySource, /createButton\.textContent = uiText\("action\.collect"\)/);
-    assert.match(legacySource, /appendIconLabel\(addButton, "plus", uiText\("action\.collect"\)\)/);
-    assert.match(mainSource, /id: "add-media", name: uiText\("action\.collect"\)/);
-    assert.ok((legacySource.match(/uiText\("action\.delete"\)/g) || []).length >= 3);
-    assert.ok((legacySource.match(/uiText\("action\.edit"\)/g) || []).length >= 2);
-    assert.match(legacySource, /button\.textContent = uiText\("action\.search"\)/);
-    assert.match(legacySource, /back\.textContent = uiText\("action\.back"\)/);
-    assert.doesNotMatch(legacySource, /保存這次整理|移除這卷|保存失敗|建立作品筆記|搜尋並收錄作品|整理這筆紀錄|移除作品/);
-  });
-
-  it("uses tracked status and timeline labels without restoring removed total fields", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.ok(UI_TEXT["media.status.ongoing"].trim());
-    assert.ok(UI_TEXT["media.status.planned"].trim());
-    assert.ok(UI_TEXT["library.timeline"].trim());
-    assert.match(legacySource, /appendIconLabel\(timelineButton, "timeline", uiText\("library\.timeline"\)\)/);
-    assert.doesNotMatch(legacySource, /日本原版最新話數|日本原版最新卷數|已追到最新/);
+  it("uses tracked action, status, and timeline labels", () => {
+    for (const key of [
+      "action.save", "action.collect", "action.delete", "action.edit", "action.search", "action.back",
+      "media.status.ongoing", "media.status.planned", "library.timeline",
+    ] as const) assert.ok(UI_TEXT[key].trim());
+    const catalog = Object.values(UI_TEXT).join("\n");
+    assert.doesNotMatch(catalog, /保存這次整理|移除這卷|保存失敗|建立作品筆記|搜尋並收錄作品|整理這筆紀錄|日本原版最新話數|日本原版最新卷數|已追到最新/);
   });
 });
 
-
 describe("Obsidian community review compliance", () => {
-  it("does not assign HTML strings directly", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    assert.doesNotMatch(legacySource, /\.innerHTML\s*=/);
-    assert.match(legacySource, /setIcon\(/);
+  it("uses safe DOM construction in the active UI boundary", () => {
+    const helpers = readFileSync(path.join(process.cwd(), "src/ui/ui-helpers.ts"), "utf8");
+    assert.doesNotMatch(helpers, /\.innerHTML\s*=/);
+    assert.match(helpers, /setIcon\(/);
   });
 
   it("preserves custom view placement during plugin unload", () => {
@@ -906,42 +886,6 @@ describe("Obsidian community review compliance", () => {
     assert.match(workflow, /attestations: write/);
     assert.match(workflow, /artifact-metadata: write/);
     assert.match(workflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/);
-  });
-});
-
-
-describe("Community review preflight", () => {
-  it("contains no blocking DOM, lifecycle, or settings-heading patterns", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    assert.doesNotMatch(legacySource, /\.innerHTML\s*=/);
-    assert.doesNotMatch(mainSource, /detachLeavesOfType\s*\(/);
-    assert.doesNotMatch(settingsSource, /setName\(["']AnimeList["']\)\.setHeading\(\)/);
-  });
-
-  it("uses paired, allowed compatibility lint scopes without forbidden suppressions", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const mainSource = readFileSync(path.join(process.cwd(), "src/main.ts"), "utf8");
-    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    const shimSource = readFileSync(path.join(process.cwd(), "types/obsidian.d.ts"), "utf8");
-    const cssSource = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
-    assert.match(legacySource, /eslint-disable[^\n]*@typescript-eslint\/no-unsafe-return/);
-    assert.match(legacySource, /eslint-enable[^\n]*@typescript-eslint\/no-unsafe-return/);
-    assert.doesNotMatch(mainSource, /eslint-disable[^\n]*@typescript-eslint\/no-unsafe-(?:member-access|assignment)/);
-    assert.doesNotMatch(legacySource, /eslint-disable[^\n]*obsidianmd\/prefer-create-el/);
-    assert.doesNotMatch(mainSource, /eslint-disable[^\n]*@typescript-eslint\/no-explicit-any/);
-    assert.doesNotMatch(settingsSource, /eslint-disable/);
-    assert.doesNotMatch(shimSource, /eslint-disable|\bany\b/);
-    assert.doesNotMatch(cssSource, /!important|stylelint-disable/);
-  });
-
-  it("uses Obsidian DOM helpers and declarative settings definitions", () => {
-    const legacySource = readFileSync(path.join(process.cwd(), "src/legacy.ts"), "utf8");
-    const settingsSource = readFileSync(path.join(process.cwd(), "src/settings.ts"), "utf8");
-    assert.doesNotMatch(legacySource, /document\.create(?:Element|DocumentFragment|TextNode)/);
-    assert.match(legacySource, /const node = createEl\(tag\)/);
-    assert.match(settingsSource, /getSettingDefinitions\(\): SettingDefinition\[\]/);
   });
 });
 
