@@ -556,6 +556,13 @@
 }
 
 /* BEGIN GENERATED FEATURE STYLES */
+/* Timeline cards preserve complete cover artwork instead of cropping it. */
+.al-timeline-card img {
+  object-fit: contain;
+  object-position: center;
+  background: var(--background-primary-alt, #202026);
+}
+
 /* Serial-reading UI overrides.
  * Kept separate from the established stylesheet so this feature branch remains
  * isolated and the production build can append the rules idempotently.
