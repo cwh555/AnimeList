@@ -1,18 +1,13 @@
 import { type Setting } from "obsidian";
+import { defineFeature, type AnimeListFeatureHost, type FeatureSettingsSection } from "./app/feature-types";
 import { SerialCoverMigrationModal } from "./serial-cover-migration-modal";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
 import type { SerialCoverPlugin } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
-import {
-  registerSettingsSectionExtension,
-  type SettingsSection,
-} from "./settings";
-
-const SETTINGS_EXTENSION_ID = "serial-cover";
 
 export function createSerialCoverSettingsSection(
   plugin: SerialCoverPlugin,
-): SettingsSection {
+): FeatureSettingsSection {
   return {
     heading: serialCoverText("settings.heading"),
     definitions: [{
@@ -24,9 +19,7 @@ export function createSerialCoverSettingsSection(
           input.setValue(plugin.settings.googleBooksApiKey ?? "");
           input.onChange(async (value) => {
             plugin.settings.googleBooksApiKey = value.trim();
-            configureSerialCoverProvider({
-              apiKey: plugin.settings.googleBooksApiKey,
-            });
+            configureSerialCoverProvider({ apiKey: plugin.settings.googleBooksApiKey });
             await plugin.saveSettings();
           });
         });
@@ -47,11 +40,13 @@ export function createSerialCoverSettingsSection(
   };
 }
 
-export function installSerialCoverSettings(
-  plugin: SerialCoverPlugin,
-): void {
-  registerSettingsSectionExtension(
-    SETTINGS_EXTENSION_ID,
-    () => createSerialCoverSettingsSection(plugin),
-  );
-}
+export const serialCoverSettingsFeature = defineFeature<AnimeListFeatureHost>({
+  id: "serial-cover-settings",
+  dependsOn: ["serial-entry-covers"],
+  contributions: [{
+    kind: "settings",
+    sections(host) {
+      return createSerialCoverSettingsSection(host);
+    },
+  }],
+});

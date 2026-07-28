@@ -1,8 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
-import { installReliableLibraryNavigation } from "./library-navigation";
-import "./search-pagination";
-import "./search-enhancements";
 import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
 import { searchFeatureText } from "./search-feature-text";
 import {
@@ -30,25 +27,13 @@ export interface AnimeListSettingsHost {
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+  getFeatureSettingsSections?(): SettingsSection[];
 }
 
 export interface SettingsSection {
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
-}
-
-export type SettingsSectionExtension = (
-  tab: AnimeListSettingTab,
-) => SettingsSection | SettingsSection[];
-
-const SETTINGS_SECTION_EXTENSIONS = new Map<string, SettingsSectionExtension>();
-
-export function registerSettingsSectionExtension(
-  id: string,
-  extension: SettingsSectionExtension,
-): void {
-  SETTINGS_SECTION_EXTENSIONS.set(id, extension);
 }
 
 function splitFolders(value: string): string[] {
@@ -65,7 +50,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
-    installReliableLibraryNavigation(plugin);
   }
 
   getSettingDefinitions(): SettingDefinition[] {
@@ -177,9 +161,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         definitions: base.slice(10),
       },
     ];
-    const extensions = [...SETTINGS_SECTION_EXTENSIONS.values()]
-      .flatMap((extension) => extension(this));
-    sections.splice(1, 0, ...extensions);
+    const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
+    sections.splice(1, 0, ...featureSections);
     return sections;
   }
 

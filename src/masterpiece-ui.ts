@@ -1,54 +1,27 @@
 import { Modal, Notice, Setting, TFile } from "obsidian";
-import type AnimeListPlugin from "./main";
-import { registerSettingsSectionExtension } from "./settings";
-import type { AnimeListSettingsHost, SettingsSection } from "./settings";
-import {
-  legacyLibraryRenderer,
-  type LibraryRenderAdapters,
-} from "./legacy-library-renderer";
+import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import type { MediaItem } from "./types";
 import {
   collectMasterpieceLabels,
+  groupMasterpieceItems,
   labelsForMasterpieceEnable,
+  matchesSpecialLabelFilter,
   normalizeMasterpieceLabel,
   normalizeMasterpieceLabels,
   normalizeSpecialLabelMode,
-  matchesSpecialLabelFilter,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
+  type SpecialLabelMode,
 } from "./masterpiece-labels";
-import type { SpecialLabelMode } from "./masterpiece-labels";
-import { masterpieceFeatureText, specialLabelName } from "./masterpiece-feature-text";
-
-interface MasterpieceSettings {
-  specialLabelMode?: SpecialLabelMode;
-}
+import { masterpieceActionText, masterpieceFeatureText, specialLabelName } from "./masterpiece-feature-text";
+import type { LibraryRenderAdapters, LibraryRenderContext } from "./ui/library-contracts";
+import type { MediaFormContext } from "./ui/media-form-contracts";
 
 interface MediaItemWithMasterpiece extends MediaItem {
   masterpieceLabels?: string[];
 }
 
-interface MasterpiecePlugin extends AnimeListSettingsHost {
-  settings: AnimeListSettingsHost["settings"] & MasterpieceSettings;
-  collectMediaItems: (source?: string) => MediaItem[];
-  setFavorite: (path: string, next: boolean) => Promise<void>;
-  getScanFolders: () => string[];
-}
-
-const installedPlugins = new WeakSet<object>();
-const installedRenderers = new WeakSet<object>();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isMediaItem(value: unknown): value is MediaItem {
-  return isRecord(value)
-    && typeof value.filePath === "string"
-    && typeof value.title === "string";
-}
-
-function modeOf(plugin: MasterpiecePlugin): SpecialLabelMode {
+function modeOf(plugin: AnimeListFeatureHost): SpecialLabelMode {
   return normalizeSpecialLabelMode(plugin.settings.specialLabelMode);
 }
 
@@ -63,15 +36,8 @@ function labelsFromFrontmatter(frontmatter: Record<string, unknown> | undefined)
     : labels;
 }
 
-function runUiAction(action: Promise<void>): void {
-  void action.catch((error: unknown) => {
-    console.error("AnimeList masterpiece update failed", error);
-    new Notice(masterpieceFeatureText("notice.failed"));
-  });
-}
-
 async function writeState(
-  plugin: MasterpiecePlugin,
+  plugin: AnimeListFeatureHost,
   path: string,
   favorite: boolean,
   labels: string[],
@@ -88,7 +54,7 @@ async function writeState(
   plugin.refreshViews();
 }
 
-function categoryNames(plugin: MasterpiecePlugin): string[] {
+function categoryNames(plugin: AnimeListFeatureHost): string[] {
   return collectMasterpieceLabels(plugin.collectMediaItems().map((item) => ({
     favorite: item.favorite,
     masterpieceLabels: labelsOf(item),
@@ -96,24 +62,21 @@ function categoryNames(plugin: MasterpiecePlugin): string[] {
 }
 
 class MasterpieceSelectionModal extends Modal {
-  private readonly plugin: MasterpiecePlugin;
-  private readonly path: string;
   private readonly selected: Set<string>;
 
   constructor(
-    plugin: MasterpiecePlugin,
-    path: string,
+    private readonly plugin: AnimeListFeatureHost,
+    private readonly path: string,
     favorite: boolean,
     labels: string[],
+    private readonly onSaved?: (favorite: boolean, labels: string[]) => void,
   ) {
     super(plugin.app);
-    this.plugin = plugin;
-    this.path = path;
     this.selected = new Set(favorite ? labelsForMasterpieceEnable(labels) : labels);
   }
 
   onOpen(): void {
-    this.modalEl.addClass("animelist-modal");
+    this.modalEl.addClass("animelist-modal", "al-masterpiece-selection-modal");
     this.contentEl.empty();
     this.contentEl.createEl("h2", { text: masterpieceFeatureText("modal.title") });
     this.contentEl.createEl("p", { text: masterpieceFeatureText("modal.description") });
@@ -138,23 +101,9 @@ class MasterpieceSelectionModal extends Modal {
       .setName(masterpieceFeatureText("modal.newLabel"))
       .addText((text) => text
         .setPlaceholder(masterpieceFeatureText("modal.newLabelPlaceholder"))
-        .onChange((value: string) => {
-          newLabel = normalizeMasterpieceLabel(value);
-        }));
+        .onChange((value: string) => { newLabel = normalizeMasterpieceLabel(value); }));
 
     const actions = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const remove = actions.createEl("button", {
-      cls: "al-delete-button",
-      text: masterpieceFeatureText("modal.remove"),
-    });
-    remove.type = "button";
-    remove.addEventListener("click", () => {
-      runUiAction(writeState(this.plugin, this.path, false, []).then(() => {
-        new Notice(masterpieceFeatureText("notice.removed"));
-        this.close();
-      }));
-    });
-
     const save = actions.createEl("button", {
       cls: "mod-cta",
       text: masterpieceFeatureText("modal.save"),
@@ -163,142 +112,229 @@ class MasterpieceSelectionModal extends Modal {
     save.addEventListener("click", () => {
       if (newLabel) this.selected.add(newLabel);
       const state = stateAfterMasterpieceSelection([...this.selected]);
-      runUiAction(writeState(
-        this.plugin,
-        this.path,
-        state.favorite,
-        state.masterpieceLabels,
-      ).then(() => {
-        new Notice(masterpieceFeatureText("notice.saved"));
-        this.close();
-      }));
+      save.disabled = true;
+      void writeState(this.plugin, this.path, state.favorite, state.masterpieceLabels)
+        .then(() => {
+          this.onSaved?.(state.favorite, state.masterpieceLabels);
+          new Notice(masterpieceFeatureText("notice.saved"));
+          this.close();
+        })
+        .catch((error: unknown) => {
+          console.error("AnimeList masterpiece update failed", error);
+          new Notice(masterpieceFeatureText("notice.failed"));
+          save.disabled = false;
+        });
     });
   }
 }
 
-function installSettingsIntegration(plugin: MasterpiecePlugin): void {
-  registerSettingsSectionExtension("masterpiece-mode", (tab): SettingsSection => {
-    const host = tab.plugin as unknown as MasterpiecePlugin;
-    return {
-      heading: masterpieceFeatureText("settings.heading"),
-      definitions: [{
-        name: masterpieceFeatureText("settings.mode.name"),
-        desc: masterpieceFeatureText("settings.mode.desc"),
-        render: (setting) => {
-          setting.addDropdown((dropdown) => dropdown
-            .addOption("favorite", masterpieceFeatureText("settings.mode.favorite"))
-            .addOption("masterpiece", masterpieceFeatureText("settings.mode.masterpiece"))
-            .setValue(modeOf(host))
-            .onChange(async (value: string) => {
-              host.settings.specialLabelMode = normalizeSpecialLabelMode(value);
-              await host.saveSettings();
-              host.refreshViews();
-              tab.display();
-            }));
-        },
-      }],
-    };
-  });
-  void plugin;
+function itemForCard(items: MediaItem[], card: HTMLElement): MediaItem | undefined {
+  const path = card.dataset.path;
+  if (path) return items.find((item) => item.filePath === path);
+  const title = card.querySelector(".al-card-title")?.textContent ?? "";
+  const original = card.querySelector(".al-original-title")?.textContent ?? "";
+  return items.find((item) => item.title === title && (item.originalTitle ?? "") === original);
 }
 
-function installPluginAdapters(plugin: MasterpiecePlugin): void {
-  const originalCollect = plugin.collectMediaItems;
-  plugin.collectMediaItems = (source?: string): MediaItem[] => originalCollect(source).map((item) => {
-    const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
-    const frontmatter = file instanceof TFile
-      ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
-      : undefined;
-    const extended: MediaItemWithMasterpiece = {
-      ...item,
-      masterpieceLabels: labelsFromFrontmatter(frontmatter),
-    };
-    return extended;
+function bindClonedCard(card: HTMLElement, item: MediaItem, adapters: LibraryRenderAdapters): void {
+  card.dataset.path = item.filePath;
+  card.addEventListener("click", () => adapters.openFile?.(item.filePath));
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    adapters.openFile?.(item.filePath);
   });
-
-  const originalFavorite = plugin.setFavorite;
-  plugin.setFavorite = async (path: string, next: boolean): Promise<void> => {
-    const file = plugin.app.vault.getAbstractFileByPath(path);
-    const frontmatter = file instanceof TFile
-      ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
-      : undefined;
-    const labels = labelsFromFrontmatter(frontmatter);
-    const favorite = frontmatter?.favorite === true;
-    if (modeOf(plugin) === "masterpiece") {
-      new MasterpieceSelectionModal(plugin, path, favorite, labels).open();
-      return;
-    }
-    if (next) {
-      await originalFavorite(path, true);
-      return;
-    }
-    const state = stateAfterFavoriteChange(labels, false);
-    await writeState(plugin, path, state.favorite, state.masterpieceLabels);
-  };
+  card.querySelector<HTMLButtonElement>(".al-favorite-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void Promise.resolve(adapters.toggleFavorite?.(item.filePath, !item.favorite));
+  });
+  card.querySelector<HTMLButtonElement>(".al-edit-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    adapters.editItem?.(item.filePath);
+  });
 }
 
-function installRenderer(plugin: MasterpiecePlugin): void {
-  if (installedRenderers.has(legacyLibraryRenderer)) return;
-  installedRenderers.add(legacyLibraryRenderer);
-  const original = legacyLibraryRenderer.renderLibrary;
+function decorateCards(context: LibraryRenderContext<AnimeListFeatureHost>): void {
+  const mode = modeOf(context.host);
+  context.container.querySelectorAll<HTMLElement>(".al-card").forEach((card) => {
+    card.querySelectorAll(".al-masterpiece-tag").forEach((tag) => tag.remove());
+    const item = itemForCard(context.items, card);
+    if (!item) return;
+    card.dataset.path = item.filePath;
+    const favoriteButton = card.querySelector<HTMLElement>(".al-favorite-button");
+    if (favoriteButton && mode === "masterpiece") {
+      favoriteButton.title = item.favorite
+        ? masterpieceFeatureText("library.editMasterpiece")
+        : masterpieceFeatureText("library.addMasterpiece");
+      favoriteButton.setAttribute("aria-label", favoriteButton.title);
+    }
+    if (mode !== "masterpiece" || !item.favorite) return;
+    let tags = card.querySelector<HTMLElement>(".al-tags");
+    if (!tags) {
+      tags = card.createDiv({ cls: "al-tags" });
+      card.querySelector(".al-progress")?.before(tags);
+    }
+    for (const label of labelsForMasterpieceEnable(labelsOf(item))) {
+      tags.createSpan({ cls: "al-tag al-masterpiece-tag", text: label });
+    }
+  });
+}
 
-  legacyLibraryRenderer.renderLibrary = (
-    container: HTMLElement,
-    inputItems: unknown[],
-    adapters: LibraryRenderAdapters = {},
-  ): void => {
-    const upstreamExtraFilters = adapters.extraStatusFilters;
-    const upstreamMatcher = adapters.matchesStatusFilter;
-    const forwardedAdapters: LibraryRenderAdapters = {
-      ...adapters,
-      extraStatusFilters: (type: string): Array<[string, string]> => [
-        ...(upstreamExtraFilters?.(type) ?? []),
-        ["favorite", specialLabelName(modeOf(plugin))],
-      ],
-      matchesStatusFilter: (item: unknown, filter: string): boolean | undefined => {
-        const specialMatch = matchesSpecialLabelFilter(item, filter);
-        if (typeof specialMatch === "boolean") return specialMatch;
-        return upstreamMatcher?.(item, filter);
-      },
-    };
-    original(container, inputItems, forwardedAdapters);
+function renderGroups(context: LibraryRenderContext<AnimeListFeatureHost>): void {
+  if (modeOf(context.host) !== "masterpiece" || context.state?.status !== "favorite") return;
+  const root = context.container.querySelector<HTMLElement>(".al-grid");
+  if (!root) return;
+  const cards = [...root.querySelectorAll<HTMLElement>(":scope > .al-card")];
+  if (!cards.length) return;
+  const entries = cards.flatMap((card) => {
+    const item = itemForCard(context.items, card);
+    return item ? [{ ...item, card }] : [];
+  });
+  const groups = groupMasterpieceItems(entries);
+  if (!groups.length) return;
 
-    const items = inputItems.filter(isMediaItem);
-    const byPath = new Map(items.map((item) => [item.filePath, item]));
-    const cards = container.querySelectorAll<HTMLElement>(".al-card");
-    cards.forEach((card) => {
-      const path = card.dataset.path ?? card.getAttribute("data-path") ?? "";
-      const item = byPath.get(path) ?? items.find((candidate) => (
-        candidate.title === card.querySelector(".al-card-title")?.textContent
-      ));
-      if (!item) return;
-      const favoriteButton = card.querySelector<HTMLElement>(".al-favorite-button");
-      if (favoriteButton && modeOf(plugin) === "masterpiece") {
-        favoriteButton.title = item.favorite
-          ? masterpieceFeatureText("library.editMasterpiece")
-          : masterpieceFeatureText("library.addMasterpiece");
-        favoriteButton.setAttribute("aria-label", favoriteButton.title);
-      }
-      if (modeOf(plugin) !== "masterpiece" || !item.favorite) return;
-      const labels = labelsForMasterpieceEnable(labelsOf(item));
-      let tags = card.querySelector<HTMLElement>(".al-tags");
-      if (!tags) {
-        tags = card.createDiv({ cls: "al-tags" });
-        card.querySelector(".al-progress")?.before(tags);
-      }
-      for (const label of labels) {
-        tags.createSpan({ cls: "al-tag al-masterpiece-tag", text: label });
-      }
+  root.className = "al-masterpiece-groups";
+  root.replaceChildren();
+  const used = new Set<string>();
+  for (const group of groups) {
+    const section = root.createEl("section", { cls: "al-masterpiece-group" });
+    section.dataset.groupKey = group.key;
+    const heading = section.createDiv({ cls: "al-masterpiece-group-heading" });
+    heading.createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
+    heading.createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
+    const grid = section.createDiv({
+      cls: `al-grid is-${context.state?.view ?? "grid"} al-masterpiece-group-grid`,
     });
-  };
+    for (const entry of group.items) {
+      let card = entry.card;
+      if (used.has(entry.filePath)) {
+        const cloned = entry.card.cloneNode(true);
+        if (cloned.nodeType !== Node.ELEMENT_NODE) continue;
+        card = cloned as HTMLElement;
+        bindClonedCard(card, entry, context.adapters);
+      } else {
+        used.add(entry.filePath);
+      }
+      grid.appendChild(card);
+    }
+  }
 }
 
-export async function installMasterpieceLabels(plugin: AnimeListPlugin): Promise<void> {
-  if (installedPlugins.has(plugin)) return;
-  installedPlugins.add(plugin);
-  const host = plugin as unknown as MasterpiecePlugin;
-  host.settings.specialLabelMode = normalizeSpecialLabelMode(host.settings.specialLabelMode);
-  installSettingsIntegration(host);
-  installPluginAdapters(host);
-  installRenderer(host);
+function configureEditControl(context: MediaFormContext<AnimeListFeatureHost>): void {
+  if (context.mode !== "edit" || !context.file || modeOf(context.host) !== "masterpiece") return;
+  const row = context.fields.favorite.closest<HTMLElement>(".al-form-checkbox");
+  if (!row) return;
+  row.hidden = true;
+  const button = createEl("button", { cls: "al-secondary-button al-masterpiece-edit-control" });
+  button.type = "button";
+  const update = (): void => {
+    const favorite = context.fields.favorite.checked;
+    button.replaceChildren();
+    button.createSpan({ text: masterpieceActionText(favorite) });
+    button.setAttribute("aria-label", masterpieceActionText(favorite));
+  };
+  update();
+  button.addEventListener("click", () => {
+    const labels = labelsFromFrontmatter(context.frontmatter);
+    new MasterpieceSelectionModal(
+      context.host,
+      context.file?.path ?? "",
+      context.fields.favorite.checked,
+      labels,
+      (favorite) => {
+        context.fields.favorite.checked = favorite;
+        update();
+      },
+    ).open();
+  });
+  row.insertAdjacentElement("afterend", button);
 }
+
+export const masterpieceFeature = defineFeature<AnimeListFeatureHost>({
+  id: "masterpiece",
+  contributions: [{
+    kind: "lifecycle",
+    activate(plugin): void {
+      plugin.settings.specialLabelMode = normalizeSpecialLabelMode(plugin.settings.specialLabelMode);
+    },
+  }, {
+    kind: "media-item",
+    decorate(item, plugin): MediaItem {
+      const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
+      const frontmatter = file instanceof TFile
+        ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
+        : undefined;
+      return { ...item, masterpieceLabels: labelsFromFrontmatter(frontmatter) } as MediaItem;
+    },
+  }, {
+    kind: "library",
+    prepareAdapters(adapters, { host }): LibraryRenderAdapters {
+      const upstreamExtraFilters = adapters.extraStatusFilters;
+      const upstreamMatcher = adapters.matchesStatusFilter;
+      return {
+        ...adapters,
+        extraStatusFilters: (type) => [
+          ...(upstreamExtraFilters?.(type) ?? []),
+          ["favorite", specialLabelName(modeOf(host))],
+        ],
+        matchesStatusFilter: (item, filter) => {
+          const special = matchesSpecialLabelFilter(item, filter);
+          return typeof special === "boolean" ? special : upstreamMatcher?.(item, filter);
+        },
+      };
+    },
+    afterRender(context): void {
+      decorateCards(context);
+      renderGroups(context);
+    },
+  }, {
+    kind: "favorite",
+    async handle({ host, path, next }): Promise<boolean> {
+      const file = host.app.vault.getAbstractFileByPath(path);
+      const frontmatter = file instanceof TFile
+        ? host.app.metadataCache.getFileCache(file)?.frontmatter
+        : undefined;
+      const labels = labelsFromFrontmatter(frontmatter);
+      const favorite = frontmatter?.favorite === true;
+      if (modeOf(host) === "masterpiece") {
+        new MasterpieceSelectionModal(host, path, favorite, labels).open();
+        return true;
+      }
+      if (next) {
+        await host.setFavoriteDirect(path, true);
+        return true;
+      }
+      const state = stateAfterFavoriteChange(labels, false);
+      await writeState(host, path, state.favorite, state.masterpieceLabels);
+      new Notice(masterpieceFeatureText("notice.removed"));
+      return true;
+    },
+  }, {
+    kind: "media-form",
+    configure: configureEditControl,
+  }, {
+    kind: "settings",
+    sections(plugin) {
+      return {
+        heading: masterpieceFeatureText("settings.heading"),
+        definitions: [{
+          name: masterpieceFeatureText("settings.mode.name"),
+          desc: masterpieceFeatureText("settings.mode.desc"),
+          render: (setting) => {
+            setting.addDropdown((dropdown) => dropdown
+              .addOption("favorite", masterpieceFeatureText("settings.mode.favorite"))
+              .addOption("masterpiece", masterpieceFeatureText("settings.mode.masterpiece"))
+              .setValue(modeOf(plugin))
+              .onChange(async (value: string) => {
+                plugin.settings.specialLabelMode = normalizeSpecialLabelMode(value);
+                await plugin.saveSettings();
+                plugin.refreshViews();
+              }));
+          },
+        }],
+      };
+    },
+  }],
+});

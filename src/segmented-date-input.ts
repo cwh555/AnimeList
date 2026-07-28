@@ -8,6 +8,12 @@ export interface SegmentedDateInputElement extends HTMLDivElement {
   required: boolean;
 }
 
+export const SEGMENTED_DATE_PARTS = {
+  year: { length: 4, placeholder: "YYYY" },
+  month: { length: 2, placeholder: "MM" },
+  day: { length: 2, placeholder: "DD" },
+} as const;
+
 export function normalizeDateParts(year: string, month: string, day: string): string {
   if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || !/^\d{2}$/.test(day)) return "";
   const yearNumber = Number(year);
@@ -51,9 +57,9 @@ export function createSegmentedDateInput(value = ""): SegmentedDateInputElement 
   const root = createDiv({ cls: "al-date-input" }) as SegmentedDateInputElement;
   root.setAttribute("role", "group");
 
-  const year = dateSegment(4, "YYYY", uiText("date.year"));
-  const month = dateSegment(2, "MM", uiText("date.month"));
-  const day = dateSegment(2, "DD", uiText("date.day"));
+  const year = dateSegment(SEGMENTED_DATE_PARTS.year.length, SEGMENTED_DATE_PARTS.year.placeholder, uiText("date.year"));
+  const month = dateSegment(SEGMENTED_DATE_PARTS.month.length, SEGMENTED_DATE_PARTS.month.placeholder, uiText("date.month"));
+  const day = dateSegment(SEGMENTED_DATE_PARTS.day.length, SEGMENTED_DATE_PARTS.day.placeholder, uiText("date.day"));
   year.className = "al-date-year";
   month.className = "al-date-month";
   day.className = "al-date-day";
@@ -113,9 +119,9 @@ export function createSegmentedDateInput(value = ""): SegmentedDateInputElement 
     });
   };
 
-  bindSegment(year, 4, month);
-  bindSegment(month, 2, day);
-  bindSegment(day, 2);
+  bindSegment(year, SEGMENTED_DATE_PARTS.year.length, month);
+  bindSegment(month, SEGMENTED_DATE_PARTS.month.length, day);
+  bindSegment(day, SEGMENTED_DATE_PARTS.day.length);
   root.addEventListener("focusout", (event) => {
     if (!root.contains(event.relatedTarget as Node | null)) emit("change");
   });

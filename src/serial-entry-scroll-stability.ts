@@ -1,5 +1,3 @@
-import type AnimeListPlugin from "./main";
-
 export interface ScrollPositionSnapshot {
   restore(): void;
 }
@@ -10,18 +8,9 @@ interface ElementScrollPosition {
   top: number;
 }
 
-function isElement(value: unknown): value is Element {
-  return typeof value === "object"
-    && value !== null
-    && "closest" in value
-    && typeof Reflect.get(value, "closest") === "function";
-}
-
 /**
  * Capture every scroll container that can be affected when an editor rebuilds
- * its rows. The returned restore operation is intentionally idempotent because
- * Obsidian and the legacy fallback may finish their DOM work in different
- * microtask or animation-frame phases.
+ * its rows. The returned restore operation is intentionally idempotent because Obsidian may finish modal layout in different microtask or animation-frame phases.
  */
 export function captureScrollPosition(anchor: HTMLElement): ScrollPositionSnapshot {
   const elements: HTMLElement[] = [];
@@ -68,7 +57,10 @@ export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElemen
   ) ?? null;
 }
 
-function scheduleStableFocus(editor: HTMLElement, snapshot: ScrollPositionSnapshot): void {
+export function scheduleStableSerialEntryFocus(
+  editor: HTMLElement,
+  snapshot: ScrollPositionSnapshot,
+): void {
   let focused = false;
   const stabilize = (): void => {
     if (!editor.isConnected) return;
@@ -90,24 +82,3 @@ function scheduleStableFocus(editor: HTMLElement, snapshot: ScrollPositionSnapsh
   }
 }
 
-/**
- * Stabilize both the current progress-unit editor and the legacy novel editor.
- * The capture listener runs before their existing click handlers rebuild rows
- * or request smooth scrolling; restoration happens before paint and again after
- * the legacy double-requestAnimationFrame reveal path.
- */
-export function installSerialEntryScrollStability(plugin: AnimeListPlugin): void {
-  const handleAddClick = (event: MouseEvent): void => {
-    if (!isElement(event.target)) return;
-    const button = event.target.closest<HTMLButtonElement>(
-      ".al-progress-unit-editor > .al-secondary-button, "
-      + ".al-volume-editor-header > .al-secondary-button",
-    );
-    const editor = button?.closest<HTMLElement>(".al-volume-editor");
-    if (!button || !editor) return;
-    scheduleStableFocus(editor, captureScrollPosition(editor));
-  };
-
-  document.addEventListener("click", handleAddClick, true);
-  plugin.register(() => document.removeEventListener("click", handleAddClick, true));
-}
