@@ -123,13 +123,17 @@ function renderEditor(state: ReadingProgressEditorState): void {
     const startedAt = createSegmentedDateInput(entry.startedAt);
     fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
 
-    const completedAt = createSegmentedDateInput(entry.completedAt || todayString());
+    const completedAt = createSegmentedDateInput(entry.completedAt || todayString(), {
+      completionTarget: add,
+    });
     entry.completedAt = completedAt.value;
-    fields.appendChild(makeField(
+    const completedAtField = makeField(
       progressUnitFeatureText("completedAt"),
       completedAt,
       progressUnitFeatureText("completedHint"),
-    ));
+    );
+    completedAtField.dataset.serialField = "completed-at";
+    fields.appendChild(completedAtField);
 
     const actions = row.createDiv({ cls: "al-volume-row-actions" });
     const remove = actions.createEl("button", {

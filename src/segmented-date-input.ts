@@ -8,6 +8,12 @@ export interface SegmentedDateInputElement extends HTMLDivElement {
   required: boolean;
 }
 
+export type SegmentedDateCompletionTarget = HTMLElement | (() => HTMLElement | null);
+
+export interface SegmentedDateInputOptions {
+  completionTarget?: SegmentedDateCompletionTarget;
+}
+
 export const SEGMENTED_DATE_PARTS = {
   year: { length: 4, placeholder: "YYYY" },
   month: { length: 2, placeholder: "MM" },
@@ -38,6 +44,19 @@ function focusNextFormControl(control: HTMLElement): void {
   controls[index + 1]?.focus();
 }
 
+export function focusSegmentedDateCompletion(
+  source: HTMLElement,
+  completionTarget: SegmentedDateCompletionTarget | undefined,
+  fallback: (control: HTMLElement) => void = focusNextFormControl,
+): void {
+  const target = typeof completionTarget === "function" ? completionTarget() : completionTarget;
+  if (target && !target.hasAttribute("disabled")) {
+    target.focus();
+    return;
+  }
+  fallback(source);
+}
+
 function dateSegment(length: number, placeholder: string, label: string): HTMLInputElement {
   const input = createEl("input");
   input.type = "text";
@@ -53,7 +72,10 @@ function dateSeparator(): HTMLSpanElement {
   return createSpan({ cls: "al-date-separator", text: "-" });
 }
 
-export function createSegmentedDateInput(value = ""): SegmentedDateInputElement {
+export function createSegmentedDateInput(
+  value = "",
+  options: SegmentedDateInputOptions = {},
+): SegmentedDateInputElement {
   const root = createDiv({ cls: "al-date-input" }) as SegmentedDateInputElement;
   root.setAttribute("role", "group");
 
@@ -104,7 +126,7 @@ export function createSegmentedDateInput(value = ""): SegmentedDateInputElement 
         nextInput.focus();
         nextInput.select();
       } else {
-        focusNextFormControl(input);
+        focusSegmentedDateCompletion(input, options.completionTarget);
       }
     });
     input.addEventListener("change", (event) => event.stopPropagation());

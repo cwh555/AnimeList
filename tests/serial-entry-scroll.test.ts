@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   captureScrollPosition,
-  findNewestSerialLabelInput,
+  findNewestSerialCompletedYearInput,
   scheduleStableSerialEntryFocus,
 } from "../src/serial-entry-scroll-stability";
 
@@ -63,9 +63,9 @@ describe("serial entry scroll stability", () => {
     assert.equal(view.scrollY, 73);
   });
 
-  it("selects the unit input from the newest row, not a segmented date input", () => {
-    const previousInput = { value: "1" } as HTMLInputElement;
-    const newestInput = { value: "2" } as HTMLInputElement;
+  it("selects the completed-date year from the newest serial row", () => {
+    const previousInput = { value: "2025" } as HTMLInputElement;
+    const newestInput = { value: "2026" } as HTMLInputElement;
     const previousRow = {
       querySelector: () => previousInput,
     } as unknown as HTMLElement;
@@ -73,7 +73,7 @@ describe("serial entry scroll stability", () => {
       querySelector: (selector: string) => {
         assert.equal(
           selector,
-          ".al-volume-row-fields > .al-form-field:first-child > input",
+          '.al-volume-row-fields > .al-form-field[data-serial-field="completed-at"] .al-date-year',
         );
         return newestInput;
       },
@@ -84,9 +84,9 @@ describe("serial entry scroll stability", () => {
       querySelectorAll: () => rows,
     } as unknown as HTMLElement;
 
-    assert.equal(findNewestSerialLabelInput(editor), newestInput);
+    assert.equal(findNewestSerialCompletedYearInput(editor), newestInput);
   });
-  it("restores the viewport while focusing the newly added serial label", async () => {
+  it("restores the viewport while focusing the newly added completed-date year", async () => {
     let restoreCount = 0;
     let focusCount = 0;
     let selectCount = 0;
