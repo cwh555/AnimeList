@@ -60,7 +60,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/plugin-workflows.test.ts", kind: "test", suite: "contract", features: ["timeline", "library"] },
   { path: "tests/contracts/settings-compatibility.test.ts", kind: "test", suite: "contract", features: ["settings", "search", "masterpiece"] },
   { path: "tests/contracts/special-label-state-service.test.ts", kind: "test", suite: "contract", features: ["masterpiece", "library"] },
-  { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release"] },
+  { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release", "timeline"] },
   { path: "tests/contracts/text-catalog.test.ts", kind: "test", suite: "contract", features: ["text", "settings"] },
   { path: "tests/contracts/test-catalog.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "scripts/check-architecture.mjs", kind: "script", suite: "contract", features: ["test-infrastructure"] },

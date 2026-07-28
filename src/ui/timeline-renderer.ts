@@ -8,6 +8,15 @@ import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 
 const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
 
+export const TIMELINE_CARD_GEOMETRY = Object.freeze({
+  width: 120,
+  coverHeight: 180,
+  cardHeight: 242,
+  gapX: 16,
+  gapY: 18,
+  stemGap: 44,
+});
+
 export const TIMELINE_MEDIA_FILTERS: readonly LibraryMediaFilter[] = [
   "all",
   "anime",
@@ -95,11 +104,11 @@ export const TimelineUI = (() => {
   const MAX_DAY_SPACING = MAX_TIMELINE_DAY_SPACING;
   const MIN_VIEW_SCALE = MIN_TIMELINE_VIEW_SCALE;
   const MAX_VIEW_SCALE = MAX_TIMELINE_VIEW_SCALE;
-  const CARD_WIDTH = 120;
-  const CARD_HEIGHT = 146;
-  const CARD_GAP_X = 16;
-  const CARD_GAP_Y = 18;
-  const STEM_GAP = 44;
+  const CARD_WIDTH = TIMELINE_CARD_GEOMETRY.width;
+  const CARD_HEIGHT = TIMELINE_CARD_GEOMETRY.cardHeight;
+  const CARD_GAP_X = TIMELINE_CARD_GEOMETRY.gapX;
+  const CARD_GAP_Y = TIMELINE_CARD_GEOMETRY.gapY;
+  const STEM_GAP = TIMELINE_CARD_GEOMETRY.stemGap;
   const SCENE_PADDING_Y = 56;
   const dayStart = (value: unknown): number => {
     const time = parseDateValue(value);

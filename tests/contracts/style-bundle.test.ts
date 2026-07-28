@@ -19,5 +19,16 @@ describe("stylesheet bundle contract", () => {
     assert.deepEqual(after, before);
     assert.equal(generated.match(new RegExp(GENERATED_STYLE_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length, 1);
     assert.equal(generated.match(new RegExp(GENERATED_STYLE_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length, 1);
+    const timelineCardRules = [...generated.matchAll(/\.al-timeline-card\s*\{([^}]*)\}/g)];
+    const finalTimelineCardRule = timelineCardRules.at(-1)?.[1] ?? "";
+    assert.match(finalTimelineCardRule, /height:\s*242px/);
+
+    const timelineImageRules = [...generated.matchAll(/\.al-timeline-card img\s*\{([^}]*)\}/g)];
+    const finalTimelineImageRule = timelineImageRules.at(-1)?.[1] ?? "";
+    assert.match(finalTimelineImageRule, /width:\s*100%/);
+    assert.match(finalTimelineImageRule, /height:\s*180px/);
+    assert.match(finalTimelineImageRule, /object-fit:\s*contain/);
+    assert.match(finalTimelineImageRule, /object-position:\s*center/);
+    assert.match(finalTimelineImageRule, /background:\s*var\(--background-primary-alt/);
   });
 });
