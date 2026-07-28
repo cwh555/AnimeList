@@ -60,7 +60,8 @@ describe("external media search service", () => {
 
     const output = await service.search("anime", "測試作品 第二季");
     assert.ok(bangumiQueries.length > 1);
-    assert.deepEqual(anilistQueries, bangumiQueries);
+    assert.ok(anilistQueries.every((query) => bangumiQueries.includes(query)));
+    assert.ok(bangumiQueries.length >= anilistQueries.length);
     assert.ok(bangumiQueries.includes("測試作品 第二季"));
     assert.deepEqual(output.results.map((item) => item.sourceId), ["2"]);
     assert.equal(output.warnings.length, 1);

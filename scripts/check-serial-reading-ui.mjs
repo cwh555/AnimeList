@@ -57,17 +57,12 @@ assert.match(progressStyles, /\.al-detail-progress/);
 assert.match(progressStyles, /\.al-detail-actions\.has-detail-progress/);
 assert.doesNotMatch(progressStyles, /:has\(/);
 
-assert.match(progressEditorSource, /\.al-volume-editor:not\(\.al-progress-unit-editor\)/);
-assert.match(progressEditorSource, /originalEditor\) => originalEditor\.remove\(\)/);
-assert.doesNotMatch(progressEditorSource, /originalEditor\.hidden/);
-assert.match(progressEditorSource, /\.al-modal-actions > button\.mod-cta/);
-assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.startedAt\)/);
-assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.completedAt \|\| todayString\(\)\)/);
-assert.doesNotMatch(progressEditorSource, /\.type\s*=\s*"date"/);
-assert.match(segmentedDateSource, /createDiv\(\{ cls: "al-date-input" \}\)/);
-assert.match(segmentedDateSource, /bindSegment\(year, 4, month\)/);
-assert.match(segmentedDateSource, /bindSegment\(month, 2, day\)/);
-assert.match(segmentedDateSource, /bindSegment\(day, 2\)/);
+assert.match(progressEditorSource, /READING_EDITOR_STATE_KEY/);
+assert.match(progressEditorSource, /captureScrollPosition\(state\.editor\)/);
+assert.match(progressEditorSource, /scheduleStableSerialEntryFocus\(state\.editor, snapshot\)/);
+assert.doesNotMatch(progressEditorSource, /MutationObserver|Modal\.prototype|processFrontMatter\s*=/);
+assert.match(segmentedDateSource, /SEGMENTED_DATE_PARTS/);
+assert.doesNotMatch(segmentedDateSource, /type\s*=\s*"date"/);
 
 // The whole candidate card is the only action. There is no Select affordance or
 // secondary Apply button/state; clicking a card downloads, commits, and closes.

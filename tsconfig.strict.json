@@ -7,13 +7,7 @@
     "noUnusedParameters": true
   },
   "include": [
-    "src/app/**/*.ts",
-    "src/domain/**/*.ts",
-    "src/data/**/*.ts",
-    "src/i18n/**/*.ts",
-    "src/ui/**/*.ts",
-    "src/settings-model.ts",
-    "src/settings-store.ts",
+    "src/**/*.ts",
     "types/**/*.d.ts"
   ]
 }

@@ -10,7 +10,7 @@ interface TestLeaf {
   setViewState(state: { type: string; active: boolean }): Promise<void>;
 }
 
-function adapter(overrides: Partial<LibraryNavigationAdapter> = {}) {
+function adapter(overrides: Partial<LibraryNavigationAdapter<TestLeaf>> = {}) {
   const events: string[] = [];
   const leaf: TestLeaf = {
     view: {
@@ -22,10 +22,15 @@ function adapter(overrides: Partial<LibraryNavigationAdapter> = {}) {
       events.push(`activate:${state.type}:${state.active}`);
     },
   };
-  const value: LibraryNavigationAdapter = {
+  const value: LibraryNavigationAdapter<TestLeaf> = {
     findLeaves: () => [],
     createLeaf: () => leaf,
+    activateLeaf: (target) => target.setViewState({ type: "animelist-library", active: true }),
     revealLeaf: () => events.push("reveal"),
+    showLibrary: async (target) => {
+      if (!target.view) throw new Error("The AnimeList library view was not available after activation.");
+      await target.view.showSection("library");
+    },
     initializeLibrary: async () => { events.push("initialize"); },
     reportOpenFailure: (error) => events.push(`open-failure:${String(error)}`),
     reportSetupFailure: (error) => events.push(`setup-failure:${String(error)}`),

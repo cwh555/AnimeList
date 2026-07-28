@@ -13,8 +13,8 @@ import { normalizeMediaStatus } from "../media-status";
 import {
   normalizeProgressValue,
   normalizeReleaseStatus,
-  normalizeVolumeLog,
 } from "../novel-progress";
+import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../progress-units";
 import { uiText } from "../ui-text";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -67,6 +67,7 @@ export class MediaRepository {
             : stringArray(frontmatter.creators);
         const modified = Number(file.stat?.mtime || 0);
         const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
+        const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
 
         return {
           title: stringValue(frontmatter.title, file.basename),
@@ -101,7 +102,9 @@ export class MediaRepository {
             : "",
           startedAt: stringValue(frontmatter.started_at),
           completedAt: stringValue(frontmatter.completed_at),
-          volumeLog: normalizeVolumeLog(frontmatter.volume_log),
+          volumeLog: mediaType !== "anime" && isReadingProgressUnit(progressUnit)
+            ? normalizeSerialLog(frontmatter.volume_log, progressUnit)
+            : [],
         };
       })
       .filter((item): item is MediaItem => item !== null);
@@ -115,16 +118,6 @@ export class MediaRepository {
       return frontmatter !== null
         && stringValue(frontmatter.source_provider) === provider
         && stringValue(frontmatter.source_id) === sourceId;
-    });
-  }
-
-  async setFavorite(path: string, next: boolean): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile)) throw new Error(uiText("validation.mediaNoteMissing"));
-    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      frontmatter.favorite = next;
-      delete frontmatter.updated_at;
-      delete frontmatter.metadata_updated_at;
     });
   }
 }

@@ -53,13 +53,17 @@ export const TEST_TARGETS = [
 
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },
   { path: "tests/contracts/media-note-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "library", "covers"] },
+  { path: "tests/contracts/media-update-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress", "library"] },
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },
+  { path: "tests/contracts/plugin-workflows.test.ts", kind: "test", suite: "contract", features: ["timeline", "library"] },
   { path: "tests/contracts/settings-compatibility.test.ts", kind: "test", suite: "contract", features: ["settings", "search", "masterpiece"] },
+  { path: "tests/contracts/special-label-state-service.test.ts", kind: "test", suite: "contract", features: ["masterpiece", "library"] },
   { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release"] },
   { path: "tests/contracts/text-catalog.test.ts", kind: "test", suite: "contract", features: ["text", "settings"] },
   { path: "tests/contracts/test-catalog.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
+  { path: "scripts/check-architecture.mjs", kind: "script", suite: "contract", features: ["test-infrastructure"] },
 
   { path: "tests/legacy-characterization.test.ts", kind: "test", suite: "legacy", features: ["library", "markdown", "progress", "release", "search", "settings", "text", "timeline", "serial-covers"] },
   { path: "scripts/check-serial-reading-ui.mjs", kind: "script", suite: "legacy", features: ["progress", "serial-covers", "timeline"] },

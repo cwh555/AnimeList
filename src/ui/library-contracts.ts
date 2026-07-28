@@ -1,36 +1,44 @@
-import { AnimeListUI } from "./legacy";
-import type { MediaType } from "./types";
+import type { MediaItem, MediaType } from "../domain/media-types";
+
+export type LibraryMediaFilter = "all" | MediaType;
+export type LibraryViewMode = "grid" | "list" | "poster";
 
 export interface LibraryRenderState {
-  type?: string;
+  type?: LibraryMediaFilter;
   status?: string;
   genre?: string;
   query?: string;
   sort?: string;
-  view?: string;
-  [key: string]: unknown;
+  view?: LibraryViewMode;
 }
 
 export interface LibraryRenderAdapters {
   initialState?: LibraryRenderState;
-  initialView?: string;
+  initialView?: LibraryViewMode;
   openFile?: (path: string) => void;
   addItem?: (mediaType: MediaType) => void;
   editItem?: (path: string) => void;
   toggleFavorite?: (path: string, next: boolean) => Promise<void> | void;
   onStateChange?: (state: LibraryRenderState) => void;
+  afterRender?: (state: LibraryRenderState) => void;
+  onViewChange?: (view: LibraryViewMode) => void;
   openTimeline?: () => void;
   extraStatusFilters?: (type: string) => Array<[string, string]>;
   matchesStatusFilter?: (item: unknown, filter: string) => boolean | undefined;
-  [key: string]: unknown;
 }
 
-export interface LegacyLibraryRenderer {
-  renderLibrary: (
+export interface LibraryRenderContext<Host> {
+  host: Host;
+  container: HTMLElement;
+  items: MediaItem[];
+  adapters: LibraryRenderAdapters;
+  state?: LibraryRenderState;
+}
+
+export interface LibraryRenderer {
+  renderLibrary(
     container: HTMLElement,
-    inputItems: unknown[],
+    items: MediaItem[],
     adapters?: LibraryRenderAdapters,
-  ) => void;
+  ): void;
 }
-
-export const legacyLibraryRenderer: LegacyLibraryRenderer = AnimeListUI;

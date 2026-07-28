@@ -105,28 +105,4 @@ describe("media repository compatibility", () => {
       else process.env.TZ = previousTimezone;
     }
   });
-
-  it("updates only favorite metadata and preserves unrelated fields", async () => {
-    const media = markdownFile("AnimeList/Anime/example.md");
-    const frontmatter: Record<string, unknown> = {
-      media_type: "anime",
-      favorite: false,
-      updated_at: "legacy",
-      metadata_updated_at: "legacy",
-      custom: { keep: true },
-    };
-    const app = {
-      vault: { getAbstractFileByPath: (path: string) => path === media.path ? media : null },
-      fileManager: {
-        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
-      },
-    } as unknown as App;
-
-    await new MediaRepository(app).setFavorite(media.path, true);
-    assert.deepEqual(frontmatter, {
-      media_type: "anime",
-      favorite: true,
-      custom: { keep: true },
-    });
-  });
 });

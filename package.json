@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
     "test": "node scripts/run-tests.mjs",
-    "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm test && npm run community:check && npm run build",
+    "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm run architecture:check && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
     "test-vault:fixtures": "node scripts/test-vault-fixtures.mjs",
@@ -27,7 +27,8 @@
     "styles:build": "node scripts/build-styles.mjs --write",
     "styles:check": "node scripts/build-styles.mjs --check",
     "styles:dev": "node scripts/build-styles.mjs --output .tmp/dev/styles.css --watch",
-    "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json"
+    "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json",
+    "architecture:check": "node scripts/check-architecture.mjs"
   },
   "keywords": [
     "obsidian",

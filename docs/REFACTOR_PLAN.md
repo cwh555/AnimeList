@@ -70,29 +70,35 @@ Required compatibility coverage:
 - Current Traditional Chinese and English UI wording remains unchanged.
 - Release `styles.css` remains reproducible.
 
-## Stage 3 — Explicit feature installation (completed)
+## Stage 3 — Feature composition and legacy removal (implementation complete)
 
 Scope:
 
-- Replace hidden side-effect imports with explicit installers.
-- Keep every existing feature installer visible in one ordered list.
-- Reject duplicate installer IDs before any feature mutates runtime state.
-- Preserve existing Library, Timeline, modal, Markdown, settings, and data behavior.
-- Avoid a broad UI rewrite or cosmetic file splitting in the final stage.
+- Replace runtime method/prototype/renderer reassignment with typed feature capability instances.
+- Replace document-wide form discovery with explicit form contexts and submit contributions.
+- Move active Library, Timeline, add/edit, detail, and Markdown UI out of `src/legacy.ts`.
+- Keep provider, pagination, create, update, favorite, and masterpiece persistence in single typed service paths.
+- Make `src/main.ts` an Obsidian lifecycle and wiring adapter rather than an application-service container.
 
-Implemented boundaries in this stage:
+Implemented boundaries:
 
-- `src/app/feature-installer.ts` owns deterministic, typed installation order.
-- `src/plugin-entry.ts` is the single feature installation manifest.
-- Progress rendering and search pagination no longer install merely because their modules were imported.
-- The installer contract is covered by focused behavior tests and strict TypeScript checking.
+- `src/plugin-entry.ts` is the only feature manifest.
+- `src/app/feature-types.ts` defines lifecycle, media-item, Library, search, form, favorite, settings, and detail capabilities.
+- `src/app/feature-registry.ts` validates IDs and dependencies before any feature activates.
+- `src/app/anime-list-application.ts` owns service construction and data operations, including the dedicated special-label state service.
+- Active UI lives in typed modules under `src/ui/`; `src/legacy.ts` is a thin compatibility barrel.
+- Add and edit modals use one typed field builder instead of duplicating title, status, score, date, progress, unit, genre, template, and favorite controls.
+- Architecture checks reject prototype patches, plugin method replacement, direct feature/UI frontmatter persistence, import-time installation, form-discovery observers, and active imports from the legacy barrel.
+- Runtime behavior tests replace source-location assertions; static checks remain only where architecture or release artifacts are the behavior under test.
 
 Completion conditions:
 
-- The complete released feature set is installed once and in a documented order.
-- Duplicate IDs fail before partial installation.
-- No Markdown/frontmatter schema, UI wording, styling, or feature behavior changes.
-- Full checks and GitHub Actions pass; final Test Vault validation remains the merge gate.
+- No feature overwrites plugin methods, `fileManager.processFrontMatter`, `Modal.prototype`, or a renderer.
+- Add and edit flows share typed form and persistence contracts while preserving existing Markdown/frontmatter data.
+- All active TypeScript passes the strict configuration without lint suppressions.
+- Full UTC checks, Asia/Taipei tests, release checks, GitHub Actions, and Test Vault validation pass.
+
+Implementation is complete on the feature branch; GitHub Actions and Test Vault remain the merge gates.
 
 ## Branch and merge gates
 

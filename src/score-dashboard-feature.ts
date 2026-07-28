@@ -1,16 +1,15 @@
-import { Notice, TFile, setIcon, type Plugin, type WorkspaceLeaf } from "obsidian";
-import { AnimeListUI } from "./legacy";
+import { Notice, TFile, setIcon, type WorkspaceLeaf } from "obsidian";
+import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { ScoreDashboardDragAutoScroller } from "./score-dashboard-drag-scroll";
 import { applyScoreDashboardChanges } from "./score-dashboard-score-service";
 import { confirmScoreDashboardClamp } from "./score-dashboard-operation-ui";
 import { ScoreDashboardRefreshGuard } from "./score-dashboard-refresh";
 import { scoreDashboardText as text } from "./score-dashboard-text";
-import { SCORE_DASHBOARD_VIEW_TYPE, ScoreDashboardView, type ScoreDashboardPluginHost } from "./score-dashboard-view";
-
-interface ScoreDashboardPluginMethods {
-  collectMediaItems(): ReturnType<ScoreDashboardPluginHost["collectMediaItems"]>;
-  openMediaFile(path: string): Promise<void>;
-}
+import {
+  SCORE_DASHBOARD_VIEW_TYPE,
+  ScoreDashboardView,
+  type ScoreDashboardPluginHost,
+} from "./score-dashboard-view";
 
 interface ScoreDashboardDomEventRegistrar {
   registerDomEvent?<K extends keyof DocumentEventMap>(
@@ -27,36 +26,9 @@ interface ScoreDashboardDomEventRegistrar {
   ): void;
 }
 
-type ScoreDashboardPlugin = ScoreDashboardPluginMethods & Pick<
-  Plugin,
-  "app" | "registerView" | "addCommand" | "registerEvent"
-> & ScoreDashboardDomEventRegistrar;
+type ScoreDashboardPlugin = AnimeListFeatureHost & ScoreDashboardDomEventRegistrar;
 
-let libraryUiInstalled = false;
-let openDashboard: (() => void) | null = null;
-
-function installLibraryButton(): void {
-  if (libraryUiInstalled) return;
-  libraryUiInstalled = true;
-  const original = AnimeListUI.renderLibrary.bind(AnimeListUI);
-  AnimeListUI.renderLibrary = (container: HTMLElement, items: unknown[], adapters: Record<string, unknown> = {}) => {
-    const result = original(container, items, adapters);
-    const actions = container.querySelector<HTMLElement>(".al-hero-actions");
-    if (!actions || actions.querySelector(".al-score-dashboard-button")) return result;
-    const button = actions.createEl("button", {
-      cls: "al-secondary-button al-score-dashboard-button",
-    });
-    button.type = "button";
-    button.title = text.open;
-    button.setAttribute("aria-label", text.open);
-    setIcon(button, "table-properties");
-    button.createSpan({ text: text.title });
-    button.addEventListener("click", () => openDashboard?.());
-    const addButton = actions.querySelector(".al-add-button");
-    actions.insertBefore(button, addButton);
-    return result;
-  };
-}
+const OPENERS = new WeakMap<object, () => void>();
 
 function createHost(
   plugin: ScoreDashboardPlugin,
@@ -87,7 +59,6 @@ function installDragAutoScroll(plugin: ScoreDashboardPlugin): void {
     scroller?.stop();
     scroller = null;
   };
-
   plugin.registerDomEvent(document, "dragstart", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -104,14 +75,22 @@ function installDragAutoScroll(plugin: ScoreDashboardPlugin): void {
   plugin.registerDomEvent(window, "blur", stop);
 }
 
-export function installScoreDashboard(plugin: ScoreDashboardPlugin): void {
-  installLibraryButton();
-  installDragAutoScroll(plugin);
+async function openScoreDashboard(plugin: ScoreDashboardPlugin): Promise<void> {
+  let leaf = plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE)[0];
+  if (!leaf) {
+    leaf = plugin.app.workspace.getLeaf("tab");
+    await leaf.setViewState({ type: SCORE_DASHBOARD_VIEW_TYPE, active: true });
+  }
+  plugin.app.workspace.revealLeaf(leaf);
+}
+
+function activateDashboard(plugin: ScoreDashboardPlugin): void {
   const refreshGuard = new ScoreDashboardRefreshGuard();
   const host = createHost(plugin, refreshGuard);
-  openDashboard = () => void openScoreDashboard(plugin);
+  const open = () => void openScoreDashboard(plugin);
+  OPENERS.set(plugin, open);
   plugin.registerView(SCORE_DASHBOARD_VIEW_TYPE, (leaf) => new ScoreDashboardView(leaf, host));
-  plugin.addCommand({ id: "open-score-dashboard", name: text.open, callback: () => void openScoreDashboard(plugin) });
+  plugin.addCommand({ id: "open-score-dashboard", name: text.open, callback: open });
   const refresh = () => plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE).forEach((leaf: WorkspaceLeaf) => {
     if (leaf.view instanceof ScoreDashboardView) leaf.view.scheduleRender();
   });
@@ -121,13 +100,29 @@ export function installScoreDashboard(plugin: ScoreDashboardPlugin): void {
   plugin.registerEvent(plugin.app.vault.on("create", refresh));
   plugin.registerEvent(plugin.app.vault.on("delete", refresh));
   plugin.registerEvent(plugin.app.vault.on("rename", refresh));
+  installDragAutoScroll(plugin);
 }
 
-export async function openScoreDashboard(plugin: ScoreDashboardPlugin): Promise<void> {
-  let leaf = plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE)[0];
-  if (!leaf) {
-    leaf = plugin.app.workspace.getLeaf("tab");
-    await leaf.setViewState({ type: SCORE_DASHBOARD_VIEW_TYPE, active: true });
-  }
-  plugin.app.workspace.revealLeaf(leaf);
-}
+export const scoreDashboardFeature = defineFeature<AnimeListFeatureHost>({
+  id: "score-dashboard",
+  contributions: [{
+    kind: "lifecycle",
+    activate: activateDashboard,
+  }, {
+    kind: "library",
+    afterRender({ host, container }): void {
+      const actions = container.querySelector<HTMLElement>(".al-hero-actions");
+      if (!actions || actions.querySelector(".al-score-dashboard-button")) return;
+      const button = actions.createEl("button", {
+        cls: "al-secondary-button al-score-dashboard-button",
+      });
+      button.type = "button";
+      button.title = text.open;
+      button.setAttribute("aria-label", text.open);
+      setIcon(button, "table-properties");
+      button.createSpan({ text: text.title });
+      button.addEventListener("click", () => OPENERS.get(host)?.());
+      actions.insertBefore(button, actions.querySelector(".al-add-button"));
+    },
+  }],
+});

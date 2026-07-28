@@ -1,5 +1,5 @@
 import { TFile } from "obsidian";
-import type AnimeListPlugin from "./main";
+import type { AnimeListFeatureHost } from "./app/feature-types";
 import { getScopedMarkdownFiles } from "./vault-scope";
 import {
   confidentSerialCover,
@@ -53,12 +53,12 @@ export interface SerialCoverMigrationProgress {
   message: string;
 }
 
-export type SerialCoverPlugin = AnimeListPlugin & {
+export interface SerialCoverPlugin extends AnimeListFeatureHost {
   loadMissingSerialCovers?: (
     onProgress?: (progress: SerialCoverMigrationProgress) => void,
     signal?: AbortSignal,
   ) => Promise<SerialCoverMigrationSummary>;
-};
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -174,7 +174,7 @@ export async function findSerialCoverCandidates(
 }
 
 export async function downloadSelectedSerialCover(
-  plugin: AnimeListPlugin,
+  plugin: AnimeListFeatureHost,
   context: SerialCoverLookupContext,
   candidate: RankedSerialCoverCandidate,
   manual: boolean,
@@ -189,7 +189,7 @@ export async function downloadSelectedSerialCover(
 }
 
 export async function loadConfidentSerialCover(
-  plugin: AnimeListPlugin,
+  plugin: AnimeListFeatureHost,
   context: SerialCoverLookupContext,
   label: string,
 ): Promise<StoredSerialCover | null> {
@@ -199,7 +199,7 @@ export async function loadConfidentSerialCover(
 }
 
 async function resolveOriginalTitle(
-  plugin: AnimeListPlugin,
+  plugin: AnimeListFeatureHost,
   mediaType: "manga" | "novel",
   frontmatter: Record<string, unknown>,
 ): Promise<string | null> {
@@ -226,7 +226,7 @@ function summary(total: number, details: SerialCoverMigrationDetail[]): SerialCo
 }
 
 export async function loadMissingSerialCovers(
-  plugin: AnimeListPlugin,
+  plugin: AnimeListFeatureHost,
   onProgress?: (progress: SerialCoverMigrationProgress) => void,
   signal?: AbortSignal,
 ): Promise<SerialCoverMigrationSummary> {

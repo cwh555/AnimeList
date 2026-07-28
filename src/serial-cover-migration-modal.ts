@@ -5,7 +5,7 @@ import type {
 } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
 
-export interface SerialCoverMigrationHost extends Plugin {
+export interface SerialCoverMigrationHost extends Pick<Plugin, "app"> {
   loadMissingSerialCovers?: (
     onProgress?: (progress: SerialCoverMigrationProgress) => void,
     signal?: AbortSignal,
