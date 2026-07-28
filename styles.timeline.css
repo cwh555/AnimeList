@@ -1,0 +1,6 @@
+/* Timeline cards preserve complete cover artwork instead of cropping it. */
+.al-timeline-card img {
+  object-fit: contain;
+  object-position: center;
+  background: var(--background-primary-alt, #202026);
+}
