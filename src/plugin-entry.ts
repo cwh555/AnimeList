@@ -14,20 +14,20 @@ import { installSerialEntryCovers } from "./serial-cover-feature";
 import { installSerialEntryScrollStability } from "./serial-entry-scroll-stability";
 import { installSerialCoverSettings } from "./serial-cover-settings";
 
-const FEATURE_INSTALLERS: readonly FeatureInstaller<AnimeListPlugin>[] = [
-  { id: "progress-display", order: 10, install: () => installProgressUi() },
-  { id: "search-pagination", order: 20, install: () => installSearchPagination() },
-  { id: "rating", order: 30, install: installRatingUi },
-  { id: "progress-units", order: 40, install: installAdditionalProgressUnitsUi },
-  { id: "serial-entry-covers", order: 50, install: installSerialEntryCovers },
-  { id: "serial-entry-scroll", order: 60, install: installSerialEntryScrollStability },
-  { id: "serial-cover-settings", order: 70, install: installSerialCoverSettings },
-  { id: "masterpiece-labels", order: 80, install: installMasterpieceLabels },
-  { id: "masterpiece-operations", order: 90, install: installMasterpieceOperationUi },
-  { id: "masterpiece-edit", order: 100, install: installMasterpieceEditUi },
-  { id: "masterpiece-grouped-view", order: 110, install: installMasterpieceGroupedView },
-  { id: "score-dashboard", order: 120, install: installScoreDashboard },
-];
+const FEATURE_INSTALLERS = [
+  { id: "progress-display", install: installProgressUi },
+  { id: "search-pagination", install: installSearchPagination },
+  { id: "rating", install: installRatingUi },
+  { id: "progress-units", install: installAdditionalProgressUnitsUi },
+  { id: "serial-entry-covers", install: installSerialEntryCovers },
+  { id: "serial-entry-scroll", install: installSerialEntryScrollStability },
+  { id: "serial-cover-settings", install: installSerialCoverSettings },
+  { id: "masterpiece-labels", install: installMasterpieceLabels },
+  { id: "masterpiece-operations", install: installMasterpieceOperationUi },
+  { id: "masterpiece-edit", install: installMasterpieceEditUi },
+  { id: "masterpiece-grouped-view", install: installMasterpieceGroupedView },
+  { id: "score-dashboard", install: installScoreDashboard },
+] satisfies readonly FeatureInstaller<AnimeListPlugin>[];
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
   async onload(): Promise<void> {

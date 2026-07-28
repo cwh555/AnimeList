@@ -2,16 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { installFeatureSet, type FeatureInstaller } from "../../src/app/feature-installer";
 
-test("feature installers run in deterministic order", async () => {
+test("feature installers run in manifest declaration order", async () => {
   const calls: string[] = [];
   const installers: FeatureInstaller<object>[] = [
-    { id: "later", order: 20, install: () => { calls.push("later"); } },
-    { id: "same-b", order: 10, install: () => { calls.push("same-b"); } },
-    { id: "same-a", order: 10, install: async () => { calls.push("same-a"); } },
+    { id: "first", install: () => { calls.push("first"); } },
+    { id: "second", install: async () => { calls.push("second"); } },
+    { id: "third", install: () => { calls.push("third"); } },
   ];
 
   await installFeatureSet({}, installers);
-  assert.deepEqual(calls, ["same-a", "same-b", "later"]);
+  assert.deepEqual(calls, ["first", "second", "third"]);
 });
 
 test("feature installers reject duplicate ids before any installer runs", async () => {
