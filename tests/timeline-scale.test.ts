@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from "../src/settings";
 import { legacyTest } from "../src/legacy";
 import type { MediaItem } from "../src/types";
 import { uiText } from "../src/ui-text";
+import { TIMELINE_CARD_GEOMETRY } from "../src/ui/timeline-renderer";
 import {
   DEFAULT_TIMELINE_MAX_STACK_DEPTH,
   MAX_TIMELINE_DAY_SPACING,
@@ -30,6 +31,18 @@ function laneCount(points: number[], minimumDistance: number): number {
 }
 
 describe("timeline scale defaults", () => {
+  it("uses a full-width portrait cover frame in the taller timeline card geometry", () => {
+    assert.deepEqual(TIMELINE_CARD_GEOMETRY, {
+      width: 120,
+      coverHeight: 180,
+      cardHeight: 242,
+      gapX: 16,
+      gapY: 18,
+      stemGap: 44,
+    });
+    assert.equal(TIMELINE_CARD_GEOMETRY.coverHeight / TIMELINE_CARD_GEOMETRY.width, 1.5);
+    assert.ok(TIMELINE_CARD_GEOMETRY.cardHeight > TIMELINE_CARD_GEOMETRY.coverHeight);
+  });
   it("supports a 10 percent minimum scene scale", () => {
     assert.equal(MIN_TIMELINE_VIEW_SCALE, 0.1);
   });

@@ -1,5 +1,12 @@
-/* Timeline cards preserve complete cover artwork instead of cropping it. */
+/* Timeline cards use a full-width portrait frame so cover artwork remains prominent. */
+.al-timeline-card {
+  height: 242px;
+}
+
 .al-timeline-card img {
+  width: 100%;
+  height: 180px;
+  flex: none;
   object-fit: contain;
   object-position: center;
   background: var(--background-primary-alt, #202026);
