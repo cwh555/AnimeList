@@ -34,14 +34,42 @@ export function normalizeDateParts(year: string, month: string, day: string): st
   return `${year}-${month}-${day}`;
 }
 
-function focusNextFormControl(control: HTMLElement): void {
+function formControls(control: HTMLElement): HTMLElement[] {
   const scope = control.closest(".modal-content") ?? control.ownerDocument.body;
-  const controls = [...scope.querySelectorAll<HTMLElement>("input, select, textarea, button, [tabindex]")]
+  return [...scope.querySelectorAll<HTMLElement>("input, select, textarea, button, [tabindex]")]
     .filter((candidate) => !candidate.hasAttribute("disabled")
       && candidate.tabIndex >= 0
       && candidate.offsetParent !== null);
+}
+
+function focusNextFormControl(control: HTMLElement): void {
+  const controls = formControls(control);
   const index = controls.indexOf(control);
   controls[index + 1]?.focus();
+}
+
+function focusPreviousFormControl(control: HTMLElement): boolean {
+  const controls = formControls(control);
+  const index = controls.indexOf(control);
+  const previous = index > 0 ? controls[index - 1] : null;
+  if (!previous) return false;
+  previous.focus();
+  const selectable = previous as HTMLElement & { select?: () => void };
+  selectable.select?.();
+  return true;
+}
+
+export function handleSegmentedDateBackspace(
+  input: HTMLInputElement,
+  previousSegment: HTMLInputElement | null,
+  key: string,
+  fallback: (control: HTMLElement) => boolean = focusPreviousFormControl,
+): boolean {
+  if (key !== "Backspace" || input.value) return false;
+  if (!previousSegment) return fallback(input);
+  previousSegment.focus();
+  previousSegment.select();
+  return true;
 }
 
 export function focusSegmentedDateCompletion(
@@ -131,13 +159,8 @@ export function createSegmentedDateInput(
     });
     input.addEventListener("change", (event) => event.stopPropagation());
     input.addEventListener("keydown", (event) => {
-      if (event.key !== "Backspace" || input.value) return;
       const previous = input === day ? month : input === month ? year : null;
-      if (previous) {
-        event.preventDefault();
-        previous.focus();
-        previous.select();
-      }
+      if (handleSegmentedDateBackspace(input, previous, event.key)) event.preventDefault();
     });
   };
 
