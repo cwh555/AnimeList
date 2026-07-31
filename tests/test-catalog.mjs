@@ -31,6 +31,7 @@ export const TEST_TARGETS = [
   { path: "tests/schema-migration.test.ts", kind: "test", suite: "integration", features: ["progress", "markdown"] },
   { path: "tests/segmented-date-input.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/serial-entry-scroll.test.ts", kind: "test", suite: "unit", features: ["progress"] },
+  { path: "tests/serial-entry-keyboard-navigation.test.ts", kind: "test", suite: "unit", features: ["progress"] },
 
   { path: "tests/score-dashboard.test.ts", kind: "test", suite: "unit", features: ["score-dashboard", "rating"] },
   { path: "tests/score-dashboard-selection.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
