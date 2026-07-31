@@ -1,0 +1,58 @@
+name: Fix serial date upload
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.head_ref == 'tmp/fix-serial-date-upload'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/serial-entry-keyboard-flow
+          fetch-depth: 0
+      - name: Verify guarded feature head
+        run: test "$(git rev-parse HEAD)" = "1fea2b40033098fde4aa2f14502ab92794db770d"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore exact validated source file
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/additional-progress-units-ui.ts')
+          source = path.read_text(encoding='utf-8')
+          if source.count('completdAt') != 2:
+              raise SystemExit('unexpected completdAt occurrence count')
+          source = source.replace('completdAt', 'completedAt')
+          broken = 'export const additionalProgressUnitsFeature = defineFeatur<AnimeListFeatureHost>('
+          correct = 'export const additionalProgressUnitsFeature = defineFeature<AnimeListFeatureHost>('
+          if source.count(broken) != 1:
+              raise SystemExit('unexpected defineFeature upload corruption')
+          path.write_text(source.replace(broken, correct), encoding='utf-8')
+          PY
+          test "$(git hash-object src/additional-progress-units-ui.ts)" = "b1f4ca46b6ae471a0e2c66a4f249ed66849bf591"
+          git diff --check
+      - name: Run full checks in UTC
+        run: TZ=UTC npm run check
+      - name: Run full tests in Asia/Taipei
+        run: TZ=Asia/Taipei npm test
+      - name: Run segmented-date keyboard flow in Chromium
+        run: npm run test:browser:date
+      - run: npm run release:check
+      - name: Commit exact source correction
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/additional-progress-units-ui.ts
+          git commit -m "fix: restore validated serial keyboard integration"
+          git push origin HEAD:feature/serial-entry-keyboard-flow
+      - name: Delete temporary branch
+        if: always()
+        run: git push origin --delete tmp/fix-serial-date-upload || true
