@@ -49,11 +49,11 @@ export function captureScrollPosition(anchor: HTMLElement): ScrollPositionSnapsh
   };
 }
 
-export function findNewestSerialCompletedYearInput(editor: HTMLElement): HTMLInputElement | null {
+export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElement | null {
   const rows = editor.querySelectorAll<HTMLElement>(".al-volume-row");
   const newest = rows.item(rows.length - 1);
   return newest?.querySelector<HTMLInputElement>(
-    '.al-volume-row-fields > .al-form-field[data-serial-field="completed-at"] .al-date-year',
+    '.al-volume-row-fields > .al-form-field[data-serial-field="label"] > input',
   ) ?? null;
 }
 
@@ -66,7 +66,7 @@ export function scheduleStableSerialEntryFocus(
     if (!editor.isConnected) return;
     snapshot.restore();
     if (!focused) {
-      const input = findNewestSerialCompletedYearInput(editor);
+      const input = findNewestSerialLabelInput(editor);
       input?.focus({ preventScroll: true });
       input?.select();
       focused = input !== null;
@@ -81,4 +81,3 @@ export function scheduleStableSerialEntryFocus(
     view.requestAnimationFrame(() => view.requestAnimationFrame(stabilize));
   }
 }
-
