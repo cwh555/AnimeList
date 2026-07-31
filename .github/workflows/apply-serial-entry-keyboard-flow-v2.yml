@@ -1,0 +1,65 @@
+name: Apply serial entry keyboard flow v2
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/apply-serial-entry-keyboard-flow-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'tmp/update-serial-entry-keyboard-flow'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/serial-entry-keyboard-flow
+          fetch-depth: 0
+      - name: Guard exact feature head
+        run: test "$(git rev-parse HEAD)" = "ba224adb4fe7eff823750c74b623442709c95370"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Fetch and apply validated patch
+        shell: bash
+        run: |
+          git fetch origin tmp/update-serial-entry-keyboard-flow
+          git show FETCH_HEAD:ci/serial-keyboard-flow-v2.patch.b64 | base64 --decode | gzip --decompress > /tmp/serial-keyboard-flow.patch
+          echo '037f00870bfadc622bbf87b29c5685507fdfbc0101c8a7665d9f4677233ca37e  /tmp/serial-keyboard-flow.patch' | sha256sum --check
+          git apply --check /tmp/serial-keyboard-flow.patch
+          git apply /tmp/serial-keyboard-flow.patch
+          test "$(git hash-object src/ui/serial-entry-keyboard-navigation.ts)" = "8d97a6288b0d14db7bf00ea12f4184db00f8cc4e"
+          test "$(git hash-object src/ui/serial-entry-date-controls.ts)" = "f410cf7fee9b18fceee8da183aa2947ab98ee524"
+          test "$(git hash-object src/additional-progress-units-ui.ts)" = "91e4d1115f4f613d3d95bd3be5285d0572b24d8b"
+          test "$(git hash-object src/serial-entry-scroll-stability.ts)" = "7e67d85c043c2408d039731ee632a185a0c0b848"
+          test "$(git hash-object tests/serial-entry-scroll.test.ts)" = "a57744f6663ccd54012e9858046bae6dbe5b36d3"
+          test "$(git hash-object tests/serial-entry-keyboard-navigation.test.ts)" = "fbd8abc6d0937582b445cf7a72cb7a76f668fcc3"
+          test "$(git hash-object tests/test-catalog.mjs)" = "89f4cfec5d4205104d056c6de4edd4bc06985c05"
+          test "$(git hash-object scripts/check-segmented-date-keyboard-flow.mjs)" = "7edcd3912b0e51c05282d9e0c4ccee71911395a5"
+      - name: Run exact validation
+        run: |
+          npm run typecheck
+          npm run typecheck:strict
+          npm run lint
+          npm run architecture:check
+          npm run test:feature -- progress
+          npm run test:browser:date
+          TZ=UTC npm run check
+          TZ=Asia/Taipei npm test
+          npm run release:check
+          ANIMELIST_TEST_VAULT_NO_OPEN=1 npm run test-vault
+      - name: Commit validated change
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/ui/serial-entry-keyboard-navigation.ts src/ui/serial-entry-date-controls.ts src/additional-progress-units-ui.ts src/serial-entry-scroll-stability.ts tests/serial-entry-scroll.test.ts tests/serial-entry-keyboard-navigation.test.ts tests/test-catalog.mjs scripts/check-segmented-date-keyboard-flow.mjs
+          git commit -m 'feat: unify serial entry keyboard navigation'
+          git push origin HEAD:feature/serial-entry-keyboard-flow
+      - name: Delete temporary branch
+        if: success()
+        run: git push origin --delete tmp/update-serial-entry-keyboard-flow
