@@ -68,7 +68,7 @@ export function createSerialBrowserFixture() {
   const render = (): HTMLButtonElement => {
     editor.replaceChildren();
     rows.length = 0;
-    const targets: Array<HTMLElement | (() => HTMLElement | null)> = [];
+    const targets: HTMLElement[] | Array<HTMLElement | (() => HTMLElement | null)> = [];
     const rowsRoot = editor.createDiv({ cls: "al-volume-editor-rows" });
     for (let index = 0; index < rowCount; index += 1) {
       const row = rowsRoot.createDiv({ cls: "al-volume-row" });
