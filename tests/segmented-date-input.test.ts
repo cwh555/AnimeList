@@ -51,7 +51,35 @@ describe("segmented serial date input", () => {
     assert.equal(fallbackControl, sourceControl);
   });
 
-  it("moves an empty year back to the previous form control", () => {
+  it("moves an empty year to its explicit previous control and selects it", () => {
+    let focusCount = 0;
+    let selectCount = 0;
+    let fallbackCount = 0;
+    const year = { value: "" } as HTMLInputElement;
+    const label = {
+      hasAttribute: () => false,
+      focus: () => { focusCount += 1; },
+      select: () => { selectCount += 1; },
+    } as unknown as HTMLInputElement;
+
+    const handled = handleSegmentedDateBackspace(
+      year,
+      null,
+      "Backspace",
+      label,
+      () => {
+        fallbackCount += 1;
+        return false;
+      },
+    );
+
+    assert.equal(handled, true);
+    assert.equal(focusCount, 1);
+    assert.equal(selectCount, 1);
+    assert.equal(fallbackCount, 0);
+  });
+
+  it("uses the fallback only when an explicit previous target is unavailable", () => {
     let fallbackSource: HTMLElement | null = null;
     const year = { value: "" } as HTMLInputElement;
 
@@ -59,6 +87,7 @@ describe("segmented serial date input", () => {
       year,
       null,
       "Backspace",
+      undefined,
       (source) => {
         fallbackSource = source;
         return true;
@@ -77,6 +106,7 @@ describe("segmented serial date input", () => {
       year,
       null,
       "Backspace",
+      undefined,
       () => {
         fallbackCount += 1;
         return true;
@@ -93,6 +123,7 @@ describe("segmented serial date input", () => {
     let fallbackCount = 0;
     const month = { value: "" } as HTMLInputElement;
     const year = {
+      hasAttribute: () => false,
       focus: () => { focusCount += 1; },
       select: () => { selectCount += 1; },
     } as unknown as HTMLInputElement;
@@ -101,6 +132,7 @@ describe("segmented serial date input", () => {
       month,
       year,
       "Backspace",
+      undefined,
       () => {
         fallbackCount += 1;
         return true;

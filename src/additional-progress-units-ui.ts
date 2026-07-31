@@ -1,5 +1,5 @@
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
-import { createSegmentedDateInput } from "./segmented-date-input";
+import { createSerialEntryDateControls } from "./ui/serial-entry-date-controls";
 import { captureScrollPosition, scheduleStableSerialEntryFocus } from "./serial-entry-scroll-stability";
 import {
   compareSerialLabels,
@@ -120,12 +120,14 @@ function renderEditor(state: ReadingProgressEditorState): void {
       progressUnitFeatureText(state.unit === "volume" ? "labelPlaceholderVolume" : "labelPlaceholderInteger"),
     ));
 
-    const startedAt = createSegmentedDateInput(entry.startedAt);
+    const { startedAt, completedAt } = createSerialEntryDateControls({
+      labelInput,
+      addButton: add,
+      startedAt: entry.startedAt,
+      completedAt: entry.completedAt || todayString(),
+    });
     fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
 
-    const completedAt = createSegmentedDateInput(entry.completedAt || todayString(), {
-      completionTarget: add,
-    });
     entry.completedAt = completedAt.value;
     const completedAtField = makeField(
       progressUnitFeatureText("completedAt"),
@@ -146,8 +148,8 @@ function renderEditor(state: ReadingProgressEditorState): void {
     startedAt.addEventListener("input", () => { entry.startedAt = startedAt.value; });
     completedAt.addEventListener("input", () => { entry.completedAt = completedAt.value; });
     completedAt.addEventListener("change", () => {
-      if (!completedAt.value) completedAt.value = todayString();
-      entry.completedAt = completedAt.value;
+      if (!completedAt.value) completdAt.value = todayString();
+      entry.completedAt = completdAt.value;
     });
     remove.addEventListener("click", () => {
       state.entries.splice(index, 1);
@@ -267,7 +269,7 @@ function prepareReadingSubmit(context: MediaFormSubmitContext<AnimeListFeatureHo
   context.form.volumeLog = editor.entries;
 }
 
-export const additionalProgressUnitsFeature = defineFeature<AnimeListFeatureHost>({
+export const additionalProgressUnitsFeature = defineFeatur<AnimeListFeatureHost>({
   id: "progress-units",
   contributions: [{
     kind: "media-form",

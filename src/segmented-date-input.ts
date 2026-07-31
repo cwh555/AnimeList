@@ -3,15 +3,24 @@ import { uiText } from "./ui-text";
 declare function createDiv(options?: string | DomElementInfo): HTMLDivElement;
 declare function createSpan(options?: string | DomElementInfo): HTMLSpanElement;
 
+export interface SegmentedDateParts {
+  readonly year: HTMLInputElement;
+  readonly month: HTMLInputElement;
+  readonly day: HTMLInputElement;
+}
+
 export interface SegmentedDateInputElement extends HTMLDivElement {
   value: string;
   required: boolean;
+  readonly parts: SegmentedDateParts;
 }
 
-export type SegmentedDateCompletionTarget = HTMLElement | (() => HTMLElement | null);
+export type SegmentedDateFocusTarget = HTMLElement | (() => HTMLElement | null);
+export type SegmentedDateCompletionTarget = SegmentedDateFocusTarget;
 
 export interface SegmentedDateInputOptions {
   completionTarget?: SegmentedDateCompletionTarget;
+  emptyYearBackspaceTarget?: SegmentedDateFocusTarget;
 }
 
 export const SEGMENTED_DATE_PARTS = {
@@ -39,7 +48,7 @@ function formControls(control: HTMLElement): HTMLElement[] {
   return [...scope.querySelectorAll<HTMLElement>("input, select, textarea, button, [tabindex]")]
     .filter((candidate) => !candidate.hasAttribute("disabled")
       && candidate.tabIndex >= 0
-      && candidate.offsetParent !== null);
+      && (candidate === control || candidate.getClientRects().length > 0));
 }
 
 function focusNextFormControl(control: HTMLElement): void {
@@ -48,28 +57,39 @@ function focusNextFormControl(control: HTMLElement): void {
   controls[index + 1]?.focus();
 }
 
+function resolveFocusTarget(target: SegmentedDateFocusTarget | undefined): HTMLElement | null {
+  return typeof target === "function" ? target() : target ?? null;
+}
+
+function focusTarget(target: SegmentedDateFocusTarget | undefined, selectText: boolean): boolean {
+  const resolved = resolveFocusTarget(target);
+  if (!resolved || resolved.hasAttribute("disabled")) return false;
+  resolved.focus();
+  if (selectText) {
+    const selectable = resolved as HTMLElement & { select?: () => void };
+    selectable.select?.();
+  }
+  return true;
+}
+
 function focusPreviousFormControl(control: HTMLElement): boolean {
   const controls = formControls(control);
   const index = controls.indexOf(control);
   const previous = index > 0 ? controls[index - 1] : null;
-  if (!previous) return false;
-  previous.focus();
-  const selectable = previous as HTMLElement & { select?: () => void };
-  selectable.select?.();
-  return true;
+  return focusTarget(previous, true);
 }
 
 export function handleSegmentedDateBackspace(
   input: HTMLInputElement,
   previousSegment: HTMLInputElement | null,
   key: string,
+  emptyYearTarget?: SegmentedDateFocusTarget,
   fallback: (control: HTMLElement) => boolean = focusPreviousFormControl,
 ): boolean {
   if (key !== "Backspace" || input.value) return false;
-  if (!previousSegment) return fallback(input);
-  previousSegment.focus();
-  previousSegment.select();
-  return true;
+  if (previousSegment) return focusTarget(previousSegment, true);
+  if (focusTarget(emptyYearTarget, true)) return true;
+  return fallback(input);
 }
 
 export function focusSegmentedDateCompletion(
@@ -77,12 +97,7 @@ export function focusSegmentedDateCompletion(
   completionTarget: SegmentedDateCompletionTarget | undefined,
   fallback: (control: HTMLElement) => void = focusNextFormControl,
 ): void {
-  const target = typeof completionTarget === "function" ? completionTarget() : completionTarget;
-  if (target && !target.hasAttribute("disabled")) {
-    target.focus();
-    return;
-  }
-  fallback(source);
+  if (!focusTarget(completionTarget, false)) fallback(source);
 }
 
 function dateSegment(length: number, placeholder: string, label: string): HTMLInputElement {
@@ -114,6 +129,11 @@ export function createSegmentedDateInput(
   month.className = "al-date-month";
   day.className = "al-date-day";
   root.append(year, dateSeparator(), month, dateSeparator(), day);
+  Object.defineProperty(root, "parts", {
+    configurable: false,
+    enumerable: false,
+    value: Object.freeze({ year, month, day }),
+  });
 
   const emit = (name: "input" | "change"): void => {
     root.dispatchEvent(new Event(name, { bubbles: true }));
@@ -160,7 +180,12 @@ export function createSegmentedDateInput(
     input.addEventListener("change", (event) => event.stopPropagation());
     input.addEventListener("keydown", (event) => {
       const previous = input === day ? month : input === month ? year : null;
-      if (handleSegmentedDateBackspace(input, previous, event.key)) event.preventDefault();
+      if (handleSegmentedDateBackspace(
+        input,
+        previous,
+        event.key,
+        input === year ? options.emptyYearBackspaceTarget : undefined,
+      )) event.preventDefault();
     });
   };
 
