@@ -148,8 +148,8 @@ function renderEditor(state: ReadingProgressEditorState): void {
     startedAt.addEventListener("input", () => { entry.startedAt = startedAt.value; });
     completedAt.addEventListener("input", () => { entry.completedAt = completedAt.value; });
     completedAt.addEventListener("change", () => {
-      if (!completedAt.value) completdAt.value = todayString();
-      entry.completedAt = completdAt.value;
+      if (!completedAt.value) completedAt.value = todayString();
+      entry.completedAt = completedAt.value;
     });
     remove.addEventListener("click", () => {
       state.entries.splice(index, 1);
@@ -269,7 +269,7 @@ function prepareReadingSubmit(context: MediaFormSubmitContext<AnimeListFeatureHo
   context.form.volumeLog = editor.entries;
 }
 
-export const additionalProgressUnitsFeature = defineFeatur<AnimeListFeatureHost>({
+export const additionalProgressUnitsFeature = defineFeature<AnimeListFeatureHost>({
   id: "progress-units",
   contributions: [{
     kind: "media-form",
