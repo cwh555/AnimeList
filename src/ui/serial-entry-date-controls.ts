@@ -5,7 +5,7 @@ import {
 
 export interface SerialEntryDateControlOptions {
   readonly labelInput: HTMLInputElement;
-  readonly addButton: HTMLButtonElement;
+  readonly removeButton: HTMLButtonElement;
   readonly startedAt: string;
   readonly completedAt: string;
 }
@@ -18,11 +18,13 @@ export interface SerialEntryDateControls {
 export function createSerialEntryDateControls(
   options: SerialEntryDateControlOptions,
 ): SerialEntryDateControls {
+  let completedAt: SegmentedDateInputElement | null = null;
   const startedAt = createSegmentedDateInput(options.startedAt, {
+    completionTarget: () => completedAt?.parts.year ?? null,
     emptyYearBackspaceTarget: options.labelInput,
   });
-  const completedAt = createSegmentedDateInput(options.completedAt, {
-    completionTarget: options.addButton,
+  completedAt = createSegmentedDateInput(options.completedAt, {
+    completionTarget: options.removeButton,
     emptyYearBackspaceTarget: startedAt.parts.day,
   });
   return { startedAt, completedAt };
