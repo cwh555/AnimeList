@@ -1,9 +1,14 @@
-import { Notice, TFile, setIcon, type WorkspaceLeaf } from "obsidian";
+import { Notice, TAbstractFile, TFile, setIcon, type WorkspaceLeaf } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { ScoreDashboardDragAutoScroller } from "./score-dashboard-drag-scroll";
 import { applyScoreDashboardChanges } from "./score-dashboard-score-service";
 import { confirmScoreDashboardClamp } from "./score-dashboard-operation-ui";
-import { ScoreDashboardRefreshGuard } from "./score-dashboard-refresh";
+import {
+  ScoreDashboardRefreshGuard,
+  shouldRefreshScoreDashboardMetadata,
+  shouldRefreshScoreDashboardPath,
+  shouldRefreshScoreDashboardRename,
+} from "./score-dashboard-refresh";
 import { scoreDashboardText as text } from "./score-dashboard-text";
 import {
   SCORE_DASHBOARD_VIEW_TYPE,
@@ -94,12 +99,26 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   const refresh = () => plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE).forEach((leaf: WorkspaceLeaf) => {
     if (leaf.view instanceof ScoreDashboardView) leaf.view.scheduleRender();
   });
+  const scanRoots = () => plugin.getScanFolders();
+  const coverFolder = () => plugin.settings.coverFolder;
   plugin.registerEvent(plugin.app.metadataCache.on("changed", (file) => {
-    if (!(file instanceof TFile) || !refreshGuard.shouldSuppress(file.path)) refresh();
+    if (file instanceof TFile && shouldRefreshScoreDashboardMetadata(
+      file.path, scanRoots(), coverFolder(), refreshGuard,
+    )) refresh();
   }));
-  plugin.registerEvent(plugin.app.vault.on("create", refresh));
-  plugin.registerEvent(plugin.app.vault.on("delete", refresh));
-  plugin.registerEvent(plugin.app.vault.on("rename", refresh));
+  plugin.registerEvent(plugin.app.vault.on("create", (file) => {
+    if (file instanceof TAbstractFile
+      && shouldRefreshScoreDashboardPath(file.path, scanRoots(), coverFolder())) refresh();
+  }));
+  plugin.registerEvent(plugin.app.vault.on("delete", (file) => {
+    if (file instanceof TAbstractFile
+      && shouldRefreshScoreDashboardPath(file.path, scanRoots(), coverFolder())) refresh();
+  }));
+  plugin.registerEvent(plugin.app.vault.on("rename", (file, oldPath) => {
+    const newPath = file instanceof TAbstractFile ? file.path : "";
+    const previousPath = typeof oldPath === "string" ? oldPath : "";
+    if (shouldRefreshScoreDashboardRename(previousPath, newPath, scanRoots(), coverFolder())) refresh();
+  }));
   installDragAutoScroll(plugin);
 }
 
