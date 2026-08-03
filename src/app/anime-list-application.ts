@@ -1,8 +1,9 @@
 import { TFile, normalizePath, type App } from "obsidian";
 import { CoverThumbnailCache } from "../cover-cache";
 import { ExternalMediaSearchService, HttpMetadataProviderClient, type MetadataProviderClient } from "../data/external-media-service";
-import { isLibraryRelevantPath } from "../data/library-change-scope";
+import { isLibraryRelevantPath, pathBelongsToLibraryRoot } from "../data/library-change-scope";
 import { LibraryStorage } from "../data/library-storage";
+import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
@@ -24,6 +25,7 @@ export interface AnimeListApplicationCallbacks {
 export class AnimeListApplicationServices {
   private coverCache?: CoverThumbnailCache;
   private mediaRepository?: MediaRepository;
+  private mediaIndex?: MediaLibraryIndex;
   private storage?: LibraryStorage;
   private providerClient?: MetadataProviderClient;
   private searchService?: ExternalMediaSearchService;
@@ -56,6 +58,11 @@ export class AnimeListApplicationServices {
   private repository(): MediaRepository {
     this.mediaRepository ??= new MediaRepository(this.app, (file) => this.coverCache?.getSources(file));
     return this.mediaRepository;
+  }
+
+  private libraryIndex(): MediaLibraryIndex {
+    this.mediaIndex ??= new MediaLibraryIndex(this.app, this.repository());
+    return this.mediaIndex;
   }
 
   private metadataProviderClient(): MetadataProviderClient {
@@ -103,15 +110,50 @@ export class AnimeListApplicationServices {
   isLibraryRelevantPath(path: string): boolean {
     return isLibraryRelevantPath(path, this.getScanFolders(), this.settings().coverFolder);
   }
+
+  handleLibraryMetadataChange(file: TFile): boolean {
+    if (!this.isLibraryRelevantPath(file.path)) return false;
+    const roots = this.getScanFolders();
+    if (roots.some((root) => pathBelongsToLibraryRoot(file.path, root))) {
+      this.mediaIndex?.update(file, roots);
+    } else {
+      this.mediaIndex?.invalidate();
+    }
+    return true;
+  }
+
+  handleLibraryDelete(path: string, isFile: boolean): boolean {
+    if (!this.isLibraryRelevantPath(path)) return false;
+    const roots = this.getScanFolders();
+    const mediaPath = roots.some((root) => pathBelongsToLibraryRoot(path, root));
+    if (mediaPath && isFile) this.mediaIndex?.remove(path);
+    else this.mediaIndex?.invalidate();
+    return true;
+  }
+
+  handleLibraryRename(file: TFile | null, oldPath: string, newPath: string): boolean {
+    if (!this.isLibraryRelevantPath(oldPath) && !this.isLibraryRelevantPath(newPath)) return false;
+    const roots = this.getScanFolders();
+    const oldMediaPath = roots.some((root) => pathBelongsToLibraryRoot(oldPath, root));
+    const newMediaPath = roots.some((root) => pathBelongsToLibraryRoot(newPath, root));
+    if (file && (oldMediaPath || newMediaPath)) {
+      this.mediaIndex?.rename(oldPath, newMediaPath ? file : null, roots);
+    } else {
+      this.mediaIndex?.invalidate();
+    }
+    return true;
+  }
   async initializeLibrary(copyTemplates = false): Promise<void> { await this.libraryStorage().initialize(copyTemplates); }
   resolveMediaCoverFile(value: unknown, sourcePath: string): TFile | null { return this.repository().resolveCoverFile(value, sourcePath); }
   resolveMediaCoverPath(value: unknown, sourcePath: string): string { return this.repository().resolveCoverPath(value, sourcePath); }
 
   collectMediaItems(source?: string): MediaItem[] {
-    const roots = source
-      ? [normalizePath(source).replace(/^\/+|\/+$/g, "")]
-      : this.getScanFolders();
-    return this.repository().collect(roots);
+    if (source) {
+      const root = normalizePath(source).replace(/^\/+|\/+$/g, "");
+      return this.repository().collect([root]);
+    }
+    const roots = this.getScanFolders();
+    return this.libraryIndex().snapshot(roots);
   }
 
   localCoverFiles(): TFile[] {
