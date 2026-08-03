@@ -42,9 +42,9 @@ export class AnimeListApplicationServices {
   ) {}
 
   async initialize(): Promise<void> {
-    this.coverCache = new CoverThumbnailCache(this.app, this.pluginId);
+    this.coverCache = new CoverThumbnailCache(this.app, this.pluginId, () => this.callbacks.refreshViews());
     await this.coverCache.initialize();
-    this.mediaRepository = new MediaRepository(this.app, (file) => this.coverCache?.getSources(file));
+    this.mediaRepository = new MediaRepository(this.app, (file) => this.coverCache?.getDeferredSources(file));
     this.coverCache.scheduleCleanup();
   }
 
@@ -56,7 +56,7 @@ export class AnimeListApplicationServices {
   }
 
   private repository(): MediaRepository {
-    this.mediaRepository ??= new MediaRepository(this.app, (file) => this.coverCache?.getSources(file));
+    this.mediaRepository ??= new MediaRepository(this.app, (file) => this.coverCache?.getDeferredSources(file));
     return this.mediaRepository;
   }
 

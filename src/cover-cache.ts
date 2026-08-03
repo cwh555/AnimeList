@@ -226,6 +226,28 @@ export class CoverThumbnailCache {
     return sources;
   }
 
+  getDeferredSources(file: TFile): CoverSources {
+    this.knownSources.set(file.path, file);
+    const existing = this.readSources(file);
+    if (existing) return existing;
+
+    let requested = false;
+    const request = (): CoverSources | undefined => {
+      const sources = this.readSources(file);
+      if (sources) return sources;
+      if (!requested) {
+        requested = true;
+        this.enqueue(file);
+      }
+      return undefined;
+    };
+    return {
+      get src() { return request()?.src ?? ""; },
+      get srcset() { return request()?.srcset ?? ""; },
+      get placeholder() { return request()?.placeholder ?? ""; },
+    };
+  }
+
   enqueue(file: TFile): boolean {
     this.knownSources.set(file.path, file);
     if (this.disposed || this.hasCompleteGroup(file)) return false;
