@@ -29,7 +29,8 @@
     "styles:check": "node scripts/build-styles.mjs --check",
     "styles:dev": "node scripts/build-styles.mjs --output .tmp/dev/styles.css --watch",
     "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json",
-    "architecture:check": "node scripts/check-architecture.mjs"
+    "architecture:check": "node scripts/check-architecture.mjs",
+    "test:browser:mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-mobile-layout.mjs"
   },
   "keywords": [
     "obsidian",
