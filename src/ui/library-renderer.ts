@@ -4,6 +4,7 @@ import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from 
 import { normalizeProgressValue, normalizeReleaseStatus, normalizeVolumeLog, progressDisplayValue, progressRatio } from "../novel-progress";
 import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
 import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryRenderState, LibraryViewMode } from "./library-contracts";
+import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
@@ -15,6 +16,8 @@ export function libraryCoverSizes(view: LibraryViewMode): string {
 export function libraryEagerCoverCount(view: LibraryViewMode): number {
   return view === "poster" ? 10 : view === "list" ? 4 : 6;
 }
+
+const activeProgressiveRenders = new WeakMap<HTMLElement, () => void>();
 
 export const AnimeListUI: LibraryRenderer = (() => {
   const normalize = (item: MediaItem): MediaItem => ({
@@ -69,6 +72,8 @@ export const AnimeListUI: LibraryRenderer = (() => {
     inputItems: MediaItem[],
     adapters: LibraryRenderAdapters = {},
   ): void {
+    activeProgressiveRenders.get(container)?.();
+    activeProgressiveRenders.delete(container);
     container.replaceChildren();
     const items = inputItems.map(normalize);
     const genres = [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
@@ -402,7 +407,24 @@ export const AnimeListUI: LibraryRenderer = (() => {
       return card;
     };
 
+    const appendCard = (item: MediaItem, index: number, eagerCount: number): void => {
+      let card = cardCache.get(item.filePath);
+      if (!card) {
+        card = makeCard(item);
+        cardCache.set(item.filePath, card);
+      }
+      const image = card.querySelector<HTMLImageElement>("img.al-cover");
+      if (image) {
+        image.loading = index < eagerCount ? "eager" : "lazy";
+        image.fetchPriority = index < 2 ? "high" : "auto";
+        image.sizes = libraryCoverSizes(state.view);
+      }
+      grid.appendChild(card);
+    };
+
     function update(): void {
+      activeProgressiveRenders.get(container)?.();
+      activeProgressiveRenders.delete(container);
       const query = state.query;
       let filtered = items.filter((item) => {
         if (state.type !== "all" && item.mediaType !== state.type) return false;
@@ -441,23 +463,82 @@ export const AnimeListUI: LibraryRenderer = (() => {
         adapters.afterRender?.({ ...state });
         return;
       }
+      const renderState = { ...state };
       const eagerCount = libraryEagerCoverCount(state.view);
-      filtered.forEach((item, index) => {
-        let card = cardCache.get(item.filePath);
-        if (!card) {
-          card = makeCard(item);
-          cardCache.set(item.filePath, card);
+      const requiresCompleteDom = adapters.requiresCompleteDom?.(renderState) === true;
+      const renderWindow = new ProgressiveRenderWindow(
+        filtered.length,
+        requiresCompleteDom ? filtered.length : LIBRARY_CARD_BATCH_SIZE,
+      );
+      const appendBatch = (batch: LibraryRenderBatch): void => {
+        for (let index = batch.start; index < batch.end; index += 1) {
+          appendCard(filtered[index], index, eagerCount);
         }
-        const image = card.querySelector<HTMLImageElement>("img.al-cover");
-        if (image) {
-          image.loading = index < eagerCount ? "eager" : "lazy";
-          image.fetchPriority = index < 2 ? "high" : "auto";
-          image.sizes = libraryCoverSizes(state.view);
-        }
-        grid.appendChild(card);
-      });
+        adapters.afterRender?.({ ...state });
+      };
+      const initialBatch = renderWindow.reset();
+      appendBatch(initialBatch);
       if (adapters.onStateChange) adapters.onStateChange({ ...state });
-      adapters.afterRender?.({ ...state });
+      if (initialBatch.done) return;
+
+      const sentinel = makeEl("div", "al-library-progressive-sentinel", "\u200b");
+      sentinel.setAttribute("aria-hidden", "true");
+      let observer: IntersectionObserver | null = null;
+      let idleHandle: number | null = null;
+      let timerHandle: number | null = null;
+      let cancelled = false;
+
+      const cancel = (): void => {
+        if (cancelled) return;
+        cancelled = true;
+        observer?.disconnect();
+        if (idleHandle !== null && typeof window.cancelIdleCallback === "function") {
+          window.cancelIdleCallback(idleHandle);
+        }
+        if (timerHandle !== null) window.clearTimeout(timerHandle);
+        sentinel.remove();
+      };
+      activeProgressiveRenders.set(container, cancel);
+
+      const revealNext = (): void => {
+        if (cancelled) return;
+        sentinel.remove();
+        const batch = renderWindow.next();
+        appendBatch(batch);
+        if (batch.done) {
+          observer?.disconnect();
+          activeProgressiveRenders.delete(container);
+          return;
+        }
+        grid.after(sentinel);
+        observer?.observe(sentinel);
+      };
+
+      grid.after(sentinel);
+      if (typeof IntersectionObserver === "function") {
+        observer = new IntersectionObserver((entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          observer?.unobserve(sentinel);
+          revealNext();
+        }, { rootMargin: "800px 0px" });
+        observer.observe(sentinel);
+      } else {
+        const scheduleIdleBatch = (): void => {
+          if (cancelled) return;
+          const run = (): void => {
+            idleHandle = null;
+            timerHandle = null;
+            revealNext();
+            if (!cancelled && sentinel.isConnected) scheduleIdleBatch();
+          };
+          if (typeof window.requestIdleCallback === "function") {
+            idleHandle = window.requestIdleCallback(run, { timeout: 250 });
+          } else {
+            timerHandle = window.setTimeout(run, 16);
+          }
+        };
+        scheduleIdleBatch();
+      }
     }
 
     update();

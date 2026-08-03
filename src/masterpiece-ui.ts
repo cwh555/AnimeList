@@ -264,6 +264,7 @@ export const masterpieceFeature = defineFeature<AnimeListFeatureHost>({
     prepareAdapters(adapters, { host }): LibraryRenderAdapters {
       const upstreamExtraFilters = adapters.extraStatusFilters;
       const upstreamMatcher = adapters.matchesStatusFilter;
+      const upstreamRequiresCompleteDom = adapters.requiresCompleteDom;
       return {
         ...adapters,
         extraStatusFilters: (type) => [
@@ -274,6 +275,10 @@ export const masterpieceFeature = defineFeature<AnimeListFeatureHost>({
           const special = matchesSpecialLabelFilter(item, filter);
           return typeof special === "boolean" ? special : upstreamMatcher?.(item, filter);
         },
+        requiresCompleteDom: (state) => Boolean(
+          upstreamRequiresCompleteDom?.(state)
+          || (modeOf(host) === "masterpiece" && state.status === "favorite"),
+        ),
       };
     },
     afterRender(context): void {
