@@ -1,6 +1,7 @@
 import { TFile, normalizePath, type App } from "obsidian";
 import { CoverThumbnailCache } from "../cover-cache";
 import { ExternalMediaSearchService, HttpMetadataProviderClient, type MetadataProviderClient } from "../data/external-media-service";
+import { isLibraryRelevantPath } from "../data/library-change-scope";
 import { LibraryStorage } from "../data/library-storage";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
@@ -99,6 +100,9 @@ export class AnimeListApplicationServices {
   getManagedMediaFolder(mediaType: MediaType): string { return this.libraryStorage().managedMediaFolder(mediaType); }
   getMediaFolder(mediaType: MediaType): string { return this.libraryStorage().mediaFolder(mediaType); }
   getScanFolders(): string[] { return this.libraryStorage().scanFolders(); }
+  isLibraryRelevantPath(path: string): boolean {
+    return isLibraryRelevantPath(path, this.getScanFolders(), this.settings().coverFolder);
+  }
   async initializeLibrary(copyTemplates = false): Promise<void> { await this.libraryStorage().initialize(copyTemplates); }
   resolveMediaCoverFile(value: unknown, sourcePath: string): TFile | null { return this.repository().resolveCoverFile(value, sourcePath); }
   resolveMediaCoverPath(value: unknown, sourcePath: string): string { return this.repository().resolveCoverPath(value, sourcePath); }
