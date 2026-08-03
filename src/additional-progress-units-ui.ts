@@ -1,5 +1,10 @@
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
-import { createSegmentedDateInput } from "./segmented-date-input";
+import { createSerialEntryDateControls } from "./ui/serial-entry-date-controls";
+import {
+  createSerialEntryKeyboardNavigation,
+  type SerialEntryKeyboardNavigation,
+  type SerialEntryKeyboardTarget,
+} from "./ui/serial-entry-keyboard-navigation";
 import { captureScrollPosition, scheduleStableSerialEntryFocus } from "./serial-entry-scroll-stability";
 import {
   compareSerialLabels,
@@ -31,6 +36,7 @@ export interface ReadingProgressEditorState {
   preparedProgress: ProgressValue;
   originalTitle: string;
   listeners: Set<RowListener>;
+  keyboard: SerialEntryKeyboardNavigation;
   render(): void;
 }
 
@@ -101,6 +107,7 @@ function renderEditor(state: ReadingProgressEditorState): void {
   });
   add.type = "button";
   state.entries.sort((left, right) => compareSerialLabels(left.label, right.label, state.unit));
+  const keyboardTargets: SerialEntryKeyboardTarget[] = [];
 
   if (!state.entries.length) {
     rows.createEl("p", { cls: "al-volume-editor-empty", text: textForUnit("empty", state.unit) });
@@ -114,22 +121,13 @@ function renderEditor(state: ReadingProgressEditorState): void {
     labelInput.type = "text";
     labelInput.inputMode = state.unit === "volume" ? "decimal" : "numeric";
     labelInput.value = entry.label;
-    fields.appendChild(makeField(
+    const labelField = makeField(
       textForUnit("label", state.unit),
       labelInput,
       progressUnitFeatureText(state.unit === "volume" ? "labelPlaceholderVolume" : "labelPlaceholderInteger"),
-    ));
-
-    const startedAt = createSegmentedDateInput(entry.startedAt);
-    fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
-
-    const completedAt = createSegmentedDateInput(entry.completedAt || todayString());
-    entry.completedAt = completedAt.value;
-    fields.appendChild(makeField(
-      progressUnitFeatureText("completedAt"),
-      completedAt,
-      progressUnitFeatureText("completedHint"),
-    ));
+    );
+    labelField.dataset.serialField = "label";
+    fields.appendChild(labelField);
 
     const actions = row.createDiv({ cls: "al-volume-row-actions" });
     const remove = actions.createEl("button", {
@@ -137,6 +135,34 @@ function renderEditor(state: ReadingProgressEditorState): void {
       text: progressUnitFeatureText("remove"),
     });
     remove.type = "button";
+
+    const { startedAt, completedAt } = createSerialEntryDateControls({
+      labelInput,
+      removeButton: remove,
+      startedAt: entry.startedAt,
+      completedAt: entry.completedAt || todayString(),
+    });
+    fields.appendChild(makeField(progressUnitFeatureText("startedAt"), startedAt));
+
+    entry.completedAt = completedAt.value;
+    const completedAtField = makeField(
+      progressUnitFeatureText("completedAt"),
+      completedAt,
+      progressUnitFeatureText("completedHint"),
+    );
+    completedAtField.dataset.serialField = "completed-at";
+    fields.appendChild(completedAtField);
+
+    keyboardTargets.push(
+      labelInput,
+      startedAt.parts.year,
+      startedAt.parts.month,
+      startedAt.parts.day,
+      completedAt.parts.year,
+      completedAt.parts.month,
+      completedAt.parts.day,
+      remove,
+    );
 
     labelInput.addEventListener("input", () => { entry.label = labelInput.value; });
     startedAt.addEventListener("input", () => { entry.startedAt = startedAt.value; });
@@ -150,6 +176,12 @@ function renderEditor(state: ReadingProgressEditorState): void {
       state.render();
     });
   });
+
+  keyboardTargets.push(
+    add,
+    () => state.context.modalEl.querySelector<HTMLButtonElement>(".al-modal-actions .mod-cta"),
+  );
+  state.keyboard.update(keyboardTargets);
 
   add.addEventListener("click", () => {
     const snapshot = captureScrollPosition(state.editor);
@@ -233,6 +265,7 @@ function configureReadingEditor(context: MediaFormContext<AnimeListFeatureHost>)
   if (favoriteRow) favoriteRow.insertAdjacentElement("beforebegin", editor);
   else context.formEl.appendChild(editor);
 
+  const keyboard = createSerialEntryKeyboardNavigation(editor);
   const state: ReadingProgressEditorState = {
     context,
     unit: selected,
@@ -241,6 +274,7 @@ function configureReadingEditor(context: MediaFormContext<AnimeListFeatureHost>)
     preparedProgress: normalizeSerialProgress(context.fields.progress.value, selected) ?? 0,
     originalTitle: originalTitle(context),
     listeners: new Set(),
+    keyboard,
     render: () => renderEditor(state),
   };
   context.state.set(READING_EDITOR_STATE_KEY, state);

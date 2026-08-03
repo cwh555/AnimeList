@@ -63,7 +63,7 @@ describe("serial entry scroll stability", () => {
     assert.equal(view.scrollY, 73);
   });
 
-  it("selects the unit input from the newest row, not a segmented date input", () => {
+  it("selects the label input from the newest serial row", () => {
     const previousInput = { value: "1" } as HTMLInputElement;
     const newestInput = { value: "2" } as HTMLInputElement;
     const previousRow = {
@@ -73,7 +73,7 @@ describe("serial entry scroll stability", () => {
       querySelector: (selector: string) => {
         assert.equal(
           selector,
-          ".al-volume-row-fields > .al-form-field:first-child > input",
+          '.al-volume-row-fields > .al-form-field[data-serial-field="label"] > input',
         );
         return newestInput;
       },

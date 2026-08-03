@@ -53,7 +53,7 @@ export function findNewestSerialLabelInput(editor: HTMLElement): HTMLInputElemen
   const rows = editor.querySelectorAll<HTMLElement>(".al-volume-row");
   const newest = rows.item(rows.length - 1);
   return newest?.querySelector<HTMLInputElement>(
-    ".al-volume-row-fields > .al-form-field:first-child > input",
+    '.al-volume-row-fields > .al-form-field[data-serial-field="label"] > input',
   ) ?? null;
 }
 
@@ -81,4 +81,3 @@ export function scheduleStableSerialEntryFocus(
     view.requestAnimationFrame(() => view.requestAnimationFrame(stabilize));
   }
 }
-
