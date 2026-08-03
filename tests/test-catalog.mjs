@@ -37,6 +37,7 @@ export const TEST_TARGETS = [
   { path: "tests/score-dashboard.test.ts", kind: "test", suite: "unit", features: ["score-dashboard", "rating"] },
   { path: "tests/score-dashboard-selection.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
   { path: "tests/score-dashboard-drag-scroll.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
+  { path: "tests/score-dashboard-cover-sources.test.ts", kind: "test", suite: "unit", features: ["score-dashboard", "covers"] },
 
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
