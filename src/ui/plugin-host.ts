@@ -17,6 +17,7 @@ export interface AnimeListUiHost {
 
   renderLibrary(container: HTMLElement, items: MediaItem[], adapters?: LibraryRenderAdapters): void;
   collectMediaItems(source?: string): MediaItem[];
+  getScanFolders(): string[];
   searchExternal(mediaType: MediaType, query: string): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];

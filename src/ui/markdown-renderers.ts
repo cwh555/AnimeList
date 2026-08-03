@@ -1,10 +1,11 @@
-import { MarkdownRenderChild, TFile } from "obsidian";
+import { MarkdownRenderChild, TAbstractFile, TFile } from "obsidian";
 import type { MediaItem, MediaType } from "../types";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeProgressValue, normalizeReleaseStatus, progressDisplayValue } from "../novel-progress";
 import { uiText } from "../ui-text";
 import type { LibraryViewMode } from "./library-contracts";
 import type { AnimeListUiHost } from "./plugin-host";
+import { shouldRefreshAnimeListBlockPath, shouldRefreshAnimeListBlockRename } from "./markdown-refresh-scope";
 import { ConfirmDeleteModal } from "./media-modals";
 import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel } from "./ui-helpers";
 
@@ -24,10 +25,25 @@ export class AnimeListRenderChild extends MarkdownRenderChild {
 
   onload(): void {
     this.render();
-    this.registerEvent(this.plugin.app.metadataCache.on("changed", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.vault.on("create", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.vault.on("delete", () => this.scheduleRender()));
-    this.registerEvent(this.plugin.app.vault.on("rename", () => this.scheduleRender()));
+    const shouldRefresh = (path: string): boolean => shouldRefreshAnimeListBlockPath(
+      path, this.config.source, this.plugin.getScanFolders(), this.plugin.settings.coverFolder,
+    );
+    this.registerEvent(this.plugin.app.metadataCache.on("changed", (file) => {
+      if (file instanceof TFile && shouldRefresh(file.path)) this.scheduleRender();
+    }));
+    this.registerEvent(this.plugin.app.vault.on("create", (file) => {
+      if (file instanceof TAbstractFile && shouldRefresh(file.path)) this.scheduleRender();
+    }));
+    this.registerEvent(this.plugin.app.vault.on("delete", (file) => {
+      if (file instanceof TAbstractFile && shouldRefresh(file.path)) this.scheduleRender();
+    }));
+    this.registerEvent(this.plugin.app.vault.on("rename", (file, oldPath) => {
+      const newPath = file instanceof TAbstractFile ? file.path : "";
+      const previousPath = typeof oldPath === "string" ? oldPath : "";
+      if (shouldRefreshAnimeListBlockRename(
+        previousPath, newPath, this.config.source, this.plugin.getScanFolders(), this.plugin.settings.coverFolder,
+      )) this.scheduleRender();
+    }));
   }
 
   scheduleRender(): void {
