@@ -47,66 +47,72 @@ export class MediaRepository {
     return coverFile ? this.app.vault.getResourcePath(coverFile) : "";
   }
 
+  read(file: TFile): MediaItem | null {
+    const frontmatter = frontmatterRecord(
+      this.app.metadataCache.getFileCache(file)?.frontmatter,
+    );
+    if (!frontmatter) return null;
+    const mediaType = mediaTypeOf(frontmatter.media_type);
+    if (!mediaType) return null;
+
+    const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
+    const studios = stringArray(frontmatter.studios);
+    const authors = stringArray(frontmatter.authors);
+    const people = studios.length
+      ? studios
+      : authors.length
+        ? authors
+        : stringArray(frontmatter.creators);
+    const modified = Number(file.stat?.mtime || 0);
+    const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
+    const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
+
+    return {
+      title: stringValue(frontmatter.title, file.basename),
+      originalTitle: stringValue(
+        frontmatter.title_original,
+        stringValue(frontmatter.title_romaji),
+      ),
+      mediaType,
+      format: stringValue(frontmatter.format, mediaType),
+      status: normalizeMediaStatus(frontmatter.status),
+      releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
+      progress: normalizeProgressValue(frontmatter.progress),
+      total: mediaType === "anime"
+        ? normalizeProgressValue(frontmatter.progress_total)
+        : 0,
+      unit: stringValue(frontmatter.progress_unit),
+      score: optionalScore(frontmatter.score),
+      favorite: frontmatter.favorite === true,
+      year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string"
+        ? frontmatter.year
+        : "",
+      genres: normalizeGenres(frontmatter.genres),
+      people,
+      platforms: stringArray(frontmatter.platforms),
+      sourceUrls: stringArray(frontmatter.source_urls),
+      cover: coverFile
+        ? this.app.vault.getResourcePath(coverFile)
+        : /^https?:\/\//i.test(normalizedCoverPath(frontmatter.cover))
+          ? normalizedCoverPath(frontmatter.cover)
+          : "",
+      coverSources: coverFile ? this.coverSourcesFor?.(coverFile) : undefined,
+      filePath: file.path,
+      updated: modified,
+      updatedLabel: modifiedLabel
+        ? uiText("library.updatedAt", { date: modifiedLabel })
+        : "",
+      startedAt: stringValue(frontmatter.started_at),
+      completedAt: stringValue(frontmatter.completed_at),
+      volumeLog: mediaType !== "anime" && isReadingProgressUnit(progressUnit)
+        ? normalizeSerialLog(frontmatter.volume_log, progressUnit)
+        : [],
+    };
+  }
+
   collect(roots: string[]): MediaItem[] {
     return getScopedMarkdownFiles(this.app, roots)
-      .map((file): MediaItem | null => {
-        const frontmatter = frontmatterRecord(
-          this.app.metadataCache.getFileCache(file)?.frontmatter,
-        );
-        if (!frontmatter) return null;
-        const mediaType = mediaTypeOf(frontmatter.media_type);
-        if (!mediaType) return null;
-
-        const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
-        const studios = stringArray(frontmatter.studios);
-        const authors = stringArray(frontmatter.authors);
-        const people = studios.length
-          ? studios
-          : authors.length
-            ? authors
-            : stringArray(frontmatter.creators);
-        const modified = Number(file.stat?.mtime || 0);
-        const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
-        const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
-
-        return {
-          title: stringValue(frontmatter.title, file.basename),
-          originalTitle: stringValue(
-            frontmatter.title_original,
-            stringValue(frontmatter.title_romaji),
-          ),
-          mediaType,
-          format: stringValue(frontmatter.format, mediaType),
-          status: normalizeMediaStatus(frontmatter.status),
-          releaseStatus: normalizeReleaseStatus(frontmatter.release_status),
-          progress: normalizeProgressValue(frontmatter.progress),
-          total: mediaType === "anime"
-            ? normalizeProgressValue(frontmatter.progress_total)
-            : 0,
-          unit: stringValue(frontmatter.progress_unit),
-          score: optionalScore(frontmatter.score),
-          favorite: frontmatter.favorite === true,
-          year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string"
-            ? frontmatter.year
-            : "",
-          genres: normalizeGenres(frontmatter.genres),
-          people,
-          platforms: stringArray(frontmatter.platforms),
-          sourceUrls: stringArray(frontmatter.source_urls),
-          cover: this.resolveCoverPath(frontmatter.cover, file.path),
-          coverSources: coverFile ? this.coverSourcesFor?.(coverFile) : undefined,
-          filePath: file.path,
-          updated: modified,
-          updatedLabel: modifiedLabel
-            ? uiText("library.updatedAt", { date: modifiedLabel })
-            : "",
-          startedAt: stringValue(frontmatter.started_at),
-          completedAt: stringValue(frontmatter.completed_at),
-          volumeLog: mediaType !== "anime" && isReadingProgressUnit(progressUnit)
-            ? normalizeSerialLog(frontmatter.volume_log, progressUnit)
-            : [],
-        };
-      })
+      .map((file) => this.read(file))
       .filter((item): item is MediaItem => item !== null);
   }
 
