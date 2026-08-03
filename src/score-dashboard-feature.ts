@@ -1,6 +1,7 @@
 import { Notice, TAbstractFile, TFile, setIcon, type WorkspaceLeaf } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { ScoreDashboardDragAutoScroller } from "./score-dashboard-drag-scroll";
+import { prepareScoreDashboardCoverSources } from "./score-dashboard-cover-sources";
 import { applyScoreDashboardChanges } from "./score-dashboard-score-service";
 import { confirmScoreDashboardClamp } from "./score-dashboard-operation-ui";
 import {
@@ -40,7 +41,7 @@ function createHost(
   refreshGuard: ScoreDashboardRefreshGuard,
 ): ScoreDashboardPluginHost {
   return {
-    collectMediaItems: () => plugin.collectMediaItems(),
+    collectMediaItems: () => prepareScoreDashboardCoverSources(plugin.collectMediaItems()),
     openMediaFile: (path) => plugin.openMediaFile(path),
     applyScoreChanges: async (changes) => {
       const paths = changes.map((change) => change.filePath);
