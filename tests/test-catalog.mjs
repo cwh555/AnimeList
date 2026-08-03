@@ -38,6 +38,7 @@ export const TEST_TARGETS = [
   { path: "tests/score-dashboard-drag-scroll.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
 
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
+  { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-pagination.test.ts", kind: "test", suite: "unit", features: ["search"] },
