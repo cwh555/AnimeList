@@ -38,7 +38,6 @@ export const TEST_TARGETS = [
   { path: "tests/score-dashboard-drag-scroll.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
 
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
-  { path: "tests/library-discovery.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-pagination.test.ts", kind: "test", suite: "unit", features: ["search"] },
@@ -57,7 +56,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/media-note-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "library", "covers"] },
   { path: "tests/contracts/media-update-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress", "library"] },
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
-  { path: "tests/contracts/existing-library-discovery.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
+  { path: "tests/contracts/existing-library-initialization.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },
   { path: "tests/contracts/plugin-workflows.test.ts", kind: "test", suite: "contract", features: ["timeline", "library"] },
