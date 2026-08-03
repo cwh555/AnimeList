@@ -51,10 +51,7 @@ export class AnimeListView extends ItemView {
       openFile: (path) => void this.host.openMediaFile(path),
       addItem: (mediaType) => this.host.openAddModal(mediaType),
       editItem: (path) => this.host.openEditModal(path),
-      toggleFavorite: async (path, next) => {
-        await this.host.setFavorite(path, next);
-        this.scheduleRender();
-      },
+      toggleFavorite: (path, next) => this.host.setFavorite(path, next),
       openTimeline: () => void this.host.openTimeline(),
     });
   }
