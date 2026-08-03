@@ -101,7 +101,8 @@ export class AnimeListApplicationServices {
 
   private existingDataScanFolders(configured: string[]): string[] {
     if (!this.discoveryComplete) {
-      const files = this.app.vault.getMarkdownFiles();
+      const vault = this.app.vault as typeof this.app.vault & { getMarkdownFiles(): TFile[] };
+      const files = vault.getMarkdownFiles();
       let unresolved = false;
       const candidates = files.map((file) => {
         const cache = this.app.metadataCache.getFileCache(file);
