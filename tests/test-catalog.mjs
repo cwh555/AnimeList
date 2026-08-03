@@ -23,6 +23,7 @@ export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
 
   { path: "tests/masterpiece-labels.test.ts", kind: "test", suite: "unit", features: ["masterpiece"] },
+  { path: "tests/masterpiece-decoration-cache.test.ts", kind: "test", suite: "unit", features: ["masterpiece", "library"] },
 
   { path: "tests/media-status.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/progress-display.test.ts", kind: "test", suite: "unit", features: ["progress"] },

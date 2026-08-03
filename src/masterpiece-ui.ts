@@ -13,6 +13,7 @@ import {
   stateAfterMasterpieceSelection,
   type SpecialLabelMode,
 } from "./masterpiece-labels";
+import { MasterpieceDecorationCache } from "./masterpiece-decoration-cache";
 import { masterpieceActionText, masterpieceFeatureText, specialLabelName } from "./masterpiece-feature-text";
 import type { LibraryRenderAdapters, LibraryRenderContext } from "./ui/library-contracts";
 import type { MediaFormContext } from "./ui/media-form-contracts";
@@ -20,6 +21,8 @@ import type { MediaFormContext } from "./ui/media-form-contracts";
 interface MediaItemWithMasterpiece extends MediaItem {
   masterpieceLabels?: string[];
 }
+
+const mediaDecorationCache = new MasterpieceDecorationCache();
 
 function modeOf(plugin: AnimeListFeatureHost): SpecialLabelMode {
   return normalizeSpecialLabelMode(plugin.settings.specialLabelMode);
@@ -253,11 +256,13 @@ export const masterpieceFeature = defineFeature<AnimeListFeatureHost>({
   }, {
     kind: "media-item",
     decorate(item, plugin): MediaItem {
-      const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
-      const frontmatter = file instanceof TFile
-        ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
-        : undefined;
-      return { ...item, masterpieceLabels: labelsFromFrontmatter(frontmatter) } as MediaItem;
+      return mediaDecorationCache.getOrCreate(plugin, item, () => {
+        const file = plugin.app.vault.getAbstractFileByPath(item.filePath);
+        const frontmatter = file instanceof TFile
+          ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
+          : undefined;
+        return { ...item, masterpieceLabels: labelsFromFrontmatter(frontmatter) } as MediaItem;
+      });
     },
   }, {
     kind: "library",
