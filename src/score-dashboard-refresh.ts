@@ -1,3 +1,5 @@
+import { isLibraryRelevantPath } from "./data/library-change-scope";
+
 export const SCORE_DASHBOARD_LOCAL_REFRESH_GUARD_MS = 1500;
 
 export class ScoreDashboardRefreshGuard {
@@ -30,4 +32,33 @@ export class ScoreDashboardRefreshGuard {
       if (until < now) this.untilByPath.delete(path);
     });
   }
+}
+
+export function shouldRefreshScoreDashboardPath(
+  path: string,
+  scanRoots: readonly string[],
+  coverFolder: string,
+): boolean {
+  return isLibraryRelevantPath(path, scanRoots, coverFolder);
+}
+
+export function shouldRefreshScoreDashboardMetadata(
+  path: string,
+  scanRoots: readonly string[],
+  coverFolder: string,
+  guard: ScoreDashboardRefreshGuard,
+  now = Date.now(),
+): boolean {
+  return shouldRefreshScoreDashboardPath(path, scanRoots, coverFolder)
+    && !guard.shouldSuppress(path, now);
+}
+
+export function shouldRefreshScoreDashboardRename(
+  oldPath: string,
+  newPath: string,
+  scanRoots: readonly string[],
+  coverFolder: string,
+): boolean {
+  return shouldRefreshScoreDashboardPath(oldPath, scanRoots, coverFolder)
+    || shouldRefreshScoreDashboardPath(newPath, scanRoots, coverFolder);
 }

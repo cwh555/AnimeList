@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TAbstractFile, TFile } from "obsidian";
 import { AnimeListApplicationServices } from "./app/anime-list-application";
 import { AnimeListFeatureRegistry } from "./app/feature-registry";
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
@@ -51,9 +51,20 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     this.registerCommands();
     this.addSettingTab(new AnimeListSettingTab(this.app, this));
 
-    this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
-    this.registerEvent(this.app.vault.on("delete", () => this.refreshViews()));
-    this.registerEvent(this.app.vault.on("rename", () => this.refreshViews()));
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+      if (file instanceof TFile && this.services().handleLibraryMetadataChange(file)) this.refreshViews();
+    }));
+    this.registerEvent(this.app.vault.on("delete", (file) => {
+      if (file instanceof TAbstractFile
+        && this.services().handleLibraryDelete(file.path, file instanceof TFile)) this.refreshViews();
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      const nextPath = file instanceof TAbstractFile ? file.path : "";
+      const previousPath = typeof oldPath === "string" ? oldPath : "";
+      if (this.services().handleLibraryRename(file instanceof TFile ? file : null, previousPath, nextPath)) {
+        this.refreshViews();
+      }
+    }));
   }
 
   private registerMarkdownRenderers(): void {

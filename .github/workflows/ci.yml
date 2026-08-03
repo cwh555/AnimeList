@@ -32,4 +32,6 @@ jobs:
         run: TZ=Asia/Taipei npm test
       - name: Run segmented-date keyboard flow in Chromium
         run: npm run test:browser:date
+      - name: Run responsive mobile layout in Chromium
+        run: npm run test:browser:mobile
       - run: npm run release:check

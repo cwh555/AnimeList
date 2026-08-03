@@ -53,6 +53,7 @@ export async function runChromiumDatasetTest({
   profile,
   testName,
   requireEnvironment = "ANIMELIST_REQUIRE_CHROMIUM",
+  viewport,
 }) {
   const browser = await findChromium();
   if (!browser) {
@@ -117,6 +118,14 @@ export async function runChromiumDatasetTest({
 
     await send("Page.enable");
     await send("Runtime.enable");
+    if (viewport) {
+      await send("Emulation.setDeviceMetricsOverride", {
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: viewport.deviceScaleFactor ?? 1,
+        mobile: viewport.mobile ?? false,
+      });
+    }
     const frameTree = await send("Page.getFrameTree");
     await send("Page.setDocumentContent", {
       frameId: frameTree.frameTree.frame.id,

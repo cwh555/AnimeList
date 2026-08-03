@@ -21,6 +21,7 @@ export interface LibraryRenderAdapters {
   toggleFavorite?: (path: string, next: boolean) => Promise<void> | void;
   onStateChange?: (state: LibraryRenderState) => void;
   afterRender?: (state: LibraryRenderState) => void;
+  requiresCompleteDom?: (state: LibraryRenderState) => boolean;
   onViewChange?: (view: LibraryViewMode) => void;
   openTimeline?: () => void;
   extraStatusFilters?: (type: string) => Array<[string, string]>;
