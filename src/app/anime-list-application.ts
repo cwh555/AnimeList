@@ -1,7 +1,6 @@
 import { TFile, normalizePath, type App } from "obsidian";
 import { CoverThumbnailCache } from "../cover-cache";
 import { ExternalMediaSearchService, HttpMetadataProviderClient, type MetadataProviderClient } from "../data/external-media-service";
-import { discoverExistingMediaRoots } from "../data/library-discovery";
 import { LibraryStorage } from "../data/library-storage";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
@@ -30,8 +29,6 @@ export class AnimeListApplicationServices {
   private noteService?: MediaNoteService;
   private updateService?: MediaUpdateService;
   private specialLabelService?: SpecialLabelStateService;
-  private discoveredScanFolders: string[] = [];
-  private discoveryComplete = false;
 
   constructor(
     private readonly app: App,
@@ -99,30 +96,9 @@ export class AnimeListApplicationServices {
     return this.specialLabelService;
   }
 
-  private existingDataScanFolders(configured: string[]): string[] {
-    if (!this.discoveryComplete) {
-      const vault = this.app.vault as typeof this.app.vault & { getMarkdownFiles(): TFile[] };
-      const files = vault.getMarkdownFiles();
-      let unresolved = false;
-      const candidates = files.map((file) => {
-        const cache = this.app.metadataCache.getFileCache(file);
-        if (!cache) unresolved = true;
-        return { path: file.path, frontmatter: cache?.frontmatter };
-      });
-      const discovered = discoverExistingMediaRoots(candidates, configured);
-      if (!unresolved) {
-        this.discoveredScanFolders = discovered;
-        this.discoveryComplete = true;
-      }
-      const current = unresolved ? discovered : this.discoveredScanFolders;
-      return [...new Set([...configured, ...current])];
-    }
-    return [...new Set([...configured, ...this.discoveredScanFolders])];
-  }
-
   getManagedMediaFolder(mediaType: MediaType): string { return this.libraryStorage().managedMediaFolder(mediaType); }
   getMediaFolder(mediaType: MediaType): string { return this.libraryStorage().mediaFolder(mediaType); }
-  getScanFolders(): string[] { return this.existingDataScanFolders(this.libraryStorage().scanFolders()); }
+  getScanFolders(): string[] { return this.libraryStorage().scanFolders(); }
   async initializeLibrary(copyTemplates = false): Promise<void> { await this.libraryStorage().initialize(copyTemplates); }
   resolveMediaCoverFile(value: unknown, sourcePath: string): TFile | null { return this.repository().resolveCoverFile(value, sourcePath); }
   resolveMediaCoverPath(value: unknown, sourcePath: string): string { return this.repository().resolveCoverPath(value, sourcePath); }
