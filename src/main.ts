@@ -1,5 +1,6 @@
-import { Notice, Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TAbstractFile, TFile } from "obsidian";
 import { AnimeListApplicationServices } from "./app/anime-list-application";
+import { isLibraryRelevantPath } from "./data/library-change-scope";
 import { AnimeListFeatureRegistry } from "./app/feature-registry";
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
 import { createReliableLibraryOpener } from "./library-navigation";
@@ -51,9 +52,22 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     this.registerCommands();
     this.addSettingTab(new AnimeListSettingTab(this.app, this));
 
-    this.registerEvent(this.app.metadataCache.on("changed", () => this.refreshViews()));
-    this.registerEvent(this.app.vault.on("delete", () => this.refreshViews()));
-    this.registerEvent(this.app.vault.on("rename", () => this.refreshViews()));
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+      if (file instanceof TFile && this.isLibraryRefreshRelevant(file.path)) this.refreshViews();
+    }));
+    this.registerEvent(this.app.vault.on("delete", (file) => {
+      if (file instanceof TAbstractFile && this.isLibraryRefreshRelevant(file.path)) this.refreshViews();
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      const nextPath = file instanceof TAbstractFile ? file.path : "";
+      const previousPath = typeof oldPath === "string" ? oldPath : "";
+      if ((nextPath && this.isLibraryRefreshRelevant(nextPath))
+        || (previousPath && this.isLibraryRefreshRelevant(previousPath))) this.refreshViews();
+    }));
+  }
+
+  private isLibraryRefreshRelevant(path: string): boolean {
+    return isLibraryRelevantPath(path, this.getScanFolders(), this.settings.coverFolder);
   }
 
   private registerMarkdownRenderers(): void {
