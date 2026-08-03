@@ -52,16 +52,18 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     this.addSettingTab(new AnimeListSettingTab(this.app, this));
 
     this.registerEvent(this.app.metadataCache.on("changed", (file) => {
-      if (file instanceof TFile && this.services().isLibraryRelevantPath(file.path)) this.refreshViews();
+      if (file instanceof TFile && this.services().handleLibraryMetadataChange(file)) this.refreshViews();
     }));
     this.registerEvent(this.app.vault.on("delete", (file) => {
-      if (file instanceof TAbstractFile && this.services().isLibraryRelevantPath(file.path)) this.refreshViews();
+      if (file instanceof TAbstractFile
+        && this.services().handleLibraryDelete(file.path, file instanceof TFile)) this.refreshViews();
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       const nextPath = file instanceof TAbstractFile ? file.path : "";
       const previousPath = typeof oldPath === "string" ? oldPath : "";
-      if ((nextPath && this.services().isLibraryRelevantPath(nextPath))
-        || (previousPath && this.services().isLibraryRelevantPath(previousPath))) this.refreshViews();
+      if (this.services().handleLibraryRename(file instanceof TFile ? file : null, previousPath, nextPath)) {
+        this.refreshViews();
+      }
     }));
   }
 
