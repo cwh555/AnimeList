@@ -1,3 +1,4 @@
+import { normalizeAniListClassification } from "../domain/media-classification";
 import { normalizeGenres } from "../domain/media-metadata";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
@@ -127,6 +128,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
       originalTitle,
       ...bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
     ].map((title) => title.trim()).filter(Boolean))],
+    sources: subjectId ? [{ provider: "bangumi", sourceId: subjectId, sourceUrl: `https://bgm.tv/subject/${subjectId}` }] : [],
   };
 }
 
@@ -159,6 +161,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     : "");
   const cover = record(media.coverImage);
   const averageScore = optionalNumber(media.averageScore);
+  const classification = normalizeAniListClassification(media);
   return {
     provider: "anilist",
     sourceId: mediaId,
@@ -187,6 +190,8 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
       stringValue(title.native),
       ...stringList(media.synonyms),
     ].map((entry) => entry.trim()).filter(Boolean))],
+    sources: mediaId ? [{ provider: "anilist", sourceId: mediaId, sourceUrl: siteUrl }] : [],
+    ...(classification ? { classification } : {}),
   };
 }
 
@@ -216,26 +221,64 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     summary: "",
     externalScore: null,
     releaseStatus: "unknown",
+    sources: key ? [{ provider: "openlibrary", sourceId: key, sourceUrl: `https://openlibrary.org/works/${key}` }] : [],
   };
 }
 
 export function dedupeSearchResults(results: readonly ExternalMediaResult[]): ExternalMediaResult[] {
-  const seenSource = new Set<string>();
-  const titleOwners = new Map<string, string>();
+  const sourceIndexes = new Map<string, number>();
+  const titleOwners = new Map<string, { provider: string; index: number }>();
   const output: ExternalMediaResult[] = [];
-  for (const result of results) {
-    const sourceKey = `${result.provider}:${result.sourceId}`;
-    if (seenSource.has(sourceKey)) continue;
-    seenSource.add(sourceKey);
+
+  const sourceRefs = (result: ExternalMediaResult) => {
+    const refs = result.sources?.length
+      ? result.sources
+      : result.sourceId
+        ? [{ provider: result.provider, sourceId: result.sourceId, sourceUrl: result.sourceUrl }]
+        : [];
+    const seen = new Set<string>();
+    return refs.filter((ref) => {
+      const key = `${ref.provider}:${ref.sourceId}`;
+      if (!ref.sourceId || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const mergeResult = (left: ExternalMediaResult, right: ExternalMediaResult): ExternalMediaResult => {
+    const sources = sourceRefs({ ...left, sources: [...sourceRefs(left), ...sourceRefs(right)] });
+    return {
+      ...left,
+      sources,
+      ...(left.classification ? {} : right.classification ? { classification: right.classification } : {}),
+    };
+  };
+
+  for (const rawResult of results) {
+    const result: ExternalMediaResult = { ...rawResult, sources: sourceRefs(rawResult) };
+    const sourceKey = result.sourceId ? `${result.provider}:${result.sourceId}` : "";
+    const sourceIndex = sourceKey ? sourceIndexes.get(sourceKey) : undefined;
+    if (sourceIndex !== undefined) {
+      output[sourceIndex] = mergeResult(output[sourceIndex], result);
+      continue;
+    }
 
     const comparableTitle = normalizeComparable(result.title || result.originalTitle);
     const titleKey = comparableTitle
       ? `${result.mediaType}:${comparableTitle}:${result.year || ""}:${result.format || ""}`
       : "";
     const titleOwner = titleKey ? titleOwners.get(titleKey) : undefined;
-    if (titleOwner && titleOwner !== result.provider) continue;
-    if (titleKey && !titleOwner) titleOwners.set(titleKey, result.provider);
+    if (titleOwner && titleOwner.provider !== result.provider) {
+      output[titleOwner.index] = mergeResult(output[titleOwner.index], result);
+      for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, titleOwner.index);
+      continue;
+    }
+
+    const index = output.length;
     output.push(result);
+    if (sourceKey) sourceIndexes.set(sourceKey, index);
+    for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, index);
+    if (titleKey && !titleOwner) titleOwners.set(titleKey, { provider: result.provider, index });
   }
   return output;
 }

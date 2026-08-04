@@ -14,6 +14,7 @@ export interface MetadataProviderClient {
   readonly supportsChineseDiscovery?: boolean;
   supports(mediaType: MediaType): boolean;
   searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage>;
+  searchPages?(mediaType: MediaType, queries: string[], page: number): Promise<MetadataProviderPage[]>;
 }
 
 export interface MetadataProviderClients {
