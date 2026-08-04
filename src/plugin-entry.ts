@@ -2,6 +2,7 @@ import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types
 import { additionalProgressUnitsFeature } from "./additional-progress-units-ui";
 import AnimeListPlugin from "./main";
 import { masterpieceFeature } from "./masterpiece-ui";
+import { legacyMetadataSettingsFeature } from "./legacy-metadata-settings";
 import { progressUiFeature } from "./progress-ui";
 import { ratingFeature } from "./rating-ui";
 import { scoreDashboardFeature } from "./score-dashboard-feature";
@@ -18,6 +19,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   additionalProgressUnitsFeature,
   serialEntryCoversFeature,
   serialCoverSettingsFeature,
+  legacyMetadataSettingsFeature,
   masterpieceFeature,
   scoreDashboardFeature,
 ];
