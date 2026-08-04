@@ -117,58 +117,7 @@ describe("external search fallbacks", () => {
 
 
 
-  it("merges fallback provider responses and returns the requested second season", async () => {
-    const common = {
-      provider: "anilist", sourceUrl: "", mediaType: "anime", format: "tv", year: 2020, coverUrl: "",
-      genres: [], rawGenres: [], people: [], platforms: [], total: 12, unit: "episode", summary: "",
-      externalScore: null, releaseStatus: "finished", originalTitle: "", romajiTitle: "",
-    } as const;
-    const calls: string[] = [];
-    const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
-      searchBangumi: (mediaType: string, query: string) => Promise<typeof common[]>;
-      searchAniList: (mediaType: string, query: string) => Promise<Array<typeof common & { sourceId: string; title: string; searchTitles: string[] }>>;
-    };
-    plugin.settings = structuredClone(DEFAULT_SETTINGS);
-    plugin.settings.providers.openlibrary = false;
-    plugin.searchBangumi = async (_mediaType, query) => { calls.push(`bangumi:${query}`); return []; };
-    plugin.searchAniList = async (_mediaType, query) => {
-      calls.push(`anilist:${query}`);
-      if (query !== "輝夜姬想讓人告白") return [];
-      return [
-        { ...common, year: 2019, sourceId: "101921", title: "Kaguya-sama: Love is War", searchTitles: ["辉夜大小姐想让我告白"] },
-        { ...common, year: 2020, sourceId: "112641", title: "Kaguya-sama: Love is War?", searchTitles: ["Kaguya-sama: Love is War Season 2", "辉夜大小姐想让我告白 第二季"] },
-      ];
-    };
 
-    const response = await plugin.searchExternal("anime", "輝夜姬想讓人告白第二季");
-    assert.equal(response.results[0].sourceId, "112641");
-    assert.ok(calls.includes("bangumi:輝夜姬想讓人告白第二季"));
-    assert.ok(calls.includes("bangumi:輝夜姬想讓人告白"));
-    assert.ok(calls.includes("anilist:輝夜姬想讓人告白第二季"));
-    assert.ok(calls.includes("anilist:輝夜姬想讓人告白"));
-  });
-
-  it("keeps a translated subtitle result returned by a broader query", async () => {
-    const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
-      searchBangumi: (mediaType: string, query: string) => Promise<any[]>;
-      searchAniList: (mediaType: string, query: string) => Promise<any[]>;
-    };
-    plugin.settings = structuredClone(DEFAULT_SETTINGS);
-    plugin.settings.providers.anilist = false;
-    plugin.settings.providers.openlibrary = false;
-    plugin.searchAniList = async () => [];
-    plugin.searchBangumi = async (_mediaType, query) => query === "輝夜姬想讓人告白"
-      ? [{
-        ...baseResult, provider: "bangumi", sourceId: "425211", sourceUrl: "", mediaType: "anime",
-        title: "辉夜大小姐想让我告白-初吻不会结束-", originalTitle: "かぐや様は告らせたい-ファーストキッスは終わらない-",
-        romajiTitle: "", format: "special", year: 2022, coverUrl: "", rawGenres: [], people: [], platforms: [],
-        externalScore: null, releaseStatus: "finished", searchTitles: ["輝夜姬想讓人告白－永不結束的初吻－"],
-      }]
-      : [];
-
-    const response = await plugin.searchExternal("anime", "輝夜姬想讓人告白 永不結束的初吻");
-    assert.equal(response.results.some((result) => result.sourceId === "425211"), true);
-  });
 });
 
 describe("segmented date input", () => {

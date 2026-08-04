@@ -5,6 +5,7 @@
 export type {
   CoverSources,
   ExternalMediaResult,
+  ExternalMediaSearchPage,
   MediaItem,
   MediaNoteForm,
   MediaType,

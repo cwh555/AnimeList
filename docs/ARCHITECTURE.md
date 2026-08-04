@@ -9,7 +9,7 @@ AnimeList is a local-first Obsidian plugin. Markdown notes and YAML frontmatter 
 - `src/plugin-entry.ts` declares the single ordered feature manifest.
 - `src/app/feature-types.ts` defines the supported feature capabilities and structural host contract.
 - `src/app/feature-registry.ts` validates duplicate IDs, dependencies, declaration order, and one-time activation before dispatching capabilities.
-- `src/app/anime-list-application.ts` is the single owner of storage, repository, provider, search, note/update, and cover-cache services.
+- `src/app/anime-list-application.ts` is the single owner of storage, repository, external-media clients/search, note/update, and cover-cache services.
 - `src/main.ts` owns only Obsidian lifecycle, commands, view/Markdown registration, feature dispatch, and thin host delegation.
 - `src/app-metadata.ts` is the single runtime version and user-agent source.
 
@@ -33,9 +33,11 @@ Application wiring may compose services, but it must not implement provider norm
 - `media-note-codec.ts`: the only Markdown/YAML note writer.
 - `media-repository.ts`: the authoritative library frontmatter reader and source-identity lookup.
 - `library-storage.ts`: folder, scan-root, template, and unique-path policy.
-- `provider-normalizers.ts`: provider payload normalization and result deduplication.
-- `external-media-service.ts`: provider orchestration, query variants, warnings, and ranking.
-- `external-media-pagination.ts`: provider pagination requests and merge policy.
+- `providers/*-client.ts`: one HTTP/API boundary per external metadata provider. AniList GraphQL transport lives only in `providers/anilist-client.ts`, so future AniList metadata methods (for example classification/tags) reuse the same endpoint and request policy.
+- `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
+- `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
+- `provider-normalizers.ts`: pure provider payload normalization and cross-provider result deduplication.
+- `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
 - `media-note-service.ts`: note creation and cover-download workflow.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
 - `special-label-state-service.ts`: the single favorite/masterpiece metadata writer and compatibility cleanup path.

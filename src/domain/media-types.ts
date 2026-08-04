@@ -61,6 +61,12 @@ export interface TimelineMediaEntry extends MediaItem {
   serialEntryLabel?: string;
 }
 
+export interface ExternalMediaSearchPage {
+  results: ExternalMediaResult[];
+  warnings: string[];
+  hasMore: boolean;
+}
+
 export interface ExternalMediaResult {
   provider: string;
   sourceId: string;

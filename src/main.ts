@@ -9,7 +9,7 @@ import { AnimeListSettingsStore } from "./settings-store";
 import { searchFeatureText } from "./search-feature-text";
 import { loadMissingSerialCovers, type SerialCoverMigrationProgress, type SerialCoverMigrationSummary } from "./serial-cover-service";
 import { MEDIA_STATUS_MIGRATION_VERSION, migrateMediaStatusNotes } from "./schema-migration";
-import type { AnimeListSettings, ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "./types";
+import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "./types";
 import { uiText } from "./ui-text";
 import { AnimeListUI } from "./ui/library-renderer";
 import type { LibraryRenderAdapters, LibraryViewMode } from "./ui/library-contracts";
@@ -90,11 +90,6 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
       this.app,
       this.manifest?.id ?? "animelist",
       () => this.settings,
-      {
-        searchBangumi: (mediaType, query) => this.searchBangumi(mediaType, query),
-        searchAniList: (mediaType, query) => this.searchAniList(mediaType, query),
-        searchOpenLibrary: (query) => this.searchOpenLibrary(query),
-      },
       {
         openMediaFile: (path) => this.openMediaFile(path),
         refreshViews: () => this.refreshViews(),
@@ -244,6 +239,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.services().getTemplates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.services().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.services().searchExternal(mediaType, query); }
+  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.services().searchExternalPage(mediaType, query, page); }
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchBangumi(mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchAniList(mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.services().searchOpenLibrary(query); }
