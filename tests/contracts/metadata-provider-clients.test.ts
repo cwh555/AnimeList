@@ -55,7 +55,27 @@ describe("metadata provider clients", () => {
       return {
         json: {
           total: 41,
-          data: [{ id: 10, name: "原名", name_cn: "中文名", images: {}, rating: {} }],
+          data: [{
+            id: 10,
+            name: "原名",
+            name_cn: "中文名",
+            images: {},
+            rating: {},
+            tags: [
+              { name: "恋爱" },
+              { name: "校园" },
+              { name: "CloverWorks" },
+              { name: "漫画改" },
+              { name: "2021年1月" },
+              { name: "狗粮" },
+              { name: "TV" },
+              { name: "日常" },
+              { name: "2021" },
+              { name: "青春" },
+              { name: "戸松遥" },
+            ],
+            infobox: [{ key: "動畫製作", value: "CloverWorks" }],
+          }],
         },
         text: "",
       };
@@ -66,6 +86,9 @@ describe("metadata provider clients", () => {
       assert.equal(JSON.parse(request.body).filter.type[0], 2);
       assert.equal(page.results[0]?.provider, "bangumi");
       assert.equal(page.results[0]?.sourceId, "10");
+      assert.deepEqual(page.results[0]?.genres, ["戀愛", "日常"]);
+      assert.deepEqual(page.results[0]?.rawGenres, ["戀愛", "日常"]);
+      assert.deepEqual(page.results[0]?.people, ["CloverWorks"]);
       assert.equal(page.hasMore, true);
     } finally {
       setRequestUrlMock(null);

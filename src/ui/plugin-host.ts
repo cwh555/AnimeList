@@ -22,6 +22,7 @@ export interface AnimeListUiHost {
     results: ExternalMediaResult[];
     warnings: string[];
   }>;
+  enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;

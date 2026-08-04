@@ -2,6 +2,7 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
+import { renderMediaClassificationFields } from "./media-classification-fields";
 import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 
@@ -174,7 +175,15 @@ export class AddMediaModal extends Modal {
     preview.appendChild(copy);
     this.contentEl.appendChild(preview);
 
-    const templates = await this.plugin.getTemplates(result.mediaType);
+    const metadataLoading = makeEl("p", "al-modal-hint", uiText("add.metadataLoading"));
+    this.contentEl.appendChild(metadataLoading);
+    const [templates, enrichedResult] = await Promise.all([
+      this.plugin.getTemplates(result.mediaType),
+      this.plugin.enrichExternalMedia(result),
+    ]);
+    metadataLoading.remove();
+    renderMediaClassificationFields(this.contentEl, enrichedResult);
+
     const form = createDiv();
     form.className = "al-media-form";
     const templateOptions: Array<[string, string]> = templates.length
@@ -182,18 +191,18 @@ export class AddMediaModal extends Modal {
       : [["", uiText("add.noTemplate")]];
     const fields = createMediaEditorFields({
       parent: form,
-      mediaType: result.mediaType,
+      mediaType: enrichedResult.mediaType,
       values: {
-        title: result.title,
+        title: enrichedResult.title,
         status: "planned",
-        releaseStatus: result.releaseStatus,
+        releaseStatus: enrichedResult.releaseStatus,
         score: "",
         startedAt: "",
         completedAt: "",
         progress: 0,
-        total: result.total || "",
-        unit: result.unit,
-        genres: result.genres,
+        total: enrichedResult.total || "",
+        unit: enrichedResult.unit,
+        genres: enrichedResult.genres,
         favorite: false,
       },
       templateOptions,
@@ -205,8 +214,8 @@ export class AddMediaModal extends Modal {
       plugin: this.plugin,
       modalEl: this.modalEl,
       formEl: form,
-      mediaType: result.mediaType,
-      result,
+      mediaType: enrichedResult.mediaType,
+      result: enrichedResult,
       file: null,
       frontmatter: {},
       fields,
@@ -215,7 +224,7 @@ export class AddMediaModal extends Modal {
 
     const sourceNote = createDiv();
     sourceNote.className = "al-source-note";
-    sourceNote.textContent = result.mediaType === "novel" ? uiText("add.sourceNovel") : uiText("add.sourceMedia");
+    sourceNote.textContent = enrichedResult.mediaType === "novel" ? uiText("add.sourceNovel") : uiText("add.sourceMedia");
     this.contentEl.appendChild(sourceNote);
 
     const actions = createDiv();
@@ -231,7 +240,7 @@ export class AddMediaModal extends Modal {
       try {
         const submitContext = { ...context, form: mediaFormValues(context) };
         await this.plugin.prepareMediaSubmit(submitContext);
-        const file = await this.plugin.createMediaNote(result, submitContext.form);
+        const file = await this.plugin.createMediaNote(enrichedResult, submitContext.form);
         this.close();
         new Notice(uiText("notice.collected", { title: submitContext.form.title }));
         await this.plugin.app.workspace.openLinkText(file.path, "", false);

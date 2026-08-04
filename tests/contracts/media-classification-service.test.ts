@@ -188,6 +188,8 @@ describe("media classification service", () => {
     assert.equal(merged.length, 1);
     assert.equal(merged[0]?.provider, "bangumi");
     assert.equal(merged[0]?.classification?.anilistId, "101");
+    assert.deepEqual(merged[0]?.genres, ["戀愛"]);
+    assert.deepEqual(merged[0]?.people, ["AniList Studio"]);
     assert.deepEqual(merged[0]?.sources?.map((source) => source.provider), ["bangumi", "anilist"]);
   });
 

@@ -192,6 +192,11 @@ export class AnimeListApplicationServices {
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }
+  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
+    return this.mediaClassification().enrichOrOriginal(result, (error) => {
+      console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
+    });
+  }
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
@@ -200,9 +205,7 @@ export class AnimeListApplicationServices {
     if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
       return this.mediaNotes().create(result, form);
     }
-    const enriched = await this.mediaClassification().enrichOrOriginal(result, (error) => {
-      console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
-    });
+    const enriched = await this.enrichExternalMedia(result);
     const originalGenres = result.genres ?? [];
     const formGenres = form.genres ?? [];
     const genresWereUnchanged = formGenres.length === originalGenres.length

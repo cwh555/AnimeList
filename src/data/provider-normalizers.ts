@@ -1,5 +1,5 @@
 import { normalizeAniListClassification } from "../domain/media-classification";
-import { normalizeGenres } from "../domain/media-metadata";
+import { normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
@@ -97,10 +97,11 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   else if (/ova/i.test(platform)) format = "ova";
   else if (/web|ona/i.test(platform)) format = "ona";
   const date = stringValue(subject.date);
-  const rawGenres = asArray(subject.tags)
+  const providerTags = asArray(subject.tags)
     .slice(0, 16)
     .map((tag) => typeof tag === "string" ? tag : stringValue(record(tag).name))
     .filter(Boolean);
+  const genres = normalizeBroadGenres(providerTags);
   const subjectId = stringValue(subject.id);
   const rating = record(subject.rating);
   return {
@@ -114,8 +115,8 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     format,
     year: yearValue(date.slice(0, 4)),
     coverUrl: stringValue(images.large, stringValue(images.common, stringValue(images.medium, stringValue(images.small, stringValue(images.grid))))),
-    genres: normalizeGenres(rawGenres),
-    rawGenres,
+    genres,
+    rawGenres: genres,
     people,
     platforms: platform ? [platform] : [],
     total: mediaType === "anime" ? numeric(subject.eps ?? subject.total_episodes) : 0,
@@ -198,7 +199,8 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
 export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
   const book = record(value);
   const key = stringValue(book.key).replace(/^\/works\//, "");
-  const rawGenres = stringList(book.subject).slice(0, 16);
+  const providerSubjects = stringList(book.subject).slice(0, 16);
+  const genres = normalizeBroadGenres(providerSubjects);
   const title = stringValue(book.title, uiText("media.untitled"));
   const coverId = stringValue(book.cover_i);
   return {
@@ -212,8 +214,8 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     format: "novel",
     year: yearValue(book.first_publish_year),
     coverUrl: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false` : "",
-    genres: normalizeGenres(rawGenres),
-    rawGenres,
+    genres,
+    rawGenres: genres,
     people: stringList(book.author_name).slice(0, 6),
     platforms: [],
     total: 0,
@@ -247,10 +249,17 @@ export function dedupeSearchResults(results: readonly ExternalMediaResult[]): Ex
 
   const mergeResult = (left: ExternalMediaResult, right: ExternalMediaResult): ExternalMediaResult => {
     const sources = sourceRefs({ ...left, sources: [...sourceRefs(left), ...sourceRefs(right)] });
+    const classification = left.classification ?? right.classification;
     return {
       ...left,
       sources,
-      ...(left.classification ? {} : right.classification ? { classification: right.classification } : {}),
+      ...(classification ? {
+        classification,
+        genres: classification.genres.length ? classification.genres : left.genres,
+        people: left.mediaType === "anime" && classification.studios.length
+          ? classification.studios
+          : left.people,
+      } : {}),
     };
   };
 

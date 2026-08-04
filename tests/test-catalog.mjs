@@ -65,6 +65,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/metadata-provider-clients.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/media-classification-service.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
+  { path: "tests/contracts/media-classification-fields.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
   { path: "tests/contracts/existing-library-initialization.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },
