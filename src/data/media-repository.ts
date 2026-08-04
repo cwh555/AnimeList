@@ -88,6 +88,14 @@ export class MediaRepository {
         ? frontmatter.year
         : "",
       genres: normalizeGenres(frontmatter.genres),
+      mediaTags: stringArray(frontmatter.media_tags),
+      season: stringValue(frontmatter.season),
+      seasonYear: typeof frontmatter.season_year === "number" || typeof frontmatter.season_year === "string"
+        ? frontmatter.season_year
+        : "",
+      sourceMaterial: stringValue(frontmatter.source_material),
+      countryOfOrigin: stringValue(frontmatter.country_of_origin),
+      anilistId: stringValue(frontmatter.anilist_id),
       people,
       platforms: stringArray(frontmatter.platforms),
       sourceUrls: stringArray(frontmatter.source_urls),

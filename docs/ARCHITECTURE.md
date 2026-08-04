@@ -22,6 +22,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `media-types.ts`: media, external-result, note-form, and serial-progress contracts.
 - `settings-types.ts`: persisted core settings contracts.
 - `media-metadata.ts`: genre and metadata normalization.
+- `media-classification.ts`: typed AniList classification values and persistence-safe tag filtering.
 - `value-normalization.ts`: safe scalar, array, path, and identifier helpers.
 
 `src/types.ts` remains a compatibility re-export barrel. New modules should import the responsible domain module directly.
@@ -33,10 +34,11 @@ Application wiring may compose services, but it must not implement provider norm
 - `media-note-codec.ts`: the only Markdown/YAML note writer.
 - `media-repository.ts`: the authoritative library frontmatter reader and source-identity lookup.
 - `library-storage.ts`: folder, scan-root, template, and unique-path policy.
-- `providers/*-client.ts`: one HTTP/API boundary per external metadata provider. AniList GraphQL transport lives only in `providers/anilist-client.ts`, so future AniList metadata methods (for example classification/tags) reuse the same endpoint and request policy.
+- `providers/*-client.ts`: one HTTP/API boundary per external metadata provider. AniList GraphQL transport lives only in `providers/anilist-client.ts`; it batches multilingual search variants, bounds interactive waits, reuses short-lived responses/in-flight requests, and applies the shared rate-limit/retry policy for both search and classification metadata.
 - `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
-- `provider-normalizers.ts`: pure provider payload normalization and cross-provider result deduplication.
+- `provider-normalizers.ts`: pure provider payload normalization and cross-provider result deduplication; deduped results retain all provider source identities so a surviving Bangumi/Open Library result can still reuse an AniList identity.
+- `media-classification-service.ts`: optional AniList enrichment after a user selects a work. Search-attached classification costs no extra request; preserved AniList IDs use one direct lookup; missing IDs use at most one batched strict-match lookup. Failure never blocks note creation.
 - `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
 - `media-note-service.ts`: note creation and cover-download workflow.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.

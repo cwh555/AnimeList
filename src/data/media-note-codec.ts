@@ -1,3 +1,4 @@
+import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeGenres } from "../domain/media-metadata";
 import type {
@@ -242,13 +243,24 @@ export function buildMediaMarkdown(
     .map(String)
     .filter((value) => value && !genres.includes(value));
   yamlArray(lines, "source_genres", rawGenres);
+  const classification = result.classification;
+  yamlArray(lines, "media_tags", persistedMediaTags(classification));
+  if (classification?.season) lines.push(`season: ${yamlScalar(classification.season)}`);
+  if (classification?.seasonYear) lines.push(`season_year: ${classification.seasonYear}`);
+  if (classification?.source) lines.push(`source_material: ${yamlScalar(classification.source)}`);
+  if (classification?.countryOfOrigin) lines.push(`country_of_origin: ${yamlScalar(classification.countryOfOrigin)}`);
+  if (classification?.anilistId) lines.push(`anilist_id: ${yamlScalar(classification.anilistId)}`);
   yamlArray(lines, "title_aliases", result.searchTitles ?? []);
   if (result.mediaType === "anime") yamlArray(lines, "studios", result.people);
   else yamlArray(lines, "authors", result.people);
   yamlArray(lines, "platforms", result.platforms);
   lines.push(`source_provider: ${yamlScalar(result.provider)}`);
   if (result.sourceId) lines.push(`source_id: ${yamlScalar(result.sourceId)}`);
-  yamlArray(lines, "source_urls", result.sourceUrl ? [result.sourceUrl] : []);
+  const sourceUrls = [...new Set([
+    result.sourceUrl,
+    ...(result.sources ?? []).map((source) => source.sourceUrl),
+  ].filter(Boolean))];
+  yamlArray(lines, "source_urls", sourceUrls);
   if (result.externalScore != null) lines.push(`source_score: ${numeric(result.externalScore)}`);
   if (form.templatePath) lines.push(`note_template: ${yamlScalar(form.templatePath)}`);
   lines.push("---", "");
