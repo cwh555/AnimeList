@@ -1,9 +1,24 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { setRequestUrlMock } from "../mocks/obsidian";
 import { AniListClient } from "../../src/data/providers/anilist-client";
 import { BangumiClient } from "../../src/data/providers/bangumi-client";
 import { OpenLibraryClient } from "../../src/data/providers/open-library-client";
+
+const originalWindow = globalThis.window;
+before(() => {
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      setTimeout: (handler: TimerHandler, timeout?: number) => setTimeout(handler, timeout),
+      clearTimeout: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
+    } as unknown as Window & typeof globalThis,
+  });
+});
+after(() => {
+  if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
+  else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+});
 
 function aniListMedia(id: number, format = "TV"): unknown {
   return {
@@ -22,7 +37,12 @@ function aniListMedia(id: number, format = "TV"): unknown {
     startDate: { year: 2026, month: 1, day: 1 },
     title: { romaji: `Title ${id}`, english: `Title ${id}`, native: `Title ${id}` },
     coverImage: { extraLarge: "", large: "", medium: "" },
-    studios: { nodes: [] },
+    season: "SPRING",
+    seasonYear: 2026,
+    source: "ORIGINAL",
+    countryOfOrigin: "JP",
+    tags: [{ name: "School", category: "Theme", rank: 80, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false }],
+    studios: { nodes: [{ name: "Studio Test" }] },
     staff: { edges: [] },
   };
 }
@@ -76,6 +96,169 @@ describe("metadata provider clients", () => {
       assert.match(body.query, /pageInfo \{ hasNextPage \}/);
       assert.deepEqual(page.results.map((item) => item.sourceId), ["1"]);
       assert.equal(page.hasMore, true);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+
+  it("batches multilingual AniList query variants into one GraphQL request", async () => {
+    let calls = 0;
+    let body: any;
+    setRequestUrlMock((options) => {
+      calls += 1;
+      body = JSON.parse(options.body ?? "{}");
+      return {
+        headers: { "X-RateLimit-Remaining": "29" },
+        json: {
+          data: {
+            q0: { pageInfo: { hasNextPage: false }, media: [aniListMedia(11)] },
+            q1: { pageInfo: { hasNextPage: false }, media: [aniListMedia(12)] },
+            q2: { pageInfo: { hasNextPage: false }, media: [] },
+          },
+        },
+        text: "",
+      };
+    });
+    try {
+      const pages = await new AniListClient().searchPages("anime", ["作品 第二季", "作品", "Work"], 1);
+      assert.equal(calls, 1);
+      assert.match(body.query, /q0: Page/);
+      assert.match(body.query, /q1: Page/);
+      assert.match(body.query, /q2: Page/);
+      assert.equal(body.variables.search0, "作品 第二季");
+      assert.equal(body.variables.search1, "作品");
+      assert.equal(body.variables.search2, "Work");
+      assert.deepEqual(pages.map((page) => page.results[0]?.sourceId ?? ""), ["11", "12", ""]);
+      assert.equal(pages[0]?.results[0]?.classification?.tags[0]?.name, "School");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("deduplicates concurrent AniList requests and reuses the short-lived response cache", async () => {
+    let calls = 0;
+    setRequestUrlMock(async () => {
+      calls += 1;
+      await Promise.resolve();
+      return {
+        headers: {},
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [aniListMedia(20)] } } },
+        text: "",
+      };
+    });
+    try {
+      const client = new AniListClient();
+      const [left, right] = await Promise.all([
+        client.searchPage("anime", "Same", 1),
+        client.searchPage("anime", "Same", 1),
+      ]);
+      const cached = await client.searchPage("anime", "Same", 1);
+      assert.equal(calls, 1);
+      assert.equal(left.results[0]?.sourceId, "20");
+      assert.equal(right.results[0]?.sourceId, "20");
+      assert.equal(cached.results[0]?.sourceId, "20");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("bounds an unresponsive AniList request instead of blocking search indefinitely", async () => {
+    setRequestUrlMock(() => new Promise(() => {}));
+    try {
+      const client = new AniListClient({ requestTimeoutMs: 5 });
+      await assert.rejects(
+        () => client.searchPage("anime", "Timeout", 1),
+        /timed out after 5 ms/,
+      );
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("honors a short AniList Retry-After once without starting a retry loop", async () => {
+    let calls = 0;
+    const sleeps: number[] = [];
+    setRequestUrlMock(() => {
+      calls += 1;
+      if (calls === 1) {
+        const error = new Error("Request failed with status 429") as Error & {
+          status: number;
+          response: { headers: Record<string, string> };
+        };
+        error.status = 429;
+        error.response = { headers: { "Retry-After": "1" } };
+        throw error;
+      }
+      return {
+        headers: { "X-RateLimit-Remaining": "28" },
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [aniListMedia(25)] } } },
+        text: "",
+      };
+    });
+    try {
+      const client = new AniListClient({
+        maxInteractiveRetryDelayMs: 1_500,
+        sleep: async (milliseconds) => { sleeps.push(milliseconds); },
+      });
+      const page = await client.searchPage("anime", "Rate Retry", 1);
+      assert.equal(calls, 2);
+      assert.deepEqual(sleeps, [1_000]);
+      assert.equal(page.results[0]?.sourceId, "25");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("fails fast on a long AniList Retry-After instead of blocking the interactive flow", async () => {
+    let calls = 0;
+    const sleeps: number[] = [];
+    setRequestUrlMock(() => {
+      calls += 1;
+      const error = new Error("Request failed with status 429") as Error & {
+        status: number;
+        response: { headers: Record<string, string> };
+      };
+      error.status = 429;
+      error.response = { headers: { "Retry-After": "30" } };
+      throw error;
+    });
+    try {
+      const client = new AniListClient({
+        maxInteractiveRetryDelayMs: 2_500,
+        sleep: async (milliseconds) => { sleeps.push(milliseconds); },
+      });
+      await assert.rejects(
+        () => client.searchPage("anime", "Long Rate Limit", 1),
+        /429/,
+      );
+      assert.equal(calls, 1);
+      assert.deepEqual(sleeps, []);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("retries one transient AniList server failure without a retry loop", async () => {
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls += 1;
+      if (calls === 1) {
+        const error = new Error("Request failed with status 503") as Error & { status: number };
+        error.status = 503;
+        throw error;
+      }
+      return {
+        headers: {},
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [aniListMedia(30)] } } },
+        text: "",
+      };
+    });
+    try {
+      const client = new AniListClient({ sleep: async () => {} });
+      const page = await client.searchPage("anime", "Retry", 1);
+      assert.equal(calls, 2);
+      assert.equal(page.results[0]?.sourceId, "30");
     } finally {
       setRequestUrlMock(null);
     }

@@ -136,4 +136,59 @@ describe("media note Markdown compatibility", () => {
     assert.match(markdown, /# Template title\n\n```animelist-detail\n```[\s\S]*Custom paragraph\./);
     assert.match(markdown, /Unknown token: \{\{custom_future_token}}/);
   });
+
+  it("writes filtered AniList classification metadata without replacing the primary source", () => {
+    const markdown = buildMediaMarkdown({
+      ...baseResult,
+      provider: "bangumi",
+      sourceId: "bgm-1",
+      sourceUrl: "https://bgm.tv/subject/1",
+      people: ["AniList Studio"],
+      sources: [
+        { provider: "bangumi", sourceId: "bgm-1", sourceUrl: "https://bgm.tv/subject/1" },
+        { provider: "anilist", sourceId: "42", sourceUrl: "https://anilist.co/anime/42" },
+      ],
+      classification: {
+        anilistId: "42",
+        genres: ["戀愛", "喜劇"],
+        season: "spring",
+        seasonYear: 2026,
+        studios: ["AniList Studio"],
+        source: "light_novel",
+        countryOfOrigin: "JP",
+        tags: [
+          { name: "School", category: "Theme", rank: 82, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false },
+          { name: "Low Rank", category: "Theme", rank: 40, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false },
+          { name: "Spoiler", category: "Theme", rank: 95, isGeneralSpoiler: false, isMediaSpoiler: true, isAdult: false },
+        ],
+      },
+    }, {
+      title: "Example",
+      score: null,
+      status: "planned",
+      releaseStatus: "unknown",
+      startedAt: "",
+      completedAt: "",
+      progress: 0,
+      total: 12,
+      unit: "episode",
+      favorite: false,
+      genres: ["戀愛", "喜劇"],
+      templatePath: "",
+      volumeLog: [],
+    }, "", "");
+
+    const yaml = frontmatter(markdown);
+    assert.match(yaml, /media_tags:\n  - "School"/);
+    assert.doesNotMatch(yaml, /Low Rank|Spoiler/);
+    assert.match(yaml, /^season: "spring"$/m);
+    assert.match(yaml, /^season_year: 2026$/m);
+    assert.match(yaml, /^source_material: "light_novel"$/m);
+    assert.match(yaml, /^country_of_origin: "JP"$/m);
+    assert.match(yaml, /^anilist_id: "42"$/m);
+    assert.match(yaml, /^source_provider: "bangumi"$/m);
+    assert.match(yaml, /source_urls:[\s\S]*https:\/\/bgm\.tv\/subject\/1[\s\S]*https:\/\/anilist\.co\/anime\/42/);
+    assert.match(yaml, /studios:\n  - "AniList Studio"/);
+  });
+
 });

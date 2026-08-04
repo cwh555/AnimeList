@@ -32,6 +32,12 @@ describe("media update service", () => {
       title: "Old title",
       source_provider: "AniList",
       source_id: "42",
+      media_tags: ["School"],
+      season: "spring",
+      season_year: 2026,
+      source_material: "manga",
+      country_of_origin: "JP",
+      anilist_id: "42",
       custom_nested: { keep: [1, 2, 3] },
       updated_at: "legacy",
       metadata_updated_at: "legacy",
@@ -66,6 +72,12 @@ describe("media update service", () => {
     assert.deepEqual(frontmatter.custom_nested, { keep: [1, 2, 3] });
     assert.equal(frontmatter.source_provider, "AniList");
     assert.equal(frontmatter.source_id, "42");
+    assert.deepEqual(frontmatter.media_tags, ["School"]);
+    assert.equal(frontmatter.season, "spring");
+    assert.equal(frontmatter.season_year, 2026);
+    assert.equal(frontmatter.source_material, "manga");
+    assert.equal(frontmatter.country_of_origin, "JP");
+    assert.equal(frontmatter.anilist_id, "42");
     assert.equal(frontmatter.schema_version, 6);
     assert.equal(frontmatter.title, "Updated title");
     assert.equal(frontmatter.progress, 5);
