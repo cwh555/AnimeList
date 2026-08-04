@@ -74,7 +74,13 @@ describe("metadata provider clients", () => {
               { name: "青春" },
               { name: "戸松遥" },
             ],
-            infobox: [{ key: "動畫製作", value: "CloverWorks" }],
+            infobox: [
+              {
+                key: "動畫製作",
+                value: "CloverWorks、「ホリミヤ」製作委員会（Aniplex、マイシアターD.D.、毎日放送、スクウェア・エニックス、鐘通インベストメント、グローバル・ソリューションズ、ムービック、未来工場）岩上敦宏、石井紹良、丸山博雄、橋本真司、松井宏記、高麗大助、國枝信吾、近藤尚己",
+              },
+              { key: "製作", value: "「ホリミヤ」製作委員会" },
+            ],
           }],
         },
         text: "",

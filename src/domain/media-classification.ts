@@ -1,4 +1,4 @@
-import { normalizeGenres } from "./media-metadata";
+import { normalizeAnimeStudios, normalizeGenres } from "./media-metadata";
 import { asArray, stringValue } from "./value-normalization";
 
 export const MEDIA_TAG_MIN_RANK = 60;
@@ -62,9 +62,7 @@ export function normalizeAniListClassification(value: unknown): MediaClassificat
     };
   }).filter((tag): tag is MediaTagMetadata => tag !== null);
 
-  const studios = asArray(record(media.studios).nodes)
-    .map((node) => stringValue(record(node).name).trim())
-    .filter(Boolean);
+  const studios = normalizeAnimeStudios(asArray(record(media.studios).nodes));
 
   return {
     anilistId,
@@ -72,7 +70,7 @@ export function normalizeAniListClassification(value: unknown): MediaClassificat
     tags,
     season: normalizeSeason(media.season),
     seasonYear: optionalInteger(media.seasonYear),
-    studios: [...new Set(studios)],
+    studios,
     source: stringValue(media.source).trim().toLocaleLowerCase(),
     countryOfOrigin: stringValue(media.countryOfOrigin).trim().toUpperCase(),
   };
