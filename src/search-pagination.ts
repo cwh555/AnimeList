@@ -1,9 +1,5 @@
 import { Notice } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
-import {
-  fetchExternalSearchPage,
-  type ExternalSearchPageSettings,
-} from "./data/external-media-pagination";
 import { dedupeSearchResults } from "./data/provider-normalizers";
 import type { SearchModalAdapter } from "./ui/search-contracts";
 import { uiText } from "./ui-text";
@@ -110,7 +106,7 @@ function canLoadMore(state: PaginationState): boolean {
 }
 
 export async function appendNextSearchPage(
-  settings: ExternalSearchPageSettings,
+  host: Pick<AnimeListFeatureHost, "searchExternalPage">,
   modal: PaginatedSearchModal,
   state: PaginationState,
   resultsEl: AppendTarget<HTMLElement>,
@@ -119,7 +115,7 @@ export async function appendNextSearchPage(
   state.loading = true;
   const page = state.loads + 2;
   try {
-    const response = await fetchExternalSearchPage(settings, modal.mediaType, modal.query, page);
+    const response = await host.searchExternalPage(modal.mediaType, modal.query, page);
     const existingKeys = new Set(state.results.map(resultKey));
     const merged = mergeSearchPages(state.results, [response.results]);
     const appended = merged.filter((result) => !existingKeys.has(resultKey(result)));
@@ -141,7 +137,7 @@ export async function appendNextSearchPage(
 }
 
 function renderPagination(
-  settings: ExternalSearchPageSettings,
+  host: AnimeListFeatureHost,
   modal: PaginatedSearchModal,
   state: PaginationState,
 ): void {
@@ -160,7 +156,7 @@ function renderPagination(
     button.disabled = true;
     button.textContent = uiText("add.loadingMore");
     button.blur();
-    void appendNextSearchPage(settings, modal, state, resultsEl)
+    void appendNextSearchPage(host, modal, state, resultsEl)
       .then(() => {
         if (state.warnings.length > previousWarningCount) {
           new Notice(uiText("add.warning", { warnings: state.warnings.join("；") }));
@@ -193,7 +189,7 @@ export const searchPaginationFeature = defineFeature<AnimeListFeatureHost>({
         state = freshState();
         PAGINATION_STATES.set(modal, state);
       }
-      renderPagination(host.settings, modal, state);
+      renderPagination(host, modal, state);
     },
   }],
 });

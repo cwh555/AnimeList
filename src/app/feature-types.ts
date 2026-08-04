@@ -2,6 +2,7 @@ import type { Plugin, SettingDefinition, TFile } from "obsidian";
 import type {
   AnimeListSettings,
   ExternalMediaResult,
+  ExternalMediaSearchPage,
   MediaItem,
   MediaNoteForm,
   MediaType,
@@ -36,6 +37,7 @@ export interface AnimeListFeatureHost extends Pick<
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
+  searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
   setFavoriteDirect(path: string, next: boolean): Promise<void>;
   updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void>;

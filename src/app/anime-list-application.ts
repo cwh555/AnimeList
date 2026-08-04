@@ -1,6 +1,7 @@
 import { TFile, normalizePath, type App } from "obsidian";
 import { CoverThumbnailCache } from "../cover-cache";
-import { ExternalMediaSearchService, HttpMetadataProviderClient, type MetadataProviderClient } from "../data/external-media-service";
+import { ExternalMediaSearchService } from "../data/external-media-service";
+import { createMetadataProviderClients, type HttpMetadataProviderClients } from "../data/metadata-provider-clients";
 import { isLibraryRelevantPath, pathBelongsToLibraryRoot } from "../data/library-change-scope";
 import { LibraryStorage } from "../data/library-storage";
 import { MediaLibraryIndex } from "../data/media-library-index";
@@ -8,14 +9,8 @@ import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
-import type { AnimeListSettings, ExternalMediaResult, MediaItem, MediaNoteForm, MediaType } from "../types";
+import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { getScopedMarkdownFiles } from "../vault-scope";
-
-export interface AnimeListProviderSearch {
-  searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
-  searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
-  searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
-}
 
 export interface AnimeListApplicationCallbacks {
   openMediaFile(path: string): Promise<void>;
@@ -27,7 +22,7 @@ export class AnimeListApplicationServices {
   private mediaRepository?: MediaRepository;
   private mediaIndex?: MediaLibraryIndex;
   private storage?: LibraryStorage;
-  private providerClient?: MetadataProviderClient;
+  private providerClients?: HttpMetadataProviderClients;
   private searchService?: ExternalMediaSearchService;
   private noteService?: MediaNoteService;
   private updateService?: MediaUpdateService;
@@ -37,7 +32,6 @@ export class AnimeListApplicationServices {
     private readonly app: App,
     private readonly pluginId: string,
     private readonly settings: () => AnimeListSettings,
-    private readonly providerSearch: AnimeListProviderSearch,
     private readonly callbacks: AnimeListApplicationCallbacks,
   ) {}
 
@@ -65,15 +59,15 @@ export class AnimeListApplicationServices {
     return this.mediaIndex;
   }
 
-  private metadataProviderClient(): MetadataProviderClient {
-    this.providerClient ??= new HttpMetadataProviderClient();
-    return this.providerClient;
+  private metadataProviders(): HttpMetadataProviderClients {
+    this.providerClients ??= createMetadataProviderClients();
+    return this.providerClients;
   }
 
   private externalMediaSearch(): ExternalMediaSearchService {
     this.searchService ??= new ExternalMediaSearchService(
       () => this.settings().providers,
-      this.providerSearch,
+      this.metadataProviders(),
       () => this.settings().searchLanguages,
     );
     return this.searchService;
@@ -187,9 +181,10 @@ export class AnimeListApplicationServices {
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.externalMediaSearch().search(mediaType, query); }
-  async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.metadataProviderClient().searchBangumi(mediaType, query); }
-  async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.metadataProviderClient().searchAniList(mediaType, query); }
-  async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.metadataProviderClient().searchOpenLibrary(query); }
+  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page); }
+  async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
+  async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
+  async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
