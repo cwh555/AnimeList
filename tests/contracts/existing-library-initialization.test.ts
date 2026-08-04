@@ -75,11 +75,6 @@ function application(app: App, settings = createDefaultSettings()): AnimeListApp
     app,
     "animelist",
     () => settings,
-    {
-      searchBangumi: async () => [],
-      searchAniList: async () => [],
-      searchOpenLibrary: async () => [],
-    },
     { openMediaFile: async () => {}, refreshViews: () => {} },
   );
 }
