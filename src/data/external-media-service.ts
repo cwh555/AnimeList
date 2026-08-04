@@ -1,105 +1,42 @@
-import { requestUrl } from "obsidian";
-import { USER_AGENT } from "../app-metadata";
 import type { ProviderSettings, SearchLanguageSettings } from "../domain/settings-types";
-import type { ExternalMediaResult, MediaType } from "../domain/media-types";
-import { asArray, stringValue } from "../domain/value-normalization";
+import type { ExternalMediaResult, ExternalMediaSearchPage, MediaType } from "../domain/media-types";
 import { searchMultilingualProviders, type SearchProviderAdapter } from "../multilingual-search";
+import { rankSearchResults } from "../search";
 import { searchFeatureText } from "../search-feature-text";
 import {
-  dedupeSearchResults,
-  normalizeAniListMedia,
-  normalizeBangumiSubject,
-  normalizeOpenLibraryBook,
-} from "./provider-normalizers";
+  enabledMetadataProviders,
+  type MetadataProviderClients,
+  type MetadataProviderId,
+  type MetadataProviderPage,
+} from "./external-media-provider";
+import { dedupeSearchResults } from "./provider-normalizers";
 
+const PAGE_RESULT_LIMIT = 24;
 
-function record(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+interface ProviderTaskResult {
+  provider: string;
+  page?: MetadataProviderPage;
+  error?: unknown;
 }
 
-export interface MetadataProviderClient {
-  searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
-  searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;
-  searchOpenLibrary(query: string): Promise<ExternalMediaResult[]>;
+function errorMessage(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value) || "Unknown error";
+  } catch {
+    return "Unknown error";
+  }
 }
 
-export class HttpMetadataProviderClient implements MetadataProviderClient {
-  async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {
-    const response = await requestUrl({
-      url: "https://api.bgm.tv/v0/search/subjects?limit=20&offset=0",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify({
-        keyword: query,
-        sort: "match",
-        filter: { type: [mediaType === "anime" ? 2 : 1], nsfw: false },
-      }),
-    });
-    const payload = record(response.json ?? JSON.parse(response.text || "{}"));
-    return asArray(payload.data).map((subject) => normalizeBangumiSubject(subject, mediaType));
-  }
-
-  async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {
-    const graphQuery = `
-      query ($search: String, $type: MediaType, $format: MediaFormat) {
-        Page(page: 1, perPage: 20) {
-          media(search: $search, type: $type, format: $format, sort: SEARCH_MATCH) {
-            id siteUrl type format status episodes chapters volumes averageScore description(asHtml: false) genres synonyms
-            startDate { year month day }
-            title { romaji english native }
-            coverImage { extraLarge large medium }
-            studios(isMain: true) { nodes { name } }
-            staff(perPage: 10, sort: RELEVANCE) { edges { role node { name { full native } } } }
-          }
-        }
-      }`;
-    const variables = {
-      search: query,
-      type: mediaType === "anime" ? "ANIME" : "MANGA",
-      format: mediaType === "novel" ? "NOVEL" : null,
-    };
-    const response = await requestUrl({
-      url: "https://graphql.anilist.co",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify({ query: graphQuery, variables }),
-    });
-    const payload = record(response.json ?? JSON.parse(response.text || "{}"));
-    const data = record(payload.data);
-    const page = record(data.Page);
-    let media = asArray(page.media);
-    if (mediaType === "manga") {
-      media = media.filter((item) => stringValue(record(item).format).toUpperCase() !== "NOVEL");
-    }
-    return media.map((item) => normalizeAniListMedia(item, mediaType));
-  }
-
-  async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> {
-    const fields = "key,title,author_name,first_publish_year,cover_i,subject";
-    const response = await requestUrl({
-      url: `https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&limit=8&lang=zh`,
-      method: "GET",
-      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
-    });
-    const payload = record(response.json ?? JSON.parse(response.text || "{}"));
-    return asArray(payload.docs).map(normalizeOpenLibraryBook);
-  }
+function providerTask(provider: string, task: Promise<MetadataProviderPage>): Promise<ProviderTaskResult> {
+  return task.then((page) => ({ provider, page })).catch((error: unknown) => ({ provider, error }));
 }
 
 export class ExternalMediaSearchService {
   constructor(
     private readonly providers: () => ProviderSettings,
-    private readonly client: MetadataProviderClient,
+    private readonly clients: MetadataProviderClients,
     private readonly languages: () => SearchLanguageSettings = () => ({
       chinese: true,
       english: true,
@@ -107,31 +44,19 @@ export class ExternalMediaSearchService {
     }),
   ) {}
 
+  private enabledProviders(mediaType: MediaType) {
+    return enabledMetadataProviders(this.providers(), mediaType, this.clients);
+  }
+
   async search(mediaType: MediaType, query: string): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
   }> {
-    const settings = this.providers();
-    const providers: SearchProviderAdapter[] = [];
-    if (settings.bangumi) {
-      providers.push({
-        label: "Bangumi",
-        supportsChineseDiscovery: true,
-        search: (candidate) => this.client.searchBangumi(mediaType, candidate),
-      });
-    }
-    if (settings.anilist) {
-      providers.push({
-        label: "AniList",
-        search: (candidate) => this.client.searchAniList(mediaType, candidate),
-      });
-    }
-    if (mediaType === "novel" && settings.openlibrary) {
-      providers.push({
-        label: "Open Library",
-        search: (candidate) => this.client.searchOpenLibrary(candidate),
-      });
-    }
+    const providers: SearchProviderAdapter[] = this.enabledProviders(mediaType).map((client) => ({
+      label: client.label,
+      supportsChineseDiscovery: client.supportsChineseDiscovery,
+      search: async (candidate) => (await client.searchPage(mediaType, candidate, 1)).results,
+    }));
     if (!providers.length) {
       return { results: [], warnings: [searchFeatureText("provider.noneEnabled")] };
     }
@@ -141,8 +66,42 @@ export class ExternalMediaSearchService {
       providers,
       languages: this.languages(),
       dedupe: dedupeSearchResults,
-      maxResults: 24,
+      maxResults: PAGE_RESULT_LIMIT,
     });
     return { results: response.results, warnings: response.warnings };
+  }
+
+  async searchPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
+    const providers = this.enabledProviders(mediaType);
+    if (!providers.length) {
+      return {
+        results: [],
+        warnings: [searchFeatureText("provider.noneEnabled")],
+        hasMore: false,
+      };
+    }
+
+    const settled = await Promise.all(
+      providers.map((client) => providerTask(client.label, client.searchPage(mediaType, query, page))),
+    );
+    const warnings = settled
+      .filter((entry) => entry.error !== undefined)
+      .map((entry) => `${entry.provider}: ${errorMessage(entry.error)}`);
+    const merged = dedupeSearchResults(settled.flatMap((entry) => entry.page?.results ?? []));
+    return {
+      results: rankSearchResults(merged, query).slice(0, PAGE_RESULT_LIMIT),
+      warnings,
+      hasMore: settled.some((entry) => entry.page?.hasMore === true),
+    };
+  }
+
+  async searchProvider(
+    provider: MetadataProviderId,
+    mediaType: MediaType,
+    query: string,
+  ): Promise<ExternalMediaResult[]> {
+    const client = this.clients[provider];
+    if (!client.supports(mediaType)) return [];
+    return (await client.searchPage(mediaType, query, 1)).results;
   }
 }
