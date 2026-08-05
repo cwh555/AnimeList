@@ -1,12 +1,40 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { TFile } from "obsidian";
+import type { ExternalMediaResult } from "../../src/domain/media-types";
 import {
   cleanupLegacyMediaFrontmatter,
+  cleanupLegacyMetadataNotes,
 } from "../../src/data/legacy-metadata-cleanup";
 import { createLegacyMetadataSettingsSection } from "../../src/legacy-metadata-settings";
+import { legacyMetadataText } from "../../src/legacy-metadata-text";
 import type { AnimeListFeatureHost } from "../../src/app/feature-types";
 
 const pollutedStudio = "CloverWorks、「ホリミヤ」製作委員会（Aniplex、マイシアターD.D.、毎日放送、スクウェア・エニックス、鐘通インベストメント、グローバル・ソリューションズ、ムービック、未来工場）岩上敦宏、石井紹良、丸山博雄、橋本真司、松井宏記、高麗大助、國枝信吾、近藤尚己";
+
+function classificationResult(source: ExternalMediaResult): ExternalMediaResult {
+  return {
+    ...source,
+    people: ["CloverWorks"],
+    sources: [
+      ...(source.sources ?? []),
+      { provider: "anilist", sourceId: "124080", sourceUrl: "https://anilist.co/anime/124080" },
+    ],
+    classification: {
+      anilistId: "124080",
+      genres: ["戀愛", "喜劇"],
+      tags: [
+        { name: "School", category: "Theme", rank: 90, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false },
+        { name: "Low", category: "Theme", rank: 40, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false },
+      ],
+      season: "winter",
+      seasonYear: 2021,
+      studios: ["CloverWorks"],
+      source: "manga",
+      countryOfOrigin: "JP",
+    },
+  };
+}
 
 describe("legacy metadata cleanup", () => {
   it("repairs the mixed legacy Bangumi metadata example without touching unrelated frontmatter", () => {
@@ -30,37 +58,120 @@ describe("legacy metadata cleanup", () => {
     assert.equal("source_genres" in frontmatter, false);
     assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
     assert.deepEqual(frontmatter.custom_future_field, { keep: true });
+    assert.equal(frontmatter.schema_version, 6);
   });
 
-  it("is idempotent and leaves unrelated providers and user genres alone", () => {
+  it("upgrades a legacy note with current AniList tags, studio, and quarter while preserving unrelated data", async () => {
     const frontmatter: Record<string, unknown> = {
       schema_version: 6,
       media_type: "anime",
-      source_provider: "anilist",
-      genres: ["校園", "異世界", "青春"],
-      studios: ["CloverWorks"],
+      source_provider: "bangumi",
+      source_id: "374400",
+      source_urls: ["https://bgm.tv/subject/374400"],
+      title: "堀與宮村",
+      title_original: "ホリミヤ",
+      genres: ["戀愛", "CloverWorks", "2021年1月", "TV"],
+      studios: [pollutedStudio],
+      custom_future_field: { keep: true },
     };
-    assert.equal(cleanupLegacyMediaFrontmatter(frontmatter).changed, false);
-    assert.deepEqual(frontmatter.genres, ["校園", "異世界", "青春"]);
+    const file = new TFile();
+    file.path = "AnimeList/Anime/Horimiya.md";
+    file.basename = "Horimiya";
+    file.extension = "md";
+    const app = {
+      metadataCache: {
+        getFileCache: () => ({ frontmatter }),
+      },
+      vault: { getRoot: () => ({ children: [file] }) },
+      fileManager: {
+        async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) {
+          callback(frontmatter);
+        },
+      },
+    } as any;
+    const seen: ExternalMediaResult[] = [];
+    const progress: string[] = [];
+    const result = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => {
+        seen.push(source);
+        return classificationResult(source);
+      },
+      onProgress: (value) => progress.push(`${value.phase}:${value.completed}/${value.total}`),
+    });
+
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.provider, "bangumi");
+    assert.equal(result.scanned, 1);
+    assert.equal(result.cleaned, 1);
+    assert.equal(result.enriched, 1);
+    assert.equal(result.classification, 1);
+    assert.deepEqual(frontmatter.genres, ["戀愛", "喜劇"]);
+    assert.deepEqual(frontmatter.media_tags, ["School"]);
     assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
+    assert.equal(frontmatter.season, "winter");
+    assert.equal(frontmatter.season_year, 2021);
+    assert.equal(frontmatter.source_material, "manga");
+    assert.equal(frontmatter.country_of_origin, "JP");
+    assert.equal(frontmatter.anilist_id, "124080");
+    assert.equal(frontmatter.schema_version, 6);
+    assert.deepEqual(frontmatter.custom_future_field, { keep: true });
+    assert.ok((frontmatter.source_urls as string[]).includes("https://bgm.tv/subject/374400"));
+    assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
+    assert.ok(progress.some((value) => value.startsWith("enriching:")));
+    assert.ok(progress.some((value) => value === "completed:1/1"));
+
+    let secondPassApiCalls = 0;
+    const secondPass = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => { secondPassApiCalls += 1; return classificationResult(source); },
+    });
+    assert.equal(secondPassApiCalls, 0);
+    assert.equal(secondPass.cleaned, 0);
   });
 
-  it("exposes one-click automatic cleanup from Settings", async () => {
-    let calls = 0;
+  it("does not mark a legacy note current when AniList metadata is unavailable, allowing a later retry", async () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      media_type: "anime",
+      source_provider: "bangumi",
+      source_id: "1",
+      title: "Unknown work",
+      genres: ["戀愛"],
+      studios: ["Studio"],
+    };
+    const file = new TFile();
+    file.path = "AnimeList/Anime/Unknown.md";
+    file.basename = "Unknown";
+    file.extension = "md";
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getRoot: () => ({ children: [file] }) },
+      fileManager: { async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) { callback(frontmatter); } },
+    } as any;
+    const result = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => source,
+    });
+    assert.equal(result.unavailable, 1);
+    assert.equal(frontmatter.schema_version, 6);
+  });
+
+  it("uses English Settings copy and opens the progress workflow", () => {
     const host = {
       app: {},
       getScanFolders: () => ["AnimeList"],
       refreshViews: () => undefined,
+      enrichExternalMedia: async (result: ExternalMediaResult) => result,
     } as unknown as AnimeListFeatureHost;
-    const section = createLegacyMetadataSettingsSection(host, async (_app, roots) => {
-      calls += 1;
-      assert.deepEqual(roots, ["AnimeList"]);
-      return { scanned: 12, cleaned: 3, genres: 2, sourceGenres: 1, studios: 2 };
-    });
-    assert.equal(section.definitions.length, 1);
+    let opened = 0;
+    const section = createLegacyMetadataSettingsSection(host, () => { opened += 1; });
+    assert.equal(section.heading, "Legacy metadata cleanup");
+    assert.match(section.description ?? "", /current metadata schema/i);
+    assert.equal(legacyMetadataText("settings.button"), "Scan and upgrade");
+
     const definition = section.definitions[0];
     if (!definition?.render) throw new Error("Legacy cleanup setting is not renderable");
-
     let handler: (() => void | Promise<void>) | undefined;
     const setting = {
       addButton(callback: (button: {
@@ -76,8 +187,7 @@ describe("legacy metadata cleanup", () => {
       },
     };
     definition.render(setting as never);
-    assert.ok(handler);
-    await handler?.();
-    assert.equal(calls, 1);
+    handler?.();
+    assert.equal(opened, 1);
   });
 });

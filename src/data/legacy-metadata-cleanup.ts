@@ -1,8 +1,12 @@
 import type { App, TFile } from "obsidian";
-import { normalizeAnimeStudios, normalizeBroadGenres } from "../domain/media-metadata";
-import type { MediaType } from "../domain/media-types";
-import type { LegacyMetadataCleanupResult } from "../domain/legacy-metadata-types";
-import { asArray, stringValue } from "../domain/value-normalization";
+import { persistedMediaTags } from "../domain/media-classification";
+import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
+import type { ExternalMediaResult, ExternalMediaSourceRef, MediaType } from "../domain/media-types";
+import type {
+  LegacyMetadataCleanupProgress,
+  LegacyMetadataCleanupResult,
+} from "../domain/legacy-metadata-types";
+import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -11,6 +15,13 @@ export interface LegacyMetadataCleanupChange {
   genres: boolean;
   sourceGenres: boolean;
   studios: boolean;
+}
+
+export interface LegacyMetadataCleanupOptions {
+  enrich?: (result: ExternalMediaResult) => Promise<ExternalMediaResult>;
+  onProgress?: (progress: LegacyMetadataCleanupProgress) => void;
+  apiIntervalMs?: number;
+  sleep?: (milliseconds: number) => Promise<void>;
 }
 
 const LEGACY_GENRE_NOISE = [
@@ -50,6 +61,88 @@ function setOptionalArray(frontmatter: Record<string, unknown>, key: string, val
   if (values.length) frontmatter[key] = values;
   else delete frontmatter[key];
   return true;
+}
+
+function setOptionalString(frontmatter: Record<string, unknown>, key: string, value: string): boolean {
+  const previous = stringValue(frontmatter[key]).trim();
+  if (previous === value) return false;
+  if (value) frontmatter[key] = value;
+  else delete frontmatter[key];
+  return true;
+}
+
+function setOptionalNumber(frontmatter: Record<string, unknown>, key: string, value: number | null): boolean {
+  const previous = Number(frontmatter[key]);
+  if (value !== null && Number.isFinite(previous) && previous === value) return false;
+  if (value !== null) frontmatter[key] = value;
+  else delete frontmatter[key];
+  return true;
+}
+
+function sourceRefs(frontmatter: Record<string, unknown>): ExternalMediaSourceRef[] {
+  const provider = stringValue(frontmatter.source_provider).trim();
+  const sourceId = stringValue(frontmatter.source_id).trim();
+  const urls = strings(frontmatter.source_urls);
+  const refs: ExternalMediaSourceRef[] = [];
+  if (provider && sourceId) {
+    const providerUrl = urls.find((url) => {
+      if (provider === "anilist") return /anilist\.co\//i.test(url);
+      if (provider === "bangumi") return /(?:bgm\.tv|bangumi\.tv)\//i.test(url);
+      if (provider === "openlibrary") return /openlibrary\.org\//i.test(url);
+      return false;
+    }) ?? urls[0] ?? "";
+    refs.push({ provider, sourceId, sourceUrl: providerUrl });
+  }
+  const anilistId = stringValue(frontmatter.anilist_id).trim();
+  if (anilistId && !refs.some((ref) => ref.provider === "anilist" && ref.sourceId === anilistId)) {
+    refs.push({
+      provider: "anilist",
+      sourceId: anilistId,
+      sourceUrl: urls.find((url) => /anilist\.co\//i.test(url)) ?? `https://anilist.co/${frontmatter.media_type === "anime" ? "anime" : "manga"}/${anilistId}`,
+    });
+  }
+  return refs;
+}
+
+function legacyResult(frontmatter: Record<string, unknown>): ExternalMediaResult | null {
+  const mediaType = frontmatter.media_type;
+  if (!isMediaType(mediaType)) return null;
+  const provider = stringValue(frontmatter.source_provider, "legacy").trim() || "legacy";
+  const refs = sourceRefs(frontmatter);
+  const primary = refs.find((ref) => ref.provider === provider);
+  const genres = normalizeGenres(frontmatter.genres);
+  const rawGenres = normalizeGenres(frontmatter.source_genres);
+  const title = stringValue(frontmatter.title).trim();
+  return {
+    provider,
+    sourceId: stringValue(frontmatter.source_id).trim(),
+    sourceUrl: primary?.sourceUrl ?? "",
+    mediaType,
+    title,
+    originalTitle: stringValue(frontmatter.title_original, title).trim(),
+    romajiTitle: stringValue(frontmatter.title_romaji).trim(),
+    format: stringValue(frontmatter.format, mediaType).trim(),
+    total: mediaType === "anime" ? numeric(frontmatter.progress_total) : 0,
+    unit: stringValue(frontmatter.progress_unit, mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume"),
+    year: numeric(frontmatter.year),
+    genres,
+    rawGenres,
+    people: strings(mediaType === "anime" ? frontmatter.studios : frontmatter.authors),
+    platforms: strings(frontmatter.platforms),
+    coverUrl: stringValue(frontmatter.cover_remote).trim(),
+    summary: "",
+    externalScore: null,
+    releaseStatus: "unknown",
+    searchTitles: strings(frontmatter.title_aliases),
+    sources: refs,
+  };
+}
+
+function needsMetadataUpgrade(frontmatter: Record<string, unknown>): boolean {
+  const version = Number(frontmatter.schema_version);
+  if (!Number.isInteger(version) || version < CURRENT_MEDIA_SCHEMA_VERSION) return true;
+  if (!stringValue(frontmatter.anilist_id).trim()) return true;
+  return frontmatter.media_type === "anime" && !Number.isInteger(Number(frontmatter.season_year));
 }
 
 /**
@@ -96,70 +189,155 @@ export function cleanupLegacyMediaFrontmatter(
     }
   }
 
-  const changed = studiosChanged || genresChanged || sourceGenresChanged;
-  if (changed) frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
   return {
-    changed,
+    changed: studiosChanged || genresChanged || sourceGenresChanged,
     genres: genresChanged,
     sourceGenres: sourceGenresChanged,
     studios: studiosChanged,
   };
 }
 
-function cleanupCandidate(frontmatter: Record<string, unknown>): boolean {
-  const copy: Record<string, unknown> = {
-    ...frontmatter,
-    genres: strings(frontmatter.genres),
-    source_genres: strings(frontmatter.source_genres),
-    studios: strings(frontmatter.studios),
-  };
-  return cleanupLegacyMediaFrontmatter(copy).changed;
+function applyClassification(
+  frontmatter: Record<string, unknown>,
+  enriched: ExternalMediaResult,
+): boolean {
+  const classification = enriched.classification;
+  if (!classification) return false;
+  let changed = false;
+  if (classification.genres.length) {
+    const genres = normalizeGenres(classification.genres);
+    if (!sameStrings(strings(frontmatter.genres), genres)) {
+      frontmatter.genres = genres;
+      changed = true;
+    }
+  }
+  if ("source_genres" in frontmatter) {
+    delete frontmatter.source_genres;
+    changed = true;
+  }
+  changed = setOptionalArray(frontmatter, "media_tags", persistedMediaTags(classification)) || changed;
+  if (enriched.mediaType === "anime") {
+    changed = setOptionalArray(frontmatter, "studios", normalizeAnimeStudios(classification.studios)) || changed;
+  } else if (enriched.people.length) {
+    changed = setOptionalArray(frontmatter, "authors", enriched.people) || changed;
+  }
+  changed = setOptionalString(frontmatter, "season", classification.season ?? "") || changed;
+  changed = setOptionalNumber(frontmatter, "season_year", classification.seasonYear) || changed;
+  changed = setOptionalString(frontmatter, "source_material", classification.source) || changed;
+  changed = setOptionalString(frontmatter, "country_of_origin", classification.countryOfOrigin) || changed;
+  changed = setOptionalString(frontmatter, "anilist_id", classification.anilistId) || changed;
+
+  const urls = [...new Set([
+    ...strings(frontmatter.source_urls),
+    enriched.sourceUrl,
+    ...(enriched.sources ?? []).map((source) => source.sourceUrl),
+  ].filter(Boolean))];
+  changed = setOptionalArray(frontmatter, "source_urls", urls) || changed;
+  return changed;
+}
+
+function progress(
+  callback: LegacyMetadataCleanupOptions["onProgress"],
+  phase: LegacyMetadataCleanupProgress["phase"],
+  completed: number,
+  total: number,
+  title: string,
+  message: string,
+): void {
+  callback?.({ phase, completed, total, title, message });
 }
 
 export async function cleanupLegacyMetadataNotes(
   app: App,
   roots: string[],
-  concurrency = 8,
+  options: LegacyMetadataCleanupOptions = {},
 ): Promise<LegacyMetadataCleanupResult> {
   const mediaFiles = getScopedMarkdownFiles(app, roots).filter((file) => {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
     return Boolean(frontmatter && isMediaType(frontmatter.media_type));
   });
-  const candidates = mediaFiles.filter((file) => {
-    const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
-    return Boolean(frontmatter && cleanupCandidate(frontmatter));
-  });
   const result: LegacyMetadataCleanupResult = {
     scanned: mediaFiles.length,
     cleaned: 0,
+    enriched: 0,
+    unavailable: 0,
+    failed: 0,
     genres: 0,
     sourceGenres: 0,
     studios: 0,
+    classification: 0,
   };
+  const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds)));
+  const interval = Math.max(0, options.apiIntervalMs ?? 2_100);
+  let lastApiAt = 0;
 
-  let nextIndex = 0;
-  const worker = async (): Promise<void> => {
-    while (nextIndex < candidates.length) {
-      const file: TFile = candidates[nextIndex];
-      nextIndex += 1;
-      let change: LegacyMetadataCleanupChange = {
-        changed: false,
-        genres: false,
-        sourceGenres: false,
-        studios: false,
-      };
-      await app.fileManager.processFrontMatter(file, (frontmatter) => {
-        change = cleanupLegacyMediaFrontmatter(frontmatter);
-      });
-      if (!change.changed) continue;
-      result.cleaned += 1;
-      if (change.genres) result.genres += 1;
-      if (change.sourceGenres) result.sourceGenres += 1;
-      if (change.studios) result.studios += 1;
+  progress(options.onProgress, "scanning", 0, mediaFiles.length, "", `Found ${mediaFiles.length} media notes.`);
+
+  for (let index = 0; index < mediaFiles.length; index += 1) {
+    const file: TFile = mediaFiles[index];
+    const cached = app.metadataCache.getFileCache(file)?.frontmatter;
+    if (!cached) continue;
+    const title = stringValue(cached.title, file.basename).trim();
+    const metadataUpgrade = needsMetadataUpgrade(cached);
+    const localCopy: Record<string, unknown> = {
+      ...cached,
+      genres: strings(cached.genres),
+      source_genres: strings(cached.source_genres),
+      studios: strings(cached.studios),
+      authors: strings(cached.authors),
+      source_urls: strings(cached.source_urls),
+      title_aliases: strings(cached.title_aliases),
+    };
+    const localChange = cleanupLegacyMediaFrontmatter(localCopy);
+    let enriched: ExternalMediaResult | null = null;
+
+    if (metadataUpgrade && options.enrich) {
+      const source = legacyResult(localCopy);
+      if (source) {
+        const wait = Math.max(0, interval - (Date.now() - lastApiAt));
+        if (lastApiAt > 0 && wait > 0) await sleep(wait);
+        progress(options.onProgress, "enriching", index, mediaFiles.length, title, `Fetching current AniList metadata for ${title}…`);
+        try {
+          lastApiAt = Date.now();
+          const candidate = await options.enrich(source);
+          if (candidate.classification) {
+            enriched = candidate;
+            result.enriched += 1;
+          } else {
+            result.unavailable += 1;
+          }
+        } catch (error) {
+          result.failed += 1;
+          console.warn(`AnimeList legacy metadata enrichment failed for ${file.path}`, error);
+        }
+      }
     }
-  };
 
-  const workers = Math.min(candidates.length, Math.max(1, Math.floor(concurrency)));
-  if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()));
+    if (!metadataUpgrade && !localChange.changed) {
+      progress(options.onProgress, "completed", index + 1, mediaFiles.length, title, `Already current: ${title}`);
+      continue;
+    }
+
+    progress(options.onProgress, "writing", index, mediaFiles.length, title, `Updating ${title}…`);
+    let changed = false;
+    await app.fileManager.processFrontMatter(file, (frontmatter) => {
+      const local = cleanupLegacyMediaFrontmatter(frontmatter);
+      if (local.genres) result.genres += 1;
+      if (local.sourceGenres) result.sourceGenres += 1;
+      if (local.studios) result.studios += 1;
+      changed = local.changed;
+      if (enriched && applyClassification(frontmatter, enriched)) {
+        result.classification += 1;
+        changed = true;
+      }
+      if (metadataUpgrade && enriched?.classification && Number(frontmatter.schema_version) !== CURRENT_MEDIA_SCHEMA_VERSION) {
+        frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
+        changed = true;
+      }
+    });
+    if (changed) result.cleaned += 1;
+    progress(options.onProgress, "completed", index + 1, mediaFiles.length, title, changed ? `Updated ${title}` : `No changes for ${title}`);
+  }
+
   return result;
 }

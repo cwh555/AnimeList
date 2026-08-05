@@ -1,15 +1,11 @@
-import { Notice, type Setting } from "obsidian";
+import { type Setting } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost, type FeatureSettingsSection } from "./app/feature-types";
-import { cleanupLegacyMetadataNotes } from "./data/legacy-metadata-cleanup";
+import { LegacyMetadataCleanupModal } from "./legacy-metadata-cleanup-modal";
 import { legacyMetadataText } from "./legacy-metadata-text";
-
-function errorMessage(value: unknown): string {
-  return value instanceof Error ? value.message : typeof value === "string" ? value : "Unknown error";
-}
 
 export function createLegacyMetadataSettingsSection(
   host: AnimeListFeatureHost,
-  cleanup: typeof cleanupLegacyMetadataNotes = cleanupLegacyMetadataNotes,
+  openCleanup: () => void = () => new LegacyMetadataCleanupModal(host).open(),
 ): FeatureSettingsSection {
   return {
     heading: legacyMetadataText("settings.heading"),
@@ -21,19 +17,7 @@ export function createLegacyMetadataSettingsSection(
         setting.addButton((button) => {
           button.setButtonText(legacyMetadataText("settings.button"));
           button.setCta();
-          button.onClick(async () => {
-            try {
-              const result = await cleanup(host.app, host.getScanFolders());
-              if (result.cleaned > 0) host.refreshViews();
-              new Notice(legacyMetadataText("settings.done", {
-                scanned: result.scanned,
-                cleaned: result.cleaned,
-              }));
-            } catch (error) {
-              console.error("AnimeList legacy metadata cleanup failed", error);
-              new Notice(legacyMetadataText("settings.failed", { error: errorMessage(error) }));
-            }
-          });
+          button.onClick(openCleanup);
         });
       },
     }],

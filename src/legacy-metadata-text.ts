@@ -1,11 +1,20 @@
 const TEXT = {
-  "settings.heading": "舊版資料清理",
-  "settings.description": "把舊版 AnimeList 已經混在一起的分類與製作資訊整理成目前的欄位格式。",
-  "settings.name": "自動清理舊版 metadata",
-  "settings.desc": "掃描目前設定的媒體資料夾；移除舊版 Bangumi 分類中的年份、格式、改編註記與工作室雜訊，並把動畫製作欄只保留真正的公司。無關 frontmatter 與 Markdown 正文不會修改。",
-  "settings.button": "掃描並清理",
-  "settings.done": "舊版資料清理完成：掃描 {scanned} 筆，清理 {cleaned} 筆。",
-  "settings.failed": "舊版資料清理失敗：{error}",
+  "settings.heading": "Legacy metadata cleanup",
+  "settings.description": "Upgrade existing AnimeList notes to the current metadata schema and refresh classification metadata from AniList.",
+  "settings.name": "Upgrade legacy metadata",
+  "settings.desc": "Scans configured media folders, cleans legacy mixed tags/studio fields, fetches current AniList classification metadata when a reliable match is available, and writes genres, AniList tags, studio/company, quarter, source material, and origin using the current schema. Unrelated frontmatter and Markdown content are preserved.",
+  "settings.button": "Scan and upgrade",
+  "settings.modalTitle": "Upgrade legacy metadata",
+  "settings.modalDescription": "AnimeList will clean legacy fields and refresh matching works from AniList. This can take a while for large libraries because API requests are rate-limited.",
+  "settings.phase.scanning": "Scanning library",
+  "settings.phase.enriching": "Fetching AniList metadata",
+  "settings.phase.writing": "Updating note",
+  "settings.phase.completed": "Completed",
+  "settings.progress": "{completed} / {total}",
+  "settings.preparing": "Preparing legacy metadata upgrade…",
+  "settings.done": "Upgrade complete: {scanned} scanned, {cleaned} updated, {enriched} enriched, {unavailable} without AniList match, {failed} failed.",
+  "settings.failed": "Legacy metadata upgrade failed: {error}",
+  "settings.close": "Close",
 } as const;
 
 export type LegacyMetadataTextKey = keyof typeof TEXT;
