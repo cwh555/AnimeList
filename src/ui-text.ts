@@ -235,6 +235,7 @@ export const UI_TEXT = {
   "detail.library": "回到收藏庫",
   "detail.source": "查看資料來源",
   "detail.noProgress": "尚未記錄進度",
+  "detail.quarter": "季度 {quarter}",
 
   "completion.animeCompleted": "動畫標記為{status}時，進度會與總集數同步，且完成日期為必填。",
   "completion.animeActive": "動畫進度會依目前集數與總集數顯示。",

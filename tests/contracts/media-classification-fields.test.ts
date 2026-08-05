@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ExternalMediaResult } from "../../src/domain/media-types";
 import { mediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
+import { detailMediaQuarterLabel, mediaQuarterLabel } from "../../src/ui/media-quarter-label";
 
 function result(): ExternalMediaResult {
   return {
@@ -54,5 +55,11 @@ describe("media classification collection fields", () => {
     assert.equal(values.country, "日本");
     assert.ok(!Object.values(values).some((value) => value.includes("戸松遥")));
     assert.ok(!Object.values(values).some((value) => value.includes("2021年1月")));
+  });
+
+  it("uses the same quarter label in collection metadata and the library detail summary", () => {
+    assert.equal(mediaQuarterLabel("winter", 2021), "2021 Q1 (冬季)");
+    assert.equal(detailMediaQuarterLabel("anime", "winter", 2021), "季度 2021 Q1 (冬季)");
+    assert.equal(detailMediaQuarterLabel("manga", "winter", 2021), "");
   });
 });

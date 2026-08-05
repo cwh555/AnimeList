@@ -1,19 +1,13 @@
-import { mediaSeasonQuarter, persistedMediaTags } from "../domain/media-classification";
+import { persistedMediaTags } from "../domain/media-classification";
 import type { ExternalMediaResult } from "../domain/media-types";
 import { mediaFormatLabel, uiText } from "../ui-text";
+import { mediaQuarterLabel } from "./media-quarter-label";
 
 export interface MediaClassificationFieldValue {
   key: "format" | "tags" | "people" | "season" | "source" | "country";
   label: string;
   value: string;
 }
-
-const SEASON_LABELS: Readonly<Record<string, string>> = {
-  winter: "冬季",
-  spring: "春季",
-  summer: "夏季",
-  fall: "秋季",
-};
 
 const SOURCE_LABELS: Readonly<Record<string, string>> = {
   original: "原創",
@@ -65,15 +59,12 @@ export function mediaClassificationFieldValues(result: ExternalMediaResult): Med
     });
   }
 
-  if (classification?.season || classification?.seasonYear) {
-    const season = classification.season ? SEASON_LABELS[classification.season] ?? classification.season : "";
-    const quarter = mediaSeasonQuarter(classification.season);
-    const year = classification.seasonYear ? String(classification.seasonYear) : "";
-    const period = [year, quarter].filter(Boolean).join(" ");
+  const quarter = mediaQuarterLabel(classification?.season, classification?.seasonYear);
+  if (quarter) {
     rows.push({
       key: "season",
       label: uiText("add.metadataSeason"),
-      value: [period, season ? `(${season})` : ""].filter(Boolean).join(" "),
+      value: quarter,
     });
   }
 
