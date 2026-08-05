@@ -129,12 +129,13 @@ export function storedMediaClassificationFieldValues(
 
 function renderClassificationRows(parent: HTMLElement, rows: readonly MediaClassificationFieldValue[]): HTMLElement | null {
   if (!rows.length) return null;
-  const section = createDiv();
-  section.className = "al-media-metadata";
   const heading = createEl("h3");
   heading.className = "al-form-section-heading";
   heading.textContent = uiText("add.metadataTitle");
-  section.appendChild(heading);
+  parent.appendChild(heading);
+
+  const section = createDiv();
+  section.className = "al-media-form al-media-metadata";
 
   for (const row of rows) {
     const wrapper = createEl("label");
