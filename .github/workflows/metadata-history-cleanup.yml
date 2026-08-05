@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - staging/anilist-metadata-clean-history2-20260805
+  pull_request:
+    branches:
+      - preview
 
 permissions:
   contents: write
