@@ -89,6 +89,7 @@ export class MediaRepository {
         : "",
       genres: normalizeGenres(frontmatter.genres),
       mediaTags: stringArray(frontmatter.media_tags),
+      userTags: stringArray(frontmatter.user_tags),
       season: stringValue(frontmatter.season),
       seasonYear: typeof frontmatter.season_year === "number" || typeof frontmatter.season_year === "string"
         ? frontmatter.season_year

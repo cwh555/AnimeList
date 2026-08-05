@@ -1,6 +1,7 @@
 import type { TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
+import { normalizeUserTags } from "../domain/user-tags";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeReleaseStatus, progressDisplayValue } from "../novel-progress";
 import { completedStatusLabel, mediaStatusOptions, uiText } from "../ui-text";
@@ -213,6 +214,10 @@ function genreInputValues(input: HTMLInputElement): string[] {
   return normalizeGenres(String(input?.value || "").split(/[、,，;；\n]+/));
 }
 
+function userTagInputValues(input: HTMLInputElement): string[] {
+  return normalizeUserTags(String(input?.value || "").split(/[、,，;；\n]+/));
+}
+
 export function releaseStatusOptions(selected: unknown = "unknown"): HTMLSelectElement {
   return createSelect([
     ["releasing", uiText("media.release.releasing")],
@@ -237,6 +242,7 @@ export function mediaFormValues(context: MediaFormContext<AnimeListUiHost>): Med
     startedAt: fields.startedAt.value,
     completedAt: fields.completedAt.value,
     genres: genreInputValues(fields.genres),
+    userTags: userTagInputValues(fields.userTags),
     templatePath: fields.template?.value || "",
     volumeLog: [],
   };
@@ -264,6 +270,7 @@ export interface MediaEditorInitialValues {
   total: unknown;
   unit: unknown;
   genres: unknown;
+  userTags?: unknown;
   favorite: boolean;
 }
 
@@ -374,6 +381,12 @@ export function createMediaEditorFields({
     createTextInput("text", normalizeGenres(values.genres).join("、")),
     uiText("add.genresHint"),
   );
+  const userTags = createLabeledField(
+    parent,
+    uiText("add.userTags"),
+    createTextInput("text", normalizeUserTags(values.userTags).join("、")),
+    uiText("add.userTagsHint"),
+  );
 
   const template = templateOptions
     ? createLabeledField(
@@ -412,6 +425,7 @@ export function createMediaEditorFields({
     total,
     unit,
     genres,
+    userTags,
     template,
     favorite,
   };

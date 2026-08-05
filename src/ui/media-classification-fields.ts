@@ -1,5 +1,7 @@
 import { persistedMediaTags } from "../domain/media-classification";
-import type { ExternalMediaResult } from "../domain/media-types";
+import type { ExternalMediaResult, MediaType } from "../domain/media-types";
+import { normalizeAnimeStudios } from "../domain/media-metadata";
+import { stringArray, stringValue } from "../domain/value-normalization";
 import { mediaFormatLabel, uiText } from "../ui-text";
 import { mediaQuarterLabel } from "./media-quarter-label";
 
@@ -7,6 +9,17 @@ export interface MediaClassificationFieldValue {
   key: "format" | "tags" | "people" | "season" | "source" | "country";
   label: string;
   value: string;
+}
+
+interface MediaClassificationDisplayInput {
+  mediaType: MediaType;
+  format: string;
+  tags: readonly string[];
+  people: readonly string[];
+  season: unknown;
+  seasonYear: unknown;
+  source: string;
+  country: string;
 }
 
 const SOURCE_LABELS: Readonly<Record<string, string>> = {
@@ -39,55 +52,83 @@ function joinValues(values: readonly string[]): string {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].join("、");
 }
 
-export function mediaClassificationFieldValues(result: ExternalMediaResult): MediaClassificationFieldValue[] {
-  const classification = result.classification;
+function classificationRows(input: MediaClassificationDisplayInput): MediaClassificationFieldValue[] {
   const rows: MediaClassificationFieldValue[] = [];
-  const format = mediaFormatLabel(result.format);
+  const format = mediaFormatLabel(input.format);
   if (format) rows.push({ key: "format", label: uiText("add.metadataFormat"), value: format });
 
-  const tags = persistedMediaTags(classification);
-  if (tags.length) {
-    rows.push({ key: "tags", label: uiText("add.metadataTags"), value: joinValues(tags) });
-  }
+  const tags = joinValues(input.tags);
+  if (tags) rows.push({ key: "tags", label: uiText("add.metadataTags"), value: tags });
 
-  const people = joinValues(result.people);
+  const people = joinValues(input.people);
   if (people) {
     rows.push({
       key: "people",
-      label: uiText(result.mediaType === "anime" ? "add.metadataStudio" : "add.metadataAuthors"),
+      label: uiText(input.mediaType === "anime" ? "add.metadataStudio" : "add.metadataAuthors"),
       value: people,
     });
   }
 
-  const quarter = mediaQuarterLabel(classification?.season, classification?.seasonYear);
-  if (quarter) {
-    rows.push({
-      key: "season",
-      label: uiText("add.metadataSeason"),
-      value: quarter,
-    });
-  }
+  const quarter = input.mediaType === "anime"
+    ? mediaQuarterLabel(input.season, input.seasonYear)
+    : "";
+  if (quarter) rows.push({ key: "season", label: uiText("add.metadataSeason"), value: quarter });
 
-  if (classification?.source) {
+  if (input.source) {
     rows.push({
       key: "source",
       label: uiText("add.metadataSource"),
-      value: SOURCE_LABELS[classification.source] ?? classification.source,
+      value: SOURCE_LABELS[input.source] ?? input.source,
     });
   }
 
-  if (classification?.countryOfOrigin) {
+  if (input.country) {
     rows.push({
       key: "country",
       label: uiText("add.metadataCountry"),
-      value: COUNTRY_LABELS[classification.countryOfOrigin] ?? classification.countryOfOrigin,
+      value: COUNTRY_LABELS[input.country] ?? input.country,
     });
   }
 
   return rows;
 }
 
-export function renderMediaClassificationFields(parent: HTMLElement, result: ExternalMediaResult): HTMLElement {
+export function mediaClassificationFieldValues(result: ExternalMediaResult): MediaClassificationFieldValue[] {
+  const classification = result.classification;
+  return classificationRows({
+    mediaType: result.mediaType,
+    format: result.format,
+    tags: persistedMediaTags(classification),
+    people: result.people,
+    season: classification?.season,
+    seasonYear: classification?.seasonYear,
+    source: classification?.source ?? "",
+    country: classification?.countryOfOrigin ?? "",
+  });
+}
+
+export function storedMediaClassificationFieldValues(
+  frontmatter: Record<string, unknown>,
+  mediaType: MediaType,
+): MediaClassificationFieldValue[] {
+  return classificationRows({
+    mediaType,
+    format: stringValue(frontmatter.format, mediaType),
+    tags: stringArray(frontmatter.media_tags),
+    people: mediaType === "anime"
+      ? normalizeAnimeStudios(frontmatter.studios)
+      : stringArray(frontmatter.authors).length
+        ? stringArray(frontmatter.authors)
+        : stringArray(frontmatter.creators),
+    season: frontmatter.season,
+    seasonYear: frontmatter.season_year,
+    source: stringValue(frontmatter.source_material),
+    country: stringValue(frontmatter.country_of_origin),
+  });
+}
+
+function renderClassificationRows(parent: HTMLElement, rows: readonly MediaClassificationFieldValue[]): HTMLElement | null {
+  if (!rows.length) return null;
   const section = createDiv();
   section.className = "al-media-metadata";
   const heading = createEl("h3");
@@ -95,7 +136,7 @@ export function renderMediaClassificationFields(parent: HTMLElement, result: Ext
   heading.textContent = uiText("add.metadataTitle");
   section.appendChild(heading);
 
-  for (const row of mediaClassificationFieldValues(result)) {
+  for (const row of rows) {
     const wrapper = createEl("label");
     wrapper.className = "al-form-field";
     const label = createSpan();
@@ -112,4 +153,16 @@ export function renderMediaClassificationFields(parent: HTMLElement, result: Ext
 
   parent.appendChild(section);
   return section;
+}
+
+export function renderMediaClassificationFields(parent: HTMLElement, result: ExternalMediaResult): HTMLElement | null {
+  return renderClassificationRows(parent, mediaClassificationFieldValues(result));
+}
+
+export function renderStoredMediaClassificationFields(
+  parent: HTMLElement,
+  frontmatter: Record<string, unknown>,
+  mediaType: MediaType,
+): HTMLElement | null {
+  return renderClassificationRows(parent, storedMediaClassificationFieldValues(frontmatter, mediaType));
 }

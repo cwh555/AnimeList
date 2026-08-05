@@ -23,6 +23,7 @@ export interface MediaFormFields {
   total: HTMLInputElement | null;
   unit: HTMLSelectElement;
   genres: HTMLInputElement;
+  userTags: HTMLInputElement;
   template: HTMLSelectElement | null;
   favorite: HTMLInputElement;
 }

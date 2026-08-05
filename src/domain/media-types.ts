@@ -44,6 +44,7 @@ export interface MediaItem {
   year: number | string;
   genres: string[];
   mediaTags?: string[];
+  userTags?: string[];
   season?: string;
   seasonYear?: number | string;
   sourceMaterial?: string;
@@ -117,6 +118,7 @@ export interface MediaNoteForm {
   startedAt: string;
   completedAt: string;
   genres: string[];
+  userTags?: string[];
   templatePath: string;
   volumeLog: SerialProgressEntry[];
 }

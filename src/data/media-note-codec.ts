@@ -1,6 +1,7 @@
 import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeGenres } from "../domain/media-metadata";
+import { normalizeUserTags } from "../domain/user-tags";
 import type {
   ExternalMediaResult,
   MediaNoteForm,
@@ -176,6 +177,9 @@ export function applyEditableMediaForm(
   frontmatter.progress_unit = unit;
   frontmatter.favorite = form.favorite === true;
   frontmatter.genres = normalizeGenres(form.genres);
+  const userTags = normalizeUserTags(form.userTags);
+  if (userTags.length) frontmatter.user_tags = userTags;
+  else delete frontmatter.user_tags;
   if (validated.score != null) frontmatter.score = validated.score;
   else delete frontmatter.score;
   if (form.startedAt) frontmatter.started_at = form.startedAt;
@@ -245,6 +249,7 @@ export function buildMediaMarkdown(
   yamlArray(lines, "source_genres", rawGenres);
   const classification = result.classification;
   yamlArray(lines, "media_tags", persistedMediaTags(classification));
+  yamlArray(lines, "user_tags", normalizeUserTags(form.userTags));
   if (classification?.season) lines.push(`season: ${yamlScalar(classification.season)}`);
   if (classification?.seasonYear) lines.push(`season_year: ${classification.seasonYear}`);
   if (classification?.source) lines.push(`source_material: ${yamlScalar(classification.source)}`);

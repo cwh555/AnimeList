@@ -174,12 +174,14 @@ describe("media note Markdown compatibility", () => {
       unit: "episode",
       favorite: false,
       genres: ["戀愛", "喜劇"],
+      userTags: ["重看", "收藏"],
       templatePath: "",
       volumeLog: [],
     }, "", "");
 
     const yaml = frontmatter(markdown);
     assert.match(yaml, /media_tags:\n  - "School"/);
+    assert.match(yaml, /user_tags:\n  - "重看"\n  - "收藏"/);
     assert.doesNotMatch(yaml, /Low Rank|Spoiler/);
     assert.match(yaml, /^season: "spring"$/m);
     assert.match(yaml, /^season_year: 2026$/m);

@@ -2,7 +2,7 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
-import { renderMediaClassificationFields } from "./media-classification-fields";
+import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
 import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 
@@ -203,6 +203,7 @@ export class AddMediaModal extends Modal {
         total: enrichedResult.total || "",
         unit: enrichedResult.unit,
         genres: enrichedResult.genres,
+        userTags: [],
         favorite: false,
       },
       templateOptions,
@@ -322,6 +323,8 @@ export class EditMediaModal extends Modal {
     const mediaType: MediaType = frontmatter.media_type === "manga" || frontmatter.media_type === "novel"
       ? frontmatter.media_type
       : "anime";
+    renderStoredMediaClassificationFields(this.contentEl, frontmatter, mediaType);
+
     const form = createDiv();
     form.className = "al-media-form";
     const fields = createMediaEditorFields({
@@ -338,6 +341,7 @@ export class EditMediaModal extends Modal {
         total: frontmatter.progress_total,
         unit: frontmatter.progress_unit,
         genres: frontmatter.genres,
+        userTags: frontmatter.user_tags,
         favorite: frontmatter.favorite === true,
       },
       selectedUnit: typeof frontmatter.progress_unit === "string"

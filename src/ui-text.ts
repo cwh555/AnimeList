@@ -208,6 +208,8 @@ export const UI_TEXT = {
   "add.unit": "進度單位",
   "add.genres": "作品類型",
   "add.genresHint": "只保留廣義作品類型；工作室、季度、格式、改編來源與 AniList 標籤會分欄顯示。",
+  "add.userTags": "自訂標籤",
+  "add.userTagsHint": "自己整理收藏用的標籤；不會被 AniList metadata 更新覆蓋。",
   "add.metadataLoading": "正在整理 AniList 作品資料…",
   "add.metadataTitle": "作品資料",
   "add.metadataFormat": "作品形式",

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ExternalMediaResult } from "../../src/domain/media-types";
-import { mediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
+import { mediaClassificationFieldValues, storedMediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
 import { detailMediaQuarterLabel, mediaQuarterLabel } from "../../src/ui/media-quarter-label";
+import { normalizeUserTags } from "../../src/domain/user-tags";
 
 function result(): ExternalMediaResult {
   return {
@@ -55,6 +56,34 @@ describe("media classification collection fields", () => {
     assert.equal(values.country, "日本");
     assert.ok(!Object.values(values).some((value) => value.includes("戸松遥")));
     assert.ok(!Object.values(values).some((value) => value.includes("2021年1月")));
+  });
+
+  it("shows stored structured metadata, including quarter, in the edit modal data section", () => {
+    const rows = storedMediaClassificationFieldValues({
+      format: "tv",
+      media_tags: ["School", "Coming of Age"],
+      studios: ["CloverWorks"],
+      season: "winter",
+      season_year: 2021,
+      source_material: "manga",
+      country_of_origin: "JP",
+    }, "anime");
+    const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+
+    assert.equal(values.format, "TV 動畫");
+    assert.equal(values.tags, "School、Coming of Age");
+    assert.equal(values.people, "CloverWorks");
+    assert.equal(values.season, "2021 Q1 (冬季)");
+    assert.equal(values.source, "漫畫");
+    assert.equal(values.country, "日本");
+  });
+
+  it("normalizes personal tags independently from genres and AniList tags", () => {
+    assert.deepEqual(normalizeUserTags([" #重看 ", "治癒系", "重看", "Comfort  Watch"]), [
+      "重看",
+      "治癒系",
+      "Comfort Watch",
+    ]);
   });
 
   it("uses the same quarter label in collection metadata and the library detail summary", () => {
