@@ -165,6 +165,28 @@ describe("metadata provider clients", () => {
     }
   });
 
+
+  it("derives quarter metadata from AniList startDate when season fields are absent", async () => {
+    setRequestUrlMock(() => {
+      const media = aniListMedia(31) as Record<string, any>;
+      media.season = null;
+      media.seasonYear = null;
+      media.startDate = { year: 2024, month: 7, day: 2 };
+      return {
+        headers: {},
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [media] } } },
+        text: "",
+      };
+    });
+    try {
+      const page = await new AniListClient().searchPage("anime", "Quarter fallback", 1);
+      assert.equal(page.results[0]?.classification?.season, "summer");
+      assert.equal(page.results[0]?.classification?.seasonYear, 2024);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("deduplicates concurrent AniList requests and reuses the short-lived response cache", async () => {
     let calls = 0;
     setRequestUrlMock(async () => {

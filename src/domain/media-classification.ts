@@ -32,6 +32,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 function optionalInteger(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : null;
 }
@@ -41,6 +42,23 @@ function normalizeSeason(value: unknown): MediaSeason | null {
   return season === "winter" || season === "spring" || season === "summer" || season === "fall"
     ? season
     : null;
+}
+
+function seasonFromMonth(value: unknown): MediaSeason | null {
+  const month = optionalInteger(value);
+  if (month === null || month < 1 || month > 12) return null;
+  if (month <= 3) return "winter";
+  if (month <= 6) return "spring";
+  if (month <= 9) return "summer";
+  return "fall";
+}
+
+export function mediaSeasonQuarter(season: MediaSeason | null | undefined): string {
+  if (season === "winter") return "Q1";
+  if (season === "spring") return "Q2";
+  if (season === "summer") return "Q3";
+  if (season === "fall") return "Q4";
+  return "";
 }
 
 export function normalizeAniListClassification(value: unknown): MediaClassification | null {
@@ -63,13 +81,16 @@ export function normalizeAniListClassification(value: unknown): MediaClassificat
   }).filter((tag): tag is MediaTagMetadata => tag !== null);
 
   const studios = normalizeAnimeStudios(asArray(record(media.studios).nodes));
+  const startDate = record(media.startDate);
+  const season = normalizeSeason(media.season) ?? seasonFromMonth(startDate.month);
+  const seasonYear = optionalInteger(media.seasonYear) ?? optionalInteger(startDate.year);
 
   return {
     anilistId,
     genres: normalizeGenres(media.genres),
     tags,
-    season: normalizeSeason(media.season),
-    seasonYear: optionalInteger(media.seasonYear),
+    season,
+    seasonYear,
     studios,
     source: stringValue(media.source).trim().toLocaleLowerCase(),
     countryOfOrigin: stringValue(media.countryOfOrigin).trim().toUpperCase(),

@@ -214,7 +214,7 @@ export const UI_TEXT = {
   "add.metadataTags": "AniList 標籤",
   "add.metadataStudio": "動畫製作",
   "add.metadataAuthors": "作者",
-  "add.metadataSeason": "播出季度",
+  "add.metadataSeason": "季度",
   "add.metadataSource": "改編來源",
   "add.metadataCountry": "原產地",
   "add.template": "筆記模板",

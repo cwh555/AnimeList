@@ -1,4 +1,4 @@
-import { persistedMediaTags } from "../domain/media-classification";
+import { mediaSeasonQuarter, persistedMediaTags } from "../domain/media-classification";
 import type { ExternalMediaResult } from "../domain/media-types";
 import { mediaFormatLabel, uiText } from "../ui-text";
 
@@ -67,11 +67,13 @@ export function mediaClassificationFieldValues(result: ExternalMediaResult): Med
 
   if (classification?.season || classification?.seasonYear) {
     const season = classification.season ? SEASON_LABELS[classification.season] ?? classification.season : "";
+    const quarter = mediaSeasonQuarter(classification.season);
     const year = classification.seasonYear ? String(classification.seasonYear) : "";
+    const period = [year, quarter].filter(Boolean).join(" ");
     rows.push({
       key: "season",
       label: uiText("add.metadataSeason"),
-      value: [year, season].filter(Boolean).join(" "),
+      value: [period, season ? `(${season})` : ""].filter(Boolean).join(" "),
     });
   }
 

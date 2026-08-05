@@ -49,7 +49,7 @@ describe("media classification collection fields", () => {
     assert.equal(values.format, "TV 動畫");
     assert.equal(values.tags, "School");
     assert.equal(values.people, "CloverWorks");
-    assert.equal(values.season, "2021 冬季");
+    assert.equal(values.season, "2021 Q1 (冬季)");
     assert.equal(values.source, "漫畫");
     assert.equal(values.country, "日本");
     assert.ok(!Object.values(values).some((value) => value.includes("戸松遥")));
