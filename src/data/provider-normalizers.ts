@@ -1,4 +1,5 @@
-import { normalizeGenres } from "../domain/media-metadata";
+import { normalizeAniListClassification } from "../domain/media-classification";
+import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
@@ -18,6 +19,31 @@ function optionalNumber(value: unknown): number | null {
 function yearValue(value: unknown): number | string {
   const parsed = optionalNumber(value);
   return parsed ?? "";
+}
+
+function dateParts(value: unknown): { year: number | null; month: number | null; day: number | null } | undefined {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const input = value as Record<string, unknown>;
+    const year = Number(input.year);
+    const month = Number(input.month);
+    const day = Number(input.day);
+    return {
+      year: Number.isInteger(year) && year > 0 ? year : null,
+      month: Number.isInteger(month) && month >= 1 && month <= 12 ? month : null,
+      day: Number.isInteger(day) && day >= 1 && day <= 31 ? day : null,
+    };
+  }
+  const text = stringValue(value).trim();
+  const match = text.match(/^((?:19|20)\d{2})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?/);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return {
+    year: Number.isInteger(year) ? year : null,
+    month: Number.isInteger(month) && month >= 1 && month <= 12 ? month : null,
+    day: Number.isInteger(day) && day >= 1 && day <= 31 ? day : null,
+  };
 }
 
 function stringList(value: unknown): string[] {
@@ -88,7 +114,14 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   const localTitle = stringValue(subject.name_cn, originalTitle || uiText("media.untitled")).trim();
   const images = record(subject.images);
   const people = mediaType === "anime"
-    ? bangumiInfoboxValues(subject.infobox, ["动画制作", "動畫製作", "制作", "製作"])
+    ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, [
+      "动画制作",
+      "動畫製作",
+      "制作会社",
+      "製作会社",
+      "制作公司",
+      "製作公司",
+    ]))
     : bangumiInfoboxValues(subject.infobox, ["作者", "原作", "作画", "作畫"]);
   const platform = stringValue(subject.platform).trim();
   let format = mediaType === "anime" ? "tv" : mediaType === "manga" ? "manga" : "light_novel";
@@ -96,10 +129,11 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   else if (/ova/i.test(platform)) format = "ova";
   else if (/web|ona/i.test(platform)) format = "ona";
   const date = stringValue(subject.date);
-  const rawGenres = asArray(subject.tags)
+  const providerTags = asArray(subject.tags)
     .slice(0, 16)
     .map((tag) => typeof tag === "string" ? tag : stringValue(record(tag).name))
     .filter(Boolean);
+  const genres = normalizeBroadGenres(providerTags);
   const subjectId = stringValue(subject.id);
   const rating = record(subject.rating);
   return {
@@ -112,9 +146,10 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     romajiTitle: "",
     format,
     year: yearValue(date.slice(0, 4)),
+    startDate: dateParts(date),
     coverUrl: stringValue(images.large, stringValue(images.common, stringValue(images.medium, stringValue(images.small, stringValue(images.grid))))),
-    genres: normalizeGenres(rawGenres),
-    rawGenres,
+    genres,
+    rawGenres: genres,
     people,
     platforms: platform ? [platform] : [],
     total: mediaType === "anime" ? numeric(subject.eps ?? subject.total_episodes) : 0,
@@ -127,6 +162,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
       originalTitle,
       ...bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
     ].map((title) => title.trim()).filter(Boolean))],
+    sources: subjectId ? [{ provider: "bangumi", sourceId: subjectId, sourceUrl: `https://bgm.tv/subject/${subjectId}` }] : [],
   };
 }
 
@@ -143,9 +179,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
       return stringValue(name.native, stringValue(name.full));
     })
     .filter(Boolean);
-  const studios = asArray(record(media.studios).nodes)
-    .map((node) => stringValue(record(node).name))
-    .filter(Boolean);
+  const studios = normalizeAnimeStudios(asArray(record(media.studios).nodes));
   const statusMap: Readonly<Record<string, ExternalMediaResult["releaseStatus"]>> = {
     RELEASING: "releasing",
     FINISHED: "finished",
@@ -159,6 +193,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     : "");
   const cover = record(media.coverImage);
   const averageScore = optionalNumber(media.averageScore);
+  const classification = normalizeAniListClassification(media);
   return {
     provider: "anilist",
     sourceId: mediaId,
@@ -169,6 +204,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     romajiTitle: stringValue(title.romaji),
     format: mapFormat(media.format, mediaType),
     year: yearValue(record(media.startDate).year),
+    startDate: dateParts(media.startDate),
     coverUrl: stringValue(cover.extraLarge, stringValue(cover.large, stringValue(cover.medium))),
     genres: normalizeGenres(rawGenres),
     rawGenres,
@@ -187,13 +223,16 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
       stringValue(title.native),
       ...stringList(media.synonyms),
     ].map((entry) => entry.trim()).filter(Boolean))],
+    sources: mediaId ? [{ provider: "anilist", sourceId: mediaId, sourceUrl: siteUrl }] : [],
+    ...(classification ? { classification } : {}),
   };
 }
 
 export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
   const book = record(value);
   const key = stringValue(book.key).replace(/^\/works\//, "");
-  const rawGenres = stringList(book.subject).slice(0, 16);
+  const providerSubjects = stringList(book.subject).slice(0, 16);
+  const genres = normalizeBroadGenres(providerSubjects);
   const title = stringValue(book.title, uiText("media.untitled"));
   const coverId = stringValue(book.cover_i);
   return {
@@ -207,8 +246,8 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     format: "novel",
     year: yearValue(book.first_publish_year),
     coverUrl: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false` : "",
-    genres: normalizeGenres(rawGenres),
-    rawGenres,
+    genres,
+    rawGenres: genres,
     people: stringList(book.author_name).slice(0, 6),
     platforms: [],
     total: 0,
@@ -216,26 +255,71 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     summary: "",
     externalScore: null,
     releaseStatus: "unknown",
+    sources: key ? [{ provider: "openlibrary", sourceId: key, sourceUrl: `https://openlibrary.org/works/${key}` }] : [],
   };
 }
 
 export function dedupeSearchResults(results: readonly ExternalMediaResult[]): ExternalMediaResult[] {
-  const seenSource = new Set<string>();
-  const titleOwners = new Map<string, string>();
+  const sourceIndexes = new Map<string, number>();
+  const titleOwners = new Map<string, { provider: string; index: number }>();
   const output: ExternalMediaResult[] = [];
-  for (const result of results) {
-    const sourceKey = `${result.provider}:${result.sourceId}`;
-    if (seenSource.has(sourceKey)) continue;
-    seenSource.add(sourceKey);
+
+  const sourceRefs = (result: ExternalMediaResult) => {
+    const refs = result.sources?.length
+      ? result.sources
+      : result.sourceId
+        ? [{ provider: result.provider, sourceId: result.sourceId, sourceUrl: result.sourceUrl }]
+        : [];
+    const seen = new Set<string>();
+    return refs.filter((ref) => {
+      const key = `${ref.provider}:${ref.sourceId}`;
+      if (!ref.sourceId || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const mergeResult = (left: ExternalMediaResult, right: ExternalMediaResult): ExternalMediaResult => {
+    const sources = sourceRefs({ ...left, sources: [...sourceRefs(left), ...sourceRefs(right)] });
+    const classification = left.classification ?? right.classification;
+    return {
+      ...left,
+      sources,
+      ...(classification ? {
+        classification,
+        genres: classification.genres.length ? classification.genres : left.genres,
+        people: left.mediaType === "anime" && classification.studios.length
+          ? classification.studios
+          : left.people,
+      } : {}),
+    };
+  };
+
+  for (const rawResult of results) {
+    const result: ExternalMediaResult = { ...rawResult, sources: sourceRefs(rawResult) };
+    const sourceKey = result.sourceId ? `${result.provider}:${result.sourceId}` : "";
+    const sourceIndex = sourceKey ? sourceIndexes.get(sourceKey) : undefined;
+    if (sourceIndex !== undefined) {
+      output[sourceIndex] = mergeResult(output[sourceIndex], result);
+      continue;
+    }
 
     const comparableTitle = normalizeComparable(result.title || result.originalTitle);
     const titleKey = comparableTitle
       ? `${result.mediaType}:${comparableTitle}:${result.year || ""}:${result.format || ""}`
       : "";
     const titleOwner = titleKey ? titleOwners.get(titleKey) : undefined;
-    if (titleOwner && titleOwner !== result.provider) continue;
-    if (titleKey && !titleOwner) titleOwners.set(titleKey, result.provider);
+    if (titleOwner && titleOwner.provider !== result.provider) {
+      output[titleOwner.index] = mergeResult(output[titleOwner.index], result);
+      for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, titleOwner.index);
+      continue;
+    }
+
+    const index = output.length;
     output.push(result);
+    if (sourceKey) sourceIndexes.set(sourceKey, index);
+    for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, index);
+    if (titleKey && !titleOwner) titleOwners.set(titleKey, { provider: result.provider, index });
   }
   return output;
 }

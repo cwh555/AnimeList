@@ -52,11 +52,20 @@ export class ExternalMediaSearchService {
     results: ExternalMediaResult[];
     warnings: string[];
   }> {
-    const providers: SearchProviderAdapter[] = this.enabledProviders(mediaType).map((client) => ({
-      label: client.label,
-      supportsChineseDiscovery: client.supportsChineseDiscovery,
-      search: async (candidate) => (await client.searchPage(mediaType, candidate, 1)).results,
-    }));
+    const providers: SearchProviderAdapter[] = this.enabledProviders(mediaType).map((client) => {
+      const provider: SearchProviderAdapter = {
+        label: client.label,
+        supportsChineseDiscovery: client.supportsChineseDiscovery,
+        search: async (candidate) => (await client.searchPage(mediaType, candidate, 1)).results,
+      };
+      if (client.searchPages !== undefined) {
+        provider.searchMany = async (candidates) => {
+          const pages = await client.searchPages?.(mediaType, candidates, 1);
+          return (pages ?? []).map((page) => page.results);
+        };
+      }
+      return provider;
+    });
     if (!providers.length) {
       return { results: [], warnings: [searchFeatureText("provider.noneEnabled")] };
     }
