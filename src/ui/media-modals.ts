@@ -2,6 +2,7 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
+import { compatibleGenres, compatibleSeasonMetadata } from "../data/media-frontmatter-compat";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
@@ -346,9 +347,9 @@ export class EditMediaModal extends Modal {
     renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
     this.contentEl.appendChild(metadataHost);
 
-    const storedSeason = typeof frontmatter.season === "string" ? frontmatter.season.trim() : "";
+    const storedSeason = compatibleSeasonMetadata(frontmatter);
     const needsQuarterRefresh = mediaType === "anime"
-      && (!storedSeason || !Number.isInteger(Number(frontmatter.season_year)));
+      && (!storedSeason.season || storedSeason.seasonYear === null);
     if (needsQuarterRefresh) {
       const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
       metadataHost.appendChild(loading);
@@ -382,10 +383,7 @@ export class EditMediaModal extends Modal {
         progress: formValue(frontmatter.progress, 0),
         total: frontmatter.progress_total,
         unit: frontmatter.progress_unit,
-        genres: [
-          ...normalizeUserTags(frontmatter.genres),
-          ...normalizeUserTags(frontmatter.user_tags),
-        ],
+        genres: compatibleGenres(frontmatter),
         favorite: frontmatter.favorite === true,
       },
       selectedUnit: typeof frontmatter.progress_unit === "string"
