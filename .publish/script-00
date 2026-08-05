@@ -11,6 +11,7 @@ git add -A
 PATCHED_TREE=$(git write-tree)
 test "$PATCHED_TREE" = "e5abe5a2901652f5df001597c9d64fb93152f036"
 FINAL_COMMIT=$(git commit-tree "$PATCHED_TREE" -p HEAD -m "temporary exact final tree")
+git reset --hard HEAD
 git fetch origin preview feature/anilist-media-metadata --prune
 test "$(git rev-parse origin/preview)" = "a828e8b535cdd1a2da89f28666ac373f364a4b05"
 test "$(git rev-parse origin/feature/anilist-media-metadata)" = "8e7bcf799508eb3841cf83ad068ba45e1185ce06"
