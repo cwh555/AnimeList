@@ -43,6 +43,7 @@ describe("media repository compatibility", () => {
         year: 2024,
         genres: ["Romance", "恋爱", "Comedy"],
         media_tags: ["School", "Coming of Age"],
+        user_tags: ["重看", "收藏"],
         season: "spring",
         season_year: 2024,
         source_material: "manga",
@@ -84,6 +85,7 @@ describe("media repository compatibility", () => {
       year: 2024,
       genres: ["戀愛", "喜劇"],
       mediaTags: ["School", "Coming of Age"],
+      userTags: ["重看", "收藏"],
       season: "spring",
       seasonYear: 2024,
       sourceMaterial: "manga",
@@ -116,5 +118,58 @@ describe("media repository compatibility", () => {
       if (previousTimezone === undefined) delete process.env.TZ;
       else process.env.TZ = previousTimezone;
     }
+  });
+
+  it("loads stable v1.2.1 schema-6 notes without requiring any new metadata fields", () => {
+    const file = markdownFile("AnimeList/Anime/legacy-v121.md", 1_700_000_000_000);
+    const root = new TFolder();
+    root.path = "AnimeList";
+    root.children = [file];
+    const oldFrontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      title: "Legacy anime",
+      title_original: "旧作",
+      media_type: "anime",
+      format: "tv",
+      status: "planned",
+      progress: 0,
+      progress_total: 12,
+      progress_unit: "episode",
+      favorite: false,
+      year: 2021,
+      genres: ["Romance", "Comedy"],
+      source_genres: ["School", "2021年1月"],
+      studios: ["Legacy Studio"],
+      platforms: ["TV"],
+      source_provider: "bangumi",
+      source_id: "123",
+      source_urls: ["https://bgm.tv/subject/123"],
+      source_score: 7.8,
+      note_template: "AnimeList/Templates/anime.md",
+    };
+    const app = {
+      vault: {
+        getAbstractFileByPath: (path: string) => path === "AnimeList" ? root : null,
+        getResourcePath: () => "",
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: oldFrontmatter }),
+        getFirstLinkpathDest: () => null,
+      },
+    } as unknown as App;
+
+    const item = new MediaRepository(app).read(file);
+    assert.ok(item);
+    assert.equal(item.title, "Legacy anime");
+    assert.deepEqual(item.genres, ["戀愛", "喜劇"]);
+    assert.deepEqual(item.people, ["Legacy Studio"]);
+    assert.deepEqual(item.sourceUrls, ["https://bgm.tv/subject/123"]);
+    assert.deepEqual(item.mediaTags, []);
+    assert.deepEqual(item.userTags, []);
+    assert.equal(item.season, "");
+    assert.equal(item.seasonYear, "");
+    assert.equal(item.sourceMaterial, "");
+    assert.equal(item.countryOfOrigin, "");
+    assert.equal(item.anilistId, "");
   });
 });

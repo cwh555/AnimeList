@@ -73,6 +73,8 @@ describe("legacy metadata cleanup", () => {
       title_original: "ホリミヤ",
       genres: ["戀愛", "CloverWorks", "2021年1月", "TV"],
       studios: [pollutedStudio],
+      user_tags: ["重看", "收藏"],
+      tags: ["obsidian-project-tag"],
       custom_future_field: { keep: true },
     };
     const file = new TFile();
@@ -116,6 +118,8 @@ describe("legacy metadata cleanup", () => {
     assert.equal(frontmatter.country_of_origin, "JP");
     assert.equal(frontmatter.anilist_id, "124080");
     assert.equal(frontmatter.schema_version, 6);
+    assert.deepEqual(frontmatter.user_tags, ["重看", "收藏"]);
+    assert.deepEqual(frontmatter.tags, ["obsidian-project-tag"]);
     assert.deepEqual(frontmatter.custom_future_field, { keep: true });
     assert.ok((frontmatter.source_urls as string[]).includes("https://bgm.tv/subject/374400"));
     assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
@@ -147,6 +151,82 @@ describe("legacy metadata cleanup", () => {
     });
     assert.equal(secondPassApiCalls, 0);
     assert.equal(secondPass.cleaned, 0);
+  });
+
+  it("preserves stable v1.2.1 source fields and personal/unknown frontmatter during enrichment", async () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      title: "Legacy anime",
+      title_original: "旧作",
+      media_type: "anime",
+      format: "tv",
+      status: "planned",
+      progress: 0,
+      progress_total: 12,
+      progress_unit: "episode",
+      favorite: false,
+      year: 2021,
+      cover: "![[AnimeList/Covers/legacy.jpg|260]]",
+      cover_remote: "https://example.com/legacy.jpg",
+      genres: ["Romance"],
+      source_genres: ["School"],
+      studios: ["Legacy Studio"],
+      platforms: ["TV"],
+      source_provider: "bangumi",
+      source_id: "123",
+      source_urls: ["https://bgm.tv/subject/123"],
+      source_score: 7.8,
+      note_template: "AnimeList/Templates/anime.md",
+      user_tags: ["重看"],
+      tags: ["obsidian-project-tag"],
+      custom_future_field: { keep: [1, 2, 3] },
+    };
+    const file = new TFile();
+    file.path = "AnimeList/Anime/legacy-v121.md";
+    file.basename = "legacy-v121";
+    file.extension = "md";
+    let bodyModifyCalls = 0;
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: {
+        getRoot: () => ({ children: [file] }),
+        modify: async () => { bodyModifyCalls += 1; },
+      },
+      fileManager: {
+        async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) {
+          callback(frontmatter);
+        },
+      },
+    } as any;
+
+    const result = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => classificationResult(source),
+    });
+
+    assert.equal(result.enriched, 1);
+    assert.equal(bodyModifyCalls, 0);
+    assert.equal(frontmatter.schema_version, 6);
+    assert.equal(frontmatter.title_original, "旧作");
+    assert.equal(frontmatter.format, "tv");
+    assert.equal(frontmatter.status, "planned");
+    assert.equal(frontmatter.progress, 0);
+    assert.equal(frontmatter.progress_total, 12);
+    assert.equal(frontmatter.progress_unit, "episode");
+    assert.equal(frontmatter.favorite, false);
+    assert.equal(frontmatter.year, 2021);
+    assert.equal(frontmatter.cover, "![[AnimeList/Covers/legacy.jpg|260]]");
+    assert.equal(frontmatter.cover_remote, "https://example.com/legacy.jpg");
+    assert.deepEqual(frontmatter.platforms, ["TV"]);
+    assert.equal(frontmatter.source_provider, "bangumi");
+    assert.equal(frontmatter.source_id, "123");
+    assert.equal(frontmatter.source_score, 7.8);
+    assert.equal(frontmatter.note_template, "AnimeList/Templates/anime.md");
+    assert.deepEqual(frontmatter.user_tags, ["重看"]);
+    assert.deepEqual(frontmatter.tags, ["obsidian-project-tag"]);
+    assert.deepEqual(frontmatter.custom_future_field, { keep: [1, 2, 3] });
+    assert.ok((frontmatter.source_urls as string[]).includes("https://bgm.tv/subject/123"));
+    assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
   });
 
   it("does not mark a legacy note current when AniList metadata is unavailable, allowing a later retry", async () => {
