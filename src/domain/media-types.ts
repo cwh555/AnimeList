@@ -1,4 +1,5 @@
 import type { MediaStatus } from "../media-status";
+import type { MediaClassification } from "./media-classification";
 
 export type MediaType = "anime" | "manga" | "novel";
 export type ReleaseStatus = "releasing" | "finished" | "hiatus" | "cancelled" | "unknown";
@@ -42,6 +43,13 @@ export interface MediaItem {
   favorite: boolean;
   year: number | string;
   genres: string[];
+  mediaTags?: string[];
+  userTags?: string[];
+  season?: string;
+  seasonYear?: number | string;
+  sourceMaterial?: string;
+  countryOfOrigin?: string;
+  anilistId?: string;
   people: string[];
   platforms: string[];
   sourceUrls: string[];
@@ -61,6 +69,12 @@ export interface TimelineMediaEntry extends MediaItem {
   serialEntryLabel?: string;
 }
 
+export interface ExternalMediaSourceRef {
+  provider: string;
+  sourceId: string;
+  sourceUrl: string;
+}
+
 export interface ExternalMediaSearchPage {
   results: ExternalMediaResult[];
   warnings: string[];
@@ -78,6 +92,7 @@ export interface ExternalMediaResult {
   total: number;
   unit: string;
   year: number | string;
+  startDate?: { year: number | null; month: number | null; day: number | null };
   genres: string[];
   rawGenres: string[];
   people: string[];
@@ -88,6 +103,8 @@ export interface ExternalMediaResult {
   externalScore: number | null;
   releaseStatus: ReleaseStatus;
   searchTitles?: string[];
+  sources?: ExternalMediaSourceRef[];
+  classification?: MediaClassification;
 }
 
 export interface MediaNoteForm {
@@ -102,6 +119,7 @@ export interface MediaNoteForm {
   startedAt: string;
   completedAt: string;
   genres: string[];
+  userTags?: string[];
   templatePath: string;
   volumeLog: SerialProgressEntry[];
 }

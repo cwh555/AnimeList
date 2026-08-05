@@ -1,6 +1,6 @@
 import { App, TFile } from "obsidian";
-import { normalizeGenres } from "../domain/media-metadata";
 import type { CoverSources, MediaItem } from "../domain/media-types";
+import { compatibleGenres, compatibleSeasonMetadata, compatibleStudios } from "./media-frontmatter-compat";
 import {
   formatFileModifiedTime,
   mediaTypeOf,
@@ -56,7 +56,7 @@ export class MediaRepository {
     if (!mediaType) return null;
 
     const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
-    const studios = stringArray(frontmatter.studios);
+    const studios = compatibleStudios(frontmatter);
     const authors = stringArray(frontmatter.authors);
     const people = studios.length
       ? studios
@@ -87,7 +87,14 @@ export class MediaRepository {
       year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string"
         ? frontmatter.year
         : "",
-      genres: normalizeGenres(frontmatter.genres),
+      genres: compatibleGenres(frontmatter),
+      mediaTags: stringArray(frontmatter.media_tags),
+      userTags: stringArray(frontmatter.user_tags),
+      season: compatibleSeasonMetadata(frontmatter).season ?? "",
+      seasonYear: compatibleSeasonMetadata(frontmatter).seasonYear ?? "",
+      sourceMaterial: stringValue(frontmatter.source_material),
+      countryOfOrigin: stringValue(frontmatter.country_of_origin),
+      anilistId: stringValue(frontmatter.anilist_id),
       people,
       platforms: stringArray(frontmatter.platforms),
       sourceUrls: stringArray(frontmatter.source_urls),

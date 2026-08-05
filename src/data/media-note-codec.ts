@@ -1,3 +1,4 @@
+import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeGenres } from "../domain/media-metadata";
 import type {
@@ -174,7 +175,8 @@ export function applyEditableMediaForm(
   frontmatter.progress = progress;
   frontmatter.progress_unit = unit;
   frontmatter.favorite = form.favorite === true;
-  frontmatter.genres = normalizeGenres(form.genres);
+  frontmatter.genres = normalizeGenres([...(form.genres ?? []), ...(form.userTags ?? [])], 32);
+  delete frontmatter.user_tags;
   if (validated.score != null) frontmatter.score = validated.score;
   else delete frontmatter.score;
   if (form.startedAt) frontmatter.started_at = form.startedAt;
@@ -206,7 +208,7 @@ export function buildMediaMarkdown(
     : 0;
   const unit = defaultProgressUnit(result.mediaType, form.unit || result.unit);
   const progress = completedProgress(status, total, form.progress, result.mediaType, unit);
-  const genres = normalizeGenres(form.genres?.length ? form.genres : result.genres);
+  const genres = normalizeGenres([...(form.genres ?? []), ...(form.userTags ?? [])], 32);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
     : normalizeReleaseStatus(form.releaseStatus || result.releaseStatus);
@@ -242,13 +244,23 @@ export function buildMediaMarkdown(
     .map(String)
     .filter((value) => value && !genres.includes(value));
   yamlArray(lines, "source_genres", rawGenres);
+  const classification = result.classification;
+  yamlArray(lines, "media_tags", persistedMediaTags(classification));
+  if (classification?.season) lines.push(`season: ${yamlScalar(classification.season)}`);
+  if (classification?.seasonYear) lines.push(`season_year: ${classification.seasonYear}`);
+  if (classification?.source) lines.push(`source_material: ${yamlScalar(classification.source)}`);
+  if (classification?.anilistId) lines.push(`anilist_id: ${yamlScalar(classification.anilistId)}`);
   yamlArray(lines, "title_aliases", result.searchTitles ?? []);
   if (result.mediaType === "anime") yamlArray(lines, "studios", result.people);
   else yamlArray(lines, "authors", result.people);
   yamlArray(lines, "platforms", result.platforms);
   lines.push(`source_provider: ${yamlScalar(result.provider)}`);
   if (result.sourceId) lines.push(`source_id: ${yamlScalar(result.sourceId)}`);
-  yamlArray(lines, "source_urls", result.sourceUrl ? [result.sourceUrl] : []);
+  const sourceUrls = [...new Set([
+    result.sourceUrl,
+    ...(result.sources ?? []).map((source) => source.sourceUrl),
+  ].filter(Boolean))];
+  yamlArray(lines, "source_urls", sourceUrls);
   if (result.externalScore != null) lines.push(`source_score: ${numeric(result.externalScore)}`);
   if (form.templatePath) lines.push(`note_template: ${yamlScalar(form.templatePath)}`);
   lines.push("---", "");
