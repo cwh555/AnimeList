@@ -3,6 +3,7 @@ import type { AnimeListFeatureHost } from "./app/feature-types";
 import { cleanupLegacyMetadataNotes } from "./data/legacy-metadata-cleanup";
 import type { LegacyMetadataCleanupProgress, LegacyMetadataCleanupResult } from "./domain/legacy-metadata-types";
 import { legacyMetadataText } from "./legacy-metadata-text";
+import { legacyMetadataDetailReport } from "./legacy-metadata-report";
 
 function phaseLabel(phase: LegacyMetadataCleanupProgress["phase"]): string {
   return legacyMetadataText(`settings.phase.${phase}` as const);
@@ -42,6 +43,14 @@ export class LegacyMetadataCleanupModal extends Modal {
       text: legacyMetadataText("settings.progress", { completed: 0, total: 0 }),
     });
 
+    const reportSection = this.contentEl.createDiv({ cls: "al-form-section" });
+    reportSection.hidden = true;
+    reportSection.createEl("strong", { text: legacyMetadataText("settings.reportTitle") });
+    const report = reportSection.createEl("textarea");
+    report.readOnly = true;
+    report.rows = 12;
+    report.setAttribute("aria-label", legacyMetadataText("settings.reportTitle"));
+
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
     const close = footer.createEl("button", { cls: "mod-cta", text: legacyMetadataText("settings.close") });
     close.type = "button";
@@ -71,6 +80,11 @@ export class LegacyMetadataCleanupModal extends Modal {
         completed: summary.scanned,
         total: summary.scanned,
       }));
+      const details = legacyMetadataDetailReport(summary);
+      if (details) {
+        report.value = details;
+        reportSection.hidden = false;
+      }
       close.disabled = false;
       if (summary.cleaned > 0) this.host.refreshViews();
       new Notice(summaryText(summary));

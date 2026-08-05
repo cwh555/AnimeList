@@ -5,6 +5,7 @@ import type { ExternalMediaResult, ExternalMediaSourceRef, MediaType } from "../
 import type {
   LegacyMetadataCleanupProgress,
   LegacyMetadataCleanupResult,
+  LegacyMetadataEnrichmentStatus,
 } from "../domain/legacy-metadata-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
@@ -197,43 +198,51 @@ export function cleanupLegacyMediaFrontmatter(
   };
 }
 
+function localChangedFields(change: LegacyMetadataCleanupChange): string[] {
+  const fields: string[] = [];
+  if (change.genres) fields.push("genres");
+  if (change.sourceGenres) fields.push("source_genres");
+  if (change.studios) fields.push("studios");
+  return fields;
+}
+
 function applyClassification(
   frontmatter: Record<string, unknown>,
   enriched: ExternalMediaResult,
-): boolean {
+): string[] {
   const classification = enriched.classification;
-  if (!classification) return false;
-  let changed = false;
+  if (!classification) return [];
+  const changes: string[] = [];
   if (classification.genres.length) {
     const genres = normalizeGenres(classification.genres);
     if (!sameStrings(strings(frontmatter.genres), genres)) {
       frontmatter.genres = genres;
-      changed = true;
+      changes.push("genres");
     }
   }
   if ("source_genres" in frontmatter) {
     delete frontmatter.source_genres;
-    changed = true;
+    changes.push("source_genres");
   }
-  changed = setOptionalArray(frontmatter, "media_tags", persistedMediaTags(classification)) || changed;
+  if (setOptionalArray(frontmatter, "media_tags", persistedMediaTags(classification))) changes.push("media_tags");
   if (enriched.mediaType === "anime") {
-    changed = setOptionalArray(frontmatter, "studios", normalizeAnimeStudios(classification.studios)) || changed;
-  } else if (enriched.people.length) {
-    changed = setOptionalArray(frontmatter, "authors", enriched.people) || changed;
+    if (setOptionalArray(frontmatter, "studios", normalizeAnimeStudios(classification.studios))) changes.push("studios");
+  } else if (enriched.people.length && setOptionalArray(frontmatter, "authors", enriched.people)) {
+    changes.push("authors");
   }
-  changed = setOptionalString(frontmatter, "season", classification.season ?? "") || changed;
-  changed = setOptionalNumber(frontmatter, "season_year", classification.seasonYear) || changed;
-  changed = setOptionalString(frontmatter, "source_material", classification.source) || changed;
-  changed = setOptionalString(frontmatter, "country_of_origin", classification.countryOfOrigin) || changed;
-  changed = setOptionalString(frontmatter, "anilist_id", classification.anilistId) || changed;
+  if (setOptionalString(frontmatter, "season", classification.season ?? "")) changes.push("season");
+  if (setOptionalNumber(frontmatter, "season_year", classification.seasonYear)) changes.push("season_year");
+  if (setOptionalString(frontmatter, "source_material", classification.source)) changes.push("source_material");
+  if (setOptionalString(frontmatter, "country_of_origin", classification.countryOfOrigin)) changes.push("country_of_origin");
+  if (setOptionalString(frontmatter, "anilist_id", classification.anilistId)) changes.push("anilist_id");
 
   const urls = [...new Set([
     ...strings(frontmatter.source_urls),
     enriched.sourceUrl,
     ...(enriched.sources ?? []).map((source) => source.sourceUrl),
   ].filter(Boolean))];
-  changed = setOptionalArray(frontmatter, "source_urls", urls) || changed;
-  return changed;
+  if (setOptionalArray(frontmatter, "source_urls", urls)) changes.push("source_urls");
+  return changes;
 }
 
 function progress(
@@ -266,6 +275,7 @@ export async function cleanupLegacyMetadataNotes(
     sourceGenres: 0,
     studios: 0,
     classification: 0,
+    details: [],
   };
   const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds)));
   const interval = Math.max(0, options.apiIntervalMs ?? 2_100);
@@ -290,6 +300,8 @@ export async function cleanupLegacyMetadataNotes(
     };
     const localChange = cleanupLegacyMediaFrontmatter(localCopy);
     let enriched: ExternalMediaResult | null = null;
+    let enrichment: LegacyMetadataEnrichmentStatus = "not-needed";
+    let enrichmentError = "";
 
     if (metadataUpgrade && options.enrich) {
       const source = legacyResult(localCopy);
@@ -302,11 +314,15 @@ export async function cleanupLegacyMetadataNotes(
           const candidate = await options.enrich(source);
           if (candidate.classification) {
             enriched = candidate;
+            enrichment = "enriched";
             result.enriched += 1;
           } else {
+            enrichment = "unavailable";
             result.unavailable += 1;
           }
         } catch (error) {
+          enrichment = "failed";
+          enrichmentError = error instanceof Error ? error.message : String(error);
           result.failed += 1;
           console.warn(`AnimeList legacy metadata enrichment failed for ${file.path}`, error);
         }
@@ -319,23 +335,37 @@ export async function cleanupLegacyMetadataNotes(
     }
 
     progress(options.onProgress, "writing", index, mediaFiles.length, title, `Updating ${title}…`);
-    let changed = false;
+    const changedFields: string[] = [];
     await app.fileManager.processFrontMatter(file, (frontmatter) => {
       const local = cleanupLegacyMediaFrontmatter(frontmatter);
       if (local.genres) result.genres += 1;
       if (local.sourceGenres) result.sourceGenres += 1;
       if (local.studios) result.studios += 1;
-      changed = local.changed;
-      if (enriched && applyClassification(frontmatter, enriched)) {
-        result.classification += 1;
-        changed = true;
+      changedFields.push(...localChangedFields(local));
+      if (enriched) {
+        const classificationFields = applyClassification(frontmatter, enriched);
+        if (classificationFields.length) {
+          result.classification += 1;
+          changedFields.push(...classificationFields);
+        }
       }
       if (metadataUpgrade && enriched?.classification && Number(frontmatter.schema_version) !== CURRENT_MEDIA_SCHEMA_VERSION) {
         frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
-        changed = true;
+        changedFields.push("schema_version");
       }
     });
+    const uniqueFields = [...new Set(changedFields)];
+    const changed = uniqueFields.length > 0;
     if (changed) result.cleaned += 1;
+    if (changed || enrichment === "unavailable" || enrichment === "failed") {
+      result.details.push({
+        title,
+        path: file.path,
+        changes: uniqueFields,
+        enrichment,
+        ...(enrichmentError ? { error: enrichmentError } : {}),
+      });
+    }
     progress(options.onProgress, "completed", index + 1, mediaFiles.length, title, changed ? `Updated ${title}` : `No changes for ${title}`);
   }
 

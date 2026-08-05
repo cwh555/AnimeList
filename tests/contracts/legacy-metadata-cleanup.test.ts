@@ -8,6 +8,7 @@ import {
 } from "../../src/data/legacy-metadata-cleanup";
 import { createLegacyMetadataSettingsSection } from "../../src/legacy-metadata-settings";
 import { legacyMetadataText } from "../../src/legacy-metadata-text";
+import { legacyMetadataDetailReport } from "../../src/legacy-metadata-report";
 import type { AnimeListFeatureHost } from "../../src/app/feature-types";
 
 const pollutedStudio = "CloverWorks、「ホリミヤ」製作委員会（Aniplex、マイシアターD.D.、毎日放送、スクウェア・エニックス、鐘通インベストメント、グローバル・ソリューションズ、ムービック、未来工場）岩上敦宏、石井紹良、丸山博雄、橋本真司、松井宏記、高麗大助、國枝信吾、近藤尚己";
@@ -120,6 +121,24 @@ describe("legacy metadata cleanup", () => {
     assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
     assert.ok(progress.some((value) => value.startsWith("enriching:")));
     assert.ok(progress.some((value) => value === "completed:1/1"));
+    assert.equal(result.details.length, 1);
+    assert.deepEqual(result.details[0], {
+      title: "堀與宮村",
+      path: "AnimeList/Anime/Horimiya.md",
+      changes: [
+        "genres",
+        "studios",
+        "media_tags",
+        "season",
+        "season_year",
+        "source_material",
+        "country_of_origin",
+        "anilist_id",
+        "source_urls",
+      ],
+      enrichment: "enriched",
+    });
+    assert.match(legacyMetadataDetailReport(result), /堀與宮村 .*changed: genres, studios, media_tags, season, season_year/);
 
     let secondPassApiCalls = 0;
     const secondPass = await cleanupLegacyMetadataNotes(app, [""], {
@@ -155,6 +174,13 @@ describe("legacy metadata cleanup", () => {
     });
     assert.equal(result.unavailable, 1);
     assert.equal(frontmatter.schema_version, 6);
+    assert.deepEqual(result.details, [{
+      title: "Unknown work",
+      path: "AnimeList/Anime/Unknown.md",
+      changes: [],
+      enrichment: "unavailable",
+    }]);
+    assert.match(legacyMetadataDetailReport(result), /Unknown work .*AniList: no reliable match/);
   });
 
   it("uses English Settings copy and opens the progress workflow", () => {

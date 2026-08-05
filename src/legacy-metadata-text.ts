@@ -14,6 +14,7 @@ const TEXT = {
   "settings.preparing": "Preparing legacy metadata upgrade…",
   "settings.done": "Upgrade complete: {scanned} scanned, {cleaned} updated, {enriched} enriched, {unavailable} without AniList match, {failed} failed.",
   "settings.failed": "Legacy metadata upgrade failed: {error}",
+  "settings.reportTitle": "Changed notes and upgrade results",
   "settings.close": "Close",
 } as const;
 

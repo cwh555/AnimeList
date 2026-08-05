@@ -8,6 +8,16 @@ export interface LegacyMetadataCleanupProgress {
   message: string;
 }
 
+export type LegacyMetadataEnrichmentStatus = "not-needed" | "enriched" | "unavailable" | "failed";
+
+export interface LegacyMetadataCleanupDetail {
+  title: string;
+  path: string;
+  changes: string[];
+  enrichment: LegacyMetadataEnrichmentStatus;
+  error?: string;
+}
+
 export interface LegacyMetadataCleanupResult {
   scanned: number;
   cleaned: number;
@@ -18,4 +28,5 @@ export interface LegacyMetadataCleanupResult {
   sourceGenres: number;
   studios: number;
   classification: number;
+  details: LegacyMetadataCleanupDetail[];
 }
