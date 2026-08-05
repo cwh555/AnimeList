@@ -173,20 +173,20 @@ describe("media note Markdown compatibility", () => {
       total: 12,
       unit: "episode",
       favorite: false,
-      genres: ["戀愛", "喜劇"],
-      userTags: ["重看", "收藏"],
+      genres: ["戀愛", "喜劇", "重看", "收藏"],
       templatePath: "",
       volumeLog: [],
     }, "", "");
 
     const yaml = frontmatter(markdown);
     assert.match(yaml, /media_tags:\n  - "School"/);
-    assert.match(yaml, /user_tags:\n  - "重看"\n  - "收藏"/);
+    assert.match(yaml, /genres:\n  - "戀愛"\n  - "喜劇"\n  - "重看"\n  - "收藏"/);
+    assert.doesNotMatch(yaml, /^user_tags:/m);
     assert.doesNotMatch(yaml, /Low Rank|Spoiler/);
     assert.match(yaml, /^season: "spring"$/m);
     assert.match(yaml, /^season_year: 2026$/m);
     assert.match(yaml, /^source_material: "light_novel"$/m);
-    assert.match(yaml, /^country_of_origin: "JP"$/m);
+    assert.doesNotMatch(yaml, /^country_of_origin:/m);
     assert.match(yaml, /^anilist_id: "42"$/m);
     assert.match(yaml, /^source_provider: "bangumi"$/m);
     assert.match(yaml, /source_urls:[\s\S]*https:\/\/bgm\.tv\/subject\/1[\s\S]*https:\/\/anilist\.co\/anime\/42/);

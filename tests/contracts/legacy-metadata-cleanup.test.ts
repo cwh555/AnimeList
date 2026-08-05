@@ -109,16 +109,16 @@ describe("legacy metadata cleanup", () => {
     assert.equal(result.cleaned, 1);
     assert.equal(result.enriched, 1);
     assert.equal(result.classification, 1);
-    assert.deepEqual(frontmatter.genres, ["戀愛", "喜劇"]);
+    assert.deepEqual(frontmatter.genres, ["戀愛", "喜劇", "重看", "收藏"]);
     assert.deepEqual(frontmatter.media_tags, ["School"]);
     assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
     assert.equal(frontmatter.season, "winter");
     assert.equal(frontmatter.season_year, 2021);
     assert.equal(frontmatter.source_material, "manga");
-    assert.equal(frontmatter.country_of_origin, "JP");
+    assert.equal("country_of_origin" in frontmatter, false);
     assert.equal(frontmatter.anilist_id, "124080");
     assert.equal(frontmatter.schema_version, 6);
-    assert.deepEqual(frontmatter.user_tags, ["重看", "收藏"]);
+    assert.equal("user_tags" in frontmatter, false);
     assert.deepEqual(frontmatter.tags, ["obsidian-project-tag"]);
     assert.deepEqual(frontmatter.custom_future_field, { keep: true });
     assert.ok((frontmatter.source_urls as string[]).includes("https://bgm.tv/subject/374400"));
@@ -132,17 +132,17 @@ describe("legacy metadata cleanup", () => {
       changes: [
         "genres",
         "studios",
+        "user_tags",
         "media_tags",
         "season",
         "season_year",
         "source_material",
-        "country_of_origin",
         "anilist_id",
         "source_urls",
       ],
       enrichment: "enriched",
     });
-    assert.match(legacyMetadataDetailReport(result), /堀與宮村 .*changed: genres, studios, media_tags, season, season_year/);
+    assert.match(legacyMetadataDetailReport(result), /堀與宮村 .*changed: genres, studios, user_tags, media_tags, season, season_year/);
 
     let secondPassApiCalls = 0;
     const secondPass = await cleanupLegacyMetadataNotes(app, [""], {
@@ -222,7 +222,8 @@ describe("legacy metadata cleanup", () => {
     assert.equal(frontmatter.source_id, "123");
     assert.equal(frontmatter.source_score, 7.8);
     assert.equal(frontmatter.note_template, "AnimeList/Templates/anime.md");
-    assert.deepEqual(frontmatter.user_tags, ["重看"]);
+    assert.equal("user_tags" in frontmatter, false);
+    assert.deepEqual(frontmatter.genres, ["戀愛", "喜劇", "重看"]);
     assert.deepEqual(frontmatter.tags, ["obsidian-project-tag"]);
     assert.deepEqual(frontmatter.custom_future_field, { keep: [1, 2, 3] });
     assert.ok((frontmatter.source_urls as string[]).includes("https://bgm.tv/subject/123"));

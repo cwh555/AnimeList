@@ -16,8 +16,7 @@ function animeForm(): MediaNoteForm {
     favorite: true,
     startedAt: "2026-01-01",
     completedAt: "",
-    genres: ["戀愛"],
-    userTags: ["重看", "收藏"],
+    genres: ["戀愛", "重看", "收藏"],
     templatePath: "",
     volumeLog: [],
   };
@@ -76,7 +75,8 @@ describe("media update service", () => {
     assert.equal(frontmatter.source_provider, "AniList");
     assert.equal(frontmatter.source_id, "42");
     assert.deepEqual(frontmatter.media_tags, ["School"]);
-    assert.deepEqual(frontmatter.user_tags, ["重看", "收藏"]);
+    assert.equal("user_tags" in frontmatter, false);
+    assert.deepEqual(frontmatter.genres, ["戀愛", "重看", "收藏"]);
     assert.deepEqual(frontmatter.tags, ["obsidian-tag-must-stay"]);
     assert.equal(frontmatter.season, "spring");
     assert.equal(frontmatter.season_year, 2026);
@@ -160,7 +160,7 @@ describe("media update service", () => {
     } as unknown as App;
 
     const form = animeForm();
-    form.userTags = ["重看", "收藏"];
+    form.genres = ["戀愛", "重看", "收藏"];
     await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
 
     assert.equal(modifyCalls, 0);
@@ -181,10 +181,11 @@ describe("media update service", () => {
     assert.equal(frontmatter.note_template, "AnimeList/Templates/anime.md");
     assert.deepEqual(frontmatter.tags, ["obsidian-project-tag"]);
     assert.deepEqual(frontmatter.custom_future_field, { keep: true });
-    assert.deepEqual(frontmatter.user_tags, ["重看", "收藏"]);
+    assert.equal("user_tags" in frontmatter, false);
+    assert.deepEqual(frontmatter.genres, ["戀愛", "重看", "收藏"]);
   });
 
-  it("clears only user_tags when the user removes personal tags", async () => {
+  it("migrates legacy user_tags into the unified editable tag set on save", async () => {
     const file = new TFile();
     file.path = "AnimeList/Anime/example.md";
     const frontmatter: Record<string, unknown> = {
@@ -201,11 +202,12 @@ describe("media update service", () => {
       },
     } as unknown as App;
     const form = animeForm();
-    form.userTags = [];
+    form.genres = ["old-personal-tag"];
 
     await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
 
     assert.equal("user_tags" in frontmatter, false);
+    assert.deepEqual(frontmatter.genres, ["old-personal-tag"]);
     assert.deepEqual(frontmatter.media_tags, ["School"]);
     assert.deepEqual(frontmatter.tags, ["obsidian-tag"]);
   });

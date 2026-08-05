@@ -51,12 +51,9 @@ describe("media classification collection fields", () => {
     const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
 
     assert.equal(values.format, "TV 動畫");
-    assert.equal(values.tags, "School");
-    assert.deepEqual(rows.find((row) => row.key === "tags")?.values, ["School"]);
     assert.equal(values.people, "CloverWorks");
     assert.equal(values.season, "2021 Q1 (冬季)");
-    assert.equal(values.source, "漫畫");
-    assert.equal(values.country, "日本");
+    assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
     assert.ok(!Object.values(values).some((value) => value.includes("戸松遥")));
     assert.ok(!Object.values(values).some((value) => value.includes("2021年1月")));
   });
@@ -74,14 +71,12 @@ describe("media classification collection fields", () => {
     const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
 
     assert.equal(values.format, "TV 動畫");
-    assert.equal(values.tags, "School、Coming of Age");
     assert.equal(values.people, "CloverWorks");
     assert.equal(values.season, "2021 Q1 (冬季)");
-    assert.equal(values.source, "漫畫");
-    assert.equal(values.country, "日本");
+    assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
   });
 
-  it("normalizes personal tags independently from genres and AniList tags", () => {
+  it("normalizes editable collection tags for the chip control", () => {
     assert.deepEqual(normalizeUserTags([" #重看 ", "治癒系", "重看", "Comfort  Watch"]), [
       "重看",
       "治癒系",
