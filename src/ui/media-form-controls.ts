@@ -9,6 +9,7 @@ import type { AnimeListUiHost } from "./plugin-host";
 import type { MediaFormContext, MediaFormDateControl, MediaFormFields } from "./media-form-contracts";
 import { markMediaFormField } from "./media-form-field";
 import { formValue, makeEl, numeric, todayString } from "./ui-helpers";
+import { createTagChipControl } from "./tag-chip-control";
 
 export function createLabeledField<T extends HTMLElement>(
   parent: HTMLElement,
@@ -214,9 +215,6 @@ function genreInputValues(input: HTMLInputElement): string[] {
   return normalizeGenres(String(input?.value || "").split(/[、,，;；\n]+/));
 }
 
-function userTagInputValues(input: HTMLInputElement): string[] {
-  return normalizeUserTags(String(input?.value || "").split(/[、,，;；\n]+/));
-}
 
 export function releaseStatusOptions(selected: unknown = "unknown"): HTMLSelectElement {
   return createSelect([
@@ -242,7 +240,7 @@ export function mediaFormValues(context: MediaFormContext<AnimeListUiHost>): Med
     startedAt: fields.startedAt.value,
     completedAt: fields.completedAt.value,
     genres: genreInputValues(fields.genres),
-    userTags: userTagInputValues(fields.userTags),
+    userTags: fields.userTags.values(),
     templatePath: fields.template?.value || "",
     volumeLog: [],
   };
@@ -281,6 +279,7 @@ export interface CreateMediaEditorFieldsInput {
   templateOptions?: Array<[string, string]>;
   selectedTemplate?: string;
   selectedUnit?: string;
+  userTagOptions?: readonly string[];
 }
 
 function progressFieldLabel(mediaType: MediaType): string {
@@ -296,6 +295,7 @@ export function createMediaEditorFields({
   templateOptions,
   selectedTemplate,
   selectedUnit,
+  userTagOptions = [],
 }: CreateMediaEditorFieldsInput): MediaFormFields {
   const title = createLabeledField(
     parent,
@@ -384,9 +384,13 @@ export function createMediaEditorFields({
   const userTags = createLabeledField(
     parent,
     uiText("add.userTags"),
-    createTextInput("text", normalizeUserTags(values.userTags).join("、")),
+    createTagChipControl({
+      values: normalizeUserTags(values.userTags),
+      suggestions: normalizeUserTags(userTagOptions),
+    }),
     uiText("add.userTagsHint"),
   );
+  userTags.closest(".al-form-field")?.classList.add("al-form-field-tags");
 
   const template = templateOptions
     ? createLabeledField(

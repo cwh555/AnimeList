@@ -1,10 +1,20 @@
 import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
+import { normalizeUserTags } from "../domain/user-tags";
+import { persistedMediaTags } from "../domain/media-classification";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
 import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
+
+
+function libraryUserTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
+  return normalizeUserTags([
+    ...plugin.collectMediaItems().flatMap((item) => item.userTags ?? []),
+    ...normalizeUserTags(extra),
+  ]);
+}
 
 export class AddMediaModal extends Modal {
   readonly plugin: AnimeListUiHost;
@@ -207,6 +217,7 @@ export class AddMediaModal extends Modal {
         favorite: false,
       },
       templateOptions,
+      userTagOptions: libraryUserTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
     });
     this.contentEl.appendChild(form);
 
@@ -309,6 +320,10 @@ export class EditMediaModal extends Modal {
 
   onOpen(): void {
     this.modalEl.classList.add("animelist-modal", "animelist-edit-modal");
+    this.render();
+  }
+
+  private render(): void {
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
     const heading = createDiv();
@@ -323,10 +338,35 @@ export class EditMediaModal extends Modal {
     const mediaType: MediaType = frontmatter.media_type === "manga" || frontmatter.media_type === "novel"
       ? frontmatter.media_type
       : "anime";
-    renderStoredMediaClassificationFields(this.contentEl, frontmatter, mediaType);
+
+    const metadataHost = createDiv();
+    metadataHost.className = "al-edit-metadata-host";
+    renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
+    this.contentEl.appendChild(metadataHost);
+
+    const storedSeason = typeof frontmatter.season === "string" ? frontmatter.season.trim() : "";
+    const needsQuarterRefresh = mediaType === "anime"
+      && (!storedSeason || !Number.isInteger(Number(frontmatter.season_year)));
+    if (needsQuarterRefresh) {
+      const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
+      metadataHost.appendChild(loading);
+      void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
+        if (!this.contentEl.isConnected || !enriched.classification) return;
+        metadataHost.replaceChildren();
+        renderMediaClassificationFields(metadataHost, enriched, true);
+      }).catch((error) => {
+        console.warn("AnimeList edit metadata refresh failed", error);
+        loading.textContent = uiText("edit.metadataRefreshUnavailable");
+      });
+    }
+
+    const formHeading = createEl("h3");
+    formHeading.className = "al-form-section-heading al-edit-form-heading";
+    formHeading.textContent = uiText("edit.collectionData");
+    this.contentEl.appendChild(formHeading);
 
     const form = createDiv();
-    form.className = "al-media-form";
+    form.className = "al-media-form al-edit-media-form";
     const fields = createMediaEditorFields({
       parent: form,
       mediaType,
@@ -347,6 +387,7 @@ export class EditMediaModal extends Modal {
       selectedUnit: typeof frontmatter.progress_unit === "string"
         ? frontmatter.progress_unit
         : undefined,
+      userTagOptions: libraryUserTagOptions(this.plugin, frontmatter.media_tags),
     });
     this.contentEl.appendChild(form);
 
@@ -376,18 +417,18 @@ export class EditMediaModal extends Modal {
     save.textContent = uiText("action.save");
     save.addEventListener("click", () => {
       void (async () => {
-      save.disabled = true;
-      try {
-        const submitContext = { ...context, form: mediaFormValues(context) };
-        await this.plugin.prepareMediaSubmit(submitContext);
-        await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
-        this.close();
-        new Notice(uiText("notice.saved"));
-      } catch (error) {
-        console.error("AnimeList edit failed", error);
-        new Notice(uiText("notice.saveFailed", { error: errorMessage(error) }));
-        save.disabled = false;
-      }
+        save.disabled = true;
+        try {
+          const submitContext = { ...context, form: mediaFormValues(context) };
+          await this.plugin.prepareMediaSubmit(submitContext);
+          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
+          this.close();
+          new Notice(uiText("notice.saved"));
+        } catch (error) {
+          console.error("AnimeList edit failed", error);
+          new Notice(uiText("notice.saveFailed", { error: errorMessage(error) }));
+          save.disabled = false;
+        }
       })();
     });
     actions.append(deleteButton, save);

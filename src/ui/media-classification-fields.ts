@@ -4,11 +4,14 @@ import { normalizeAnimeStudios } from "../domain/media-metadata";
 import { stringArray, stringValue } from "../domain/value-normalization";
 import { mediaFormatLabel, uiText } from "../ui-text";
 import { mediaQuarterLabel } from "./media-quarter-label";
+import { appendReadOnlyTagChips } from "./tag-chip-control";
+import { makeEl } from "./ui-helpers";
 
 export interface MediaClassificationFieldValue {
   key: "format" | "tags" | "people" | "season" | "source" | "country";
   label: string;
   value: string;
+  values?: readonly string[];
 }
 
 interface MediaClassificationDisplayInput {
@@ -48,52 +51,67 @@ const COUNTRY_LABELS: Readonly<Record<string, string>> = {
   US: "美國",
 };
 
-function joinValues(values: readonly string[]): string {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].join("、");
+function uniqueValues(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
-function classificationRows(input: MediaClassificationDisplayInput): MediaClassificationFieldValue[] {
-  const rows: MediaClassificationFieldValue[] = [];
-  const format = mediaFormatLabel(input.format);
-  if (format) rows.push({ key: "format", label: uiText("add.metadataFormat"), value: format });
+function joinValues(values: readonly string[]): string {
+  return uniqueValues(values).join("、");
+}
 
-  const tags = joinValues(input.tags);
-  if (tags) rows.push({ key: "tags", label: uiText("add.metadataTags"), value: tags });
+function classificationRows(
+  input: MediaClassificationDisplayInput,
+  includeEmpty = false,
+): MediaClassificationFieldValue[] {
+  const rows: MediaClassificationFieldValue[] = [];
+  const push = (row: MediaClassificationFieldValue): void => {
+    if (includeEmpty || row.value) rows.push(row);
+  };
+
+  const format = mediaFormatLabel(input.format);
+  push({ key: "format", label: uiText("add.metadataFormat"), value: format });
+
+  const tags = uniqueValues(input.tags);
+  push({
+    key: "tags",
+    label: uiText("add.metadataTags"),
+    value: joinValues(tags),
+    values: tags,
+  });
 
   const people = joinValues(input.people);
-  if (people) {
-    rows.push({
-      key: "people",
-      label: uiText(input.mediaType === "anime" ? "add.metadataStudio" : "add.metadataAuthors"),
-      value: people,
-    });
-  }
+  push({
+    key: "people",
+    label: uiText(input.mediaType === "anime" ? "add.metadataStudio" : "add.metadataAuthors"),
+    value: people,
+  });
 
   const quarter = input.mediaType === "anime"
     ? mediaQuarterLabel(input.season, input.seasonYear)
     : "";
-  if (quarter) rows.push({ key: "season", label: uiText("add.metadataSeason"), value: quarter });
-
-  if (input.source) {
-    rows.push({
-      key: "source",
-      label: uiText("add.metadataSource"),
-      value: SOURCE_LABELS[input.source] ?? input.source,
-    });
+  if (input.mediaType === "anime") {
+    push({ key: "season", label: uiText("add.metadataSeason"), value: quarter });
   }
 
-  if (input.country) {
-    rows.push({
-      key: "country",
-      label: uiText("add.metadataCountry"),
-      value: COUNTRY_LABELS[input.country] ?? input.country,
-    });
-  }
+  push({
+    key: "source",
+    label: uiText("add.metadataSource"),
+    value: input.source ? SOURCE_LABELS[input.source] ?? input.source : "",
+  });
+
+  push({
+    key: "country",
+    label: uiText("add.metadataCountry"),
+    value: input.country ? COUNTRY_LABELS[input.country] ?? input.country : "",
+  });
 
   return rows;
 }
 
-export function mediaClassificationFieldValues(result: ExternalMediaResult): MediaClassificationFieldValue[] {
+export function mediaClassificationFieldValues(
+  result: ExternalMediaResult,
+  includeEmpty = false,
+): MediaClassificationFieldValue[] {
   const classification = result.classification;
   return classificationRows({
     mediaType: result.mediaType,
@@ -104,12 +122,13 @@ export function mediaClassificationFieldValues(result: ExternalMediaResult): Med
     seasonYear: classification?.seasonYear,
     source: classification?.source ?? "",
     country: classification?.countryOfOrigin ?? "",
-  });
+  }, includeEmpty);
 }
 
 export function storedMediaClassificationFieldValues(
   frontmatter: Record<string, unknown>,
   mediaType: MediaType,
+  includeEmpty = false,
 ): MediaClassificationFieldValue[] {
   return classificationRows({
     mediaType,
@@ -124,46 +143,58 @@ export function storedMediaClassificationFieldValues(
     seasonYear: frontmatter.season_year,
     source: stringValue(frontmatter.source_material),
     country: stringValue(frontmatter.country_of_origin),
-  });
+  }, includeEmpty);
 }
 
-function renderClassificationRows(parent: HTMLElement, rows: readonly MediaClassificationFieldValue[]): HTMLElement | null {
+function renderClassificationRows(
+  parent: HTMLElement,
+  rows: readonly MediaClassificationFieldValue[],
+): HTMLElement | null {
   if (!rows.length) return null;
+  const section = createDiv();
+  section.className = "al-media-metadata-section";
   const heading = createEl("h3");
   heading.className = "al-form-section-heading";
   heading.textContent = uiText("add.metadataTitle");
-  parent.appendChild(heading);
+  section.appendChild(heading);
 
-  const section = createDiv();
-  section.className = "al-media-form al-media-metadata";
+  const grid = createDiv();
+  grid.className = "al-media-metadata-grid";
 
   for (const row of rows) {
-    const wrapper = createEl("label");
-    wrapper.className = "al-form-field";
-    const label = createSpan();
-    label.className = "al-form-label";
-    label.textContent = row.label;
-    const input = createEl("input");
-    input.type = "text";
-    input.value = row.value;
-    input.readOnly = true;
-    input.setAttribute("aria-readonly", "true");
-    wrapper.append(label, input);
-    section.appendChild(wrapper);
+    const item = createDiv();
+    item.className = `al-media-metadata-item al-media-metadata-item-${row.key}`;
+    item.appendChild(makeEl("div", "al-media-metadata-label", row.label));
+    if (row.key === "tags" && row.values?.length) {
+      appendReadOnlyTagChips(item, row.values);
+    } else {
+      item.appendChild(makeEl(
+        "div",
+        `al-media-metadata-value${row.value ? "" : " is-empty"}`,
+        row.value || "—",
+      ));
+    }
+    grid.appendChild(item);
   }
 
+  section.appendChild(grid);
   parent.appendChild(section);
   return section;
 }
 
-export function renderMediaClassificationFields(parent: HTMLElement, result: ExternalMediaResult): HTMLElement | null {
-  return renderClassificationRows(parent, mediaClassificationFieldValues(result));
+export function renderMediaClassificationFields(
+  parent: HTMLElement,
+  result: ExternalMediaResult,
+  includeEmpty = false,
+): HTMLElement | null {
+  return renderClassificationRows(parent, mediaClassificationFieldValues(result, includeEmpty));
 }
 
 export function renderStoredMediaClassificationFields(
   parent: HTMLElement,
   frontmatter: Record<string, unknown>,
   mediaType: MediaType,
+  includeEmpty = false,
 ): HTMLElement | null {
-  return renderClassificationRows(parent, storedMediaClassificationFieldValues(frontmatter, mediaType));
+  return renderClassificationRows(parent, storedMediaClassificationFieldValues(frontmatter, mediaType, includeEmpty));
 }

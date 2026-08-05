@@ -1,4 +1,5 @@
 import type { TFile } from "obsidian";
+import type { TagChipControl } from "./tag-chip-control";
 import type {
   ExternalMediaResult,
   MediaNoteForm,
@@ -23,7 +24,7 @@ export interface MediaFormFields {
   total: HTMLInputElement | null;
   unit: HTMLSelectElement;
   genres: HTMLInputElement;
-  userTags: HTMLInputElement;
+  userTags: TagChipControl;
   template: HTMLSelectElement | null;
   favorite: HTMLInputElement;
 }

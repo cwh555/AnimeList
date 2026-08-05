@@ -244,6 +244,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchAniList(mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.services().searchOpenLibrary(query); }
   async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> { return this.services().enrichExternalMedia(result); }
+  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> { return this.services().enrichStoredMedia(frontmatter, mediaType); }
   async ensureFolder(path: string): Promise<void> { await this.services().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.services().findExistingBySource(provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }

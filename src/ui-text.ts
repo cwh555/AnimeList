@@ -210,6 +210,10 @@ export const UI_TEXT = {
   "add.genresHint": "只保留廣義作品類型；工作室、季度、格式、改編來源與 AniList 標籤會分欄顯示。",
   "add.userTags": "自訂標籤",
   "add.userTagsHint": "自己整理收藏用的標籤；不會被 AniList metadata 更新覆蓋。",
+  "add.userTagsAdd": "新增自訂標籤",
+  "add.userTagsPlaceholder": "搜尋既有標籤或輸入新標籤",
+  "add.userTagsCreateHint": "按 Enter 建立這個標籤。",
+  "add.userTagsRemove": "移除標籤：{tag}",
   "add.metadataLoading": "正在整理 AniList 作品資料…",
   "add.metadataTitle": "作品資料",
   "add.metadataFormat": "作品形式",
@@ -228,6 +232,9 @@ export const UI_TEXT = {
 
   "edit.title": "整理：{title}",
   "edit.description": "調整自己的進度、日期與評分；外部作品資料會保持原樣。",
+  "edit.collectionData": "收藏資料",
+  "edit.metadataRefreshing": "正在補齊 AniList 作品資料…",
+  "edit.metadataRefreshUnavailable": "目前無法補齊 AniList 作品資料；既有收藏資料仍可正常編輯。",
 
   "delete.title": "刪除作品？",
   "delete.description": "「{title}」的 Markdown notes 會移到系統垃圾桶；本地封面不會一併刪除。",

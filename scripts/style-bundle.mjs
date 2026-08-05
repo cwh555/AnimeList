@@ -13,6 +13,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.score-dashboard.css",
   "styles.serial-cover.css",
   "styles.library-list.css",
+  "styles.media-metadata.css",
   "styles.mobile.css",
 ]);
 

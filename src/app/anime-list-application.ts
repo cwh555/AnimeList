@@ -10,6 +10,7 @@ import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
+import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -196,6 +197,9 @@ export class AnimeListApplicationServices {
     return this.mediaClassification().enrichOrOriginal(result, (error) => {
       console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
     });
+  }
+  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
+    return this.enrichExternalMedia(storedMediaExternalResult(frontmatter, mediaType));
   }
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
