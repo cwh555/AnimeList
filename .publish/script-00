@@ -1,0 +1,25 @@
+set -euo pipefail
+git config user.name "AnimeList CI"
+git config user.email "actions@users.noreply.github.com"
+cat .publish/part-* | base64 -d | gzip -d > /tmp/final.patch
+echo "455193700ca8b8b0becd29beeaf47f0668c035b54344316211c49464bbf26e3f  /tmp/final.patch" | sha256sum -c -
+git apply --check /tmp/final.patch
+git apply /tmp/final.patch
+rm -rf .publish .github/workflows/metadata-history-cleanup.yml
+git diff --check
+git add -A
+PATCHED_TREE=$(git write-tree)
+test "$PATCHED_TREE" = "e5abe5a2901652f5df001597c9d64fb93152f036"
+FINAL_COMMIT=$(git commit-tree "$PATCHED_TREE" -p HEAD -m "temporary exact final tree")
+git fetch origin preview feature/anilist-media-metadata --prune
+test "$(git rev-parse origin/preview)" = "a828e8b535cdd1a2da89f28666ac373f364a4b05"
+test "$(git rev-parse origin/feature/anilist-media-metadata)" = "8e7bcf799508eb3841cf83ad068ba45e1185ce06"
+git switch --detach origin/preview
+git checkout "$FINAL_COMMIT" -- 'src/domain/media-classification.ts' 'src/data/external-media-provider.ts' 'src/data/external-media-service.ts' 'src/data/media-classification-service.ts' 'src/data/provider-normalizers.ts' 'src/data/providers/anilist-client.ts' 'src/data/providers/bangumi-client.ts' 'src/multilingual-search.ts'
+git add -A -- 'src/domain/media-classification.ts' 'src/data/external-media-provider.ts' 'src/data/external-media-service.ts' 'src/data/media-classification-service.ts' 'src/data/provider-normalizers.ts' 'src/data/providers/anilist-client.ts' 'src/data/providers/bangumi-client.ts' 'src/multilingual-search.ts'
+git commit -m "feat: add rate-aware media metadata providers"
+git checkout "$FINAL_COMMIT" -- 'src/domain/media-types.ts' 'src/domain/media-metadata.ts' 'src/domain/user-tags.ts' 'src/data/media-note-codec.ts' 'src/data/media-repository.ts' 'src/data/stored-media-result.ts' 'src/data/media-frontmatter-compat.ts'
+git add -A -- 'src/domain/media-types.ts' 'src/domain/media-metadata.ts' 'src/domain/user-tags.ts' 'src/data/media-note-codec.ts' 'src/data/media-repository.ts' 'src/data/stored-media-result.ts' 'src/data/media-frontmatter-compat.ts'
+git commit -m "feat: persist compatible media metadata"
+git checkout "$FINAL_COMMIT" -- 'src/app/anime-list-application.ts' 'src/app/feature-types.ts' 'src/main.ts' 'src/ui-text.ts' 'src/ui/markdown-renderers.ts' 'src/ui/media-classification-fields.ts' 'src/ui/media-form-contracts.ts' 'src/ui/media-form-controls.ts' 'src/ui/media-modals.ts' 'src/ui/media-quarter-label.ts' 'src/ui/plugin-host.ts' 'src/ui/tag-chip-control.ts' 'styles.media-metadata.css' 'styles.css' 'scripts/style-bundle.mjs'
+git add -A -- 'src/app/anime-list-application.ts' 'src/app/feature-types.ts' 'src/main.ts' 'src/ui-text.ts' 'src/ui/markdown-renderers.ts' 'src/ui/media-classification-fields.ts' 'src/ui/media-form-contracts.t
