@@ -14,6 +14,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.serial-cover.css",
   "styles.library-list.css",
   "styles.media-metadata.css",
+  "styles.library-filters.css",
   "styles.mobile.css",
 ]);
 
