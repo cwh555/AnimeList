@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import type { ExternalMediaResult } from "../../src/domain/media-types";
 import { mediaClassificationFieldValues, storedMediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
 import { detailMediaQuarterLabel, mediaQuarterLabel } from "../../src/ui/media-quarter-label";
+import { tagSuggestionValues } from "../../src/ui/tag-chip-control";
+import { storedMediaExternalResult, storedMediaNeedsClassificationRefresh } from "../../src/data/stored-media-result";
 import { normalizeUserTags } from "../../src/domain/user-tags";
 
 function result(): ExternalMediaResult {
@@ -50,6 +52,7 @@ describe("media classification collection fields", () => {
 
     assert.equal(values.format, "TV 動畫");
     assert.equal(values.tags, "School");
+    assert.deepEqual(rows.find((row) => row.key === "tags")?.values, ["School"]);
     assert.equal(values.people, "CloverWorks");
     assert.equal(values.season, "2021 Q1 (冬季)");
     assert.equal(values.source, "漫畫");
@@ -91,4 +94,37 @@ describe("media classification collection fields", () => {
     assert.equal(detailMediaQuarterLabel("anime", "winter", 2021), "季度 2021 Q1 (冬季)");
     assert.equal(detailMediaQuarterLabel("manga", "winter", 2021), "");
   });
+  it("keeps quarter visible in edit metadata while an older note is being enriched", () => {
+    const rows = storedMediaClassificationFieldValues({ format: "tv" }, "anime", true);
+    const quarter = rows.find((row) => row.key === "season");
+    assert.ok(quarter);
+    assert.equal(quarter.value, "");
+    assert.equal(storedMediaNeedsClassificationRefresh({ format: "tv" }, "anime"), true);
+    assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021 }, "anime"), false);
+  });
+
+  it("reconstructs enough stored identity to refresh missing AniList metadata", () => {
+    const stored = storedMediaExternalResult({
+      title: "Re：從零開始的異世界生活 新編集版",
+      title_original: "Re:ゼロから始める異世界生活 新編集版",
+      media_type: "anime",
+      format: "tv",
+      source_provider: "bangumi",
+      source_id: "414337",
+      source_urls: ["https://bgm.tv/subject/414337"],
+      anilist_id: "39587",
+      progress_unit: "episode",
+    }, "anime");
+    assert.equal(stored.originalTitle, "Re:ゼロから始める異世界生活 新編集版");
+    assert.ok(stored.sources?.some((source) => source.provider === "anilist" && source.sourceId === "39587"));
+  });
+
+  it("offers existing tags as chips without duplicating already selected tags", () => {
+    assert.deepEqual(
+      tagSuggestionValues(["重看", "收藏", "School", "收藏"], ["重看"], ""),
+      ["收藏", "School"],
+    );
+    assert.deepEqual(tagSuggestionValues(["重看", "收藏", "School"], [], "sch"), ["School"]);
+  });
+
 });
