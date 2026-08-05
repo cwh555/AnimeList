@@ -1,0 +1,23 @@
+s' 'src/ui/media-form-controls.ts' 'src/ui/media-modals.ts' 'src/ui/media-quarter-label.ts' 'src/ui/plugin-host.ts' 'src/ui/tag-chip-control.ts' 'styles.media-metadata.css' 'styles.css' 'scripts/style-bundle.mjs'
+git commit -m "feat: integrate media metadata editing UI"
+git checkout "$FINAL_COMMIT" -- 'src/domain/legacy-metadata-types.ts' 'src/data/legacy-metadata-cleanup.ts' 'src/legacy-metadata-cleanup-modal.ts' 'src/legacy-metadata-report.ts' 'src/legacy-metadata-settings.ts' 'src/legacy-metadata-text.ts' 'src/plugin-entry.ts'
+git add -A -- 'src/domain/legacy-metadata-types.ts' 'src/data/legacy-metadata-cleanup.ts' 'src/legacy-metadata-cleanup-modal.ts' 'src/legacy-metadata-report.ts' 'src/legacy-metadata-settings.ts' 'src/legacy-metadata-text.ts' 'src/plugin-entry.ts'
+git commit -m "feat: add legacy metadata upgrade workflow"
+git checkout "$FINAL_COMMIT" -- 'docs/ARCHITECTURE.md' 'scripts/check-mobile-layout.mjs' 'tests/contracts/external-media-service.test.ts' 'tests/contracts/legacy-metadata-cleanup.test.ts' 'tests/contracts/media-classification-fields.test.ts' 'tests/contracts/media-classification-service.test.ts' 'tests/contracts/media-note-compatibility.test.ts' 'tests/contracts/media-repository.test.ts' 'tests/contracts/media-update-service.test.ts' 'tests/contracts/metadata-provider-clients.test.ts' 'tests/test-catalog.mjs'
+git add -A -- 'docs/ARCHITECTURE.md' 'scripts/check-mobile-layout.mjs' 'tests/contracts/external-media-service.test.ts' 'tests/contracts/legacy-metadata-cleanup.test.ts' 'tests/contracts/media-classification-fields.test.ts' 'tests/contracts/media-classification-service.test.ts' 'tests/contracts/media-note-compatibility.test.ts' 'tests/contracts/media-repository.test.ts' 'tests/contracts/media-update-service.test.ts' 'tests/contracts/metadata-provider-clients.test.ts' 'tests/test-catalog.mjs'
+git commit -m "test: validate metadata enrichment and compatibility"
+test "$(git rev-list --count origin/preview..HEAD)" = "5"
+test "$(git rev-parse HEAD^{tree})" = "e5abe5a2901652f5df001597c9d64fb93152f036"
+git diff --check origin/preview...HEAD
+git log --oneline --decorate origin/preview..HEAD
+npm ci
+npm test
+TZ=UTC npm run check
+npm run release:check
+ANIMELIST_TEST_VAULT_NO_OPEN=1 npm run test-vault
+git fetch origin preview feature/anilist-media-metadata --prune
+test "$(git rev-parse origin/preview)" = "a828e8b535cdd1a2da89f28666ac373f364a4b05"
+test "$(git rev-parse origin/feature/anilist-media-metadata)" = "8e7bcf799508eb3841cf83ad068ba45e1185ce06"
+git push --force-with-lease=refs/heads/feature/anilist-media-metadata:8e7bcf799508eb3841cf83ad068ba45e1185ce06 origin HEAD:refs/heads/feature/anilist-media-metadata
+git push origin --delete staging/anilist-metadata-clean-history2-20260805 || true
+git push origin --delete staging/anili
