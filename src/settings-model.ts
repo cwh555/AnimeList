@@ -9,6 +9,7 @@ import {
   normalizeTimelineMaxStackDepth,
 } from "./timeline-scale";
 import type { AnimeListSettings } from "./domain/settings-types";
+import { normalizeLibraryFilters } from "./domain/library-filters";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -47,7 +48,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     section: "library",
     type: "all",
     status: "all",
-    genre: "all",
+    filters: { companies: [], quarter: "", tags: [] },
     sort: "completed-desc",
     view: "grid",
   },
@@ -67,6 +68,7 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
   const providers = isRecord(loaded.providers) ? loaded.providers : {};
   const migrations = isRecord(loaded.migrations) ? loaded.migrations : {};
   const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
+  const { genre: legacyGenre, ...retainedUiState } = uiState;
 
   return {
     ...loaded,
@@ -101,13 +103,13 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
         : DEFAULT_SETTINGS.migrations.mediaStatus,
     },
     uiState: {
-      ...uiState,
+      ...retainedUiState,
       section: uiState.section === "timeline" ? "timeline" : "library",
       type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel"
         ? uiState.type
         : "all",
       status: normalizeStatusFilter(uiState.status),
-      genre: stringValue(uiState.genre, DEFAULT_SETTINGS.uiState.genre),
+      filters: normalizeLibraryFilters(uiState.filters, legacyGenre),
       sort: stringValue(uiState.sort, DEFAULT_SETTINGS.uiState.sort),
       view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
     },

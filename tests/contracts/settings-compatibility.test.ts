@@ -47,7 +47,7 @@ describe("settings compatibility", () => {
       section: "timeline",
       type: "manga",
       status: "ongoing",
-      genre: "戀愛",
+      filters: { companies: [], quarter: "", tags: ["戀愛"] },
       sort: "score-desc",
       view: "list",
     });
@@ -111,7 +111,10 @@ it("preserves unknown feature settings through the shared settings store", async
   assert.deepEqual(persisted.futureFeature, { enabled: true, mode: "compact" });
   assert.equal((persisted.providers as Record<string, unknown>).futureProvider, true);
   assert.equal((persisted.migrations as Record<string, unknown>).futureMigration, 7);
-  assert.equal((persisted.uiState as Record<string, unknown>).futureLayout, "dense");
+  const persistedUiState = persisted.uiState as Record<string, unknown>;
+  assert.equal(persistedUiState.futureLayout, "dense");
+  assert.equal("genre" in persistedUiState, false);
+  assert.deepEqual(persistedUiState.filters, { companies: [], quarter: "", tags: ["科幻"] });
   assert.equal(settings.searchLanguages.original, true);
   assert.equal(settings.specialLabelMode, "favorite");
 });
