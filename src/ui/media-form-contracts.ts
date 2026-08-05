@@ -23,8 +23,7 @@ export interface MediaFormFields {
   progress: HTMLInputElement;
   total: HTMLInputElement | null;
   unit: HTMLSelectElement;
-  genres: HTMLInputElement;
-  userTags: TagChipControl;
+  genres: TagChipControl;
   template: HTMLSelectElement | null;
   favorite: HTMLInputElement;
 }

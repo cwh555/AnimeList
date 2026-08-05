@@ -87,7 +87,10 @@ export class MediaRepository {
       year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string"
         ? frontmatter.year
         : "",
-      genres: normalizeGenres(frontmatter.genres),
+      genres: normalizeGenres([
+        ...stringArray(frontmatter.genres),
+        ...stringArray(frontmatter.user_tags),
+      ], 32),
       mediaTags: stringArray(frontmatter.media_tags),
       userTags: stringArray(frontmatter.user_tags),
       season: stringValue(frontmatter.season),

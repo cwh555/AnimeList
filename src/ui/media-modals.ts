@@ -9,9 +9,12 @@ import { createMediaEditorFields, createMediaFormContext, createTextInput, media
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 
 
-function libraryUserTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
+function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
   return normalizeUserTags([
-    ...plugin.collectMediaItems().flatMap((item) => item.userTags ?? []),
+    ...plugin.collectMediaItems().flatMap((item) => [
+      ...item.genres,
+      ...(item.userTags ?? []),
+    ]),
     ...normalizeUserTags(extra),
   ]);
 }
@@ -213,11 +216,10 @@ export class AddMediaModal extends Modal {
         total: enrichedResult.total || "",
         unit: enrichedResult.unit,
         genres: enrichedResult.genres,
-        userTags: [],
         favorite: false,
       },
       templateOptions,
-      userTagOptions: libraryUserTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
+      tagOptions: libraryTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
     });
     this.contentEl.appendChild(form);
 
@@ -380,14 +382,16 @@ export class EditMediaModal extends Modal {
         progress: formValue(frontmatter.progress, 0),
         total: frontmatter.progress_total,
         unit: frontmatter.progress_unit,
-        genres: frontmatter.genres,
-        userTags: frontmatter.user_tags,
+        genres: [
+          ...normalizeUserTags(frontmatter.genres),
+          ...normalizeUserTags(frontmatter.user_tags),
+        ],
         favorite: frontmatter.favorite === true,
       },
       selectedUnit: typeof frontmatter.progress_unit === "string"
         ? frontmatter.progress_unit
         : undefined,
-      userTagOptions: libraryUserTagOptions(this.plugin, frontmatter.media_tags),
+      tagOptions: libraryTagOptions(this.plugin, frontmatter.media_tags),
     });
     this.contentEl.appendChild(form);
 

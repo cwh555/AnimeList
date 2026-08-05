@@ -41,7 +41,7 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
   const root = createDiv() as TagChipControl;
   root.className = "al-tag-control";
   root.setAttribute("role", "group");
-  root.setAttribute("aria-label", uiText("add.userTags"));
+  root.setAttribute("aria-label", uiText("add.genres"));
 
   const chipSet = createDiv();
   chipSet.className = "al-tag-chip-set";
@@ -49,8 +49,8 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
   add.type = "button";
   add.className = "al-tag-add-button";
   add.textContent = "+";
-  add.setAttribute("aria-label", uiText("add.userTagsAdd"));
-  add.title = uiText("add.userTagsAdd");
+  add.setAttribute("aria-label", uiText("add.tagsAdd"));
+  add.title = uiText("add.tagsAdd");
   chipSet.appendChild(add);
   root.appendChild(chipSet);
 
@@ -60,8 +60,8 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
   const input = createEl("input");
   input.type = "text";
   input.autocomplete = "off";
-  input.placeholder = uiText("add.userTagsPlaceholder");
-  input.setAttribute("aria-label", uiText("add.userTagsPlaceholder"));
+  input.placeholder = uiText("add.tagsPlaceholder");
+  input.setAttribute("aria-label", uiText("add.tagsPlaceholder"));
   const suggestionsEl = createDiv();
   suggestionsEl.className = "al-tag-suggestions";
   picker.append(input, suggestionsEl);
@@ -98,7 +98,7 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
       suggestionsEl.appendChild(suggestion);
     }
     if (!available.length && input.value.trim()) {
-      suggestionsEl.appendChild(makeEl("small", "al-tag-picker-hint", uiText("add.userTagsCreateHint")));
+      suggestionsEl.appendChild(makeEl("small", "al-tag-picker-hint", uiText("add.tagsCreateHint")));
     }
   };
 
@@ -110,8 +110,8 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
       chip.appendChild(makeEl("span", "al-tag-chip-label", value));
       const remove = makeEl("button", "al-tag-chip-remove", "×");
       remove.type = "button";
-      remove.setAttribute("aria-label", uiText("add.userTagsRemove", { tag: value }));
-      remove.title = uiText("add.userTagsRemove", { tag: value });
+      remove.setAttribute("aria-label", uiText("add.tagsRemove", { tag: value }));
+      remove.title = uiText("add.tagsRemove", { tag: value });
       remove.addEventListener("click", () => removeValue(value));
       chip.appendChild(remove);
       chipSet.insertBefore(chip, add);

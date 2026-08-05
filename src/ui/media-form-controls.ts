@@ -211,11 +211,6 @@ export function bindScoreRequirement(
   sync();
 }
 
-function genreInputValues(input: HTMLInputElement): string[] {
-  return normalizeGenres(String(input?.value || "").split(/[、,，;；\n]+/));
-}
-
-
 export function releaseStatusOptions(selected: unknown = "unknown"): HTMLSelectElement {
   return createSelect([
     ["releasing", uiText("media.release.releasing")],
@@ -239,8 +234,7 @@ export function mediaFormValues(context: MediaFormContext<AnimeListUiHost>): Med
     favorite: fields.favorite.checked,
     startedAt: fields.startedAt.value,
     completedAt: fields.completedAt.value,
-    genres: genreInputValues(fields.genres),
-    userTags: fields.userTags.values(),
+    genres: normalizeGenres(fields.genres.values(), 32),
     templatePath: fields.template?.value || "",
     volumeLog: [],
   };
@@ -279,7 +273,7 @@ export interface CreateMediaEditorFieldsInput {
   templateOptions?: Array<[string, string]>;
   selectedTemplate?: string;
   selectedUnit?: string;
-  userTagOptions?: readonly string[];
+  tagOptions?: readonly string[];
 }
 
 function progressFieldLabel(mediaType: MediaType): string {
@@ -295,7 +289,7 @@ export function createMediaEditorFields({
   templateOptions,
   selectedTemplate,
   selectedUnit,
-  userTagOptions = [],
+  tagOptions = [],
 }: CreateMediaEditorFieldsInput): MediaFormFields {
   const title = createLabeledField(
     parent,
@@ -378,19 +372,16 @@ export function createMediaEditorFields({
   const genres = createLabeledField(
     parent,
     uiText("add.genres"),
-    createTextInput("text", normalizeGenres(values.genres).join("、")),
+    createTagChipControl({
+      values: normalizeUserTags([
+        ...normalizeGenres(values.genres, 32),
+        ...normalizeUserTags(values.userTags),
+      ]),
+      suggestions: normalizeUserTags(tagOptions),
+    }),
     uiText("add.genresHint"),
   );
-  const userTags = createLabeledField(
-    parent,
-    uiText("add.userTags"),
-    createTagChipControl({
-      values: normalizeUserTags(values.userTags),
-      suggestions: normalizeUserTags(userTagOptions),
-    }),
-    uiText("add.userTagsHint"),
-  );
-  userTags.closest(".al-form-field")?.classList.add("al-form-field-tags");
+  genres.closest(".al-form-field")?.classList.add("al-form-field-tags");
 
   const template = templateOptions
     ? createLabeledField(
@@ -429,7 +420,6 @@ export function createMediaEditorFields({
     total,
     unit,
     genres,
-    userTags,
     template,
     favorite,
   };

@@ -16,6 +16,7 @@ export interface LegacyMetadataCleanupChange {
   genres: boolean;
   sourceGenres: boolean;
   studios: boolean;
+  userTags: boolean;
 }
 
 export interface LegacyMetadataCleanupOptions {
@@ -155,7 +156,18 @@ export function cleanupLegacyMediaFrontmatter(
 ): LegacyMetadataCleanupChange {
   const mediaType = frontmatter.media_type;
   if (!isMediaType(mediaType)) {
-    return { changed: false, genres: false, sourceGenres: false, studios: false };
+    return { changed: false, genres: false, sourceGenres: false, studios: false, userTags: false };
+  }
+
+  const legacyUserTags = normalizeGenres(frontmatter.user_tags, 32);
+  let userTagsChanged = false;
+  if (legacyUserTags.length) {
+    const merged = normalizeGenres([...strings(frontmatter.genres), ...legacyUserTags], 32);
+    if (!sameStrings(strings(frontmatter.genres), merged)) {
+      frontmatter.genres = merged;
+    }
+    delete frontmatter.user_tags;
+    userTagsChanged = true;
   }
 
   let studiosChanged = false;
@@ -177,7 +189,10 @@ export function cleanupLegacyMediaFrontmatter(
       || hasLegacyGenreNoise(sourceGenres, cleanedStudios);
 
     if (contaminated) {
-      const cleanedGenres = normalizeBroadGenres(genres);
+      const cleanedGenres = normalizeGenres([
+        ...normalizeBroadGenres(genres),
+        ...legacyUserTags,
+      ], 32);
       if (!sameStrings(genres, cleanedGenres)) {
         frontmatter.genres = cleanedGenres;
         genresChanged = true;
@@ -191,10 +206,11 @@ export function cleanupLegacyMediaFrontmatter(
   }
 
   return {
-    changed: studiosChanged || genresChanged || sourceGenresChanged,
+    changed: studiosChanged || genresChanged || sourceGenresChanged || userTagsChanged,
     genres: genresChanged,
     sourceGenres: sourceGenresChanged,
     studios: studiosChanged,
+    userTags: userTagsChanged,
   };
 }
 
@@ -203,18 +219,25 @@ function localChangedFields(change: LegacyMetadataCleanupChange): string[] {
   if (change.genres) fields.push("genres");
   if (change.sourceGenres) fields.push("source_genres");
   if (change.studios) fields.push("studios");
+  if (change.userTags) fields.push("user_tags");
   return fields;
 }
 
 function applyClassification(
   frontmatter: Record<string, unknown>,
   enriched: ExternalMediaResult,
+  seedApiGenres = false,
 ): string[] {
   const classification = enriched.classification;
   if (!classification) return [];
   const changes: string[] = [];
-  if (classification.genres.length) {
-    const genres = normalizeGenres(classification.genres);
+  if (classification.genres.length && (seedApiGenres || strings(frontmatter.genres).length === 0)) {
+    const genres = normalizeGenres(
+      seedApiGenres
+        ? [...classification.genres, ...strings(frontmatter.genres)]
+        : classification.genres,
+      32,
+    );
     if (!sameStrings(strings(frontmatter.genres), genres)) {
       frontmatter.genres = genres;
       changes.push("genres");
@@ -233,7 +256,6 @@ function applyClassification(
   if (setOptionalString(frontmatter, "season", classification.season ?? "")) changes.push("season");
   if (setOptionalNumber(frontmatter, "season_year", classification.seasonYear)) changes.push("season_year");
   if (setOptionalString(frontmatter, "source_material", classification.source)) changes.push("source_material");
-  if (setOptionalString(frontmatter, "country_of_origin", classification.countryOfOrigin)) changes.push("country_of_origin");
   if (setOptionalString(frontmatter, "anilist_id", classification.anilistId)) changes.push("anilist_id");
 
   const urls = [...new Set([
@@ -289,6 +311,7 @@ export async function cleanupLegacyMetadataNotes(
     if (!cached) continue;
     const title = stringValue(cached.title, file.basename).trim();
     const metadataUpgrade = needsMetadataUpgrade(cached);
+    const hadLegacyUserTags = strings(cached.user_tags).length > 0;
     const localCopy: Record<string, unknown> = {
       ...cached,
       genres: strings(cached.genres),
@@ -343,7 +366,7 @@ export async function cleanupLegacyMetadataNotes(
       if (local.studios) result.studios += 1;
       changedFields.push(...localChangedFields(local));
       if (enriched) {
-        const classificationFields = applyClassification(frontmatter, enriched);
+        const classificationFields = applyClassification(frontmatter, enriched, hadLegacyUserTags);
         if (classificationFields.length) {
           result.classification += 1;
           changedFields.push(...classificationFields);
