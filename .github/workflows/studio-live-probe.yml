@@ -1,0 +1,70 @@
+name: Studio live provider probe
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Probe Bangumi structured staff and AniList studios
+        shell: bash
+        run: |
+          node <<'NODE'
+          const cases = [
+            [240038, '青春ブタ野郎はバニーガール先輩の夢を見ない', 'CloverWorks'],
+            [260680, '青春ブタ野郎はゆめみる少女の夢を見ない', 'CloverWorks'],
+            [402656, '青春ブタ野郎はおでかけシスターの夢を見ない', 'CloverWorks'],
+            [183878, 'ヴァイオレット・エヴァーガーデン', '京都アニメーション'],
+            [245665, '鬼滅の刃', 'ufotable'],
+            [84171, 'ハイキュー!!', 'Production I.G'],
+            [537409, 'ぼっち・ざ・ろっく！ 第2期', 'CloverWorks'],
+            [355199, 'Re:Monster', 'スタジオディーン'],
+          ];
+          const ua = 'AnimeList studio reliability probe (github.com/cwh555/AnimeList)';
+          const normalized = (value) => String(value ?? '').normalize('NFKC').replace(/[\s\p{P}\p{S}]+/gu, '').toLowerCase();
+          const animationRelations = new Set(['动画制作','動畫製作','アニメーション制作','アニメーション製作'].map(normalized));
+          let failed = 0;
+          for (const [id, title, expected] of cases) {
+            const subjectRes = await fetch(`https://api.bgm.tv/v0/subjects/${id}`, { headers: { Accept: 'application/json', 'User-Agent': ua } });
+            if (!subjectRes.ok) throw new Error(`Bangumi subject ${id}: HTTP ${subjectRes.status}`);
+            const subject = await subjectRes.json();
+            const personsRes = await fetch(`https://api.bgm.tv/v0/subjects/${id}/persons`, { headers: { Accept: 'application/json', 'User-Agent': ua } });
+            if (!personsRes.ok) throw new Error(`Bangumi persons ${id}: HTTP ${personsRes.status}`);
+            const persons = await personsRes.json();
+            const bangumiStudios = persons
+              .filter((entry) => animationRelations.has(normalized(entry.relation)))
+              .filter((entry) => entry.type === 2 || entry.type === 3)
+              .map((entry) => entry.name);
+
+            const gql = `query ($search: String) { Media(search: $search, type: ANIME, sort: SEARCH_MATCH) { id title { native romaji english } studios(isMain: true) { nodes { id name isAnimationStudio } } } }`;
+            const aniRes = await fetch('https://graphql.anilist.co', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': ua },
+              body: JSON.stringify({ query: gql, variables: { search: subject.name || title } }),
+            });
+            let anilist = null;
+            if (aniRes.ok) {
+              const payload = await aniRes.json();
+              const media = payload?.data?.Media;
+              anilist = media ? {
+                id: media.id,
+                title: media.title,
+                studios: (media.studios?.nodes ?? []).filter((node) => node.isAnimationStudio === true).map((node) => node.name),
+              } : null;
+            } else {
+              anilist = { error: `HTTP ${aniRes.status}` };
+            }
+
+            const bangumiMatches = bangumiStudios.some((name) => normalized(name) === normalized(expected));
+            if (!bangumiMatches) failed += 1;
+            console.log(JSON.stringify({ id, expected, subjectName: subject.name, bangumiStudios, bangumiMatches, anilist }));
+          }
+          if (failed) throw new Error(`${failed} Bangumi structured-studio probe case(s) did not match expected studio`);
+          NODE
