@@ -1,5 +1,5 @@
 import { normalizeAniListClassification } from "../domain/media-classification";
-import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
+import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres, normalizeStructuredAnimationStudios } from "../domain/media-metadata";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
@@ -86,6 +86,15 @@ function mapFormat(value: unknown, mediaType: MediaType): string {
   return formats[format] ?? (mediaType === "anime" ? "tv" : mediaType === "manga" ? "manga" : "novel");
 }
 
+const BANGUMI_ANIMATION_STUDIO_FIELDS = [
+  "动画制作",
+  "動畫製作",
+  "制作会社",
+  "製作会社",
+  "制作公司",
+  "製作公司",
+] as const;
+
 function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string[] {
   const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
   const values: string[] = [];
@@ -114,14 +123,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   const localTitle = stringValue(subject.name_cn, originalTitle || uiText("media.untitled")).trim();
   const images = record(subject.images);
   const people = mediaType === "anime"
-    ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, [
-      "动画制作",
-      "動畫製作",
-      "制作会社",
-      "製作会社",
-      "制作公司",
-      "製作公司",
-    ]))
+    ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, BANGUMI_ANIMATION_STUDIO_FIELDS))
     : bangumiInfoboxValues(subject.infobox, ["作者", "原作", "作画", "作畫"]);
   const platform = stringValue(subject.platform).trim();
   let format = mediaType === "anime" ? "tv" : mediaType === "manga" ? "manga" : "light_novel";
@@ -179,7 +181,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
       return stringValue(name.native, stringValue(name.full));
     })
     .filter(Boolean);
-  const studios = normalizeAnimeStudios(asArray(record(media.studios).nodes));
+  const studios = normalizeStructuredAnimationStudios(asArray(record(media.studios).nodes));
   const statusMap: Readonly<Record<string, ExternalMediaResult["releaseStatus"]>> = {
     RELEASING: "releasing",
     FINISHED: "finished",

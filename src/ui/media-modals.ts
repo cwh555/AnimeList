@@ -2,7 +2,8 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
-import { compatibleGenres, compatibleSeasonMetadata } from "../data/media-frontmatter-compat";
+import { compatibleGenres } from "../data/media-frontmatter-compat";
+import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
@@ -347,10 +348,8 @@ export class EditMediaModal extends Modal {
     renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
     this.contentEl.appendChild(metadataHost);
 
-    const storedSeason = compatibleSeasonMetadata(frontmatter);
-    const needsQuarterRefresh = mediaType === "anime"
-      && (!storedSeason.season || storedSeason.seasonYear === null);
-    if (needsQuarterRefresh) {
+    const needsMetadataRefresh = storedMediaNeedsClassificationRefresh(frontmatter, mediaType);
+    if (needsMetadataRefresh) {
       const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
       metadataHost.appendChild(loading);
       void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {

@@ -42,7 +42,7 @@ function aniListMedia(id: number, format = "TV"): unknown {
     source: "ORIGINAL",
     countryOfOrigin: "JP",
     tags: [{ name: "School", category: "Theme", rank: 80, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false }],
-    studios: { nodes: [{ name: "Studio Test" }] },
+    studios: { nodes: [{ name: "Production Test", isAnimationStudio: false }, { name: "Studio Test", isAnimationStudio: true }] },
     staff: { edges: [] },
   };
 }
@@ -134,6 +134,33 @@ describe("metadata provider clients", () => {
     }
   });
 
+  it("uses Bangumi animation-production fields and never treats generic production credits as studios", async () => {
+    setRequestUrlMock(() => ({
+      json: {
+        id: 355199,
+        name: "Re:Monster",
+        name_cn: "怪物转生",
+        date: "2024-04-01",
+        platform: "TV",
+        images: {},
+        rating: {},
+        tags: [],
+        infobox: [
+          { key: "动画制作", value: "スタジオディーン" },
+          { key: "监制", value: "ジェンコ" },
+          { key: "制作", value: "制片：ジェンコ" },
+        ],
+      },
+      text: "",
+    }));
+    try {
+      const result = await new BangumiClient().fetchById("anime", "355199");
+      assert.deepEqual(result?.people, ["スタジオディーン"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("keeps the AniList GraphQL query and page variables in one client", async () => {
     let body: any;
     setRequestUrlMock((options) => {
@@ -156,7 +183,9 @@ describe("metadata provider clients", () => {
       assert.equal(body.variables.type, "MANGA");
       assert.equal(body.variables.format, null);
       assert.match(body.query, /pageInfo \{ hasNextPage \}/);
+      assert.match(body.query, /studios\(isMain: true\) \{ nodes \{ name isAnimationStudio \} \}/);
       assert.deepEqual(page.results.map((item) => item.sourceId), ["1"]);
+      assert.deepEqual(page.results[0]?.classification?.studios, ["Studio Test"]);
       assert.equal(page.hasMore, true);
     } finally {
       setRequestUrlMock(null);

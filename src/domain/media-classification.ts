@@ -1,4 +1,4 @@
-import { normalizeAnimeStudios, normalizeGenres } from "./media-metadata";
+import { normalizeGenres, normalizeStructuredAnimationStudios } from "./media-metadata";
 import { asArray, stringValue } from "./value-normalization";
 
 export const MEDIA_TAG_MIN_RANK = 60;
@@ -80,7 +80,7 @@ export function normalizeAniListClassification(value: unknown): MediaClassificat
     };
   }).filter((tag): tag is MediaTagMetadata => tag !== null);
 
-  const studios = normalizeAnimeStudios(asArray(record(media.studios).nodes));
+  const studios = normalizeStructuredAnimationStudios(asArray(record(media.studios).nodes));
   const startDate = record(media.startDate);
   const season = normalizeSeason(media.season) ?? seasonFromMonth(startDate.month);
   const seasonYear = optionalInteger(media.seasonYear) ?? optionalInteger(startDate.year);

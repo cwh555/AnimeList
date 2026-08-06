@@ -55,7 +55,7 @@ function aniListMedia(id: number, title = "テスト作品"): unknown {
     tags: [
       { name: "School", category: "Theme", rank: 82, isGeneralSpoiler: false, isMediaSpoiler: false, isAdult: false },
     ],
-    studios: { nodes: [{ name: "AniList Studio" }] },
+    studios: { nodes: [{ name: "AniList Producer", isAnimationStudio: false }, { name: "AniList Studio", isAnimationStudio: true }] },
     staff: { edges: [] },
   };
 }

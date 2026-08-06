@@ -19,7 +19,7 @@ const ANILIST_MEDIA_FIELDS = `
   coverImage { extraLarge large medium }
   season seasonYear source countryOfOrigin
   tags { name category rank isGeneralSpoiler isMediaSpoiler isAdult }
-  studios(isMain: true) { nodes { name } }
+  studios(isMain: true) { nodes { name isAnimationStudio } }
   staff(perPage: 10, sort: RELEVANCE) { edges { role node { name { full native } } } }
 `;
 

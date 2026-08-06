@@ -77,16 +77,11 @@ describe("media classification collection fields", () => {
     assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
   });
 
-  it("keeps one canonical primary studio and ignores partnership organizations", () => {
-    assert.deepEqual(normalizeAnimeStudios([
-      "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO",
-    ]), ["Studio Colorido"]);
-    assert.deepEqual(normalizeAnimeStudios([
-      "コロリド・ツインエンジンパートナーズ (スタジオコロリド、ツインエンジン)",
-      "スタジオコロリド",
-      "STUDIO CHROMATO",
-    ]), ["Studio Colorido"]);
-    assert.deepEqual(normalizeAnimeStudios(["STUDIO CHROMATO"]), ["Studio Chromato"]);
+  it("normalizes provider studio values without company-name keyword rules", () => {
+    assert.deepEqual(normalizeAnimeStudios(["  CloverWorks  "]), ["CloverWorks"]);
+    assert.deepEqual(normalizeAnimeStudios(["Studio A、Studio B"]), ["Studio A"]);
+    assert.deepEqual(normalizeAnimeStudios(["STUDIO CHROMATO"]), ["STUDIO CHROMATO"]);
+    assert.deepEqual(normalizeAnimeStudios(["制作:ジェンコ"]), []);
   });
 
   it("normalizes editable collection tags for the chip control", () => {
@@ -110,6 +105,7 @@ describe("media classification collection fields", () => {
     assert.equal(storedMediaNeedsClassificationRefresh({ format: "tv" }, "anime"), true);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021 }, "anime"), true);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021, studios: ["CloverWorks"] }, "anime"), false);
+    assert.equal(storedMediaNeedsClassificationRefresh({ season: "spring", season_year: 2024, studios: ["制作:ジェンコ"] }, "anime"), true);
   });
 
 
