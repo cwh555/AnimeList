@@ -1,0 +1,189 @@
+diff --git a/src/data/provider-normalizers.ts b/src/data/provider-normalizers.ts
+index 70288c1..4ea1049 100644
+--- a/src/data/provider-normalizers.ts
++++ b/src/data/provider-normalizers.ts
+@@ -95,6 +95,29 @@ const BANGUMI_ANIMATION_STUDIO_FIELDS = [
+   "アニメーション製作",
+ ] as const;
+ 
++const BANGUMI_ANIMATION_STUDIO_RELATIONS = new Set([
++  "动画制作",
++  "動畫製作",
++  "アニメーション制作",
++  "アニメーション製作",
++].map((value) => normalizeComparable(value)));
++
++/**
++ * Extract animation studios from Bangumi's structured subject-person relation
++ * endpoint. Relation/type are provider-owned semantics; company names are never
++ * classified by keywords here. Bangumi person types 2 and 3 are company/group.
++ */
++export function normalizeBangumiAnimationStudiosFromPersons(value: unknown): string[] {
++  return normalizeAnimeStudios(
++    asArray(value)
++      .map((entry) => record(entry))
++      .filter((entry) => BANGUMI_ANIMATION_STUDIO_RELATIONS.has(normalizeComparable(entry.relation)))
++      .filter((entry) => entry.type === 2 || entry.type === 3)
++      .map((entry) => stringValue(entry.name).trim())
++      .filter(Boolean),
++  );
++}
++
+ function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string[] {
+   const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
+   const values: string[] = [];
+diff --git a/src/data/providers/bangumi-client.ts b/src/data/providers/bangumi-client.ts
+index 60ef0cc..4b70432 100644
+--- a/src/data/providers/bangumi-client.ts
++++ b/src/data/providers/bangumi-client.ts
+@@ -3,10 +3,11 @@ import { USER_AGENT } from "../../app-metadata";
+ import type { MediaType } from "../../domain/media-types";
+ import { asArray } from "../../domain/value-normalization";
+ import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
+-import { normalizeBangumiSubject } from "../provider-normalizers";
++import { normalizeBangumiAnimationStudiosFromPersons, normalizeBangumiSubject } from "../provider-normalizers";
+ 
+ const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
+ const BANGUMI_SUBJECT_ENDPOINT = "https://api.bgm.tv/v0/subjects";
++const BANGUMI_SUBJECT_PERSONS_SUFFIX = "/persons";
+ const BANGUMI_PAGE_SIZE = 20;
+ 
+ function record(value: unknown): Record<string, unknown> {
+@@ -40,7 +41,26 @@ export class BangumiClient implements MetadataProviderClient {
+     });
+     const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+     const subject = record(parsed);
+-    return Object.keys(subject).length ? normalizeBangumiSubject(subject, mediaType) : null;
++    if (!Object.keys(subject).length) return null;
++
++    const normalized = normalizeBangumiSubject(subject, mediaType);
++    if (mediaType !== "anime" || normalized.people.length) return normalized;
++
++    try {
++      const personsResponse = await requestUrl({
++        url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(id)}${BANGUMI_SUBJECT_PERSONS_SUFFIX}`,
++        method: "GET",
++        headers: { Accept: "application/json", "User-Agent": USER_AGENT },
++      });
++      const persons: unknown = personsResponse.json ?? JSON.parse(personsResponse.text || "[]");
++      const studios = normalizeBangumiAnimationStudiosFromPersons(persons);
++      return studios.length ? { ...normalized, people: studios } : normalized;
++    } catch {
++      // The relation endpoint is a reliability fallback. Preserve the exact
++      // subject result if it is temporarily unavailable; AniList enrichment
++      // remains an independent secondary source.
++      return normalized;
++    }
+   }
+ 
+   async searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
+diff --git a/tests/contracts/metadata-provider-clients.test.ts b/tests/contracts/metadata-provider-clients.test.ts
+index cd93565..1f8c2bc 100644
+--- a/tests/contracts/metadata-provider-clients.test.ts
++++ b/tests/contracts/metadata-provider-clients.test.ts
+@@ -134,6 +134,105 @@ describe("metadata provider clients", () => {
+     }
+   });
+ 
++  it("recovers a missing anime studio from Bangumi structured subject-person relations", async () => {
++    const urls: string[] = [];
++    setRequestUrlMock((options) => {
++      urls.push(options.url);
++      if (options.url.endsWith("/persons")) {
++        return {
++          json: [
++            { id: 1, name: "Aniplex", type: 2, relation: "製作", career: [], eps: "" },
++            { id: 32356, name: "CloverWorks", type: 2, relation: "动画制作", career: [], eps: "" },
++            { id: 3, name: "Individual Producer", type: 1, relation: "动画制作", career: [], eps: "" },
++          ],
++          text: "",
++        };
++      }
++      return {
++        json: {
++          id: 240038,
++          name: "青春ブタ野郎はバニーガール先輩の夢を見ない",
++          name_cn: "青春猪头少年不会梦到兔女郎学姐",
++          date: "2018-10-04",
++          platform: "TV",
++          images: {},
++          rating: {},
++          tags: [],
++          infobox: [],
++        },
++        text: "",
++      };
++    });
++    try {
++      const result = await new BangumiClient().fetchById("anime", "240038");
++      assert.deepEqual(urls, [
++        "https://api.bgm.tv/v0/subjects/240038",
++        "https://api.bgm.tv/v0/subjects/240038/persons",
++      ]);
++      assert.deepEqual(result?.people, ["CloverWorks"]);
++    } finally {
++      setRequestUrlMock(null);
++    }
++  });
++
++  it("does not spend a second Bangumi request when explicit animation-studio metadata already exists", async () => {
++    let calls = 0;
++    setRequestUrlMock(() => {
++      calls += 1;
++      return {
++        json: {
++          id: 183878,
++          name: "ヴァイオレット・エヴァーガーデン",
++          name_cn: "紫罗兰永恒花园",
++          date: "2018-01-10",
++          platform: "TV",
++          images: {},
++          rating: {},
++          tags: [],
++          infobox: [{ key: "动画制作", value: "京都アニメーション" }],
++        },
++        text: "",
++      };
++    });
++    try {
++      const result = await new BangumiClient().fetchById("anime", "183878");
++      assert.equal(calls, 1);
++      assert.deepEqual(result?.people, ["京都アニメーション"]);
++    } finally {
++      setRequestUrlMock(null);
++    }
++  });
++
++  it("fails open when Bangumi structured studio relations are temporarily unavailable", async () => {
++    let calls = 0;
++    setRequestUrlMock((options) => {
++      calls += 1;
++      if (options.url.endsWith("/persons")) throw new Error("temporary Bangumi persons failure");
++      return {
++        json: {
++          id: 245665,
++          name: "鬼滅の刃",
++          name_cn: "鬼灭之刃",
++          date: "2019-04-06",
++          platform: "TV",
++          images: {},
++          rating: {},
++          tags: [],
++          infobox: [],
++        },
++        text: "",
++      };
++    });
++    try {
++      const result = await new BangumiClient().fetchById("anime", "245665");
++      assert.equal(calls, 2);
++      assert.deepEqual(result?.people, []);
++      assert.equal(result?.sourceId, "245665");
++    } finally {
++      setRequestUrlMock(null);
++    }
++  });
++
+   it("uses only explicit Bangumi animation-production roles for studios", async () => {
+     setRequestUrlMock(() => ({
+       json: {"branch":"agent/studio-fix-materializer-20260806
