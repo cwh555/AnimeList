@@ -89,6 +89,7 @@ export function normalizeBroadGenres(values: unknown, limit = 12): string[] {
 }
 
 const PRODUCTION_COMMITTEE_PATTERN = /(製作委員会|制作委員会|製作委員會|制作委員會|製作委员会|制作委员会)/i;
+const NON_STUDIO_ORGANIZATION_PATTERN = /(パートナーズ|\bpartners?\b|copyright)/i;
 const STUDIO_SEPARATOR_PATTERN = /[、,，;；\n]+/;
 
 function studioText(value: unknown): string {
@@ -105,7 +106,7 @@ function studioText(value: unknown): string {
  * value shaped like `CloverWorks、「作品」製作委員会（...）producer names...`;
  * only the company prefix is useful to AnimeList.
  */
-export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
+export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
   const output: string[] = [];
   const seen = new Set<string>();
 
@@ -131,7 +132,12 @@ export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
       const studio = part
         .replace(/^(?:動畫製作|动画制作|動畫制作|动画製作|製作会社|制作会社|製作公司|制作公司)\s*[:：]\s*/i, "")
         .trim();
-      if (!studio || PRODUCTION_COMMITTEE_PATTERN.test(studio) || seen.has(studio)) continue;
+      if (
+        !studio
+        || PRODUCTION_COMMITTEE_PATTERN.test(studio)
+        || NON_STUDIO_ORGANIZATION_PATTERN.test(studio)
+        || seen.has(studio)
+      ) continue;
       seen.add(studio);
       output.push(studio);
       if (output.length >= limit) return output;
@@ -139,4 +145,18 @@ export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
   }
 
   return output;
+}
+
+/**
+ * Return true only when stored studio metadata is already a single clean
+ * primary-company value. Multi-company or legacy producer/committee shapes
+ * should be refreshed from AniList when Edit Media opens.
+ */
+export function hasCanonicalPrimaryAnimeStudio(values: unknown): boolean {
+  const raw = asArray(values)
+    .map((value) => studioText(value).normalize("NFKC").trim())
+    .filter(Boolean);
+  if (raw.length !== 1) return false;
+  const normalized = normalizeAnimeStudios(raw, 1);
+  return normalized.length === 1 && normalized[0] === raw[0];
 }

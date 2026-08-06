@@ -199,6 +199,26 @@ describe("metadata provider clients", () => {
   });
 
 
+  it("keeps one primary AniList studio in canonical provider metadata", async () => {
+    setRequestUrlMock(() => {
+      const media = aniListMedia(32) as Record<string, any>;
+      media.studios = { nodes: [{ name: "Studio Colorido" }, { name: "Studio Chromato" }] };
+      return {
+        headers: {},
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [media] } } },
+        text: "",
+      };
+    });
+    try {
+      const page = await new AniListClient().searchPage("anime", "Primary studio", 1);
+      assert.deepEqual(page.results[0]?.people, ["Studio Colorido"]);
+      assert.deepEqual(page.results[0]?.classification?.studios, ["Studio Colorido"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+
   it("derives quarter metadata from AniList startDate when season fields are absent", async () => {
     setRequestUrlMock(() => {
       const media = aniListMedia(31) as Record<string, any>;

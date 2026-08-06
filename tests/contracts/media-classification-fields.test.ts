@@ -97,6 +97,16 @@ describe("media classification collection fields", () => {
     assert.equal(storedMediaNeedsClassificationRefresh({ format: "tv" }, "anime"), true);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021 }, "anime"), true);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021, studios: ["CloverWorks"] }, "anime"), false);
+    assert.equal(storedMediaNeedsClassificationRefresh({
+      season: "winter",
+      season_year: 2021,
+      studios: ["Studio Colorido", "Studio Chromato"],
+    }, "anime"), true);
+    assert.equal(storedMediaNeedsClassificationRefresh({
+      season: "winter",
+      season_year: 2021,
+      studios: ["コロリド・ツインエンジンパートナーズ", "スタジオコロリド", "STUDIO CHROMATO"],
+    }, "anime"), true);
   });
 
 

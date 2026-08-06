@@ -2,6 +2,7 @@ import type { ExternalMediaResult, ExternalMediaSourceRef, MediaType } from "../
 import { numeric, stringArray, stringValue } from "../domain/value-normalization";
 import { compatibleGenres, compatibleSeasonMetadata, compatibleSourceGenres, compatibleStudios } from "./media-frontmatter-compat";
 import { normalizeReleaseStatus } from "../novel-progress";
+import { hasCanonicalPrimaryAnimeStudio } from "../domain/media-metadata";
 
 function sourceRefs(frontmatter: Record<string, unknown>): ExternalMediaSourceRef[] {
   const output: ExternalMediaSourceRef[] = [];
@@ -25,7 +26,14 @@ export function storedMediaNeedsClassificationRefresh(
 ): boolean {
   if (mediaType !== "anime") return false;
   const season = compatibleSeasonMetadata(frontmatter);
-  return !season.season || season.seasonYear === null || compatibleStudios(frontmatter).length === 0;
+  const studios = compatibleStudios(frontmatter);
+  const storedStudios = stringArray(frontmatter.studios);
+  const storedStudioNeedsRefresh = storedStudios.length > 0
+    && !hasCanonicalPrimaryAnimeStudio(storedStudios);
+  return !season.season
+    || season.seasonYear === null
+    || studios.length !== 1
+    || storedStudioNeedsRefresh;
 }
 
 export function storedMediaExternalResult(
