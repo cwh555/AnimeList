@@ -186,4 +186,4 @@ index cd93565..1f8c2bc 100644
 +
    it("uses only explicit Bangumi animation-production roles for studios", async () => {
      setRequestUrlMock(() => ({
-       json: {"branch":"agent/studio-fix-materializer-20260806
+       json: {
