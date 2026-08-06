@@ -25,7 +25,7 @@ jobs:
             [245665, '鬼滅の刃', 'ufotable'],
             [84171, 'ハイキュー!!', 'Production I.G'],
             [537409, 'ぼっち・ざ・ろっく！ 第2期', 'CloverWorks'],
-            [355199, 'Re:Monster', 'スタジオディーン'],
+            [455345, 'Re:Monster', 'スタジオディーン'],
           ];
           const ua = 'AnimeList studio reliability probe (github.com/cwh555/AnimeList)';
           const normalized = (value) => String(value ?? '').normalize('NFKC').replace(/[\s\p{P}\p{S}]+/gu, '').toLowerCase();
