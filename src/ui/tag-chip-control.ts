@@ -94,7 +94,11 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
     for (const value of available.slice(0, 18)) {
       const suggestion = makeEl("button", "al-tag-suggestion", value);
       suggestion.type = "button";
-      suggestion.addEventListener("click", () => addValue(value));
+      suggestion.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        addValue(value);
+      });
       suggestionsEl.appendChild(suggestion);
     }
     if (!available.length && input.value.trim()) {
@@ -112,14 +116,25 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
       remove.type = "button";
       remove.setAttribute("aria-label", uiText("add.tagsRemove", { tag: value }));
       remove.title = uiText("add.tagsRemove", { tag: value });
-      remove.addEventListener("click", () => removeValue(value));
+      remove.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeValue(value);
+      });
+      chip.addEventListener("click", (event) => {
+        if (event.target === remove || remove.contains(event.target as Node)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      });
       chip.appendChild(remove);
       chipSet.insertBefore(chip, add);
     }
     renderSuggestions();
   };
 
-  add.addEventListener("click", () => {
+  add.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     picker.hidden = !picker.hidden;
     add.classList.toggle("is-active", !picker.hidden);
     add.setAttribute("aria-expanded", picker.hidden ? "false" : "true");

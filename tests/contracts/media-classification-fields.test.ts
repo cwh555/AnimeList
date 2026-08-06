@@ -6,6 +6,7 @@ import { detailMediaQuarterLabel, mediaQuarterLabel } from "../../src/ui/media-q
 import { tagSuggestionValues } from "../../src/ui/tag-chip-control";
 import { storedMediaExternalResult, storedMediaNeedsClassificationRefresh } from "../../src/data/stored-media-result";
 import { normalizeUserTags } from "../../src/domain/user-tags";
+import { normalizeAnimeStudios } from "../../src/domain/media-metadata";
 
 function result(): ExternalMediaResult {
   return {
@@ -74,6 +75,15 @@ describe("media classification collection fields", () => {
     assert.equal(values.people, "CloverWorks");
     assert.equal(values.season, "2021 Q1 (冬季)");
     assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
+  });
+
+  it("keeps one canonical primary studio and ignores partnership organizations", () => {
+    assert.deepEqual(normalizeAnimeStudios([
+      "コロリド・ツインエンジンパートナーズ (スタジオコロリド、ツインエンジン)",
+      "スタジオコロリド",
+      "STUDIO CHROMATO",
+    ]), ["Studio Colorido"]);
+    assert.deepEqual(normalizeAnimeStudios(["STUDIO CHROMATO"]), ["Studio Chromato"]);
   });
 
   it("normalizes editable collection tags for the chip control", () => {

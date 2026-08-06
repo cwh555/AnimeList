@@ -90,6 +90,15 @@ export function normalizeBroadGenres(values: unknown, limit = 12): string[] {
 
 const PRODUCTION_COMMITTEE_PATTERN = /(製作委員会|制作委員会|製作委員會|制作委員會|製作委员会|制作委员会)/i;
 const STUDIO_SEPARATOR_PATTERN = /[、,，;；\n]+/;
+const STUDIO_PARTNERSHIP_PATTERN = /(partners?|partnership|パートナーズ)/i;
+const STUDIO_COMPANY_SUFFIX_PATTERN = /(?:\s*(?:co\.?\s*,?\s*ltd\.?|inc\.?|llc|株式会社|有限会社))$/i;
+
+const STUDIO_NAME_ALIASES = new Map<string, string>([
+  ["スタジオコロリド", "Studio Colorido"],
+  ["studio colorido", "Studio Colorido"],
+  ["studio colorido co ltd", "Studio Colorido"],
+  ["studio chromato", "Studio Chromato"],
+]);
 
 function studioText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -105,13 +114,44 @@ function studioText(value: unknown): string {
  * value shaped like `CloverWorks、「作品」製作委員会（...）producer names...`;
  * only the company prefix is useful to AnimeList.
  */
-export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
+function canonicalStudioName(value: string): string {
+  const withoutCompanySuffix = value
+    .replace(STUDIO_COMPANY_SUFFIX_PATTERN, "")
+    .replace(/[.。]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!withoutCompanySuffix) return "";
+
+  const aliasKey = withoutCompanySuffix
+    .toLocaleLowerCase()
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const alias = STUDIO_NAME_ALIASES.get(aliasKey);
+  if (alias) return alias;
+
+  const studioPrefix = /^studio\s+(.+)$/i.exec(withoutCompanySuffix);
+  if (studioPrefix) {
+    const rest = studioPrefix[1]
+      .toLocaleLowerCase()
+      .replace(/(^|[\s-])([a-z])/g, (_match, separator: string, letter: string) => `${separator}${letter.toUpperCase()}`);
+    return `Studio ${rest}`;
+  }
+  return withoutCompanySuffix;
+}
+
+/**
+ * Return one canonical primary animation studio. Provider APIs can mark
+ * multiple values as main, including partnership/financing organizations;
+ * those organizations are not useful as the Library company facet.
+ */
+export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
   const output: string[] = [];
   const seen = new Set<string>();
 
   for (const raw of asArray(values)) {
     let value = studioText(raw).normalize("NFKC").trim();
-    if (!value) continue;
+    if (!value || STUDIO_PARTNERSHIP_PATTERN.test(value)) continue;
 
     const committeeIndex = value.search(PRODUCTION_COMMITTEE_PATTERN);
     if (committeeIndex >= 0) {
@@ -128,11 +168,14 @@ export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
     }
 
     for (const part of value.split(STUDIO_SEPARATOR_PATTERN)) {
-      const studio = part
+      const candidate = part
         .replace(/^(?:動畫製作|动画制作|動畫制作|动画製作|製作会社|制作会社|製作公司|制作公司)\s*[:：]\s*/i, "")
         .trim();
-      if (!studio || PRODUCTION_COMMITTEE_PATTERN.test(studio) || seen.has(studio)) continue;
-      seen.add(studio);
+      if (!candidate || STUDIO_PARTNERSHIP_PATTERN.test(candidate) || PRODUCTION_COMMITTEE_PATTERN.test(candidate)) continue;
+      const studio = canonicalStudioName(candidate);
+      const key = studio.toLocaleLowerCase();
+      if (!studio || seen.has(key)) continue;
+      seen.add(key);
       output.push(studio);
       if (output.length >= limit) return output;
     }

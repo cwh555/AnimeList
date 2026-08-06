@@ -34,4 +34,6 @@ jobs:
         run: npm run test:browser:date
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run tag chip interactions in Chromium
+        run: npm run test:browser:tags
       - run: npm run release:check
