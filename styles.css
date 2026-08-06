@@ -1687,7 +1687,7 @@
   .al-add-button { min-height:44px; padding-inline:10px; }
 
   .al-type-tabs,
-  .al-status-bar { width:100%; max-width:none; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-inline:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .al-status-bar { width:100%; max-width:none; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
   .al-type-tabs::-webkit-scrollbar,
   .al-status-bar::-webkit-scrollbar { display:none; }
   .al-type-tabs { margin:12px 0 10px; }
@@ -1753,7 +1753,7 @@
   .al-score-dashboard-description { line-height:1.45; }
   .al-score-dashboard-summary { max-width:none; font-size:.68rem; text-align:left; }
   .al-score-dashboard-controls { position:static; display:grid; grid-template-columns:1fr; gap:8px; padding:10px 0; }
-  .al-score-dashboard-tabs { width:100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .al-score-dashboard-tabs { width:100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .al-score-dashboard-tabs::-webkit-scrollbar { display:none; }
   .al-score-dashboard-tab { flex:0 0 auto; min-height:42px; }
   .al-score-dashboard-action-group { width:100%; }
@@ -1780,7 +1780,7 @@
   .al-score-dashboard[data-label-layout="compact"] .al-score-lane { display:block; min-height:0; }
   .al-score-lane-label,
   .al-score-dashboard[data-label-layout="compact"] .al-score-lane-label { display:flex; min-height:30px; align-items:center; justify-content:flex-start; padding:6px 10px; border-right:0; border-bottom:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); font-size:.68rem; }
-  .al-score-lane-posters { flex-wrap:nowrap; align-content:center; overflow-x:auto; overscroll-behavior-inline:contain; padding:9px 10px 11px; scroll-snap-type:x proximity; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+  .al-score-lane-posters { flex-wrap:nowrap; align-content:center; overflow-x:auto; overscroll-behavior-inline:contain; padding:9px 10px 11px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
   .al-score-poster { scroll-snap-align:start; }
 
   /* Media forms and serial-entry editor become touch-first cards. */
@@ -1812,7 +1812,7 @@
     grid-row:auto;
     grid-template-columns:72px minmax(0,1fr);
     grid-template-rows:auto auto;
-    column-gap:10px;
+    gap:0 10px;
     align-items:center;
     justify-items:stretch;
   }
@@ -1830,7 +1830,7 @@
   .al-timeline-toolbar { display:grid; grid-template-columns:1fr; gap:8px; padding:10px 10px max(10px, env(safe-area-inset-top)); }
   .al-timeline-copy { min-width:0; }
   .al-timeline-type-filters,
-  .al-timeline-controls { width:100%; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .al-timeline-controls { width:100%; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .al-timeline-type-filters::-webkit-scrollbar,
   .al-timeline-controls::-webkit-scrollbar { display:none; }
   .al-timeline-type-filter { min-height:40px; flex:0 0 auto; padding-inline:12px; }

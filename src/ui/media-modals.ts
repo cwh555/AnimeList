@@ -354,7 +354,7 @@ export class EditMediaModal extends Modal {
       const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
       metadataHost.appendChild(loading);
       void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
-        if (!this.contentEl.isConnected || !enriched.classification) return;
+        if (!this.contentEl.isConnected) return;
         metadataHost.replaceChildren();
         renderMediaClassificationFields(metadataHost, enriched, true);
       }).catch((error) => {

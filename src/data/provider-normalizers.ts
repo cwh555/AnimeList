@@ -95,6 +95,29 @@ const BANGUMI_ANIMATION_STUDIO_FIELDS = [
   "アニメーション製作",
 ] as const;
 
+const BANGUMI_ANIMATION_STUDIO_RELATIONS = new Set([
+  "动画制作",
+  "動畫製作",
+  "アニメーション制作",
+  "アニメーション製作",
+].map((value) => normalizeComparable(value)));
+
+/**
+ * Extract animation studios from Bangumi's structured subject-person relation
+ * endpoint. Relation/type are provider-owned semantics; company names are never
+ * classified by keywords here. Bangumi person types 2 and 3 are company/group.
+ */
+export function normalizeBangumiAnimationStudiosFromPersons(value: unknown): string[] {
+  return normalizeAnimeStudios(
+    asArray(value)
+      .map((entry) => record(entry))
+      .filter((entry) => BANGUMI_ANIMATION_STUDIO_RELATIONS.has(normalizeComparable(entry.relation)))
+      .filter((entry) => entry.type === 2 || entry.type === 3)
+      .map((entry) => stringValue(entry.name).trim())
+      .filter(Boolean),
+  );
+}
+
 function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string[] {
   const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
   const values: string[] = [];

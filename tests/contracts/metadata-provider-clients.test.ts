@@ -134,6 +134,105 @@ describe("metadata provider clients", () => {
     }
   });
 
+  it("recovers a missing anime studio from Bangumi structured subject-person relations", async () => {
+    const urls: string[] = [];
+    setRequestUrlMock((options) => {
+      urls.push(options.url);
+      if (options.url.endsWith("/persons")) {
+        return {
+          json: [
+            { id: 1, name: "Aniplex", type: 2, relation: "製作", career: [], eps: "" },
+            { id: 32356, name: "CloverWorks", type: 2, relation: "动画制作", career: [], eps: "" },
+            { id: 3, name: "Individual Producer", type: 1, relation: "动画制作", career: [], eps: "" },
+          ],
+          text: "",
+        };
+      }
+      return {
+        json: {
+          id: 240038,
+          name: "青春ブタ野郎はバニーガール先輩の夢を見ない",
+          name_cn: "青春猪头少年不会梦到兔女郎学姐",
+          date: "2018-10-04",
+          platform: "TV",
+          images: {},
+          rating: {},
+          tags: [],
+          infobox: [],
+        },
+        text: "",
+      };
+    });
+    try {
+      const result = await new BangumiClient().fetchById("anime", "240038");
+      assert.deepEqual(urls, [
+        "https://api.bgm.tv/v0/subjects/240038",
+        "https://api.bgm.tv/v0/subjects/240038/persons",
+      ]);
+      assert.deepEqual(result?.people, ["CloverWorks"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("does not spend a second Bangumi request when explicit animation-studio metadata already exists", async () => {
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls += 1;
+      return {
+        json: {
+          id: 183878,
+          name: "ヴァイオレット・エヴァーガーデン",
+          name_cn: "紫罗兰永恒花园",
+          date: "2018-01-10",
+          platform: "TV",
+          images: {},
+          rating: {},
+          tags: [],
+          infobox: [{ key: "动画制作", value: "京都アニメーション" }],
+        },
+        text: "",
+      };
+    });
+    try {
+      const result = await new BangumiClient().fetchById("anime", "183878");
+      assert.equal(calls, 1);
+      assert.deepEqual(result?.people, ["京都アニメーション"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("fails open when Bangumi structured studio relations are temporarily unavailable", async () => {
+    let calls = 0;
+    setRequestUrlMock((options) => {
+      calls += 1;
+      if (options.url.endsWith("/persons")) throw new Error("temporary Bangumi persons failure");
+      return {
+        json: {
+          id: 245665,
+          name: "鬼滅の刃",
+          name_cn: "鬼灭之刃",
+          date: "2019-04-06",
+          platform: "TV",
+          images: {},
+          rating: {},
+          tags: [],
+          infobox: [],
+        },
+        text: "",
+      };
+    });
+    try {
+      const result = await new BangumiClient().fetchById("anime", "245665");
+      assert.equal(calls, 2);
+      assert.deepEqual(result?.people, []);
+      assert.equal(result?.sourceId, "245665");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("uses only explicit Bangumi animation-production roles for studios", async () => {
     setRequestUrlMock(() => ({
       json: {

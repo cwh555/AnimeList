@@ -116,5 +116,5 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
       sort: stringValue(uiState.sort, DEFAULT_SETTINGS.uiState.sort),
       view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
     },
-  } as AnimeListSettings;
+  };
 }

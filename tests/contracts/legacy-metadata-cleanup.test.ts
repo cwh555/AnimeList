@@ -260,6 +260,52 @@ describe("legacy metadata cleanup", () => {
     assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
   });
 
+  it("retries an otherwise-current anime when studio metadata is missing and persists a structured provider studio without AniList classification", async () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      media_type: "anime",
+      source_provider: "bangumi",
+      source_id: "240038",
+      source_urls: ["https://bgm.tv/subject/240038"],
+      title: "青春ブタ野郎はバニーガール先輩の夢を見ない",
+      genres: ["戀愛"],
+      season: "fall",
+      season_year: 2018,
+      anilist_id: "101291",
+    };
+    const file = new TFile();
+    file.path = "AnimeList/Anime/Bunny Girl Senpai.md";
+    file.basename = "Bunny Girl Senpai";
+    file.extension = "md";
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getRoot: () => ({ children: [file] }) },
+      fileManager: {
+        async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) { callback(frontmatter); },
+      },
+    } as any;
+    let enrichCalls = 0;
+    const result = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => {
+        enrichCalls += 1;
+        return { ...source, people: ["CloverWorks"] };
+      },
+    });
+
+    assert.equal(enrichCalls, 1);
+    assert.equal(result.cleaned, 1);
+    assert.equal(result.unavailable, 1);
+    assert.equal(result.studios, 1);
+    assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
+    assert.deepEqual(result.details, [{
+      title: "青春ブタ野郎はバニーガール先輩の夢を見ない",
+      path: "AnimeList/Anime/Bunny Girl Senpai.md",
+      changes: ["studios"],
+      enrichment: "unavailable",
+    }]);
+  });
+
   it("does not mark a legacy note current when AniList metadata is unavailable, allowing a later retry", async () => {
     const frontmatter: Record<string, unknown> = {
       schema_version: 6,

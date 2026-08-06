@@ -59,6 +59,15 @@ describe("media classification collection fields", () => {
     assert.ok(!Object.values(values).some((value) => value.includes("2021年1月")));
   });
 
+  it("renders provider-recovered studio metadata even when AniList classification is unavailable", () => {
+    const recovered = { ...result(), classification: undefined, people: ["CloverWorks"] };
+    const rows = mediaClassificationFieldValues(recovered, true);
+    const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+
+    assert.equal(values.people, "CloverWorks");
+    assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
+  });
+
   it("shows stored structured metadata, including quarter, in the edit modal data section", () => {
     const rows = storedMediaClassificationFieldValues({
       format: "tv",

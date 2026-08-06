@@ -147,7 +147,9 @@ function needsMetadataUpgrade(frontmatter: Record<string, unknown>): boolean {
   const version = Number(frontmatter.schema_version);
   if (!Number.isInteger(version) || version < CURRENT_MEDIA_SCHEMA_VERSION) return true;
   if (!stringValue(frontmatter.anilist_id).trim()) return true;
-  return frontmatter.media_type === "anime" && !Number.isInteger(Number(frontmatter.season_year));
+  if (frontmatter.media_type !== "anime") return false;
+  if (!Number.isInteger(Number(frontmatter.season_year))) return true;
+  return compatibleStudios(frontmatter).length === 0;
 }
 
 /**
@@ -275,6 +277,16 @@ function applyClassification(
   return changes;
 }
 
+function applyProviderStudioFallback(
+  frontmatter: Record<string, unknown>,
+  refreshed: ExternalMediaResult,
+): boolean {
+  if (refreshed.mediaType !== "anime") return false;
+  if (compatibleStudios(frontmatter).length > 0) return false;
+  const studios = normalizeAnimeStudios(refreshed.people);
+  return studios.length > 0 && setOptionalArray(frontmatter, "studios", studios);
+}
+
 function progress(
   callback: LegacyMetadataCleanupOptions["onProgress"],
   phase: LegacyMetadataCleanupProgress["phase"],
@@ -330,6 +342,7 @@ export async function cleanupLegacyMetadataNotes(
       title_aliases: strings(cached.title_aliases),
     };
     const localChange = cleanupLegacyMediaFrontmatter(localCopy);
+    let refreshed: ExternalMediaResult | null = null;
     let enriched: ExternalMediaResult | null = null;
     let enrichment: LegacyMetadataEnrichmentStatus = "not-needed";
     let enrichmentError = "";
@@ -343,6 +356,7 @@ export async function cleanupLegacyMetadataNotes(
         try {
           lastApiAt = Date.now();
           const candidate = await options.enrich(source);
+          refreshed = candidate;
           if (candidate.classification) {
             enriched = candidate;
             enrichment = "enriched";
@@ -373,6 +387,10 @@ export async function cleanupLegacyMetadataNotes(
       if (local.sourceGenres) result.sourceGenres += 1;
       if (local.studios) result.studios += 1;
       changedFields.push(...localChangedFields(local));
+      if (refreshed && applyProviderStudioFallback(frontmatter, refreshed)) {
+        result.studios += 1;
+        changedFields.push("studios");
+      }
       if (enriched) {
         const classificationFields = applyClassification(frontmatter, enriched, hadLegacyUserTags);
         if (classificationFields.length) {
