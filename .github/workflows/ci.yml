@@ -36,4 +36,6 @@ jobs:
         run: npm run test:browser:mobile
       - name: Run tag chip interactions in Chromium
         run: npm run test:browser:tags
+      - name: Run tag manager interactions in Chromium
+        run: npm run test:browser:tag-manager
       - run: npm run release:check
