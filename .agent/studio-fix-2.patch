@@ -1,0 +1,149 @@
+diff --git a/src/data/legacy-metadata-cleanup.ts b/src/data/legacy-metadata-cleanup.ts
+index a7b5158..82a838b 100644
+--- a/src/data/legacy-metadata-cleanup.ts
++++ b/src/data/legacy-metadata-cleanup.ts
+@@ -147,7 +147,9 @@ function needsMetadataUpgrade(frontmatter: Record<string, unknown>): boolean {
+   const version = Number(frontmatter.schema_version);
+   if (!Number.isInteger(version) || version < CURRENT_MEDIA_SCHEMA_VERSION) return true;
+   if (!stringValue(frontmatter.anilist_id).trim()) return true;
+-  return frontmatter.media_type === "anime" && !Number.isInteger(Number(frontmatter.season_year));
++  if (frontmatter.media_type !== "anime") return false;
++  if (!Number.isInteger(Number(frontmatter.season_year))) return true;
++  return compatibleStudios(frontmatter).length === 0;
+ }
+ 
+ /**
+@@ -275,6 +277,16 @@ function applyClassification(
+   return changes;
+ }
+ 
++function applyProviderStudioFallback(
++  frontmatter: Record<string, unknown>,
++  refreshed: ExternalMediaResult,
++): boolean {
++  if (refreshed.mediaType !== "anime") return false;
++  if (compatibleStudios(frontmatter).length > 0) return false;
++  const studios = normalizeAnimeStudios(refreshed.people);
++  return studios.length > 0 && setOptionalArray(frontmatter, "studios", studios);
++}
++
+ function progress(
+   callback: LegacyMetadataCleanupOptions["onProgress"],
+   phase: LegacyMetadataCleanupProgress["phase"],
+@@ -330,6 +342,7 @@ export async function cleanupLegacyMetadataNotes(
+       title_aliases: strings(cached.title_aliases),
+     };
+     const localChange = cleanupLegacyMediaFrontmatter(localCopy);
++    let refreshed: ExternalMediaResult | null = null;
+     let enriched: ExternalMediaResult | null = null;
+     let enrichment: LegacyMetadataEnrichmentStatus = "not-needed";
+     let enrichmentError = "";
+@@ -343,6 +356,7 @@ export async function cleanupLegacyMetadataNotes(
+         try {
+           lastApiAt = Date.now();
+           const candidate = await options.enrich(source);
++          refreshed = candidate;
+           if (candidate.classification) {
+             enriched = candidate;
+             enrichment = "enriched";
+@@ -373,6 +387,10 @@ export async function cleanupLegacyMetadataNotes(
+       if (local.sourceGenres) result.sourceGenres += 1;
+       if (local.studios) result.studios += 1;
+       changedFields.push(...localChangedFields(local));
++      if (refreshed && applyProviderStudioFallback(frontmatter, refreshed)) {
++        result.studios += 1;
++        changedFields.push("studios");
++      }
+       if (enriched) {
+         const classificationFields = applyClassification(frontmatter, enriched, hadLegacyUserTags);
+         if (classificationFields.length) {
+diff --git a/src/ui/media-modals.ts b/src/ui/media-modals.ts
+index 84f5607..b3f2e7b 100644
+--- a/src/ui/media-modals.ts
++++ b/src/ui/media-modals.ts
+@@ -354,7 +354,7 @@ export class EditMediaModal extends Modal {
+       const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
+       metadataHost.appendChild(loading);
+       void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
+-        if (!this.contentEl.isConnected || !enriched.classification) return;
++        if (!this.contentEl.isConnected) return;
+         metadataHost.replaceChildren();
+         renderMediaClassificationFields(metadataHost, enriched, true);
+       }).catch((error) => {
+diff --git a/tests/contracts/legacy-metadata-cleanup.test.ts b/tests/contracts/legacy-metadata-cleanup.test.ts
+index a5c135a..769565d 100644
+--- a/tests/contracts/legacy-metadata-cleanup.test.ts
++++ b/tests/contracts/legacy-metadata-cleanup.test.ts
+@@ -260,6 +260,52 @@ describe("legacy metadata cleanup", () => {
+     assert.ok((frontmatter.source_urls as string[]).includes("https://anilist.co/anime/124080"));
+   });
+ 
++  it("retries an otherwise-current anime when studio metadata is missing and persists a structured provider studio without AniList classification", async () => {
++    const frontmatter: Record<string, unknown> = {
++      schema_version: 6,
++      media_type: "anime",
++      source_provider: "bangumi",
++      source_id: "240038",
++      source_urls: ["https://bgm.tv/subject/240038"],
++      title: "青春ブタ野郎はバニーガール先輩の夢を見ない",
++      genres: ["戀愛"],
++      season: "fall",
++      season_year: 2018,
++      anilist_id: "101291",
++    };
++    const file = new TFile();
++    file.path = "AnimeList/Anime/Bunny Girl Senpai.md";
++    file.basename = "Bunny Girl Senpai";
++    file.extension = "md";
++    const app = {
++      metadataCache: { getFileCache: () => ({ frontmatter }) },
++      vault: { getRoot: () => ({ children: [file] }) },
++      fileManager: {
++        async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) { callback(frontmatter); },
++      },
++    } as any;
++    let enrichCalls = 0;
++    const result = await cleanupLegacyMetadataNotes(app, [""], {
++      apiIntervalMs: 0,
++      enrich: async (source) => {
++        enrichCalls += 1;
++        return { ...source, people: ["CloverWorks"] };
++      },
++    });
++
++    assert.equal(enrichCalls, 1);
++    assert.equal(result.cleaned, 1);
++    assert.equal(result.unavailable, 1);
++    assert.equal(result.studios, 1);
++    assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
++    assert.deepEqual(result.details, [{
++      title: "青春ブタ野郎はバニーガール先輩の夢を見ない",
++      path: "AnimeList/Anime/Bunny Girl Senpai.md",
++      changes: ["studios"],
++      enrichment: "unavailable",
++    }]);
++  });
++
+   it("does not mark a legacy note current when AniList metadata is unavailable, allowing a later retry", async () => {
+     const frontmatter: Record<string, unknown> = {
+       schema_version: 6,
+diff --git a/tests/contracts/media-classification-fields.test.ts b/tests/contracts/media-classification-fields.test.ts
+index c4fe689..49a4fe0 100644
+--- a/tests/contracts/media-classification-fields.test.ts
++++ b/tests/contracts/media-classification-fields.test.ts
+@@ -59,6 +59,15 @@ describe("media classification collection fields", () => {
+     assert.ok(!Object.values(values).some((value) => value.includes("2021年1月")));
+   });
+ 
++  it("renders provider-recovered studio metadata even when AniList classification is unavailable", () => {
++    const recovered = { ...result(), classification: undefined, people: ["CloverWorks"] };
++    const rows = mediaClassificationFieldValues(recovered, true);
++    const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
++
++    assert.equal(values.people, "CloverWorks");
++    assert.deepEqual(rows.map((row) => row.key), ["format", "people", "season"]);
++  });
++
+   it("shows stored structured metadata, including quarter, in the edit modal data section", () => {
+     const rows = storedMediaClassificationFieldValues({
+       format: "tv",
