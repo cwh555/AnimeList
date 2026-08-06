@@ -63,6 +63,25 @@ describe("library filters", () => {
     assert.equal(toggleLibraryQuarter("2021:winter", "2022:spring"), "2022:spring");
   });
 
+  it("deduplicates company display-format variants and matches them by stable identity", () => {
+    const options = collectLibraryFilterOptions([
+      mediaItem({ people: ["A-1Pictures"] }),
+      mediaItem({ title: "Second", filePath: "AnimeList/Anime/second.md", people: ["A-1 Pictures"] }),
+      mediaItem({ title: "Third", filePath: "AnimeList/Anime/third.md", people: ["WHITEFOX"] }),
+      mediaItem({ title: "Fourth", filePath: "AnimeList/Anime/fourth.md", people: ["WHITE FOX"] }),
+    ]);
+
+    assert.deepEqual(options.companies, ["A-1 Pictures", "WHITE FOX"]);
+    assert.equal(libraryItemMatchesFilters(
+      mediaItem({ people: ["A-1Pictures"] }),
+      { companies: ["A-1 Pictures"], quarter: "", tags: [] },
+    ), true);
+    assert.deepEqual(reconcileLibraryFilters(
+      { companies: ["A-1Pictures"], quarter: "", tags: [] },
+      options,
+    ).companies, ["A-1 Pictures"]);
+  });
+
   it("extracts only anime companies while keeping shared tags and descending quarters", () => {
     const options = collectLibraryFilterOptions([
       mediaItem({ people: ["CloverWorks"], genres: ["戀愛", "校園"], season: "winter", seasonYear: 2021 }),

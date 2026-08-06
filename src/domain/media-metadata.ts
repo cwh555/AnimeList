@@ -1,4 +1,5 @@
 import { asArray, stringValue } from "./value-normalization";
+import { normalizeStudioNames } from "./studio-identity";
 
 const GENRE_ALIASES = new Map(Object.entries({
   romance: "戀愛", love: "戀愛", 恋爱: "戀愛", 戀愛: "戀愛", 爱情: "戀愛",
@@ -88,41 +89,12 @@ export function normalizeBroadGenres(values: unknown, limit = 12): string[] {
     .slice(0, limit);
 }
 
-const STUDIO_LIST_SEPARATOR_PATTERN = /[、,，;；\n/×]+/;
-const LABELED_STUDIO_VALUE_PATTERN = /^.{1,24}[:：]\s*\S/u;
-
-function studioText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "object" && value !== null && "name" in value) {
-    return stringValue((value as { name?: unknown }).name);
-  }
-  return "";
-}
-
 /**
  * Normalize provider-supplied studio names without guessing company roles from
- * words inside a name. Role selection belongs to the provider normalizer. When
- * a provider returns several studios in one display value, keep provider order
- * so the first studio remains the primary fallback.
+ * words inside a name. Role selection belongs to the provider normalizer.
  */
 export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
-  const output: string[] = [];
-  const seen = new Set<string>();
-
-  for (const raw of asArray(values)) {
-    const value = studioText(raw).normalize("NFKC").replace(/\s+/g, " ").trim();
-    if (!value) continue;
-    for (const part of value.split(STUDIO_LIST_SEPARATOR_PATTERN)) {
-      const studio = part.trim();
-      const key = studio.toLocaleLowerCase();
-      if (!studio || LABELED_STUDIO_VALUE_PATTERN.test(studio) || seen.has(key)) continue;
-      seen.add(key);
-      output.push(studio);
-      if (output.length >= limit) return output;
-    }
-  }
-
-  return output;
+  return normalizeStudioNames(values, limit);
 }
 
 /**

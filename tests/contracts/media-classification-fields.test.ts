@@ -106,6 +106,11 @@ describe("media classification collection fields", () => {
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021 }, "anime"), true);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "winter", season_year: 2021, studios: ["CloverWorks"] }, "anime"), false);
     assert.equal(storedMediaNeedsClassificationRefresh({ season: "spring", season_year: 2024, studios: ["制作:ジェンコ"] }, "anime"), true);
+    assert.equal(storedMediaNeedsClassificationRefresh({
+      season: "spring",
+      season_year: 2024,
+      studios: ["コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO"],
+    }, "anime"), true);
   });
 
 

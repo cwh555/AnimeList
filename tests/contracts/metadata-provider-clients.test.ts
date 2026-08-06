@@ -183,7 +183,7 @@ describe("metadata provider clients", () => {
       assert.equal(body.variables.type, "MANGA");
       assert.equal(body.variables.format, null);
       assert.match(body.query, /pageInfo \{ hasNextPage \}/);
-      assert.match(body.query, /studios\(isMain: true\) \{ nodes \{ name isAnimationStudio \} \}/);
+      assert.match(body.query, /studios\(isMain: true\) \{ nodes \{ id name isAnimationStudio \} \}/);
       assert.deepEqual(page.results.map((item) => item.sourceId), ["1"]);
       assert.deepEqual(page.results[0]?.classification?.studios, ["Studio Test"]);
       assert.equal(page.hasMore, true);

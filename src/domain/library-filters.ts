@@ -1,5 +1,6 @@
 import type { MediaSeason } from "./media-classification";
 import type { MediaItem } from "./media-types";
+import { normalizeStudioName, preferredStudioDisplayName, studioIdentityKey } from "./studio-identity";
 
 export interface LibraryFilters {
   companies: string[];
@@ -92,11 +93,20 @@ export function reconcileLibraryFilters(
   filters: LibraryFilters,
   options: LibraryFilterOptions,
 ): LibraryFilters {
-  const companies = new Set(options.companies);
+  const companies = new Map(options.companies.map((company) => [studioIdentityKey(company), company]));
   const tags = new Set(options.tags);
   const quarters = new Set(options.quarters.map((option) => option.key));
+  const selectedCompanies: string[] = [];
+  const selectedCompanyKeys = new Set<string>();
+  for (const company of filters.companies) {
+    const key = studioIdentityKey(company);
+    const canonical = companies.get(key);
+    if (!key || !canonical || selectedCompanyKeys.has(key)) continue;
+    selectedCompanyKeys.add(key);
+    selectedCompanies.push(canonical);
+  }
   return {
-    companies: filters.companies.filter((company) => companies.has(company)),
+    companies: selectedCompanies,
     quarter: quarters.has(filters.quarter) ? filters.quarter : "",
     tags: filters.tags.filter((tag) => tags.has(tag)),
   };
@@ -116,7 +126,8 @@ export function toggleLibraryQuarter(current: string, value: string): string {
 export function libraryItemMatchesFilters(item: MediaItem, filters: LibraryFilters): boolean {
   if (filters.companies.length) {
     if (item.mediaType !== "anime") return false;
-    if (!filters.companies.every((company) => item.people.includes(company))) return false;
+    const companyKeys = new Set(item.people.map(studioIdentityKey).filter(Boolean));
+    if (!filters.companies.every((company) => companyKeys.has(studioIdentityKey(company)))) return false;
   }
   if (filters.quarter) {
     if (item.mediaType !== "anime") return false;
@@ -126,7 +137,7 @@ export function libraryItemMatchesFilters(item: MediaItem, filters: LibraryFilte
 }
 
 export function collectLibraryFilterOptions(items: readonly MediaItem[]): LibraryFilterOptions {
-  const companies = new Set<string>();
+  const companies = new Map<string, string>();
   const tags = new Set<string>();
   const quarters = new Map<string, LibraryQuarterOption>();
 
@@ -137,8 +148,11 @@ export function collectLibraryFilterOptions(items: readonly MediaItem[]): Librar
     }
     if (item.mediaType !== "anime") continue;
     for (const company of item.people) {
-      const normalized = company.normalize("NFKC").trim();
-      if (normalized) companies.add(normalized);
+      const normalized = normalizeStudioName(company);
+      const key = studioIdentityKey(normalized);
+      if (!key) continue;
+      const current = companies.get(key);
+      companies.set(key, current ? preferredStudioDisplayName(current, normalized) : normalized);
     }
     const season = mediaSeason(item.season);
     const year = mediaYear(item.seasonYear);
@@ -148,7 +162,7 @@ export function collectLibraryFilterOptions(items: readonly MediaItem[]): Librar
   }
 
   return {
-    companies: [...companies].sort((left, right) => left.localeCompare(right, "zh-Hant")),
+    companies: [...companies.values()].sort((left, right) => left.localeCompare(right, "zh-Hant")),
     quarters: [...quarters.values()].sort((left, right) => (
       right.year - left.year || SEASON_ORDER[right.season] - SEASON_ORDER[left.season]
     )),

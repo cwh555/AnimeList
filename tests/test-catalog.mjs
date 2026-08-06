@@ -44,6 +44,7 @@ export const TEST_TARGETS = [
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-progressive-render.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-filters.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/studio-identity.test.ts", kind: "test", suite: "unit", features: ["library", "search"] },
   { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },
   { path: "tests/user-tag-settings.test.ts", kind: "test", suite: "integration", features: ["tags", "settings"] },
   { path: "tests/media-library-index.test.ts", kind: "test", suite: "unit", features: ["library"] },

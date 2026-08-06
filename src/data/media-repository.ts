@@ -58,7 +58,7 @@ export class MediaRepository {
     const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
     const studios = compatibleStudios(frontmatter);
     const authors = stringArray(frontmatter.authors);
-    const people = studios.length
+    const people = mediaType === "anime"
       ? studios
       : authors.length
         ? authors

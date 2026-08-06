@@ -106,6 +106,33 @@ describe("media repository compatibility", () => {
     assert.equal(repository.findBySource(["AnimeList"], "AniList", "42"), anime);
   });
 
+  it("does not expose malformed studio metadata or fall back to anime author fields", () => {
+    const file = markdownFile("AnimeList/Anime/composite-studio.md");
+    const composite = "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO";
+    const app = {
+      vault: {
+        getAbstractFileByPath: () => null,
+        getResourcePath: () => "",
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            media_type: "anime",
+            title: "Composite studio",
+            studios: [composite],
+            authors: ["Not an animation studio"],
+            creators: ["Also not a studio"],
+          },
+        }),
+        getFirstLinkpathDest: () => null,
+      },
+    } as unknown as App;
+
+    const item = new MediaRepository(app).read(file);
+    assert.ok(item);
+    assert.deepEqual(item.people, []);
+  });
+
   it("formats modified labels in the active local timezone", () => {
     const previousTimezone = process.env.TZ;
     try {
