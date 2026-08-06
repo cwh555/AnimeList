@@ -1,0 +1,88 @@
+name: Warning cleanup materializer
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.head_ref == 'agent/warning-cleanup-20260806'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Apply warning cleanup and validate exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=3d8d899414ffaec7737e3b3ab3bc85bac87f8e15
+          PREVIEW=7a51df4e5bb90f1e067a0a874311e38ac674aa14
+          TARGET=fix/studio-metadata-reliability
+
+          git fetch origin preview "$TARGET"
+          test "$(git rev-parse origin/preview)" = "$PREVIEW"
+          test "$(git rev-parse "origin/$TARGET")" = "$BASE"
+          git checkout --detach "$BASE"
+          git config user.name "AnimeList GitHub Agent"
+          git config user.email "actions@users.noreply.github.com"
+
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one match in {path}: {old!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "src/data/providers/anilist-client.ts",
+              "      const oldest = this.cache.keys().next().value as string | undefined;\n      if (!oldest) break;\n      this.cache.delete(oldest);",
+              "      const [oldest] = this.cache.keys();\n      if (!oldest) break;\n      this.cache.delete(oldest);",
+          )
+          replace_once("src/search-enhancements.ts", 'import type { MediaType } from "./types";\n', "")
+          replace_once("src/search-enhancements.ts", "      mediaType: mediaType as MediaType,", "      mediaType,")
+          replace_once("src/settings-model.ts", "  } as AnimeListSettings;\n}", "  };\n}")
+
+          mobile = Path("styles.mobile.css")
+          text = mobile.read_text()
+          replacements = {
+              " overscroll-behavior-inline:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch;": " overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch;",
+              " overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;": " overflow-x:auto; -webkit-overflow-scrolling:touch;",
+              " scroll-snap-type:x proximity; scrollbar-width:thin; -webkit-overflow-scrolling:touch;": " scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch;",
+              "    column-gap:10px;": "    gap:0 10px;",
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count < 1:
+                  raise SystemExit(f"missing CSS warning pattern: {old!r}")
+              text = text.replace(old, new)
+          mobile.write_text(text)
+          PY
+
+          npm ci
+          npm run styles:build
+
+          ! grep -RInE 'scrollbar-width|column-gap|as string \\| undefined|mediaType: mediaType as MediaType|\\} as AnimeListSettings' src styles.mobile.css styles.css
+          git diff --check
+
+          TZ=UTC npm run check
+          TZ=Asia/Taipei npm test
+          npm run test:browser:date
+          npm run test:browser:mobile
+          npm run test:browser:tags
+          npm run test:browser:tag-manager
+          npm run release:check
+          ANIMELIST_TEST_VAULT_NO_OPEN=1 npm run test-vault
+
+          git add src/data/providers/anilist-client.ts src/search-enhancements.ts src/settings-model.ts styles.mobile.css styles.css
+          git commit -m "chore: resolve review compatibility warnings"
+          git push origin HEAD:"refs/heads/$TARGET"
