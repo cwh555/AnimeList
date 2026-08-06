@@ -111,6 +111,11 @@ describe("media classification collection fields", () => {
       season_year: 2024,
       studios: ["コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO"],
     }, "anime"), true);
+    assert.equal(storedMediaNeedsClassificationRefresh({
+      season: "winter",
+      season_year: 2026,
+      studios: ["コロリド・ツインエンジンパートナーズ (スタジオコロリド"],
+    }, "anime"), true);
   });
 
 

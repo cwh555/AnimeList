@@ -134,7 +134,7 @@ describe("metadata provider clients", () => {
     }
   });
 
-  it("uses Bangumi animation-production fields and never treats generic production credits as studios", async () => {
+  it("uses only explicit Bangumi animation-production roles for studios", async () => {
     setRequestUrlMock(() => ({
       json: {
         id: 355199,
@@ -147,6 +147,7 @@ describe("metadata provider clients", () => {
         tags: [],
         infobox: [
           { key: "动画制作", value: "スタジオディーン" },
+          { key: "製作会社", value: "コロリド・ツインエンジンパートナーズ（アニメーション制作：スタジオコロリド＝スタジオクロマト）" },
           { key: "监制", value: "ジェンコ" },
           { key: "制作", value: "制片：ジェンコ" },
         ],
@@ -156,6 +157,31 @@ describe("metadata provider clients", () => {
     try {
       const result = await new BangumiClient().fetchById("anime", "355199");
       assert.deepEqual(result?.people, ["スタジオディーン"]);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("does not promote a generic Bangumi production-company field to animation studio metadata", async () => {
+    setRequestUrlMock(() => ({
+      json: {
+        id: 999001,
+        name: "超かぐや姫！",
+        name_cn: "超時空輝夜姬！",
+        date: "2026-01-22",
+        platform: "WEB",
+        images: {},
+        rating: {},
+        tags: [],
+        infobox: [
+          { key: "製作会社", value: "コロリド・ツインエンジンパートナーズ（アニメーション制作：スタジオコロリド＝スタジオクロマト）" },
+        ],
+      },
+      text: "",
+    }));
+    try {
+      const result = await new BangumiClient().fetchById("anime", "999001");
+      assert.deepEqual(result?.people, []);
     } finally {
       setRequestUrlMock(null);
     }

@@ -15,11 +15,17 @@ describe("studio identity", () => {
     assert.equal(preferredStudioDisplayName("WHITEFOX", "WHITE FOX"), "WHITE FOX");
   });
 
-  it("rejects role-labelled and composite metadata blobs instead of treating them as one company", () => {
-    const composite = "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO";
+  it("rejects role-labelled and composite metadata blobs before list splitting", () => {
+    const composite = "コロリド・ツインエンジンパートナーズ (スタジオコロリド/スタジオクロマト)";
     assert.equal(isSingleStudioDisplayValue("制作:ジェンコ"), false);
     assert.equal(isSingleStudioDisplayValue(composite), false);
-    assert.deepEqual(normalizeStudioNames([composite]), []);
+    assert.equal(isSingleStudioDisplayValue("コロリド・ツインエンジンパートナーズ (スタジオコロリド"), false);
+    assert.equal(isSingleStudioDisplayValue("スタジオクロマト)"), false);
+    assert.deepEqual(normalizeStudioNames([composite], 3), []);
+    assert.deepEqual(normalizeStudioNames(["スタジオコロリド / スタジオクロマト"], 3), [
+      "スタジオコロリド",
+      "スタジオクロマト",
+    ]);
   });
 
   it("keeps ordinary provider names and deduplicates equivalent display variants", () => {

@@ -89,10 +89,10 @@ function mapFormat(value: unknown, mediaType: MediaType): string {
 const BANGUMI_ANIMATION_STUDIO_FIELDS = [
   "动画制作",
   "動畫製作",
-  "制作会社",
-  "製作会社",
-  "制作公司",
-  "製作公司",
+  "动画制作公司",
+  "動畫製作公司",
+  "アニメーション制作",
+  "アニメーション製作",
 ] as const;
 
 function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string[] {

@@ -2,7 +2,7 @@ import { asArray, stringValue } from "./value-normalization";
 
 const STUDIO_LIST_SEPARATOR_PATTERN = /[、,，;；\n/×]+/u;
 const LABELED_VALUE_PATTERN = /^.{1,24}[:：]\s*\S/u;
-const BRACKETED_NOTE_PATTERN = /[（(][^）)]*[）)]/u;
+const BRACKET_CHARACTERS = new Set("()[]{}（）［］【】〈〉《》");
 const MAX_STUDIO_NAME_LENGTH = 96;
 
 function studioText(value: unknown): string {
@@ -42,7 +42,7 @@ export function isSingleStudioDisplayValue(value: unknown): boolean {
   const normalized = normalizeStudioName(raw);
   if (!normalized || normalized.length > MAX_STUDIO_NAME_LENGTH) return false;
   if (LABELED_VALUE_PATTERN.test(normalized)) return false;
-  if (BRACKETED_NOTE_PATTERN.test(normalized)) return false;
+  if ([...normalized].some((character) => BRACKET_CHARACTERS.has(character))) return false;
   return true;
 }
 
