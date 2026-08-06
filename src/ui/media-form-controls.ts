@@ -9,7 +9,7 @@ import type { AnimeListUiHost } from "./plugin-host";
 import type { MediaFormContext, MediaFormDateControl, MediaFormFields } from "./media-form-contracts";
 import { markMediaFormField } from "./media-form-field";
 import { formValue, makeEl, numeric, todayString } from "./ui-helpers";
-import { createTagChipControl } from "./tag-chip-control";
+import { createTagChipField } from "./tag-chip-control";
 
 export function createLabeledField<T extends HTMLElement>(
   parent: HTMLElement,
@@ -369,19 +369,17 @@ export function createMediaEditorFields({
     uiText("add.unit"),
     createSelect(unitValues, unitSelection),
   );
-  const genres = createLabeledField(
+  const genres = createTagChipField(
     parent,
-    uiText("add.genres"),
-    createTagChipControl({
+    {
       values: normalizeUserTags([
         ...normalizeGenres(values.genres, 32),
         ...normalizeUserTags(values.userTags),
       ]),
       suggestions: normalizeUserTags(tagOptions),
-    }),
+    },
     uiText("add.genresHint"),
   );
-  genres.closest(".al-form-field")?.classList.add("al-form-field-tags");
 
   const template = templateOptions
     ? createLabeledField(

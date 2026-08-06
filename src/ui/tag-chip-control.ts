@@ -12,6 +12,23 @@ export interface CreateTagChipControlInput {
   suggestions?: readonly string[];
 }
 
+export function createTagChipField(
+  parent: HTMLElement,
+  input: CreateTagChipControlInput,
+  hintText = "",
+): TagChipControl {
+  const wrapper = createDiv();
+  wrapper.className = "al-form-field al-form-field-tags";
+  wrapper.append(
+    makeEl("span", "al-form-label", uiText("add.genres")),
+  );
+  const control = createTagChipControl(input);
+  wrapper.appendChild(control);
+  if (hintText) wrapper.appendChild(makeEl("small", "al-form-hint", hintText));
+  parent.appendChild(wrapper);
+  return control;
+}
+
 export function tagSuggestionValues(
   suggestions: readonly string[],
   selected: readonly string[],
