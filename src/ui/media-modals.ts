@@ -13,6 +13,7 @@ import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } fro
 
 function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
   return normalizeUserTags([
+    ...plugin.settings.tagCatalog,
     ...plugin.collectMediaItems().flatMap((item) => [
       ...item.genres,
       ...(item.userTags ?? []),

@@ -1470,6 +1470,55 @@
   }
 }
 
+.al-user-tag-setting .setting-item-control {
+  flex: 1 1 28rem;
+}
+
+.al-user-tag-manager {
+  display: grid;
+  width: min(100%, 42rem);
+  gap: 0.65rem;
+}
+
+.al-user-tag-add-row,
+.al-user-tag-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.al-user-tag-add-row input,
+.al-user-tag-editor input {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.al-user-tag-catalog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.al-user-tag-catalog-chip {
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+}
+
+.al-user-tag-catalog-chip.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.al-user-tag-editor {
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.al-user-tag-empty {
+  color: var(--text-muted);
+}
+
 /* Mobile-first interaction and layout overrides.
  * This file intentionally sits last in the generated bundle so phone layouts
  * can change hierarchy without duplicating desktop renderer logic.

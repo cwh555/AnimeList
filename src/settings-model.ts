@@ -10,6 +10,7 @@ import {
 } from "./timeline-scale";
 import type { AnimeListSettings } from "./domain/settings-types";
 import { normalizeLibraryFilters } from "./domain/library-filters";
+import { normalizeUserTagCatalog } from "./domain/user-tag-catalog";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     openlibrary: true,
   },
   searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
+  tagCatalog: [],
   specialLabelMode: "favorite",
   migrations: {
     mediaStatus: 0,
@@ -95,6 +97,7 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
         : DEFAULT_SETTINGS.providers.openlibrary,
     },
     searchLanguages: normalizeSearchLanguageSettings(loaded.searchLanguages),
+    tagCatalog: normalizeUserTagCatalog(loaded.tagCatalog),
     specialLabelMode: normalizeSpecialLabelMode(loaded.specialLabelMode),
     migrations: {
       ...migrations,

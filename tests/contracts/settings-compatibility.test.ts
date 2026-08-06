@@ -25,6 +25,7 @@ describe("settings compatibility", () => {
       templateFolder: "Templates",
       timelineMaxStackDepth: 5,
       googleBooksApiKey: "  secret  ",
+      tagCatalog: [" 重看 ", "收藏", "重看"],
       providers: { bangumi: false, anilist: true, openlibrary: false },
       migrations: { mediaStatus: 6 },
       uiState: {
@@ -41,6 +42,7 @@ describe("settings compatibility", () => {
     assert.equal(settings.flatMediaFolder, "Media");
     assert.deepEqual(settings.additionalScanFolders, ["Archive", "Other"]);
     assert.equal(settings.googleBooksApiKey, "secret");
+    assert.deepEqual(settings.tagCatalog, ["重看", "收藏"]);
     assert.deepEqual(settings.providers, { bangumi: false, anilist: true, openlibrary: false });
     assert.equal(settings.migrations.mediaStatus, 6);
     assert.deepEqual(settings.uiState, {
@@ -64,6 +66,7 @@ describe("settings compatibility", () => {
 
     assert.equal(settings.storageMode, DEFAULT_SETTINGS.storageMode);
     assert.deepEqual(settings.additionalScanFolders, []);
+    assert.deepEqual(settings.tagCatalog, []);
     assert.deepEqual(settings.providers, DEFAULT_SETTINGS.providers);
     assert.equal(settings.migrations.mediaStatus, 0);
     assert.deepEqual(settings.uiState, DEFAULT_SETTINGS.uiState);

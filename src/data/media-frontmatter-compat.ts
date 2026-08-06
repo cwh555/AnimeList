@@ -90,6 +90,18 @@ export function compatibleGenres(frontmatter: Record<string, unknown>): string[]
   ], 32);
 }
 
+export function writeCompatibleGenres(
+  frontmatter: Record<string, unknown>,
+  values: unknown,
+): string[] {
+  const genres = normalizeGenres(values, 32);
+  if (genres.length) frontmatter.genres = genres;
+  else delete frontmatter.genres;
+  delete frontmatter.user_tags;
+  for (const key of LEGACY_SELECTED_TAG_KEYS) delete frontmatter[key];
+  return genres;
+}
+
 function seasonFromValue(value: unknown): MediaSeason | null {
   const normalized = stringValue(value).normalize("NFKC").trim().toLocaleLowerCase();
   if (!normalized) return null;

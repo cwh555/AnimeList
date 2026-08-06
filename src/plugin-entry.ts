@@ -10,6 +10,7 @@ import { searchEnhancementsFeature } from "./search-enhancements";
 import { searchPaginationFeature } from "./search-pagination";
 import { serialEntryCoversFeature } from "./serial-cover-feature";
 import { serialCoverSettingsFeature } from "./serial-cover-settings";
+import { userTagSettingsFeature } from "./user-tag-settings";
 
 const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   progressUiFeature,
@@ -20,6 +21,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   serialEntryCoversFeature,
   serialCoverSettingsFeature,
   legacyMetadataSettingsFeature,
+  userTagSettingsFeature,
   masterpieceFeature,
   scoreDashboardFeature,
 ];

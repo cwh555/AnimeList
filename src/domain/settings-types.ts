@@ -44,6 +44,7 @@ export interface AnimeListSettings {
   providers: ProviderSettings;
   googleBooksApiKey: string;
   searchLanguages: SearchLanguageSettings;
+  tagCatalog: string[];
   specialLabelMode: SpecialLabelMode;
   migrations: MigrationSettings;
   uiState: LibraryUiState;

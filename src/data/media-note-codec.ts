@@ -1,4 +1,5 @@
 import { persistedMediaTags } from "../domain/media-classification";
+import { writeCompatibleGenres } from "./media-frontmatter-compat";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeGenres } from "../domain/media-metadata";
 import type {
@@ -175,8 +176,7 @@ export function applyEditableMediaForm(
   frontmatter.progress = progress;
   frontmatter.progress_unit = unit;
   frontmatter.favorite = form.favorite === true;
-  frontmatter.genres = normalizeGenres([...(form.genres ?? []), ...(form.userTags ?? [])], 32);
-  delete frontmatter.user_tags;
+  writeCompatibleGenres(frontmatter, [...(form.genres ?? []), ...(form.userTags ?? [])]);
   if (validated.score != null) frontmatter.score = validated.score;
   else delete frontmatter.score;
   if (form.startedAt) frontmatter.started_at = form.startedAt;

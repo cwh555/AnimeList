@@ -193,6 +193,7 @@ describe("media update service", () => {
       media_type: "anime",
       title: "Example",
       user_tags: ["old-personal-tag"],
+      classification_genres: ["legacy-selected-tag"],
       media_tags: ["School"],
       tags: ["obsidian-tag"],
     };
@@ -207,6 +208,7 @@ describe("media update service", () => {
     await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
 
     assert.equal("user_tags" in frontmatter, false);
+    assert.equal("classification_genres" in frontmatter, false);
     assert.deepEqual(frontmatter.genres, ["old-personal-tag"]);
     assert.deepEqual(frontmatter.media_tags, ["School"]);
     assert.deepEqual(frontmatter.tags, ["obsidian-tag"]);
