@@ -1,0 +1,57 @@
+name: Studio fix materializer
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.head_ref == 'agent/studio-fix-materializer-20260806'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Build and validate clean fix commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=7a51df4e5bb90f1e067a0a874311e38ac674aa14
+          TARGET=fix/studio-metadata-reliability
+          cp .agent/studio-fix-1.patch /tmp/studio-fix-1.patch
+          cp .agent/studio-fix-2.patch /tmp/studio-fix-2.patch
+
+          git fetch origin preview "$TARGET"
+          test "$(git rev-parse origin/preview)" = "$BASE"
+          test "$(git rev-parse "origin/$TARGET")" = "$BASE"
+          git checkout --detach "$BASE"
+          git config user.name "AnimeList GitHub Agent"
+          git config user.email "actions@users.noreply.github.com"
+
+          git apply --check /tmp/studio-fix-1.patch
+          git apply /tmp/studio-fix-1.patch
+          git add src/data/provider-normalizers.ts src/data/providers/bangumi-client.ts tests/contracts/metadata-provider-clients.test.ts
+          git commit -m "fix: recover Bangumi studios from structured relations"
+
+          git apply --check /tmp/studio-fix-2.patch
+          git apply /tmp/studio-fix-2.patch
+          git add src/data/legacy-metadata-cleanup.ts src/ui/media-modals.ts tests/contracts/legacy-metadata-cleanup.test.ts tests/contracts/media-classification-fields.test.ts
+          git commit -m "fix: backfill recovered studio metadata"
+
+          npm ci
+          TZ=UTC npm run check
+          TZ=Asia/Taipei npm test
+          npm run test:browser:date
+          npm run test:browser:mobile
+          npm run test:browser:tags
+          npm run test:browser:tag-manager
+          npm run release:check
+          ANIMELIST_TEST_VAULT_NO_OPEN=1 npm run test-vault
+
+          git push origin HEAD:"refs/heads/$TARGET"
