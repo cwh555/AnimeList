@@ -79,6 +79,9 @@ describe("media classification collection fields", () => {
 
   it("keeps one canonical primary studio and ignores partnership organizations", () => {
     assert.deepEqual(normalizeAnimeStudios([
+      "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO",
+    ]), ["Studio Colorido"]);
+    assert.deepEqual(normalizeAnimeStudios([
       "コロリド・ツインエンジンパートナーズ (スタジオコロリド、ツインエンジン)",
       "スタジオコロリド",
       "STUDIO CHROMATO",

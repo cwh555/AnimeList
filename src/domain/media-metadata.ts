@@ -97,8 +97,22 @@ const STUDIO_NAME_ALIASES = new Map<string, string>([
   ["スタジオコロリド", "Studio Colorido"],
   ["studio colorido", "Studio Colorido"],
   ["studio colorido co ltd", "Studio Colorido"],
+  ["スタジオクロマト", "Studio Chromato"],
   ["studio chromato", "Studio Chromato"],
 ]);
+
+const EMBEDDED_STUDIO_ALIASES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/(?:スタジオ\s*コロリド|studio\s+colorido)/i, "Studio Colorido"],
+  [/(?:スタジオ\s*クロマト|studio\s+chromato)/i, "Studio Chromato"],
+];
+
+function embeddedStudioNames(value: string): string[] {
+  return EMBEDDED_STUDIO_ALIASES
+    .map(([pattern, studio]) => ({ index: value.search(pattern), studio }))
+    .filter((match) => match.index >= 0)
+    .sort((left, right) => left.index - right.index)
+    .map((match) => match.studio);
+}
 
 function studioText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -151,7 +165,20 @@ export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
 
   for (const raw of asArray(values)) {
     let value = studioText(raw).normalize("NFKC").trim();
-    if (!value || STUDIO_PARTNERSHIP_PATTERN.test(value)) continue;
+    if (!value) continue;
+
+    // Some provider values collapse a financing partnership, parenthesized
+    // aliases, and multiple animation studios into one string. Recover known
+    // studio names before discarding the non-studio partnership wrapper.
+    for (const studio of embeddedStudioNames(value)) {
+      const key = studio.toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      output.push(studio);
+      if (output.length >= limit) return output;
+    }
+
+    if (STUDIO_PARTNERSHIP_PATTERN.test(value)) continue;
 
     const committeeIndex = value.search(PRODUCTION_COMMITTEE_PATTERN);
     if (committeeIndex >= 0) {
