@@ -24,18 +24,27 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new in 1.2.1**
+> **What's new in 1.3.0**
 >
-> - Fixed manga and novel serial-entry date layout and standardized date input behavior.
-> - Prevented newly added chapter, season, or volume rows from causing scroll jumps.
-> - Fixed the serial-cover modal method binding warning without changing modal behavior.
-> - Corrected list-mode cover sizing and kept cover status text on one line.
+> - Added richer media metadata for format, animation studio or author, anime quarter, AniList classification tags, and source material while keeping Markdown as the source of truth.
+> - Added a Library filter dialog for animation company, quarter, and reusable work tags. Company and tag selections can be combined; all filter groups apply together.
+> - Added an English **Tag manager** in Settings with search, add, rename, global delete, usage counts, and per-work removal without deleting the reusable tag itself.
+> - Improved animation-studio reliability with structured AniList data and Bangumi animation-production relations, including canonical company identity so formatting variants do not create duplicate filters.
+> - Made large libraries faster with a cached media index, scoped refreshes, progressive card rendering, demand-loaded thumbnails, and lazy Score Dashboard cover work.
+> - Added a mobile-first phone layout for the Library, Score Dashboard, media editors, serial entries, and Timeline while preserving tablet and desktop layouts.
+> - Added consistent keyboard navigation across manga and novel serial-entry rows, including Enter/Tab progression and previous-field Backspace navigation.
+> - Reorganized external metadata providers behind typed clients so search and Load More share the same Bangumi, AniList, and Open Library behavior.
+
+> [!DANGER]
+> **Existing libraries and legacy metadata**
+>
+> Stable 1.2.1 notes remain readable and AnimeList does not automatically rewrite the library on startup. To backfill the new company/quarter metadata for existing notes, or if the vault has ever used preview/development builds that wrote `user_tags`, `classification_*`, mixed tag/studio values, or malformed company data, make sure the vault is backed up or synced and run **Settings → Legacy metadata cleanup → Scan and upgrade** once. The cleanup rewrites only recognized AnimeList metadata fields into the current schema and preserves unrelated frontmatter and Markdown body content.
 
 ## Features
 
 - One Markdown-based library for anime, manga, and novels.
-- Metadata search through Bangumi, AniList, and Open Library.
-- Card, list, and poster views with search, filters, and sorting.
+- Metadata search through Bangumi, AniList, and Open Library, with structured classification metadata for supported works.
+- Card, list, and poster views with search, sorting, and combined company, quarter, and tag filters.
 - Media-specific progress tracking and dated serial entries with optional per-entry covers.
 - A Score Dashboard for direct and batch rating changes.
 - Favorite mode or reusable Masterpiece categories.
@@ -64,11 +73,11 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 3. Review the imported metadata and save the note.
 4. Update its status, progress, dates, rating, or special label from the library.
 
-The interface uses Traditional Chinese. Provider metadata may remain in its original language.
+The main Library and media workflow uses Traditional Chinese. The 1.3 Tag manager and legacy-cleanup Settings tools use English. Provider metadata may remain in its original language.
 
 ## Documentation
 
-See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, search, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
+See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, metadata and filters, reusable tags, legacy cleanup, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
 
 ## Metadata and privacy
 
