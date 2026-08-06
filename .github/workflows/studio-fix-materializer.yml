@@ -26,6 +26,8 @@ jobs:
           TARGET=fix/studio-metadata-reliability
           cp .agent/studio-fix-1.patch /tmp/studio-fix-1.patch
           cp .agent/studio-fix-2.patch /tmp/studio-fix-2.patch
+          printf '\n' >> /tmp/studio-fix-1.patch
+          printf '\n' >> /tmp/studio-fix-2.patch
 
           git fetch origin preview "$TARGET"
           test "$(git rev-parse origin/preview)" = "$BASE"
