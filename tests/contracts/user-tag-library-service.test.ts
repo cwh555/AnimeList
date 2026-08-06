@@ -60,14 +60,25 @@ describe("user tag library service", () => {
 
     const service = new UserTagLibraryService(app, () => ["AnimeList"]);
     assert.deepEqual(service.collect(), ["戀愛", "重看", "校園", "重看", "收藏"]);
+    assert.deepEqual(service.usages("重看").map((usage) => usage.filePath), [
+      "AnimeList/Anime/first.md",
+      "AnimeList/Anime/second.md",
+    ]);
+    assert.equal(service.usageCounts().get("重看"), 2);
     assert.equal(processCalls, 0);
     assert.equal(markdownWrites, 0);
 
+    const removedFromOne = await service.removeFromWork("重看", "AnimeList/Anime/first.md");
+    assert.equal(removedFromOne.changedNotes, 1);
+    assert.deepEqual(frontmatters.get(first)?.genres, ["戀愛", "校園"]);
+    assert.deepEqual(service.usages("重看").map((usage) => usage.filePath), ["AnimeList/Anime/second.md"]);
+    assert.equal(markdownWrites, 0);
+
     const renamed = await service.rename("重看", "稍後重看");
-    assert.equal(renamed.changedNotes, 2);
+    assert.equal(renamed.changedNotes, 1);
     assert.equal(processCalls, 2);
     assert.equal(markdownWrites, 0);
-    assert.deepEqual(frontmatters.get(first)?.genres, ["戀愛", "稍後重看", "校園"]);
+    assert.deepEqual(frontmatters.get(first)?.genres, ["戀愛", "校園"]);
     assert.equal("user_tags" in (frontmatters.get(first) ?? {}), false);
     assert.equal("classification_genres" in (frontmatters.get(first) ?? {}), false);
     assert.deepEqual(frontmatters.get(first)?.source_genres, ["2024年4月"]);
@@ -79,7 +90,7 @@ describe("user tag library service", () => {
     const removed = await service.remove("校園");
     assert.equal(removed.changedNotes, 1);
     assert.equal(processCalls, 3);
-    assert.deepEqual(frontmatters.get(first)?.genres, ["戀愛", "稍後重看"]);
+    assert.deepEqual(frontmatters.get(first)?.genres, ["戀愛"]);
     assert.deepEqual(frontmatters.get(first)?.source_genres, ["2024年4月"]);
     assert.deepEqual(frontmatters.get(first)?.tags, ["obsidian-tag"]);
   });

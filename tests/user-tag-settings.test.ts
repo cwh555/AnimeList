@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import { AnimeListFeatureRegistry } from "../src/app/feature-registry";
 import { userTagSettingsFeature } from "../src/user-tag-settings";
 import { createDefaultSettings } from "../src/settings-model";
+import { createUserTagSettingsSection } from "../src/user-tag-settings";
+import { userTagText } from "../src/user-tag-text";
 
 describe("user tag settings feature", () => {
   it("does not scan the Library during plugin activation", async () => {
@@ -47,5 +49,26 @@ describe("user tag settings feature", () => {
     } as any);
     assert.deepEqual(settings.tagCatalog, ["收藏", "戀愛", "重看"]);
     assert.equal(saves, 1);
+  });
+
+  it("keeps the settings surface and tag manager copy in English", () => {
+    const section = createUserTagSettingsSection({} as any);
+    assert.equal(section.heading, "Tags");
+    assert.equal(section.description, "Manage reusable work tags without crowding the settings page.");
+    assert.equal(section.definitions[0].name, "Tag manager");
+    assert.equal(userTagText("settings.manage"), "Manage tags…");
+    assert.equal(userTagText("manager.usedBy", { count: 3 }), "Used by 3 works");
+    assert.doesNotMatch([
+      userTagText("settings.heading"),
+      userTagText("settings.description"),
+      userTagText("settings.name"),
+      userTagText("settings.desc"),
+      userTagText("settings.manage"),
+      userTagText("manager.title"),
+      userTagText("manager.description"),
+      userTagText("manager.rename"),
+      userTagText("manager.delete"),
+      userTagText("manager.cancel"),
+    ].join(" "), /[^\x00-\x7F…←×]/);
   });
 });

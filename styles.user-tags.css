@@ -1,48 +1,191 @@
+/* Settings launcher and scalable tag-management modal. */
 .al-user-tag-setting .setting-item-control {
-  flex: 1 1 28rem;
+  flex: 0 0 auto;
 }
 
-.al-user-tag-manager {
+.modal.animelist-user-tag-modal {
+  width: min(720px, calc(100vw - 28px));
+  max-width: 720px;
+}
+
+.animelist-user-tag-modal .modal-content {
+  display: flex;
+  max-height: min(80vh, 780px);
+  flex-direction: column;
+}
+
+.al-user-tag-search {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-modifier-form-field, var(--background-secondary));
+}
+
+.al-user-tag-search .al-icon {
   display: grid;
-  width: min(100%, 42rem);
-  gap: 0.65rem;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.al-user-tag-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .al-user-tag-add-row,
-.al-user-tag-editor {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  align-items: center;
+.al-user-tag-rename-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.al-user-tag-rename-row {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
 }
 
 .al-user-tag-add-row input,
-.al-user-tag-editor input {
-  flex: 1 1 12rem;
-  min-width: 10rem;
+.al-user-tag-rename-row input {
+  min-width: 0;
 }
 
-.al-user-tag-catalog {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.al-user-tag-catalog-chip {
-  border-radius: 999px;
-  padding: 0.25rem 0.65rem;
-}
-
-.al-user-tag-catalog-chip.is-active {
-  color: var(--text-on-accent);
-  background: var(--interactive-accent);
-}
-
-.al-user-tag-editor {
-  padding-top: 0.65rem;
+.al-user-tag-list,
+.al-user-tag-usage-list {
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 12px;
   border-top: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.al-user-tag-list {
+  flex: 1 1 auto;
+}
+
+.al-user-tag-row {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  color: var(--text-normal);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.al-user-tag-row:last-child {
+  border-bottom: 0;
+}
+
+.al-user-tag-row:hover,
+.al-user-tag-row:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+.al-user-tag-row-name {
+  overflow: hidden;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-user-tag-row-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+.al-user-tag-back {
+  align-self: flex-start;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+}
+
+.al-user-tag-usage-section {
+  min-height: 0;
+  margin-top: 18px;
+}
+
+.al-user-tag-usage-section h3 {
+  margin: 0;
+  font-size: var(--font-ui-small);
+}
+
+.al-user-tag-usage-list {
+  max-height: min(42vh, 420px);
+}
+
+.al-user-tag-usage-row {
+  display: grid;
+  min-height: 42px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.al-user-tag-usage-row:last-child {
+  border-bottom: 0;
+}
+
+.al-user-tag-usage-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-user-tag-usage-remove {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.al-user-tag-usage-remove:hover,
+.al-user-tag-usage-remove:focus-visible {
+  color: var(--text-error, var(--text-normal));
+  background: var(--background-modifier-hover);
 }
 
 .al-user-tag-empty {
+  padding: 14px 10px;
   color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 780px) {
+  .modal.animelist-user-tag-modal {
+    width: calc(100vw - 18px);
+  }
+
+  .animelist-user-tag-modal .modal-content {
+    max-height: 84vh;
+  }
+
+  .al-user-tag-add-row,
+  .al-user-tag-rename-row {
+    grid-template-columns: 1fr;
+  }
+
+  .al-user-tag-add-row button,
+  .al-user-tag-rename-row button {
+    min-height: 42px;
+  }
 }
