@@ -1,6 +1,6 @@
 import type { MediaItem } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
-import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, type LibraryFilters } from "../domain/library-filters";
+import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
 import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../media-status";
 import { normalizeProgressValue, normalizeReleaseStatus, normalizeVolumeLog, progressDisplayValue, progressRatio } from "../novel-progress";
 import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
@@ -104,7 +104,10 @@ export const AnimeListUI: LibraryRenderer = (() => {
     } = {
       type: initialType,
       status: initialStatusKeys.has(initialStatus) ? initialStatus : normalizeStatusFilter(initialStatus),
-      filters: normalizeLibraryFilters(initialState.filters, initialState.genre),
+      filters: reconcileLibraryFilters(
+        normalizeLibraryFilters(initialState.filters, initialState.genre),
+        filterOptions,
+      ),
       query: initialState.query ?? "",
       sort: initialState.sort ?? "completed-desc",
       view: initialView,

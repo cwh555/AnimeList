@@ -18,6 +18,16 @@ export class UserTagLibraryService {
     private readonly roots: () => string[],
   ) {}
 
+  collect(): string[] {
+    const tags: string[] = [];
+    for (const file of this.mediaFiles()) {
+      const frontmatter = this.frontmatter(file);
+      if (!frontmatter) continue;
+      tags.push(...compatibleGenres(frontmatter));
+    }
+    return tags;
+  }
+
   async rename(current: unknown, next: unknown): Promise<UserTagMutationResult> {
     const source = normalizeUserTag(current);
     const replacement = normalizeUserTag(next);

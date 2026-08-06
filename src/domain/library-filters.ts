@@ -88,6 +88,21 @@ export function libraryFilterCount(filters: LibraryFilters): number {
   return filters.companies.length + filters.tags.length + (filters.quarter ? 1 : 0);
 }
 
+export function reconcileLibraryFilters(
+  filters: LibraryFilters,
+  options: LibraryFilterOptions,
+): LibraryFilters {
+  const companies = new Set(options.companies);
+  const tags = new Set(options.tags);
+  const quarters = new Set(options.quarters.map((option) => option.key));
+  return {
+    companies: filters.companies.filter((company) => companies.has(company)),
+    quarter: quarters.has(filters.quarter) ? filters.quarter : "",
+    tags: filters.tags.filter((tag) => tags.has(tag)),
+  };
+}
+
+
 export function toggleLibraryFilterValue(values: readonly string[], value: string): string[] {
   return values.includes(value)
     ? values.filter((entry) => entry !== value)

@@ -7,6 +7,7 @@ import {
   libraryItemMatchesFilters,
   libraryQuarterKey,
   normalizeLibraryFilters,
+  reconcileLibraryFilters,
   toggleLibraryFilterValue,
   toggleLibraryQuarter,
 } from "../src/domain/library-filters";
@@ -100,4 +101,22 @@ describe("library filters", () => {
     assert.equal(libraryItemMatchesFilters(manga, { companies: ["CloverWorks"], quarter: "", tags: [] }), false);
     assert.equal(libraryItemMatchesFilters(manga, { companies: [], quarter: "2021:winter", tags: [] }), false);
   });
+
+  it("drops persisted filters that no longer exist after metadata normalization", () => {
+    const filters = normalizeLibraryFilters({
+      companies: ["制作:ジェンコ", "Studio DEEN"],
+      quarter: "2024:spring",
+      tags: ["舊標籤", "戀愛"],
+    });
+    assert.deepEqual(reconcileLibraryFilters(filters, {
+      companies: ["Studio DEEN"],
+      quarters: [{ key: "2025:winter", season: "winter", year: 2025 }],
+      tags: ["戀愛"],
+    }), {
+      companies: ["Studio DEEN"],
+      quarter: "",
+      tags: ["戀愛"],
+    });
+  });
+
 });

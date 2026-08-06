@@ -59,6 +59,10 @@ describe("user tag library service", () => {
     } as unknown as App;
 
     const service = new UserTagLibraryService(app, () => ["AnimeList"]);
+    assert.deepEqual(service.collect(), ["戀愛", "重看", "校園", "重看", "收藏"]);
+    assert.equal(processCalls, 0);
+    assert.equal(markdownWrites, 0);
+
     const renamed = await service.rename("重看", "稍後重看");
     assert.equal(renamed.changedNotes, 2);
     assert.equal(processCalls, 2);

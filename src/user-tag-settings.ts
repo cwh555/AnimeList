@@ -8,6 +8,7 @@ import {
   renameUserTagInCatalog,
 } from "./domain/user-tag-catalog";
 import { normalizeUserTag } from "./domain/user-tags";
+import { compatibleGenres } from "./data/media-frontmatter-compat";
 import { userTagText } from "./user-tag-text";
 
 function sameTags(left: readonly string[], right: readonly string[]): boolean {
@@ -38,6 +39,12 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
 
   let activeTag = "";
   const service = new UserTagLibraryService(host.app, () => host.getScanFolders());
+  let catalog = mergeUserTagCatalog(host.settings.tagCatalog, service.collect());
+
+  const persistCatalog = async (next: string[]): Promise<void> => {
+    catalog = next;
+    await saveCatalog(host, next);
+  };
 
   const render = (): void => {
     root.replaceChildren();
@@ -52,7 +59,7 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
     const addTag = async (): Promise<void> => {
       const tag = normalizeUserTag(addInput.value);
       if (!tag) return;
-      await saveCatalog(host, addUserTagToCatalog(host.settings.tagCatalog, tag));
+      await persistCatalog(addUserTagToCatalog(catalog, tag));
       addInput.value = "";
       activeTag = "";
       render();
@@ -69,7 +76,7 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
 
     const chips = createDiv();
     chips.className = "al-user-tag-catalog";
-    for (const tag of host.settings.tagCatalog) {
+    for (const tag of catalog) {
       const chip = button(tag, `al-user-tag-catalog-chip${activeTag === tag ? " is-active" : ""}`);
       chip.setAttribute("aria-pressed", activeTag === tag ? "true" : "false");
       chip.addEventListener("click", () => {
@@ -78,7 +85,7 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
       });
       chips.appendChild(chip);
     }
-    if (!host.settings.tagCatalog.length) {
+    if (!catalog.length) {
       const empty = createEl("small");
       empty.className = "al-user-tag-empty";
       empty.textContent = userTagText("settings.empty");
@@ -104,8 +111,8 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
       remove.disabled = true;
       try {
         const result = await service.rename(activeTag, next);
-        const catalog = renameUserTagInCatalog(host.settings.tagCatalog, activeTag, next);
-        await saveCatalog(host, catalog);
+        const nextCatalog = renameUserTagInCatalog(catalog, activeTag, next);
+        await persistCatalog(nextCatalog);
         activeTag = "";
         host.refreshViews();
         new Notice(userTagText("notice.renamed", { count: result.changedNotes }));
@@ -129,7 +136,7 @@ function renderTagManager(setting: Setting, host: AnimeListFeatureHost): void {
         remove.disabled = true;
         try {
           const result = await service.remove(activeTag);
-          await saveCatalog(host, removeUserTagFromCatalog(host.settings.tagCatalog, activeTag));
+          await persistCatalog(removeUserTagFromCatalog(catalog, activeTag));
           activeTag = "";
           host.refreshViews();
           new Notice(userTagText("notice.deleted", { count: result.changedNotes }));
@@ -172,21 +179,17 @@ export const userTagSettingsFeature = defineFeature<AnimeListFeatureHost>({
   id: "user-tag-catalog",
   contributions: [
     {
-      kind: "lifecycle",
-      async activate(host) {
-        const libraryTags = host.collectMediaItems().flatMap((item) => [
-          ...item.genres,
-          ...(item.userTags ?? []),
-        ]);
-        await saveCatalog(host, mergeUserTagCatalog(host.settings.tagCatalog, libraryTags));
-      },
-    },
-    {
       kind: "media-form",
       async prepareSubmit(context) {
+        const previousTags = context.mode === "edit"
+          ? compatibleGenres(context.frontmatter)
+          : [];
         await saveCatalog(
           context.host,
-          mergeUserTagCatalog(context.host.settings.tagCatalog, context.form.genres),
+          mergeUserTagCatalog(context.host.settings.tagCatalog, [
+            ...previousTags,
+            ...(context.form.genres ?? []),
+          ]),
         );
       },
     },
