@@ -3,10 +3,11 @@ import { USER_AGENT } from "../../app-metadata";
 import type { MediaType } from "../../domain/media-types";
 import { asArray } from "../../domain/value-normalization";
 import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
-import { normalizeBangumiSubject } from "../provider-normalizers";
+import { normalizeBangumiAnimationStudiosFromPersons, normalizeBangumiSubject } from "../provider-normalizers";
 
 const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
 const BANGUMI_SUBJECT_ENDPOINT = "https://api.bgm.tv/v0/subjects";
+const BANGUMI_SUBJECT_PERSONS_SUFFIX = "/persons";
 const BANGUMI_PAGE_SIZE = 20;
 
 function record(value: unknown): Record<string, unknown> {
@@ -40,7 +41,26 @@ export class BangumiClient implements MetadataProviderClient {
     });
     const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
     const subject = record(parsed);
-    return Object.keys(subject).length ? normalizeBangumiSubject(subject, mediaType) : null;
+    if (!Object.keys(subject).length) return null;
+
+    const normalized = normalizeBangumiSubject(subject, mediaType);
+    if (mediaType !== "anime" || normalized.people.length) return normalized;
+
+    try {
+      const personsResponse = await requestUrl({
+        url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(id)}${BANGUMI_SUBJECT_PERSONS_SUFFIX}`,
+        method: "GET",
+        headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+      });
+      const persons: unknown = personsResponse.json ?? JSON.parse(personsResponse.text || "[]");
+      const studios = normalizeBangumiAnimationStudiosFromPersons(persons);
+      return studios.length ? { ...normalized, people: studios } : normalized;
+    } catch {
+      // The relation endpoint is a reliability fallback. Preserve the exact
+      // subject result if it is temporarily unavailable; AniList enrichment
+      // remains an independent secondary source.
+      return normalized;
+    }
   }
 
   async searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
