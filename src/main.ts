@@ -12,6 +12,7 @@ import { MEDIA_STATUS_MIGRATION_VERSION, migrateMediaStatusNotes } from "./schem
 import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "./types";
 import { uiText } from "./ui-text";
 import { AnimeListUI } from "./ui/library-renderer";
+import { LibraryFilterModal } from "./ui/library-filter-modal";
 import type { LibraryRenderAdapters, LibraryViewMode } from "./ui/library-contracts";
 import { AnimeListView, ANIMELIST_VIEW_TYPE } from "./ui/library-view";
 import { parseAnimeListBlockConfig } from "./ui/markdown-config";
@@ -120,7 +121,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
       ...this.settings.uiState,
       type: state.type,
       status: state.status,
-      genre: state.genre,
+      filters: state.filters,
       sort: state.sort,
       view: state.view,
     };
@@ -142,6 +143,9 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     const upstreamAfterRender = prepared.afterRender;
     prepared = {
       ...prepared,
+      openFilterModal: prepared.openFilterModal ?? ((filters, options, onApply) => {
+        new LibraryFilterModal(this.app, filters, options, onApply).open();
+      }),
       afterRender: (state) => {
         upstreamAfterRender?.(state);
         this.features.afterLibraryRender({ host: this, container, items, adapters: prepared, state });
@@ -243,6 +247,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchBangumi(mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchAniList(mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.services().searchOpenLibrary(query); }
+  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> { return this.services().enrichExternalMedia(result); }
+  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> { return this.services().enrichStoredMedia(frontmatter, mediaType); }
   async ensureFolder(path: string): Promise<void> { await this.services().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.services().findExistingBySource(provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }

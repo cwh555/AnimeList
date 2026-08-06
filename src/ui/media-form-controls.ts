@@ -1,6 +1,7 @@
 import type { TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
+import { normalizeUserTags } from "../domain/user-tags";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeReleaseStatus, progressDisplayValue } from "../novel-progress";
 import { completedStatusLabel, mediaStatusOptions, uiText } from "../ui-text";
@@ -8,6 +9,7 @@ import type { AnimeListUiHost } from "./plugin-host";
 import type { MediaFormContext, MediaFormDateControl, MediaFormFields } from "./media-form-contracts";
 import { markMediaFormField } from "./media-form-field";
 import { formValue, makeEl, numeric, todayString } from "./ui-helpers";
+import { createTagChipControl } from "./tag-chip-control";
 
 export function createLabeledField<T extends HTMLElement>(
   parent: HTMLElement,
@@ -209,10 +211,6 @@ export function bindScoreRequirement(
   sync();
 }
 
-function genreInputValues(input: HTMLInputElement): string[] {
-  return normalizeGenres(String(input?.value || "").split(/[、,，;；\n]+/));
-}
-
 export function releaseStatusOptions(selected: unknown = "unknown"): HTMLSelectElement {
   return createSelect([
     ["releasing", uiText("media.release.releasing")],
@@ -236,7 +234,7 @@ export function mediaFormValues(context: MediaFormContext<AnimeListUiHost>): Med
     favorite: fields.favorite.checked,
     startedAt: fields.startedAt.value,
     completedAt: fields.completedAt.value,
-    genres: genreInputValues(fields.genres),
+    genres: normalizeGenres(fields.genres.values(), 32),
     templatePath: fields.template?.value || "",
     volumeLog: [],
   };
@@ -264,6 +262,7 @@ export interface MediaEditorInitialValues {
   total: unknown;
   unit: unknown;
   genres: unknown;
+  userTags?: unknown;
   favorite: boolean;
 }
 
@@ -274,6 +273,7 @@ export interface CreateMediaEditorFieldsInput {
   templateOptions?: Array<[string, string]>;
   selectedTemplate?: string;
   selectedUnit?: string;
+  tagOptions?: readonly string[];
 }
 
 function progressFieldLabel(mediaType: MediaType): string {
@@ -289,6 +289,7 @@ export function createMediaEditorFields({
   templateOptions,
   selectedTemplate,
   selectedUnit,
+  tagOptions = [],
 }: CreateMediaEditorFieldsInput): MediaFormFields {
   const title = createLabeledField(
     parent,
@@ -371,9 +372,16 @@ export function createMediaEditorFields({
   const genres = createLabeledField(
     parent,
     uiText("add.genres"),
-    createTextInput("text", normalizeGenres(values.genres).join("、")),
+    createTagChipControl({
+      values: normalizeUserTags([
+        ...normalizeGenres(values.genres, 32),
+        ...normalizeUserTags(values.userTags),
+      ]),
+      suggestions: normalizeUserTags(tagOptions),
+    }),
     uiText("add.genresHint"),
   );
+  genres.closest(".al-form-field")?.classList.add("al-form-field-tags");
 
   const template = templateOptions
     ? createLabeledField(

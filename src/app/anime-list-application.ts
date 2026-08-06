@@ -4,11 +4,13 @@ import { ExternalMediaSearchService } from "../data/external-media-service";
 import { createMetadataProviderClients, type HttpMetadataProviderClients } from "../data/metadata-provider-clients";
 import { isLibraryRelevantPath, pathBelongsToLibraryRoot } from "../data/library-change-scope";
 import { LibraryStorage } from "../data/library-storage";
+import { MediaClassificationService } from "../data/media-classification-service";
 import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
+import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -21,6 +23,7 @@ export class AnimeListApplicationServices {
   private coverCache?: CoverThumbnailCache;
   private mediaRepository?: MediaRepository;
   private mediaIndex?: MediaLibraryIndex;
+  private classificationService?: MediaClassificationService;
   private storage?: LibraryStorage;
   private providerClients?: HttpMetadataProviderClients;
   private searchService?: ExternalMediaSearchService;
@@ -71,6 +74,11 @@ export class AnimeListApplicationServices {
       () => this.settings().searchLanguages,
     );
     return this.searchService;
+  }
+
+  private mediaClassification(): MediaClassificationService {
+    this.classificationService ??= new MediaClassificationService(this.metadataProviders().anilist);
+    return this.classificationService;
   }
 
   private mediaNotes(): MediaNoteService {
@@ -185,10 +193,39 @@ export class AnimeListApplicationServices {
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }
+  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
+    let base = result;
+    if (result.provider === "bangumi" && result.sourceId && (!result.people.length || !result.rawGenres.length)) {
+      try {
+        base = await this.metadataProviders().bangumi.fetchById(result.mediaType, result.sourceId) ?? result;
+      } catch (error) {
+        console.warn("AnimeList Bangumi metadata refresh failed; continuing with stored metadata", error);
+      }
+    }
+    return this.mediaClassification().enrichOrOriginal(base, (error) => {
+      console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
+    });
+  }
+  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
+    return this.enrichExternalMedia(storedMediaExternalResult(frontmatter, mediaType));
+  }
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.mediaNotes().downloadCover(result); }
-  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> { return this.mediaNotes().create(result, form); }
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
+    if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
+      return this.mediaNotes().create(result, form);
+    }
+    const enriched = await this.enrichExternalMedia(result);
+    const originalGenres = result.genres ?? [];
+    const formGenres = form.genres ?? [];
+    const genresWereUnchanged = formGenres.length === originalGenres.length
+      && formGenres.every((genre, index) => genre === originalGenres[index]);
+    const preparedForm = genresWereUnchanged && enriched.genres.length
+      ? { ...form, genres: enriched.genres }
+      : form;
+    return this.mediaNotes().create(enriched, preparedForm);
+  }
   async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> { await this.mediaUpdates().update(file, mediaType, form); }
 }

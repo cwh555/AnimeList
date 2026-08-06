@@ -1082,6 +1082,586 @@
   text-overflow: ellipsis;
 }
 
+/* Structured media metadata and tag-chip controls. */
+.al-media-metadata-section {
+  margin: 0 0 18px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.al-media-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 24px;
+}
+
+.al-media-metadata-item {
+  min-width: 0;
+}
+
+.al-media-metadata-label {
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: .64rem;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+
+.al-media-metadata-value {
+  overflow-wrap: anywhere;
+  color: var(--text-normal);
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.al-media-metadata-value.is-empty {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.al-edit-form-heading {
+  margin: 18px 0 12px;
+}
+
+.al-edit-media-form {
+  gap: 18px 22px;
+}
+
+.al-form-field-tags {
+  grid-column: 1 / -1;
+}
+
+.al-metadata-refresh-note {
+  display: block;
+  margin: -10px 0 16px;
+  color: var(--text-faint);
+  font-size: .66rem;
+}
+
+.al-tag-control {
+  min-width: 0;
+}
+
+.al-tag-chip-set {
+  display: flex;
+  min-height: 34px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.al-tag-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-normal);
+  background: var(--background-primary-alt);
+  font-size: .68rem;
+  font-weight: 560;
+  line-height: 1.2;
+}
+
+.al-tag-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-tag-chip-readonly {
+  color: var(--text-muted);
+  background: var(--background-primary);
+}
+
+.al-tag-chip-selected {
+  border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+}
+
+.al-tag-chip-remove {
+  display: inline-grid;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  place-items: center;
+  margin: 0 -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
+  font-size: .8rem;
+  line-height: 1;
+}
+
+.al-tag-chip-remove:hover,
+.al-tag-chip-remove:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.al-tag-add-button {
+  display: inline-grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.al-tag-add-button:hover,
+.al-tag-add-button:focus-visible,
+.al-tag-add-button.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.al-tag-picker {
+  margin-top: 9px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary-alt);
+}
+
+.al-tag-picker[hidden] {
+  display: none;
+}
+
+.al-tag-picker > input {
+  width: 100%;
+  min-height: 36px;
+}
+
+.al-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.al-tag-suggestion {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: .66rem;
+}
+
+.al-tag-suggestion:hover,
+.al-tag-suggestion:focus-visible {
+  border-color: var(--background-modifier-border-hover);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.al-tag-picker-hint {
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+
+@media (max-width: 620px) {
+  .al-media-metadata-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .al-edit-media-form {
+    gap: 12px;
+  }
+}
+
+/* Library company / quarter / tag filtering. */
+.al-filter-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--al-border);
+  border-radius: 10px;
+  color: var(--text-muted, #aaa);
+  background: var(--background-secondary, #25252b);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.al-filter-button:hover,
+.al-filter-button:focus-visible {
+  color: var(--text-normal, #ddd);
+  background: var(--background-modifier-hover, #303038);
+}
+
+.al-filter-button.is-active {
+  border-color: color-mix(in srgb, var(--al-accent) 52%, var(--al-border));
+  color: var(--al-accent);
+  background: var(--al-accent-soft);
+}
+
+.al-filter-button:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.al-filter-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--text-on-accent, #fff);
+  background: var(--al-accent);
+  font-size: .62rem;
+  font-weight: 760;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.modal.animelist-library-filter-modal {
+  width: min(720px, calc(100vw - 28px));
+  max-width: 720px;
+}
+
+.animelist-library-filter-modal .modal-content {
+  display: flex;
+  max-height: min(78vh, 760px);
+  flex-direction: column;
+}
+
+.al-filter-search {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-modifier-form-field, var(--background-secondary));
+}
+
+.al-filter-search .al-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.al-filter-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.al-filter-groups {
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding-right: 2px;
+}
+
+.al-filter-group {
+  padding: 16px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.al-filter-group:first-child {
+  border-top: 0;
+}
+
+.al-filter-group-title {
+  margin: 0 0 10px;
+  color: var(--text-normal);
+  font-size: .78rem;
+  font-weight: 720;
+}
+
+.al-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.al-filter-chip {
+  min-height: 30px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-primary-alt);
+  box-shadow: none;
+  cursor: pointer;
+  font-size: .68rem;
+  font-weight: 580;
+  line-height: 1.2;
+}
+
+.al-filter-chip:hover,
+.al-filter-chip:focus-visible {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.al-filter-chip.is-selected {
+  border-color: color-mix(in srgb, var(--interactive-accent) 58%, var(--background-modifier-border));
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.al-filter-chip.is-selected:hover,
+.al-filter-chip.is-selected:focus-visible {
+  filter: brightness(1.06);
+}
+
+.al-filter-empty {
+  color: var(--text-faint);
+  font-size: .68rem;
+}
+
+.al-filter-actions {
+  align-items: center;
+}
+
+.al-filter-action-spacer {
+  flex: 1;
+}
+
+.al-filter-clear {
+  color: var(--text-muted);
+}
+
+@media (max-width: 780px) {
+  .al-filter-button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .modal.animelist-library-filter-modal {
+    width: calc(100vw - 18px);
+  }
+
+  .animelist-library-filter-modal .modal-content {
+    max-height: 82vh;
+  }
+
+  .al-filter-chip {
+    min-height: 34px;
+  }
+}
+
+/* Settings launcher and scalable tag-management modal. */
+.al-user-tag-setting .setting-item-control {
+  flex: 0 0 auto;
+}
+
+.modal.animelist-user-tag-modal {
+  width: min(720px, calc(100vw - 28px));
+  max-width: 720px;
+}
+
+.animelist-user-tag-modal .modal-content {
+  display: flex;
+  max-height: min(80vh, 780px);
+  flex-direction: column;
+}
+
+.al-user-tag-search {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-modifier-form-field, var(--background-secondary));
+}
+
+.al-user-tag-search .al-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.al-user-tag-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.al-user-tag-add-row,
+.al-user-tag-rename-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.al-user-tag-rename-row {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.al-user-tag-add-row input,
+.al-user-tag-rename-row input {
+  min-width: 0;
+}
+
+.al-user-tag-list,
+.al-user-tag-usage-list {
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.al-user-tag-list {
+  flex: 1 1 auto;
+}
+
+.al-user-tag-row {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  color: var(--text-normal);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.al-user-tag-row:last-child {
+  border-bottom: 0;
+}
+
+.al-user-tag-row:hover,
+.al-user-tag-row:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+.al-user-tag-row-name {
+  overflow: hidden;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-user-tag-row-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+.al-user-tag-back {
+  align-self: flex-start;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+}
+
+.al-user-tag-usage-section {
+  min-height: 0;
+  margin-top: 18px;
+}
+
+.al-user-tag-usage-section h3 {
+  margin: 0;
+  font-size: var(--font-ui-small);
+}
+
+.al-user-tag-usage-list {
+  max-height: min(42vh, 420px);
+}
+
+.al-user-tag-usage-row {
+  display: grid;
+  min-height: 42px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.al-user-tag-usage-row:last-child {
+  border-bottom: 0;
+}
+
+.al-user-tag-usage-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.al-user-tag-usage-remove {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.al-user-tag-usage-remove:hover,
+.al-user-tag-usage-remove:focus-visible {
+  color: var(--text-error, var(--text-normal));
+  background: var(--background-modifier-hover);
+}
+
+.al-user-tag-empty {
+  padding: 14px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 780px) {
+  .modal.animelist-user-tag-modal {
+    width: calc(100vw - 18px);
+  }
+
+  .animelist-user-tag-modal .modal-content {
+    max-height: 84vh;
+  }
+
+  .al-user-tag-add-row,
+  .al-user-tag-rename-row {
+    grid-template-columns: 1fr;
+  }
+
+  .al-user-tag-add-row button,
+  .al-user-tag-rename-row button {
+    min-height: 42px;
+  }
+}
+
 /* Mobile-first interaction and layout overrides.
  * This file intentionally sits last in the generated bundle so phone layouts
  * can change hierarchy without duplicating desktop renderer logic.

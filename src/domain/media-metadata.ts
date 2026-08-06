@@ -1,4 +1,5 @@
 import { asArray, stringValue } from "./value-normalization";
+import { normalizeStudioNames } from "./studio-identity";
 
 const GENRE_ALIASES = new Map(Object.entries({
   romance: "戀愛", love: "戀愛", 恋爱: "戀愛", 戀愛: "戀愛", 爱情: "戀愛",
@@ -30,6 +31,26 @@ const GENRE_ALIASES = new Map(Object.entries({
   "boys love": "BL", "boy's love": "BL", bl: "BL",
 }));
 
+const BROAD_MEDIA_GENRES = new Set([
+  "戀愛",
+  "喜劇",
+  "奇幻",
+  "冒險",
+  "動作",
+  "劇情",
+  "日常",
+  "心理",
+  "懸疑",
+  "驚悚",
+  "恐怖",
+  "科幻",
+  "超自然",
+  "運動",
+  "音樂",
+  "歷史",
+  "機器人",
+]);
+
 export function normalizeGenre(value: unknown): string {
   const raw = typeof value === "string"
     ? value
@@ -53,4 +74,41 @@ export function normalizeGenres(values: unknown, limit = 12): string[] {
     if (output.length >= limit) break;
   }
   return output;
+}
+
+/**
+ * Provider tag lists such as Bangumi `subject.tags` and Open Library
+ * `subject` mix genres with staff, dates, formats, adaptation notes, and
+ * arbitrary user tags. Only retain broad genre values when those loose tag
+ * lists are used as a fallback source. AniList's explicit `genres` field
+ * continues to use `normalizeGenres()` directly.
+ */
+export function normalizeBroadGenres(values: unknown, limit = 12): string[] {
+  return normalizeGenres(values, Number.MAX_SAFE_INTEGER)
+    .filter((value) => BROAD_MEDIA_GENRES.has(value))
+    .slice(0, limit);
+}
+
+/**
+ * Normalize provider-supplied studio names without guessing company roles from
+ * words inside a name. Role selection belongs to the provider normalizer.
+ */
+export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
+  return normalizeStudioNames(values, limit);
+}
+
+/**
+ * Select animation studios from a structured provider payload. The provider's
+ * semantic boolean determines the role; no company-name keyword list is used.
+ */
+export function normalizeStructuredAnimationStudios(values: unknown, limit = 1): string[] {
+  return normalizeAnimeStudios(
+    asArray(values).filter((value) => (
+      typeof value === "object"
+      && value !== null
+      && !Array.isArray(value)
+      && (value as { isAnimationStudio?: unknown }).isAnimationStudio === true
+    )),
+    limit,
+  );
 }

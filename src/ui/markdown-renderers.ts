@@ -6,6 +6,7 @@ import { uiText } from "../ui-text";
 import type { LibraryViewMode } from "./library-contracts";
 import type { AnimeListUiHost } from "./plugin-host";
 import { shouldRefreshAnimeListBlockPath, shouldRefreshAnimeListBlockRename } from "./markdown-refresh-scope";
+import { detailMediaQuarterLabel } from "./media-quarter-label";
 import { ConfirmDeleteModal } from "./media-modals";
 import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel } from "./ui-helpers";
 
@@ -125,6 +126,8 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
       ? `${progressDisplayValue(detailItem.progress)} / ${progressDisplayValue(detailItem.total)} ${unitLabel}`
       : detailItem.progress !== 0 ? uiText(detailItem.mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", { progress: progressDisplayValue(detailItem.progress), unit: unitLabel }) : uiText("detail.noProgress"));
     summary.append(status, progress);
+    const quarter = detailMediaQuarterLabel(mediaType, fm.season, fm.season_year);
+    if (quarter) summary.appendChild(makeEl("span", "al-detail-quarter", quarter));
     if (fm.score != null && fm.score !== "") summary.appendChild(makeEl("span", "al-detail-score", `★ ${Number(fm.score).toFixed(1)}`));
     const actions = makeEl("div", "al-detail-buttons");
     const favorite = makeEl("button", `al-detail-favorite${fm.favorite === true ? " is-active" : ""}`, fm.favorite === true ? uiText("detail.favorite") : uiText("detail.favoriteAdd"));

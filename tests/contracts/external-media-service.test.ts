@@ -133,6 +133,31 @@ describe("external media search service", () => {
     assert.ok(novel.results.length >= 1);
   });
 
+  it("batches AniList query variants through the provider client without changing search expansion", async () => {
+    const batches: string[][] = [];
+    const anilist: MetadataProviderClient = {
+      id: "anilist",
+      label: "AniList",
+      supports: () => true,
+      searchPage: async () => {
+        throw new Error("single-query AniList path should not run for expanded search");
+      },
+      searchPages: async (_mediaType, queries) => {
+        batches.push([...queries]);
+        return queries.map(() => ({ results: [], hasMore: false }));
+      },
+    };
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: false, anilist: true, openlibrary: false }),
+      clients({ anilist }),
+    );
+
+    await service.search("anime", "測試作品 第二季");
+    assert.equal(batches.length, 1);
+    assert.ok(batches[0].length > 1);
+    assert.equal(batches[0][0], "測試作品 第二季");
+  });
+
   it("keeps fallback query expansion and requested-season ranking across providers", async () => {
     const calls: string[] = [];
     const providerClients = clients({

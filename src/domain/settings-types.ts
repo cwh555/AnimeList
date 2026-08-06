@@ -1,6 +1,7 @@
 import type { MediaStatusFilter } from "../media-status";
 import type { SpecialLabelMode } from "../masterpiece-labels";
 import type { MediaType } from "./media-types";
+import type { LibraryFilters } from "./library-filters";
 
 export type StorageMode = "managed" | "flat";
 export type LibrarySection = "library" | "timeline";
@@ -27,7 +28,7 @@ export interface LibraryUiState {
   section: LibrarySection;
   type: "all" | MediaType;
   status: MediaStatusFilter;
-  genre: string;
+  filters: LibraryFilters;
   sort: string;
   view: LibraryViewMode;
 }
@@ -43,6 +44,7 @@ export interface AnimeListSettings {
   providers: ProviderSettings;
   googleBooksApiKey: string;
   searchLanguages: SearchLanguageSettings;
+  tagCatalog: string[];
   specialLabelMode: SpecialLabelMode;
   migrations: MigrationSettings;
   uiState: LibraryUiState;

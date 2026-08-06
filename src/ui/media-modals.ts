@@ -1,9 +1,26 @@
 import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
+import { normalizeUserTags } from "../domain/user-tags";
+import { persistedMediaTags } from "../domain/media-classification";
+import { compatibleGenres } from "../data/media-frontmatter-compat";
+import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
+import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
 import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
+
+
+function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
+  return normalizeUserTags([
+    ...plugin.settings.tagCatalog,
+    ...plugin.collectMediaItems().flatMap((item) => [
+      ...item.genres,
+      ...(item.userTags ?? []),
+    ]),
+    ...normalizeUserTags(extra),
+  ]);
+}
 
 export class AddMediaModal extends Modal {
   readonly plugin: AnimeListUiHost;
@@ -174,7 +191,15 @@ export class AddMediaModal extends Modal {
     preview.appendChild(copy);
     this.contentEl.appendChild(preview);
 
-    const templates = await this.plugin.getTemplates(result.mediaType);
+    const metadataLoading = makeEl("p", "al-modal-hint", uiText("add.metadataLoading"));
+    this.contentEl.appendChild(metadataLoading);
+    const [templates, enrichedResult] = await Promise.all([
+      this.plugin.getTemplates(result.mediaType),
+      this.plugin.enrichExternalMedia(result),
+    ]);
+    metadataLoading.remove();
+    renderMediaClassificationFields(this.contentEl, enrichedResult);
+
     const form = createDiv();
     form.className = "al-media-form";
     const templateOptions: Array<[string, string]> = templates.length
@@ -182,21 +207,22 @@ export class AddMediaModal extends Modal {
       : [["", uiText("add.noTemplate")]];
     const fields = createMediaEditorFields({
       parent: form,
-      mediaType: result.mediaType,
+      mediaType: enrichedResult.mediaType,
       values: {
-        title: result.title,
+        title: enrichedResult.title,
         status: "planned",
-        releaseStatus: result.releaseStatus,
+        releaseStatus: enrichedResult.releaseStatus,
         score: "",
         startedAt: "",
         completedAt: "",
         progress: 0,
-        total: result.total || "",
-        unit: result.unit,
-        genres: result.genres,
+        total: enrichedResult.total || "",
+        unit: enrichedResult.unit,
+        genres: enrichedResult.genres,
         favorite: false,
       },
       templateOptions,
+      tagOptions: libraryTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
     });
     this.contentEl.appendChild(form);
 
@@ -205,8 +231,8 @@ export class AddMediaModal extends Modal {
       plugin: this.plugin,
       modalEl: this.modalEl,
       formEl: form,
-      mediaType: result.mediaType,
-      result,
+      mediaType: enrichedResult.mediaType,
+      result: enrichedResult,
       file: null,
       frontmatter: {},
       fields,
@@ -215,7 +241,7 @@ export class AddMediaModal extends Modal {
 
     const sourceNote = createDiv();
     sourceNote.className = "al-source-note";
-    sourceNote.textContent = result.mediaType === "novel" ? uiText("add.sourceNovel") : uiText("add.sourceMedia");
+    sourceNote.textContent = enrichedResult.mediaType === "novel" ? uiText("add.sourceNovel") : uiText("add.sourceMedia");
     this.contentEl.appendChild(sourceNote);
 
     const actions = createDiv();
@@ -231,7 +257,7 @@ export class AddMediaModal extends Modal {
       try {
         const submitContext = { ...context, form: mediaFormValues(context) };
         await this.plugin.prepareMediaSubmit(submitContext);
-        const file = await this.plugin.createMediaNote(result, submitContext.form);
+        const file = await this.plugin.createMediaNote(enrichedResult, submitContext.form);
         this.close();
         new Notice(uiText("notice.collected", { title: submitContext.form.title }));
         await this.plugin.app.workspace.openLinkText(file.path, "", false);
@@ -299,6 +325,10 @@ export class EditMediaModal extends Modal {
 
   onOpen(): void {
     this.modalEl.classList.add("animelist-modal", "animelist-edit-modal");
+    this.render();
+  }
+
+  private render(): void {
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
     const heading = createDiv();
@@ -313,8 +343,33 @@ export class EditMediaModal extends Modal {
     const mediaType: MediaType = frontmatter.media_type === "manga" || frontmatter.media_type === "novel"
       ? frontmatter.media_type
       : "anime";
+
+    const metadataHost = createDiv();
+    metadataHost.className = "al-edit-metadata-host";
+    renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
+    this.contentEl.appendChild(metadataHost);
+
+    const needsMetadataRefresh = storedMediaNeedsClassificationRefresh(frontmatter, mediaType);
+    if (needsMetadataRefresh) {
+      const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
+      metadataHost.appendChild(loading);
+      void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
+        if (!this.contentEl.isConnected || !enriched.classification) return;
+        metadataHost.replaceChildren();
+        renderMediaClassificationFields(metadataHost, enriched, true);
+      }).catch((error) => {
+        console.warn("AnimeList edit metadata refresh failed", error);
+        loading.textContent = uiText("edit.metadataRefreshUnavailable");
+      });
+    }
+
+    const formHeading = createEl("h3");
+    formHeading.className = "al-form-section-heading al-edit-form-heading";
+    formHeading.textContent = uiText("edit.collectionData");
+    this.contentEl.appendChild(formHeading);
+
     const form = createDiv();
-    form.className = "al-media-form";
+    form.className = "al-media-form al-edit-media-form";
     const fields = createMediaEditorFields({
       parent: form,
       mediaType,
@@ -328,12 +383,13 @@ export class EditMediaModal extends Modal {
         progress: formValue(frontmatter.progress, 0),
         total: frontmatter.progress_total,
         unit: frontmatter.progress_unit,
-        genres: frontmatter.genres,
+        genres: compatibleGenres(frontmatter),
         favorite: frontmatter.favorite === true,
       },
       selectedUnit: typeof frontmatter.progress_unit === "string"
         ? frontmatter.progress_unit
         : undefined,
+      tagOptions: libraryTagOptions(this.plugin, frontmatter.media_tags),
     });
     this.contentEl.appendChild(form);
 
@@ -363,18 +419,18 @@ export class EditMediaModal extends Modal {
     save.textContent = uiText("action.save");
     save.addEventListener("click", () => {
       void (async () => {
-      save.disabled = true;
-      try {
-        const submitContext = { ...context, form: mediaFormValues(context) };
-        await this.plugin.prepareMediaSubmit(submitContext);
-        await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
-        this.close();
-        new Notice(uiText("notice.saved"));
-      } catch (error) {
-        console.error("AnimeList edit failed", error);
-        new Notice(uiText("notice.saveFailed", { error: errorMessage(error) }));
-        save.disabled = false;
-      }
+        save.disabled = true;
+        try {
+          const submitContext = { ...context, form: mediaFormValues(context) };
+          await this.plugin.prepareMediaSubmit(submitContext);
+          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
+          this.close();
+          new Notice(uiText("notice.saved"));
+        } catch (error) {
+          console.error("AnimeList edit failed", error);
+          new Notice(uiText("notice.saveFailed", { error: errorMessage(error) }));
+          save.disabled = false;
+        }
       })();
     });
     actions.append(deleteButton, save);

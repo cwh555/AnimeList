@@ -6,6 +6,7 @@ import type { MetadataProviderClient, MetadataProviderPage } from "../external-m
 import { normalizeBangumiSubject } from "../provider-normalizers";
 
 const BANGUMI_SEARCH_ENDPOINT = "https://api.bgm.tv/v0/search/subjects";
+const BANGUMI_SUBJECT_ENDPOINT = "https://api.bgm.tv/v0/subjects";
 const BANGUMI_PAGE_SIZE = 20;
 
 function record(value: unknown): Record<string, unknown> {
@@ -27,6 +28,20 @@ export class BangumiClient implements MetadataProviderClient {
   readonly supportsChineseDiscovery = true;
 
   supports(_mediaType: MediaType): boolean { return true; }
+
+
+  async fetchById(mediaType: MediaType, sourceId: string): Promise<ReturnType<typeof normalizeBangumiSubject> | null> {
+    const id = sourceId.trim();
+    if (!id) return null;
+    const response = await requestUrl({
+      url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(id)}`,
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    });
+    const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+    const subject = record(parsed);
+    return Object.keys(subject).length ? normalizeBangumiSubject(subject, mediaType) : null;
+  }
 
   async searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
     const normalizedPage = Math.max(1, Math.floor(page));

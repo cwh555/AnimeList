@@ -42,6 +42,13 @@ describe("media repository compatibility", () => {
         favorite: true,
         year: 2024,
         genres: ["Romance", "恋爱", "Comedy"],
+        media_tags: ["School", "Coming of Age"],
+        user_tags: ["重看", "收藏"],
+        season: "spring",
+        season_year: 2024,
+        source_material: "manga",
+        country_of_origin: "JP",
+        anilist_id: "42",
         studios: ["Studio A"],
         source_provider: "AniList",
         source_id: 42,
@@ -76,7 +83,14 @@ describe("media repository compatibility", () => {
       score: 8.5,
       favorite: true,
       year: 2024,
-      genres: ["戀愛", "喜劇"],
+      genres: ["戀愛", "喜劇", "重看", "收藏"],
+      mediaTags: ["School", "Coming of Age"],
+      userTags: ["重看", "收藏"],
+      season: "spring",
+      seasonYear: 2024,
+      sourceMaterial: "manga",
+      countryOfOrigin: "JP",
+      anilistId: "42",
       people: ["Studio A"],
       platforms: [],
       sourceUrls: [],
@@ -92,6 +106,33 @@ describe("media repository compatibility", () => {
     assert.equal(repository.findBySource(["AnimeList"], "AniList", "42"), anime);
   });
 
+  it("does not expose malformed studio metadata or fall back to anime author fields", () => {
+    const file = markdownFile("AnimeList/Anime/composite-studio.md");
+    const composite = "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO";
+    const app = {
+      vault: {
+        getAbstractFileByPath: () => null,
+        getResourcePath: () => "",
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            media_type: "anime",
+            title: "Composite studio",
+            studios: [composite],
+            authors: ["Not an animation studio"],
+            creators: ["Also not a studio"],
+          },
+        }),
+        getFirstLinkpathDest: () => null,
+      },
+    } as unknown as App;
+
+    const item = new MediaRepository(app).read(file);
+    assert.ok(item);
+    assert.deepEqual(item.people, []);
+  });
+
   it("formats modified labels in the active local timezone", () => {
     const previousTimezone = process.env.TZ;
     try {
@@ -104,5 +145,58 @@ describe("media repository compatibility", () => {
       if (previousTimezone === undefined) delete process.env.TZ;
       else process.env.TZ = previousTimezone;
     }
+  });
+
+  it("loads stable v1.2.1 schema-6 notes without requiring any new metadata fields", () => {
+    const file = markdownFile("AnimeList/Anime/legacy-v121.md", 1_700_000_000_000);
+    const root = new TFolder();
+    root.path = "AnimeList";
+    root.children = [file];
+    const oldFrontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      title: "Legacy anime",
+      title_original: "旧作",
+      media_type: "anime",
+      format: "tv",
+      status: "planned",
+      progress: 0,
+      progress_total: 12,
+      progress_unit: "episode",
+      favorite: false,
+      year: 2021,
+      genres: ["Romance", "Comedy"],
+      source_genres: ["School", "2021年1月"],
+      studios: ["Legacy Studio"],
+      platforms: ["TV"],
+      source_provider: "bangumi",
+      source_id: "123",
+      source_urls: ["https://bgm.tv/subject/123"],
+      source_score: 7.8,
+      note_template: "AnimeList/Templates/anime.md",
+    };
+    const app = {
+      vault: {
+        getAbstractFileByPath: (path: string) => path === "AnimeList" ? root : null,
+        getResourcePath: () => "",
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: oldFrontmatter }),
+        getFirstLinkpathDest: () => null,
+      },
+    } as unknown as App;
+
+    const item = new MediaRepository(app).read(file);
+    assert.ok(item);
+    assert.equal(item.title, "Legacy anime");
+    assert.deepEqual(item.genres, ["戀愛", "喜劇"]);
+    assert.deepEqual(item.people, ["Legacy Studio"]);
+    assert.deepEqual(item.sourceUrls, ["https://bgm.tv/subject/123"]);
+    assert.deepEqual(item.mediaTags, []);
+    assert.deepEqual(item.userTags, []);
+    assert.equal(item.season, "winter");
+    assert.equal(item.seasonYear, 2021);
+    assert.equal(item.sourceMaterial, "");
+    assert.equal(item.countryOfOrigin, "");
+    assert.equal(item.anilistId, "");
   });
 });

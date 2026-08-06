@@ -1,9 +1,10 @@
 import type { MediaItem } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
+import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
 import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../media-status";
 import { normalizeProgressValue, normalizeReleaseStatus, normalizeVolumeLog, progressDisplayValue, progressRatio } from "../novel-progress";
 import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
-import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryRenderState, LibraryViewMode } from "./library-contracts";
+import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryViewMode } from "./library-contracts";
 import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 
@@ -76,7 +77,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
     activeProgressiveRenders.delete(container);
     container.replaceChildren();
     const items = inputItems.map(normalize);
-    const genres = [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+    const filterOptions = collectLibraryFilterOptions(items);
     const initialState = adapters.initialState ?? {};
     const requestedView = initialState.view ?? adapters.initialView;
     const initialView: LibraryViewMode = requestedView === "list" || requestedView === "poster"
@@ -93,10 +94,20 @@ export const AnimeListUI: LibraryRenderer = (() => {
     ];
     const initialStatus = String(initialState.status ?? "");
     const initialStatusKeys = new Set(statusOptions(initialType).map(([key]) => key));
-    const state: Required<LibraryRenderState> = {
+    const state: {
+      type: LibraryMediaFilter;
+      status: string;
+      filters: LibraryFilters;
+      query: string;
+      sort: string;
+      view: LibraryViewMode;
+    } = {
       type: initialType,
       status: initialStatusKeys.has(initialStatus) ? initialStatus : normalizeStatusFilter(initialStatus),
-      genre: initialState.genre ?? "all",
+      filters: reconcileLibraryFilters(
+        normalizeLibraryFilters(initialState.filters, initialState.genre),
+        filterOptions,
+      ),
       query: initialState.query ?? "",
       sort: initialState.sort ?? "completed-desc",
       view: initialView,
@@ -106,6 +117,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
     const editItem = adapters.editItem || null;
     const toggleFavorite = adapters.toggleFavorite || null;
     const openTimeline = adapters.openTimeline || null;
+    const openFilterModal = adapters.openFilterModal || null;
 
     const shell = makeEl("section", "al-shell");
     container.appendChild(shell);
@@ -185,20 +197,31 @@ export const AnimeListUI: LibraryRenderer = (() => {
     });
     searchWrap.append(searchIcon, searchInput);
 
-    const genreWrap = makeEl("label", "al-sort al-genre-filter");
-    const genreSelect = makeEl("select");
-    ([
-      ["all", uiText("library.genreAll")],
-      ...genres.map((genre) => [genre, genre] as [string, string]),
-    ] as Array<[string, string]>).forEach(([value, text]) => {
-      const option = makeEl("option", "", text);
-      option.value = value;
-      genreSelect.appendChild(option);
-    });
-    if (genres.includes(state.genre)) genreSelect.value = state.genre;
-    else state.genre = "all";
-    genreSelect.addEventListener("change", () => { state.genre = genreSelect.value; update(); });
-    genreWrap.appendChild(genreSelect);
+    const filterButton = makeEl("button", "al-filter-button");
+    filterButton.type = "button";
+    const renderFilterButton = (): void => {
+      filterButton.replaceChildren();
+      appendIconLabel(filterButton, "filter", uiText("library.filterButton"));
+      const count = libraryFilterCount(state.filters);
+      if (count > 0) filterButton.appendChild(makeEl("span", "al-filter-count", count));
+      filterButton.classList.toggle("is-active", count > 0);
+    };
+    renderFilterButton();
+    if (openFilterModal) {
+      filterButton.addEventListener("click", () => {
+        openFilterModal(
+          normalizeLibraryFilters(state.filters),
+          filterOptions,
+          (filters) => {
+            state.filters = normalizeLibraryFilters(filters);
+            renderFilterButton();
+            update();
+          },
+        );
+      });
+    } else {
+      filterButton.disabled = true;
+    }
 
     const sortWrap = makeEl("label", "al-sort");
     const sortIcon = makeEl("span", "al-icon");
@@ -241,7 +264,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       viewButtons.set(key, button);
       views.appendChild(button);
     });
-    toolbar.append(searchWrap, genreWrap, sortWrap, views);
+    toolbar.append(searchWrap, filterButton, sortWrap, views);
     shell.appendChild(toolbar);
 
     const statusBar = makeEl("div", "al-status-bar");
@@ -429,7 +452,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       let filtered = items.filter((item) => {
         if (state.type !== "all" && item.mediaType !== state.type) return false;
         if (!statusMatch(item, state.status, adapters)) return false;
-        if (state.genre !== "all" && !item.genres.includes(state.genre)) return false;
+        if (!libraryItemMatchesFilters(item, state.filters)) return false;
         if (!query) return true;
         return [item.title, item.originalTitle, item.format, ...item.genres, ...item.people, ...item.platforms].join(" ").toLocaleLowerCase().includes(query);
       });
@@ -450,8 +473,9 @@ export const AnimeListUI: LibraryRenderer = (() => {
       };
       filtered.sort(sorters[state.sort] || sorters["completed-desc"]);
       resultTitle.textContent = state.type === "all" ? uiText("library.resultAll") : MEDIA_UI_LABELS.type[state.type];
-      const genreSuffix = state.genre === "all" ? "" : ` · ${state.genre}`;
-      resultMeta.textContent = uiText("library.resultMeta", { shown: filtered.length, total: items.length, genre: genreSuffix });
+      const activeFilterCount = libraryFilterCount(state.filters);
+      const filterSuffix = activeFilterCount ? ` · ${uiText("library.filterActiveCount", { count: activeFilterCount })}` : "";
+      resultMeta.textContent = uiText("library.resultMeta", { shown: filtered.length, total: items.length, genre: filterSuffix });
       grid.className = `al-grid is-${state.view}`;
       grid.replaceChildren();
       if (!filtered.length) {

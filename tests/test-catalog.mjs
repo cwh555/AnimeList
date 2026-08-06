@@ -17,6 +17,7 @@ export const TEST_FEATURES = [
   "test-vault",
   "text",
   "timeline",
+  "tags",
 ];
 
 export const TEST_TARGETS = [
@@ -42,6 +43,10 @@ export const TEST_TARGETS = [
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-progressive-render.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/library-filters.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/studio-identity.test.ts", kind: "test", suite: "unit", features: ["library", "search"] },
+  { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },
+  { path: "tests/user-tag-settings.test.ts", kind: "test", suite: "integration", features: ["tags", "settings"] },
   { path: "tests/media-library-index.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/markdown-refresh-scope.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
@@ -62,8 +67,12 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },
   { path: "tests/contracts/media-note-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "library", "covers"] },
   { path: "tests/contracts/media-update-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress", "library"] },
+  { path: "tests/contracts/user-tag-library-service.test.ts", kind: "test", suite: "contract", features: ["tags", "settings", "markdown"] },
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/metadata-provider-clients.test.ts", kind: "test", suite: "contract", features: ["search"] },
+  { path: "tests/contracts/media-classification-service.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
+  { path: "tests/contracts/media-classification-fields.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
+  { path: "tests/contracts/legacy-metadata-cleanup.test.ts", kind: "test", suite: "contract", features: ["settings", "markdown", "search"] },
   { path: "tests/contracts/existing-library-initialization.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },

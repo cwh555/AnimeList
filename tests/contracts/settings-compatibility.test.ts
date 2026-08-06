@@ -25,6 +25,7 @@ describe("settings compatibility", () => {
       templateFolder: "Templates",
       timelineMaxStackDepth: 5,
       googleBooksApiKey: "  secret  ",
+      tagCatalog: [" 重看 ", "收藏", "重看"],
       providers: { bangumi: false, anilist: true, openlibrary: false },
       migrations: { mediaStatus: 6 },
       uiState: {
@@ -41,13 +42,14 @@ describe("settings compatibility", () => {
     assert.equal(settings.flatMediaFolder, "Media");
     assert.deepEqual(settings.additionalScanFolders, ["Archive", "Other"]);
     assert.equal(settings.googleBooksApiKey, "secret");
+    assert.deepEqual(settings.tagCatalog, ["重看", "收藏"]);
     assert.deepEqual(settings.providers, { bangumi: false, anilist: true, openlibrary: false });
     assert.equal(settings.migrations.mediaStatus, 6);
     assert.deepEqual(settings.uiState, {
       section: "timeline",
       type: "manga",
       status: "ongoing",
-      genre: "戀愛",
+      filters: { companies: [], quarter: "", tags: ["戀愛"] },
       sort: "score-desc",
       view: "list",
     });
@@ -64,6 +66,7 @@ describe("settings compatibility", () => {
 
     assert.equal(settings.storageMode, DEFAULT_SETTINGS.storageMode);
     assert.deepEqual(settings.additionalScanFolders, []);
+    assert.deepEqual(settings.tagCatalog, []);
     assert.deepEqual(settings.providers, DEFAULT_SETTINGS.providers);
     assert.equal(settings.migrations.mediaStatus, 0);
     assert.deepEqual(settings.uiState, DEFAULT_SETTINGS.uiState);
@@ -111,7 +114,10 @@ it("preserves unknown feature settings through the shared settings store", async
   assert.deepEqual(persisted.futureFeature, { enabled: true, mode: "compact" });
   assert.equal((persisted.providers as Record<string, unknown>).futureProvider, true);
   assert.equal((persisted.migrations as Record<string, unknown>).futureMigration, 7);
-  assert.equal((persisted.uiState as Record<string, unknown>).futureLayout, "dense");
+  const persistedUiState = persisted.uiState as Record<string, unknown>;
+  assert.equal(persistedUiState.futureLayout, "dense");
+  assert.equal("genre" in persistedUiState, false);
+  assert.deepEqual(persistedUiState.filters, { companies: [], quarter: "", tags: ["科幻"] });
   assert.equal(settings.searchLanguages.original, true);
   assert.equal(settings.specialLabelMode, "favorite");
 });
