@@ -37,6 +37,16 @@ export function appendReadOnlyTagChips(parent: HTMLElement, values: readonly str
   return set;
 }
 
+export function appendTagValue(selected: readonly string[], raw: unknown): string[] {
+  const value = normalizeUserTag(raw);
+  if (!value || selected.some((entry) => entry.toLocaleLowerCase() === value.toLocaleLowerCase())) return [...selected];
+  return normalizeUserTags([...selected, value]);
+}
+
+export function removeTagValue(selected: readonly string[], value: string): string[] {
+  return selected.filter((entry) => entry !== value);
+}
+
 export function createTagChipControl({ values, suggestions = [] }: CreateTagChipControlInput): TagChipControl {
   const root = createDiv() as TagChipControl;
   root.className = "al-tag-control";
@@ -74,16 +84,18 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
   };
 
   const addValue = (raw: unknown): void => {
-    const value = normalizeUserTag(raw);
-    if (!value || selected.some((entry) => entry.toLocaleLowerCase() === value.toLocaleLowerCase())) return;
-    selected = normalizeUserTags([...selected, value]);
+    const next = appendTagValue(selected, raw);
+    if (next.length === selected.length) return;
+    selected = next;
     input.value = "";
     render();
     emit();
   };
 
   const removeValue = (value: string): void => {
-    selected = selected.filter((entry) => entry !== value);
+    const next = removeTagValue(selected, value);
+    if (next.length === selected.length) return;
+    selected = next;
     render();
     emit();
   };
@@ -94,7 +106,11 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
     for (const value of available.slice(0, 18)) {
       const suggestion = makeEl("button", "al-tag-suggestion", value);
       suggestion.type = "button";
-      suggestion.addEventListener("click", () => addValue(value));
+      suggestion.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        addValue(value);
+      });
       suggestionsEl.appendChild(suggestion);
     }
     if (!available.length && input.value.trim()) {
@@ -112,14 +128,20 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
       remove.type = "button";
       remove.setAttribute("aria-label", uiText("add.tagsRemove", { tag: value }));
       remove.title = uiText("add.tagsRemove", { tag: value });
-      remove.addEventListener("click", () => removeValue(value));
+      remove.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeValue(value);
+      });
       chip.appendChild(remove);
       chipSet.insertBefore(chip, add);
     }
     renderSuggestions();
   };
 
-  add.addEventListener("click", () => {
+  add.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     picker.hidden = !picker.hidden;
     add.classList.toggle("is-active", !picker.hidden);
     add.setAttribute("aria-expanded", picker.hidden ? "false" : "true");

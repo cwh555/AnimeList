@@ -3,9 +3,10 @@ import { describe, it } from "node:test";
 import type { ExternalMediaResult } from "../../src/domain/media-types";
 import { mediaClassificationFieldValues, storedMediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
 import { detailMediaQuarterLabel, mediaQuarterLabel } from "../../src/ui/media-quarter-label";
-import { tagSuggestionValues } from "../../src/ui/tag-chip-control";
+import { appendTagValue, removeTagValue, tagSuggestionValues } from "../../src/ui/tag-chip-control";
 import { storedMediaExternalResult, storedMediaNeedsClassificationRefresh } from "../../src/data/stored-media-result";
 import { normalizeUserTags } from "../../src/domain/user-tags";
+import { normalizeAnimeStudios } from "../../src/domain/media-metadata";
 
 function result(): ExternalMediaResult {
   return {
@@ -82,6 +83,23 @@ describe("media classification collection fields", () => {
       "治癒系",
       "Comfort Watch",
     ]);
+  });
+
+  it("keeps one canonical primary studio and removes committee aliases", () => {
+    assert.deepEqual(normalizeAnimeStudios([
+      "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO",
+    ]), ["Studio Colorido"]);
+    assert.deepEqual(normalizeAnimeStudios([
+      { name: "studio colorido" },
+      { name: "STUDIO CHROMATO" },
+    ]), ["Studio Colorido"]);
+  });
+
+  it("adds tags without replacing existing values and only removes the requested tag", () => {
+    const added = appendTagValue(["戀愛", "校園"], "喜劇");
+    assert.deepEqual(added, ["戀愛", "校園", "喜劇"]);
+    assert.deepEqual(appendTagValue(added, "戀愛"), added);
+    assert.deepEqual(removeTagValue(added, "校園"), ["戀愛", "喜劇"]);
   });
 
   it("uses the same quarter label in collection metadata and the library detail summary", () => {

@@ -89,7 +89,14 @@ export function normalizeBroadGenres(values: unknown, limit = 12): string[] {
 }
 
 const PRODUCTION_COMMITTEE_PATTERN = /(製作委員会|制作委員会|製作委員會|制作委員會|製作委员会|制作委员会)/i;
-const STUDIO_SEPARATOR_PATTERN = /[、,，;；\n]+/;
+const NON_STUDIO_COMPANY_PATTERN = /(パートナーズ|partners|製作会社|制作会社|製作公司|制作公司|製作$|制作$)/i;
+const STUDIO_SEPARATOR_PATTERN = /[、,，;；\n/]+/;
+
+const CANONICAL_STUDIO_ALIASES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/(?:スタジオ\s*コロリド|studio\s*colorido)/i, "Studio Colorido"],
+  [/(?:スタジオ\s*クロマト|studio\s*chromato)/i, "Studio Chromato"],
+  [/(?:シンエイ動画|shin[\s-]*ei\s*animation)/i, "Shin-Ei Animation"],
+];
 
 function studioText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -99,42 +106,60 @@ function studioText(value: unknown): string {
   return "";
 }
 
+function canonicalStudioAliases(value: string): string[] {
+  return CANONICAL_STUDIO_ALIASES
+    .filter(([pattern]) => pattern.test(value))
+    .map(([, canonical]) => canonical);
+}
+
+function normalizeStudioPart(value: string): string {
+  const clean = value
+    .replace(/^(?:動畫製作|动画制作|動畫制作|动画製作|製作会社|制作会社|製作公司|制作公司)\s*[:：]\s*/i, "")
+    .replace(/^[\s()（）[\]【】]+|[\s()（）[\]【】]+$/g, "")
+    .trim();
+  if (!clean || PRODUCTION_COMMITTEE_PATTERN.test(clean) || NON_STUDIO_COMPANY_PATTERN.test(clean)) return "";
+  const aliases = canonicalStudioAliases(clean);
+  return aliases[0] ?? clean;
+}
+
 /**
- * Normalize animation-company metadata without treating production committees
- * or their producer/staff tails as studios. Bangumi occasionally exposes a
- * value shaped like `CloverWorks、「作品」製作委員会（...）producer names...`;
- * only the company prefix is useful to AnimeList.
+ * Return one stable, user-facing primary animation studio.
+ *
+ * AniList already orders `studios(isMain: true)` by the provider's primary
+ * studio order, so retaining the first normalized entry gives notes, filters,
+ * and Edit Media one consistent company identity. Bangumi occasionally folds
+ * a production committee, aliases, and multiple studios into one infobox
+ * string; known aliases are extracted before generic splitting so that a value
+ * such as `コロリド・ツインエンジンパートナーズ (...) スタジオコロリド・STUDIO CHROMATO`
+ * resolves to the common name `Studio Colorido` instead of the committee.
  */
-export function normalizeAnimeStudios(values: unknown, limit = 12): string[] {
+export function normalizeAnimeStudios(values: unknown, limit = 1): string[] {
   const output: string[] = [];
   const seen = new Set<string>();
+  const append = (studio: string): boolean => {
+    const key = studio.toLocaleLowerCase();
+    if (!studio || seen.has(key)) return false;
+    seen.add(key);
+    output.push(studio);
+    return output.length >= Math.max(1, limit);
+  };
 
   for (const raw of asArray(values)) {
     let value = studioText(raw).normalize("NFKC").trim();
     if (!value) continue;
 
-    const committeeIndex = value.search(PRODUCTION_COMMITTEE_PATTERN);
-    if (committeeIndex >= 0) {
-      const prefix = value.slice(0, committeeIndex);
-      const separatorIndex = Math.max(
-        prefix.lastIndexOf("、"),
-        prefix.lastIndexOf(","),
-        prefix.lastIndexOf("，"),
-        prefix.lastIndexOf(";"),
-        prefix.lastIndexOf("；"),
-        prefix.lastIndexOf("/"),
-      );
-      value = separatorIndex >= 0 ? prefix.slice(0, separatorIndex) : "";
+    const aliases = canonicalStudioAliases(value);
+    if (aliases.length) {
+      for (const studio of aliases) if (append(studio)) return output;
+      continue;
     }
 
+    const committeeIndex = value.search(PRODUCTION_COMMITTEE_PATTERN);
+    if (committeeIndex >= 0) value = value.slice(0, committeeIndex);
+
     for (const part of value.split(STUDIO_SEPARATOR_PATTERN)) {
-      const studio = part
-        .replace(/^(?:動畫製作|动画制作|動畫制作|动画製作|製作会社|制作会社|製作公司|制作公司)\s*[:：]\s*/i, "")
-        .trim();
-      if (!studio || PRODUCTION_COMMITTEE_PATTERN.test(studio) || seen.has(studio)) continue;
-      seen.add(studio);
-      output.push(studio);
-      if (output.length >= limit) return output;
+      const studio = normalizeStudioPart(part);
+      if (studio && append(studio)) return output;
     }
   }
 

@@ -369,19 +369,21 @@ export function createMediaEditorFields({
     uiText("add.unit"),
     createSelect(unitValues, unitSelection),
   );
-  const genres = createLabeledField(
-    parent,
-    uiText("add.genres"),
-    createTagChipControl({
-      values: normalizeUserTags([
-        ...normalizeGenres(values.genres, 32),
-        ...normalizeUserTags(values.userTags),
-      ]),
-      suggestions: normalizeUserTags(tagOptions),
-    }),
-    uiText("add.genresHint"),
+  const genres = createTagChipControl({
+    values: normalizeUserTags([
+      ...normalizeGenres(values.genres, 32),
+      ...normalizeUserTags(values.userTags),
+    ]),
+    suggestions: normalizeUserTags(tagOptions),
+  });
+  const genresWrapper = createDiv();
+  genresWrapper.className = "al-form-field al-form-field-tags";
+  genresWrapper.append(
+    makeEl("span", "al-form-label", uiText("add.genres")),
+    genres,
+    makeEl("small", "al-form-hint", uiText("add.genresHint")),
   );
-  genres.closest(".al-form-field")?.classList.add("al-form-field-tags");
+  parent.appendChild(genresWrapper);
 
   const template = templateOptions
     ? createLabeledField(
