@@ -147,7 +147,7 @@ export class AniListClient implements MetadataProviderClient {
     if (this.maxCacheEntries <= 0 || this.cacheTtlMs <= 0) return;
     this.cache.set(key, { expiresAt: this.now() + this.cacheTtlMs, payload });
     while (this.cache.size > this.maxCacheEntries) {
-      const oldest = this.cache.keys().next().value as string | undefined;
+      const [oldest] = this.cache.keys();
       if (!oldest) break;
       this.cache.delete(oldest);
     }

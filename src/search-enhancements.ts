@@ -1,7 +1,6 @@
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { findConfidentDuplicate, type StoredMediaIdentity } from "./duplicate-detection";
 import { searchFeatureText } from "./search-feature-text";
-import type { MediaType } from "./types";
 import { getScopedMarkdownFiles } from "./vault-scope";
 
 function stringValue(value: unknown): string {
@@ -31,7 +30,7 @@ function collectStoredMedia(plugin: AnimeListFeatureHost): StoredMediaIdentity[]
       originalTitle: stringValue(frontmatter.title_original),
       romajiTitle: stringValue(frontmatter.title_romaji),
       aliases: stringArray(frontmatter.title_aliases),
-      mediaType: mediaType as MediaType,
+      mediaType,
       format: stringValue(frontmatter.format),
       year: typeof frontmatter.year === "number" || typeof frontmatter.year === "string" ? frontmatter.year : "",
       total: numberValue(frontmatter.progress_total),
