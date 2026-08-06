@@ -19,7 +19,7 @@ The library uses four personal statuses:
 
 Legacy status values remain readable. Watching, Reading, and Active map to Ongoing; Wishlist, On Hold, and Paused map to Wishlist.
 
-Use the library controls to search, filter by media type, status, genre, or special label, change sorting, and switch between card, list, and poster views.
+Use the library controls to search, filter by media type or status, open the dedicated Filter dialog, change sorting, and switch between card, list, and poster views. The Filter dialog groups animation companies, anime quarters, and reusable work tags. Company and tag groups support multiple selections; quarter is single-select; all active groups apply together.
 
 ## Progress, ratings, and dated entries
 
@@ -32,6 +32,8 @@ Anime progress uses episodes. Manga and novels can use chapters, seasons, or vol
 - Other statuses may leave the rating and completion date empty.
 
 Ratings use a 0–10 range in 0.5-point increments. Existing values such as `7.3` are not changed during upgrade. Saving that note rounds the value to the nearest 0.5 and shows a warning.
+
+For manga and novel dated rows, Tab follows one ordered workflow through the entry label, start date, completion date, Remove, the next row, Add entry, and Save. Plain Enter advances through text/date inputs; Enter on buttons keeps the button action. When the current input is empty, fully selected, or reduced from one character to empty, Backspace can move to the previous ordered field.
 
 Anime shows numeric progress when a usable total is known. Manga and novel progress uses a state-based track: completed titles are full, ongoing or dropped titles with recorded progress are partial, and Wishlist or zero-progress titles are empty.
 
@@ -57,6 +59,28 @@ Search settings can expand queries with Chinese, English, and original-language 
 Results are ranked with title relevance and season, part, movie, special, or edition information. Use **Load more** when a provider has additional results.
 
 Duplicate warnings are intentionally conservative. A warning appears only when stored identity data strongly indicates the same title, rather than merely a related season, adaptation, movie, special, or spin-off. The warning can open the existing note directly.
+
+## Metadata, filters, and tags
+
+When a supported result is selected, AnimeList can enrich the note with classification metadata without replacing the original provider identity. Anime records can show format, animation-production studio, and quarter; manga and novels show format and author information when available. AniList classification can also provide filtered media tags and source material.
+
+The Library **篩選** dialog contains three independent groups:
+
+- **公司** — animation studios for anime. Multiple selections require the work to match every selected studio identity. Formatting-only name variants are collapsed into one option.
+- **季度** — one anime quarter at a time, displayed from the stored season and year.
+- **標籤** — reusable work tags. Multiple selections require the work to contain every selected tag.
+
+Company/quarter filters apply only to anime. All active groups combine, so a work must satisfy the media/status/search controls and every selected filter group. Saved filters that no longer correspond to any current option are cleared automatically instead of hiding the whole library.
+
+Editable work tags are stored in `genres`. Provider classification tags are stored separately in `media_tags`; they do not overwrite the tags you selected for the work. Adding a tag from an Add/Edit dialog also adds it to the reusable catalog. Removing it from one work removes only that membership.
+
+Open **Settings → Tags → Manage tags…** to manage the reusable catalog. The Tag manager is intentionally English and uses a searchable vertical list instead of displaying every tag directly in Settings. Open a tag to rename it, delete it globally, inspect every work using it, or use the `×` beside one work to remove only that work's membership. Renaming into an existing tag merges memberships without creating duplicates.
+
+### Animation-studio metadata
+
+AnimeList treats the Company filter as **animation production**, not generic producers, committees, or financing/production entities. AniList studio data is accepted only from structured animation-studio records. When a Bangumi subject does not expose a usable animation studio in its summary metadata, AnimeList can fall back to Bangumi's structured subject-person relation for animation production.
+
+Studio identity normalization is formatting-based rather than a per-company alias list. Spacing and punctuation variants can collapse to one filter option, while role-labelled or malformed composite metadata is rejected instead of becoming a company name.
 
 ## Favorites and Masterpiece categories
 
@@ -113,6 +137,12 @@ Common values include:
 - `media_type`: `anime`, `manga`, or `novel`
 - `status`: `ongoing`, `completed`, `planned`, or `dropped`
 - `progress_unit`: `episode`, `chapter`, `season`, or `volume`
+- `genres`: editable/reusable work tags; this is the canonical field used by the 1.3 Tag manager and Library tag filter
+- `media_tags`: filtered provider classification tags, kept separate from editable work tags
+- `studios`: animation-production studios for anime
+- `season` and `season_year`: anime quarter metadata used by the Library quarter filter
+- `source_material`: optional classification source material
+- `anilist_id`: preserved AniList identity when a reliable match is available
 - `favorite`: whether the special label is active
 - `masterpiece_labels`: reusable Masterpiece categories
 - `volume_log`: the backward-compatible container for dated serial entries
@@ -136,6 +166,13 @@ The built-in template is intentionally minimal. Custom templates can be placed i
 
 ## Settings and privacy
 
-Settings control storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, Favorite or Masterpiece mode, and migration of missing serial-entry covers.
+Settings control storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, Favorite or Masterpiece mode, reusable tags, migration of missing serial-entry covers, and explicit legacy metadata cleanup.
 
-Only search terms are sent to enabled metadata providers. Ratings, progress, dates, labels, note bodies, and locally stored covers remain in the vault.
+> [!DANGER]
+> **Legacy metadata cleanup changes recognized AnimeList frontmatter.**
+>
+> Stable 1.2.1 notes stay readable without an automatic migration. However, older notes may not yet contain the company/quarter fields used by the new 1.3 filters, and preview/development builds may have written legacy `user_tags`, `classification_*`, mixed tag/studio values, or malformed company data. Before cleanup, make sure the vault is backed up or fully synced. Then use **Settings → Legacy metadata cleanup → Scan and upgrade**. The cleanup preserves unrelated frontmatter and Markdown body content while consolidating recognized legacy fields and refreshing classification metadata when a reliable provider match is available.
+
+The cleanup is explicit rather than automatic. A note without a reliable AniList match remains eligible for a future retry. Existing valid studio metadata is not replaced by the Bangumi fallback path, while missing studio metadata can be recovered from a structured animation-production relation when available.
+
+Only search/enrichment queries are sent to enabled metadata providers. Ratings, progress, dates, reusable tags, note bodies, and locally stored covers remain in the vault.
