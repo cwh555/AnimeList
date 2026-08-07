@@ -4,6 +4,11 @@ AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels
 
 Your Markdown notes remain the source of truth. Removing the plugin does not remove your records, notes, or images.
 
+> [!CAUTION]
+> **Existing libraries and legacy metadata**
+>
+> Stable 1.2.1 notes remain readable and AnimeList does not automatically rewrite the library on startup. To backfill the new company/quarter metadata for existing notes, or if the vault has ever used preview/development builds that wrote `user_tags`, `classification_*`, mixed tag/studio values, or malformed company data, make sure the vault is backed up or synced and run **Settings → Legacy metadata cleanup → Scan and upgrade** once. The cleanup rewrites only recognized AnimeList metadata fields into the current schema and preserves unrelated frontmatter and Markdown body content.
+
 <table>
   <tr>
     <td colspan="2" align="center">
@@ -17,7 +22,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
       <sub><b>Score Dashboard</b></sub>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/timeline.webp" alt="AnimeList completion timeline"><br>
+      <img src="docs/images/timeline.png" alt="AnimeList completion timeline"><br>
       <sub><b>Timeline</b></sub>
     </td>
   </tr>
@@ -34,11 +39,6 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > - Added a mobile-first phone layout for the Library, Score Dashboard, media editors, serial entries, and Timeline while preserving tablet and desktop layouts.
 > - Added consistent keyboard navigation across manga and novel serial-entry rows, including Enter/Tab progression and previous-field Backspace navigation.
 > - Reorganized external metadata providers behind typed clients so search and Load More share the same Bangumi, AniList, and Open Library behavior.
-
-> [!DANGER]
-> **Existing libraries and legacy metadata**
->
-> Stable 1.2.1 notes remain readable and AnimeList does not automatically rewrite the library on startup. To backfill the new company/quarter metadata for existing notes, or if the vault has ever used preview/development builds that wrote `user_tags`, `classification_*`, mixed tag/studio values, or malformed company data, make sure the vault is backed up or synced and run **Settings → Legacy metadata cleanup → Scan and upgrade** once. The cleanup rewrites only recognized AnimeList metadata fields into the current schema and preserves unrelated frontmatter and Markdown body content.
 
 ## Features
 
