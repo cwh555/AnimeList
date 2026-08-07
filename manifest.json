@@ -1,7 +1,7 @@
 {
   "id": "animelist",
   "name": "AnimeList",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "minAppVersion": "1.5.0",
   "description": "A local-first anime, manga, and novel library backed by Markdown, with metadata search, covers, ratings, templates, filters, and a completion timeline.",
   "author": "cwh555",
