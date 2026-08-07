@@ -37,20 +37,49 @@ function optionalInteger(value: unknown): number | null {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-function normalizeSeason(value: unknown): MediaSeason | null {
+export function normalizeMediaSeason(value: unknown): MediaSeason | null {
   const season = stringValue(value).toLocaleLowerCase();
   return season === "winter" || season === "spring" || season === "summer" || season === "fall"
     ? season
     : null;
 }
 
-function seasonFromMonth(value: unknown): MediaSeason | null {
+export function mediaSeasonFromMonth(value: unknown): MediaSeason | null {
   const month = optionalInteger(value);
   if (month === null || month < 1 || month > 12) return null;
   if (month <= 3) return "winter";
   if (month <= 6) return "spring";
   if (month <= 9) return "summer";
   return "fall";
+}
+
+export interface MediaSeasonMetadata {
+  season: MediaSeason | null;
+  seasonYear: number | null;
+}
+
+export interface MediaSeasonMetadataInput {
+  season?: unknown;
+  seasonYear?: unknown;
+  startDate?: unknown;
+  fallbackYear?: unknown;
+}
+
+/**
+ * Resolve the canonical calendar quarter for a work. When an actual start
+ * month is available it wins over provider-specific season buckets, because
+ * AnimeList quarters are calendar quarters (Jan-Mar, Apr-Jun, Jul-Sep,
+ * Oct-Dec). Provider season metadata remains a fallback when the start month
+ * is unavailable.
+ */
+export function resolveMediaSeasonMetadata(input: MediaSeasonMetadataInput): MediaSeasonMetadata {
+  const startDate = record(input.startDate);
+  const startSeason = mediaSeasonFromMonth(startDate.month);
+  const startYear = optionalInteger(startDate.year);
+  return {
+    season: startSeason ?? normalizeMediaSeason(input.season),
+    seasonYear: startYear ?? optionalInteger(input.seasonYear) ?? optionalInteger(input.fallbackYear),
+  };
 }
 
 export function mediaSeasonQuarter(season: MediaSeason | null | undefined): string {
@@ -81,9 +110,11 @@ export function normalizeAniListClassification(value: unknown): MediaClassificat
   }).filter((tag): tag is MediaTagMetadata => tag !== null);
 
   const studios = normalizeStructuredAnimationStudios(asArray(record(media.studios).nodes));
-  const startDate = record(media.startDate);
-  const season = normalizeSeason(media.season) ?? seasonFromMonth(startDate.month);
-  const seasonYear = optionalInteger(media.seasonYear) ?? optionalInteger(startDate.year);
+  const { season, seasonYear } = resolveMediaSeasonMetadata({
+    season: media.season,
+    seasonYear: media.seasonYear,
+    startDate: media.startDate,
+  });
 
   return {
     anilistId,

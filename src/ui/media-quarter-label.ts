@@ -24,7 +24,7 @@ function yearValue(value: unknown): number | null {
 export function mediaQuarterLabel(seasonInput: unknown, seasonYearInput: unknown): string {
   const season = seasonValue(seasonInput);
   const year = yearValue(seasonYearInput);
-  if (!season && year === null) return "";
+  if (!season) return "";
   const quarter = mediaSeasonQuarter(season);
   const period = [year === null ? "" : String(year), quarter].filter(Boolean).join(" ");
   const seasonLabel = season ? SEASON_LABELS[season] : "";

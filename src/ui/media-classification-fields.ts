@@ -1,3 +1,4 @@
+import { resolveMediaSeasonMetadata } from "../domain/media-classification";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { stringArray, stringValue } from "../domain/value-normalization";
 import { compatibleSeasonMetadata, compatibleStudios, seasonMetadataFromValues } from "../data/media-frontmatter-compat";
@@ -61,24 +62,19 @@ export function mediaClassificationFieldValues(
   includeEmpty = false,
 ): MediaClassificationFieldValue[] {
   const classification = result.classification;
-  const startMonth = result.startDate?.month ?? null;
-  const startYear = result.startDate?.year ?? null;
-  const startSeason = startMonth === null
-    ? null
-    : startMonth <= 3
-      ? "winter"
-      : startMonth <= 6
-        ? "spring"
-        : startMonth <= 9
-          ? "summer"
-          : "fall";
-  const inferred = seasonMetadataFromValues(result.rawGenres, startYear ?? result.year);
+  const canonical = resolveMediaSeasonMetadata({
+    season: classification?.season,
+    seasonYear: classification?.seasonYear,
+    startDate: result.startDate,
+    fallbackYear: result.year,
+  });
+  const inferred = seasonMetadataFromValues(result.rawGenres, canonical.seasonYear ?? result.year);
   return classificationRows({
     mediaType: result.mediaType,
     format: result.format,
     people: result.people,
-    season: classification?.season ?? startSeason ?? inferred.season,
-    seasonYear: classification?.seasonYear ?? startYear ?? inferred.seasonYear,
+    season: canonical.season ?? inferred.season,
+    seasonYear: canonical.seasonYear ?? inferred.seasonYear,
   }, includeEmpty);
 }
 

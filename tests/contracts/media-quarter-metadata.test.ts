@@ -1,0 +1,162 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { TFile } from "obsidian";
+import {
+  normalizeAniListClassification,
+  resolveMediaSeasonMetadata,
+} from "../../src/domain/media-classification";
+import type { ExternalMediaResult } from "../../src/domain/media-types";
+import { buildMediaMarkdown } from "../../src/data/media-note-codec";
+import { cleanupLegacyMetadataNotes } from "../../src/data/legacy-metadata-cleanup";
+import { mediaClassificationFieldValues } from "../../src/ui/media-classification-fields";
+import { mediaQuarterLabel } from "../../src/ui/media-quarter-label";
+
+function animeResult(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResult {
+  return {
+    provider: "bangumi",
+    sourceId: "bgm-quarter",
+    sourceUrl: "https://bgm.tv/subject/quarter",
+    mediaType: "anime",
+    title: "Quarter test",
+    originalTitle: "Quarter test",
+    romajiTitle: "Quarter test",
+    format: "tv",
+    year: 2025,
+    coverUrl: "",
+    genres: ["戀愛"],
+    rawGenres: ["戀愛"],
+    people: ["Studio"],
+    platforms: [],
+    total: 24,
+    unit: "episode",
+    summary: "",
+    externalScore: null,
+    releaseStatus: "releasing",
+    searchTitles: ["Quarter test"],
+    sources: [{ provider: "bangumi", sourceId: "bgm-quarter", sourceUrl: "https://bgm.tv/subject/quarter" }],
+    ...overrides,
+  };
+}
+
+function noteFrontmatter(markdown: string): string {
+  const match = markdown.match(/^---\n([\s\S]*?)\n---\n/);
+  assert.ok(match, "generated note must start with YAML frontmatter");
+  return match[1];
+}
+
+describe("anime calendar quarter metadata", () => {
+  it("uses actual start month ahead of provider season buckets", () => {
+    const metadata = resolveMediaSeasonMetadata({
+      season: "spring",
+      seasonYear: 2024,
+      startDate: { year: 2024, month: 3, day: 31 },
+    });
+    assert.deepEqual(metadata, { season: "winter", seasonYear: 2024 });
+
+    const classification = normalizeAniListClassification({
+      id: 42,
+      genres: [],
+      tags: [],
+      studios: { nodes: [] },
+      season: "SPRING",
+      seasonYear: 2024,
+      startDate: { year: 2024, month: 3, day: 31 },
+      source: "ORIGINAL",
+      countryOfOrigin: "JP",
+    });
+    assert.equal(classification?.season, "winter");
+    assert.equal(classification?.seasonYear, 2024);
+  });
+
+  it("uses provider season only when the actual start month is unavailable", () => {
+    assert.deepEqual(resolveMediaSeasonMetadata({
+      season: "summer",
+      seasonYear: 2025,
+      startDate: { year: 2025, month: null, day: null },
+    }), { season: "summer", seasonYear: 2025 });
+  });
+
+  it("keeps UI quarter display aligned with calendar start month and hides year-only pseudo-quarters", () => {
+    const result = animeResult({
+      startDate: { year: 2025, month: 3, day: 31 },
+      classification: {
+        anilistId: "42",
+        genres: ["戀愛"],
+        tags: [],
+        season: "spring",
+        seasonYear: 2025,
+        studios: ["Studio"],
+        source: "original",
+        countryOfOrigin: "JP",
+      },
+    });
+    const quarter = mediaClassificationFieldValues(result).find((row) => row.key === "season");
+    assert.equal(quarter?.value, "2025 Q1 (冬季)");
+    assert.equal(mediaQuarterLabel(null, 2025), "");
+  });
+
+  it("persists quarter from provider startDate even without AniList classification", () => {
+    const markdown = buildMediaMarkdown(animeResult({
+      startDate: { year: 2025, month: 7, day: 4 },
+      classification: undefined,
+    }), {
+      title: "Cross-season show",
+      score: null,
+      status: "ongoing",
+      releaseStatus: "unknown",
+      startedAt: "",
+      completedAt: "",
+      progress: 14,
+      total: 24,
+      unit: "episode",
+      favorite: false,
+      genres: ["戀愛"],
+      templatePath: "",
+      volumeLog: [],
+    }, "", "");
+    const yaml = noteFrontmatter(markdown);
+    assert.match(yaml, /^season: "summer"$/m);
+    assert.match(yaml, /^season_year: 2025$/m);
+  });
+
+  it("backfills a missing quarter when an old note already has only season_year", async () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      media_type: "anime",
+      source_provider: "bangumi",
+      source_id: "quarter-only",
+      source_urls: ["https://bgm.tv/subject/quarter-only"],
+      anilist_id: "12345",
+      title: "Cross-season show",
+      year: 2025,
+      season_year: 2025,
+      genres: ["戀愛"],
+      studios: ["Studio"],
+    };
+    const file = new TFile();
+    file.path = "AnimeList/Anime/Cross-season show.md";
+    file.basename = "Cross-season show";
+    file.extension = "md";
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getRoot: () => ({ children: [file] }) },
+      fileManager: {
+        async processFrontMatter(_file: unknown, callback: (value: Record<string, unknown>) => void) {
+          callback(frontmatter);
+        },
+      },
+    } as any;
+
+    const result = await cleanupLegacyMetadataNotes(app, [""], {
+      apiIntervalMs: 0,
+      enrich: async (source) => ({
+        ...source,
+        startDate: { year: 2025, month: 10, day: 3 },
+      }),
+    });
+
+    assert.equal(frontmatter.season, "fall");
+    assert.equal(frontmatter.season_year, 2025);
+    assert.deepEqual(result.details[0]?.changes, ["season"]);
+  });
+});
