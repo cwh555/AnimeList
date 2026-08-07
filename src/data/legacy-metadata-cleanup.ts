@@ -1,5 +1,5 @@
 import type { App, TFile } from "obsidian";
-import { persistedMediaTags } from "../domain/media-classification";
+import { persistedMediaTags, resolveMediaSeasonMetadata } from "../domain/media-classification";
 import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
 import type { ExternalMediaResult, ExternalMediaSourceRef, MediaType } from "../domain/media-types";
 import type {
@@ -8,7 +8,7 @@ import type {
   LegacyMetadataEnrichmentStatus,
 } from "../domain/legacy-metadata-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
-import { compatibleGenres, compatibleSourceGenres, compatibleStudios, legacyClassificationKeys, legacySelectedClassificationTags, migrateLegacyClassificationHeaders } from "./media-frontmatter-compat";
+import { compatibleGenres, compatibleSeasonMetadata, compatibleSourceGenres, compatibleStudios, legacyClassificationKeys, legacySelectedClassificationTags, migrateLegacyClassificationHeaders } from "./media-frontmatter-compat";
 import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
@@ -148,7 +148,8 @@ function needsMetadataUpgrade(frontmatter: Record<string, unknown>): boolean {
   if (!Number.isInteger(version) || version < CURRENT_MEDIA_SCHEMA_VERSION) return true;
   if (!stringValue(frontmatter.anilist_id).trim()) return true;
   if (frontmatter.media_type !== "anime") return false;
-  if (!Number.isInteger(Number(frontmatter.season_year))) return true;
+  const season = compatibleSeasonMetadata(frontmatter);
+  if (!season.season || season.seasonYear === null) return true;
   return compatibleStudios(frontmatter).length === 0;
 }
 
@@ -233,6 +234,25 @@ function localChangedFields(change: LegacyMetadataCleanupChange): string[] {
   return fields;
 }
 
+function applyAnimeQuarter(
+  frontmatter: Record<string, unknown>,
+  enriched: ExternalMediaResult,
+): string[] {
+  if (enriched.mediaType !== "anime") return [];
+  const classification = enriched.classification;
+  const season = resolveMediaSeasonMetadata({
+    season: classification?.season,
+    seasonYear: classification?.seasonYear,
+    startDate: enriched.startDate,
+    fallbackYear: enriched.year,
+  });
+  if (!season.season) return [];
+  const changes: string[] = [];
+  if (setOptionalString(frontmatter, "season", season.season)) changes.push("season");
+  if (season.seasonYear !== null && setOptionalNumber(frontmatter, "season_year", season.seasonYear)) changes.push("season_year");
+  return changes;
+}
+
 function applyClassification(
   frontmatter: Record<string, unknown>,
   enriched: ExternalMediaResult,
@@ -260,11 +280,12 @@ function applyClassification(
   if (setOptionalArray(frontmatter, "media_tags", persistedMediaTags(classification))) changes.push("media_tags");
   if (enriched.mediaType === "anime") {
     if (setOptionalArray(frontmatter, "studios", normalizeAnimeStudios(classification.studios))) changes.push("studios");
-  } else if (enriched.people.length && setOptionalArray(frontmatter, "authors", enriched.people)) {
-    changes.push("authors");
+    changes.push(...applyAnimeQuarter(frontmatter, enriched));
+  } else {
+    if (enriched.people.length && setOptionalArray(frontmatter, "authors", enriched.people)) changes.push("authors");
+    if (setOptionalString(frontmatter, "season", classification.season ?? "")) changes.push("season");
+    if (setOptionalNumber(frontmatter, "season_year", classification.seasonYear)) changes.push("season_year");
   }
-  if (setOptionalString(frontmatter, "season", classification.season ?? "")) changes.push("season");
-  if (setOptionalNumber(frontmatter, "season_year", classification.seasonYear)) changes.push("season_year");
   if (setOptionalString(frontmatter, "source_material", classification.source)) changes.push("source_material");
   if (setOptionalString(frontmatter, "anilist_id", classification.anilistId)) changes.push("anilist_id");
 
@@ -391,11 +412,13 @@ export async function cleanupLegacyMetadataNotes(
         result.studios += 1;
         changedFields.push("studios");
       }
-      if (enriched) {
-        const classificationFields = applyClassification(frontmatter, enriched, hadLegacyUserTags);
-        if (classificationFields.length) {
+      if (refreshed) {
+        const metadataFields = enriched
+          ? applyClassification(frontmatter, enriched, hadLegacyUserTags)
+          : applyAnimeQuarter(frontmatter, refreshed);
+        if (metadataFields.length) {
           result.classification += 1;
-          changedFields.push(...classificationFields);
+          changedFields.push(...metadataFields);
         }
       }
       if (metadataUpgrade && enriched?.classification && Number(frontmatter.schema_version) !== CURRENT_MEDIA_SCHEMA_VERSION) {
