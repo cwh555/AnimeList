@@ -52,4 +52,13 @@ export const SERIAL_COVER_MESSAGES = {
   "settings.failedTitle": "Failed",
   "settings.summary": "Scanned {scanned} entries. Loaded {loaded}, not found {notFound}, failed {failed}, skipped {skipped}.",
   "settings.failed": "Serial cover loading failed. Check the developer console for details.",
+  "migration.scanning": "Scanning notes",
+  "migration.resolving": "Resolving original title",
+  "migration.loading": "Loading cover",
+  "migration.saving": "Saving cover",
+  "migration.originalTitleUnavailable": "Original title unavailable",
+  "migration.status.loaded": "LOADED",
+  "migration.status.notFound": "NOT FOUND",
+  "migration.status.failed": "FAILED",
+  "migration.status.skipped": "SKIPPED",
 } as const;

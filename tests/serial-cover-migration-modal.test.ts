@@ -27,7 +27,7 @@ test("serial cover migration report summarizes counts and preserves detail order
   assert.equal(output, [
     "Scanned 5 entries. Loaded 2, not found 1, failed 1, skipped 1.",
     "LOADED · Example title · 3 · Cover loaded",
-    "NOT-FOUND · Other title · 7 · No confident match",
+    "NOT FOUND · Other title · 7 · No confident match",
   ].join("\n"));
 });
 

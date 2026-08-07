@@ -31,8 +31,7 @@ export function registerLocaleMessages<T extends TextMessages>(
 ): void {
   const state = CATALOGS.get(namespace);
   if (!state) throw new Error(`Unknown text catalog namespace: ${namespace}`);
-  const fallback = state.messagesByLocale.get(state.defaultLocale) ?? {};
-  const existing = state.messagesByLocale.get(locale) ?? fallback;
+  const existing = state.messagesByLocale.get(locale) ?? {};
   state.messagesByLocale.set(locale, { ...existing, ...messages });
 }
 

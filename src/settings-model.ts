@@ -1,4 +1,5 @@
 import { normalizeStatusFilter } from "./media-status";
+import { DEFAULT_INTERFACE_LANGUAGE, normalizeLanguagePreference } from "./i18n/locale";
 import { normalizeSpecialLabelMode } from "./masterpiece-labels";
 import {
   DEFAULT_SEARCH_LANGUAGES,
@@ -27,6 +28,7 @@ function stringArray(value: unknown): string[] {
 }
 
 export const DEFAULT_SETTINGS: AnimeListSettings = {
+  interfaceLanguage: DEFAULT_INTERFACE_LANGUAGE,
   storageMode: "managed",
   libraryRoot: "AnimeList",
   flatMediaFolder: "AnimeList",
@@ -74,6 +76,7 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
 
   return {
     ...loaded,
+    interfaceLanguage: normalizeLanguagePreference(loaded.interfaceLanguage),
     storageMode: loaded.storageMode === "flat" ? "flat" : "managed",
     libraryRoot: stringValue(loaded.libraryRoot, DEFAULT_SETTINGS.libraryRoot),
     flatMediaFolder: stringValue(loaded.flatMediaFolder, DEFAULT_SETTINGS.flatMediaFolder),

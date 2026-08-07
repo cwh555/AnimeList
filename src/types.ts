@@ -21,6 +21,7 @@ export type {
   LibrarySection,
   LibraryUiState,
   LibraryViewMode,
+  LanguagePreference,
   MigrationSettings,
   ProviderSettings,
   SearchLanguage,

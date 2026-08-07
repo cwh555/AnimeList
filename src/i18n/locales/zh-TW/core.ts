@@ -5,6 +5,15 @@ export const CORE_MESSAGES = {
   "app.optimizeCovers": "最佳化既有封面縮圖",
   "app.clearCoverCache": "清除封面縮圖快取",
 
+  "settings.language.heading": "介面語言",
+  "settings.language.name": "顯示語言",
+  "settings.language.desc": "變更 AnimeList 介面使用的語言。不會修改筆記、標籤或作品資料。",
+  "settings.language.system": "跟隨 Obsidian",
+  "settings.language.zhTW": "繁體中文",
+  "settings.language.en": "English",
+  "settings.language.ja": "日本語",
+  "settings.language.ko": "한국어",
+
   "settings.intro": "AnimeList keeps media records in Markdown. Configure storage, timeline layout, metadata providers, and library setup here.",
   "settings.storageLayout.name": "Storage layout",
   "settings.storageLayout.desc": "Managed mode creates Anime, Manga, and Novel subfolders. Flat mode writes every media note directly into one folder.",
@@ -237,6 +246,10 @@ export const CORE_MESSAGES = {
   "detail.source": "查看資料來源",
   "detail.noProgress": "尚未記錄進度",
   "detail.quarter": "季度 {quarter}",
+  "season.winter": "冬季",
+  "season.spring": "春季",
+  "season.summer": "夏季",
+  "season.fall": "秋季",
 
   "completion.animeCompleted": "動畫標記為{status}時，進度會與總集數同步，且完成日期為必填。",
   "completion.animeActive": "動畫進度會依目前集數與總集數顯示。",

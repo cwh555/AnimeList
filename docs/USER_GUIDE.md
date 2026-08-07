@@ -74,7 +74,7 @@ Company/quarter filters apply only to anime. All active groups combine, so a wor
 
 Editable work tags are stored in `genres`. Provider classification tags are stored separately in `media_tags`; they do not overwrite the tags you selected for the work. Adding a tag from an Add/Edit dialog also adds it to the reusable catalog. Removing it from one work removes only that membership.
 
-Open **Settings → Tags → Manage tags…** to manage the reusable catalog. The Tag manager is intentionally English and uses a searchable vertical list instead of displaying every tag directly in Settings. Open a tag to rename it, delete it globally, inspect every work using it, or use the `×` beside one work to remove only that work's membership. Renaming into an existing tag merges memberships without creating duplicates.
+Open **Settings → Tags → Manage tags…** to manage the reusable catalog. The Tag manager follows the selected AnimeList interface language and uses a searchable vertical list instead of displaying every tag directly in Settings. Open a tag to rename it, delete it globally, inspect every work using it, or use the `×` beside one work to remove only that work's membership. Renaming into an existing tag merges memberships without creating duplicates.
 
 ### Animation-studio metadata
 
@@ -166,7 +166,9 @@ The built-in template is intentionally minimal. Custom templates can be placed i
 
 ## Settings and privacy
 
-Settings control storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, Favorite or Masterpiece mode, reusable tags, migration of missing serial-entry covers, and explicit legacy metadata cleanup.
+Settings control the AnimeList interface language, storage folders, templates, cover storage, timeline defaults, metadata providers, search-language expansion, Favorite or Masterpiece mode, reusable tags, migration of missing serial-entry covers, and explicit legacy metadata cleanup.
+
+The **Interface language** setting supports **Follow Obsidian**, **Traditional Chinese**, **English**, **Japanese**, and **Korean**. Interface language is independent from the Search languages settings: changing it only changes AnimeList labels, descriptions, notices, dialogs, and other product UI. It does not translate or rewrite media titles, provider metadata, reusable tags, Markdown/frontmatter, note bodies, or existing templates. Older settings without an interface-language value continue to use Traditional Chinese.
 
 > [!DANGER]
 > **Legacy metadata cleanup changes recognized AnimeList frontmatter.**

@@ -73,7 +73,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 3. Review the imported metadata and save the note.
 4. Update its status, progress, dates, rating, or special label from the library.
 
-The main Library and media workflow uses Traditional Chinese. The 1.3 Tag manager and legacy-cleanup Settings tools use English. Provider metadata may remain in its original language.
+AnimeList can display its interface in Traditional Chinese, English, Japanese, or Korean. Choose a language in Settings or follow Obsidian's interface language. This changes only AnimeList UI text; provider metadata, media titles, reusable tags, Markdown/frontmatter, and existing templates are not translated or rewritten.
 
 ## Documentation
 

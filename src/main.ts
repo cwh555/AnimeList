@@ -3,6 +3,9 @@ import { AnimeListApplicationServices } from "./app/anime-list-application";
 import { AnimeListFeatureRegistry } from "./app/feature-registry";
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
 import { createReliableLibraryOpener } from "./library-navigation";
+import { normalizeLanguagePreference, resolveInterfaceLocale, type LanguagePreference } from "./i18n/locale";
+import { setActiveLocale } from "./i18n/catalog";
+import { getObsidianInterfaceLanguage } from "./i18n/obsidian-locale";
 import { AnimeListSettingTab } from "./settings";
 import { createDefaultSettings } from "./settings-model";
 import { AnimeListSettingsStore } from "./settings-store";
@@ -100,8 +103,26 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   }
 
   private settingsStore(): AnimeListSettingsStore { return new AnimeListSettingsStore(this); }
-  async loadSettings(): Promise<void> { this.settings = await this.settingsStore().load(); }
+  private applyInterfaceLanguage(): void {
+    setActiveLocale(resolveInterfaceLocale(
+      this.settings.interfaceLanguage,
+      getObsidianInterfaceLanguage(),
+    ));
+  }
+
+  async loadSettings(): Promise<void> {
+    this.settings = await this.settingsStore().load();
+    this.applyInterfaceLanguage();
+  }
+
   async saveSettings(): Promise<void> { this.settings = await this.settingsStore().save(this.settings); }
+
+  async setInterfaceLanguage(preference: LanguagePreference): Promise<void> {
+    this.settings.interfaceLanguage = normalizeLanguagePreference(preference);
+    this.applyInterfaceLanguage();
+    await this.saveSettings();
+    this.refreshViews();
+  }
 
   private async migrateMediaStatuses(): Promise<void> {
     if (this.settings.migrations.mediaStatus >= MEDIA_STATUS_MIGRATION_VERSION) return;

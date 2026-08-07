@@ -9,6 +9,7 @@ import {
 } from "./timeline-scale";
 import type {
   AnimeListSettings,
+  LanguagePreference,
   SearchLanguage,
   SearchLanguageSettings,
   StorageMode,
@@ -27,6 +28,7 @@ export interface AnimeListSettingsHost {
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+  setInterfaceLanguage?(preference: LanguagePreference): Promise<void>;
   getFeatureSettingsSections?(): SettingsSection[];
 }
 
@@ -50,6 +52,14 @@ export class AnimeListSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
+  }
+
+  getInterfaceLanguageDefinition(): SettingDefinition {
+    return {
+      name: uiText("settings.language.name"),
+      desc: uiText("settings.language.desc"),
+      render: (setting) => this.renderInterfaceLanguage(setting),
+    };
   }
 
   getSettingDefinitions(): SettingDefinition[] {
@@ -142,7 +152,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
   getSettingSections(): SettingsSection[] {
     const base = this.getSettingDefinitions();
     const sections: SettingsSection[] = [
-      { definitions: base.slice(0, 6) },
+      { definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)] },
       {
         heading: uiText("settings.timeline.heading"),
         description: uiText("settings.timeline.desc"),
@@ -200,6 +210,29 @@ export class AnimeListSettingTab extends PluginSettingTab {
       return;
     }
     this.renderImperativeSettings();
+  }
+
+  private renderInterfaceLanguage(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      dropdown
+        .addOption("system", uiText("settings.language.system"))
+        .addOption("zh-TW", uiText("settings.language.zhTW"))
+        .addOption("en", uiText("settings.language.en"))
+        .addOption("ja", uiText("settings.language.ja"))
+        .addOption("ko", uiText("settings.language.ko"))
+        .setValue(this.plugin.settings.interfaceLanguage)
+        .onChange(async (value) => {
+          const preference = value as LanguagePreference;
+          if (this.plugin.setInterfaceLanguage) {
+            await this.plugin.setInterfaceLanguage(preference);
+          } else {
+            this.plugin.settings.interfaceLanguage = preference;
+            await this.plugin.saveSettings();
+            this.plugin.refreshViews();
+          }
+          this.refreshSettingsTab();
+        });
+    });
   }
 
   private renderStorageLayout(setting: Setting): void {

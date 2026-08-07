@@ -1,4 +1,5 @@
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
+import { registerBundledLocales } from "./i18n/locales";
 import { additionalProgressUnitsFeature } from "./additional-progress-units-ui";
 import AnimeListPlugin from "./main";
 import { masterpieceFeature } from "./masterpiece-ui";
@@ -11,6 +12,8 @@ import { searchPaginationFeature } from "./search-pagination";
 import { serialEntryCoversFeature } from "./serial-cover-feature";
 import { serialCoverSettingsFeature } from "./serial-cover-settings";
 import { userTagSettingsFeature } from "./user-tag-settings";
+
+registerBundledLocales();
 
 const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   progressUiFeature,

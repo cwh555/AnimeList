@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { masterpieceFeatureText } from "../../src/masterpiece-feature-text";
+import { legacyMetadataText } from "../../src/legacy-metadata-text";
+import { userTagText } from "../../src/user-tag-text";
+import { BUNDLED_LOCALE_CATALOGS, registerBundledLocales } from "../../src/i18n/locales";
+import { normalizeSupportedLocale, resolveInterfaceLocale } from "../../src/i18n/locale";
 import {
   PROGRESS_UNIT_FEATURE_TEXT,
   progressUnitFeatureText,
@@ -58,17 +62,72 @@ describe("user-visible text catalog compatibility", () => {
     assert.equal(scoreDashboardText.selected(3), "已選 3 部");
   });
 
+
+  it("keeps bundled locales complete with matching interpolation placeholders", () => {
+    const placeholderNames = (value: string): string[] => [...value.matchAll(/\{([A-Za-z0-9_.-]+)\}/g)]
+      .map((match) => match[1] ?? "")
+      .sort();
+    const reference = BUNDLED_LOCALE_CATALOGS["zh-TW"];
+    for (const [locale, catalogs] of Object.entries(BUNDLED_LOCALE_CATALOGS)) {
+      for (const namespace of Object.keys(reference) as Array<keyof typeof reference>) {
+        const baseMessages = reference[namespace] as Record<string, string>;
+        const localized = catalogs[namespace] as Record<string, string>;
+        assert.deepEqual(Object.keys(localized).sort(), Object.keys(baseMessages).sort(), `${locale}.${namespace} keys`);
+        for (const [key, template] of Object.entries(baseMessages)) {
+          assert.deepEqual(
+            placeholderNames(localized[key] ?? ""),
+            placeholderNames(template),
+            `${locale}.${namespace}.${key} placeholders`,
+          );
+        }
+      }
+    }
+  });
+
+  it("switches all catalog namespaces between bundled interface languages", () => {
+    registerBundledLocales();
+    const cases = [
+      ["zh-TW", "收藏庫", "儲存", "Tags"],
+      ["en", "Library", "Save", "Tags"],
+      ["ja", "ライブラリ", "保存", "タグ"],
+      ["ko", "라이브러리", "저장", "태그"],
+    ] as const;
+    try {
+      for (const [locale, libraryTitle, save, tagHeading] of cases) {
+        setActiveLocale(locale);
+        assert.equal(uiText("library.title"), libraryTitle);
+        assert.equal(masterpieceFeatureText("modal.save"), save);
+        assert.equal(userTagText("settings.heading"), tagHeading);
+        assert.ok(legacyMetadataText("settings.button").trim());
+        assert.ok(serialCoverText("search").trim());
+        assert.ok(scoreDashboardText.title.trim());
+      }
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
+  it("normalizes explicit and system locale preferences deterministically", () => {
+    assert.equal(normalizeSupportedLocale("zh-Hant-TW"), "zh-TW");
+    assert.equal(normalizeSupportedLocale("en-US"), "en");
+    assert.equal(normalizeSupportedLocale("ja_JP"), "ja");
+    assert.equal(normalizeSupportedLocale("ko-KR"), "ko");
+    assert.equal(resolveInterfaceLocale("system", "ja-JP"), "ja");
+    assert.equal(resolveInterfaceLocale("system", "fr-FR"), "zh-TW");
+    assert.equal(resolveInterfaceLocale("en", "ja-JP"), "en");
+  });
+
   it("supports partial locale registration with per-key fallback", () => {
-    registerLocaleMessages("core", "en", {
+    registerLocaleMessages("core", "test-partial", {
       "action.delete": "Delete",
     });
-    registerLocaleMessages("core", "en", {
+    registerLocaleMessages("core", "test-partial", {
       "library.resultMeta": "Showing {shown} of {total}{genre}",
     });
-    registerLocaleMessages("rating", "en", {
+    registerLocaleMessages("rating", "test-partial", {
       adjusted: "Rating {original} was rounded to {rounded}.",
     });
-    setActiveLocale("en");
+    setActiveLocale("test-partial");
     try {
       assert.equal(uiText("action.delete"), "Delete");
       assert.equal(
