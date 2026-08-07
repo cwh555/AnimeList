@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { setRequestUrlMock } from "./mocks/obsidian";
 import {
   SEARCH_PAGINATION_LIMITS,
   appendNextSearchPage,
   appendSearchResultRows,
   mergeSearchPages,
+  synchronizePaginationState,
 } from "../src/search-pagination";
-import type { ExternalMediaResult } from "../src/types";
+import type { ExternalMediaResult, ExternalMediaSearchPage } from "../src/types";
 
 function result(id: number): ExternalMediaResult {
   return {
@@ -33,33 +33,8 @@ function result(id: number): ExternalMediaResult {
   };
 }
 
-function aniListPayload(id: number, hasNextPage: boolean): unknown {
-  return {
-    data: {
-      Page: {
-        pageInfo: { hasNextPage },
-        media: [{
-          id,
-          siteUrl: `https://anilist.co/anime/${id}`,
-          type: "ANIME",
-          format: "TV",
-          status: "FINISHED",
-          episodes: 12,
-          chapters: null,
-          volumes: null,
-          averageScore: 80,
-          description: "",
-          genres: [],
-          synonyms: [],
-          startDate: { year: 2026, month: 1, day: 1 },
-          title: { romaji: `Title ${id}`, english: `Title ${id}`, native: `Title ${id}` },
-          coverImage: { extraLarge: "", large: "", medium: "" },
-          studios: { nodes: [] },
-          staff: { edges: [] },
-        }],
-      },
-    },
-  };
+function page(results: ExternalMediaResult[], hasMore: boolean): ExternalMediaSearchPage {
+  return { results, warnings: [], hasMore };
 }
 
 describe("search pagination", () => {
@@ -93,14 +68,15 @@ describe("search pagination", () => {
     assert.deepEqual(target.children, ["existing", "2", "3"]);
   });
 
-  it("loads page two into the live modal without rerendering or changing scroll", async () => {
+  it("loads page two through the host service without rerendering or changing scroll", async () => {
     let requestedPage = 0;
-    setRequestUrlMock((options: { body?: string }) => {
-      const body = JSON.parse(options.body ?? "{}") as { variables?: { page?: number } };
-      requestedPage = body.variables?.page ?? 0;
-      return { json: aniListPayload(2, true), text: "", headers: {} };
-    });
-
+    const host = {
+      async searchExternalPage(_mediaType: string, _query: string, pageNumber: number) {
+        requestedPage = pageNumber;
+        return page([result(2)], true);
+      },
+    };
+    const initialResults = [result(1)];
     const contentEl = { scrollTop: 640 };
     const rows = {
       children: ["1"],
@@ -108,12 +84,9 @@ describe("search pagination", () => {
     };
     let renderCalls = 0;
     const modal = {
-      plugin: {
-        settings: { providers: { bangumi: false, anilist: true, openlibrary: false } },
-      },
       mediaType: "anime",
       query: "Title",
-      results: [result(1)],
+      results: initialResults,
       warnings: [],
       contentEl,
       renderSearch() { renderCalls += 1; },
@@ -122,42 +95,38 @@ describe("search pagination", () => {
     };
     const state = {
       signature: "anime\u0000Title",
-      results: [result(1)],
+      results: [...initialResults],
       warnings: [],
       loads: 0,
       hasMore: true,
       loading: false,
-      initialSearchPending: false,
+      sourceResults: initialResults,
     };
 
-    try {
-      const appended = await appendNextSearchPage(
-        modal as never,
-        state,
-        rows as never,
-      );
-      assert.equal(appended, 1);
-      assert.equal(requestedPage, 2);
-      assert.equal(renderCalls, 0);
-      assert.equal(contentEl.scrollTop, 640);
-      assert.deepEqual(rows.children, ["1", "2"]);
-      assert.deepEqual(modal.results.map((item) => item.sourceId), ["1", "2"]);
-    } finally {
-      setRequestUrlMock(null);
-    }
+    const appended = await appendNextSearchPage(host as never, modal as never, state, rows as never);
+    assert.equal(appended, 1);
+    assert.equal(requestedPage, 2);
+    assert.equal(renderCalls, 0);
+    assert.equal(contentEl.scrollTop, 640);
+    assert.deepEqual(rows.children, ["1", "2"]);
+    assert.deepEqual(modal.results.map((item) => item.sourceId), ["1", "2"]);
+    assert.equal(state.sourceResults, modal.results);
   });
 
-  it("stops requesting after two additional pages", async () => {
-    let requests = 0;
-    setRequestUrlMock(() => {
-      requests += 1;
-      return { json: aniListPayload(3, true), text: "", headers: {} };
-    });
+  it("resets loaded pages when the same query is searched again", async () => {
+    let requestedPage = 0;
+    const host = {
+      async searchExternalPage(_mediaType: string, _query: string, pageNumber: number) {
+        requestedPage = pageNumber;
+        return page([result(3)], false);
+      },
+    };
+    const previousResults = [result(1), result(2)];
+    const refreshedResults = [result(1)];
     const modal = {
-      plugin: { settings: { providers: { bangumi: false, anilist: true, openlibrary: false } } },
       mediaType: "anime",
       query: "Title",
-      results: [result(1)],
+      results: refreshedResults,
       warnings: [],
       contentEl: { scrollTop: 0 },
       renderSearch() {},
@@ -166,20 +135,61 @@ describe("search pagination", () => {
     };
     const state = {
       signature: "anime\u0000Title",
-      results: [result(1)],
+      results: [...previousResults],
+      warnings: ["old warning"],
+      loads: 1,
+      hasMore: true,
+      loading: false,
+      sourceResults: previousResults,
+    };
+    const rows = {
+      children: ["1"],
+      appendChild(node: string) { this.children.push(node); },
+    };
+
+    synchronizePaginationState(modal as never, state);
+    assert.equal(state.loads, 0);
+    assert.deepEqual(state.results.map((item) => item.sourceId), ["1"]);
+    assert.deepEqual(state.warnings, []);
+    assert.equal(state.sourceResults, refreshedResults);
+
+    const appended = await appendNextSearchPage(host as never, modal as never, state, rows as never);
+    assert.equal(appended, 1);
+    assert.equal(requestedPage, 2);
+    assert.deepEqual(rows.children, ["1", "3"]);
+  });
+
+  it("stops requesting after two additional pages", async () => {
+    let requests = 0;
+    const host = {
+      async searchExternalPage() {
+        requests += 1;
+        return page([result(3)], true);
+      },
+    };
+    const initialResults = [result(1)];
+    const modal = {
+      mediaType: "anime",
+      query: "Title",
+      results: initialResults,
+      warnings: [],
+      contentEl: { scrollTop: 0 },
+      renderSearch() {},
+      async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title",
+      results: [...initialResults],
       warnings: [],
       loads: SEARCH_PAGINATION_LIMITS.maxLoads,
       hasMore: true,
       loading: false,
-      initialSearchPending: false,
+      sourceResults: initialResults,
     };
     const rows = { appendChild() {} };
 
-    try {
-      assert.equal(await appendNextSearchPage(modal as never, state, rows as never), 0);
-      assert.equal(requests, 0);
-    } finally {
-      setRequestUrlMock(null);
-    }
+    assert.equal(await appendNextSearchPage(host as never, modal as never, state, rows as never), 0);
+    assert.equal(requests, 0);
   });
 });

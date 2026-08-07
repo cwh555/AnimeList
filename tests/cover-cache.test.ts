@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { App, TFile } from "obsidian";
 import {
+  CoverThumbnailCache,
   coverCacheGroupKey,
   coverCacheKey,
   coverCachePaths,
@@ -68,12 +68,100 @@ describe("cover thumbnail cache", () => {
     ]);
   });
 
-  it("queues cache misses and keeps generation off scroll handlers", () => {
-    const source = readFileSync(path.join(process.cwd(), "src/cover-cache.ts"), "utf8");
-    assert.match(source, /if \(!sources\) this\.enqueue\(file\)/);
-    assert.match(source, /requestIdleCallback/);
-    assert.match(source, /workerHandle/);
-    assert.doesNotMatch(source, /addEventListener\(["']scroll/);
-    assert.match(source, /if \(!idle\) \{\n      this\.enqueue\(file\)/);
+  it("defers cache-miss work until a rendered cover reads its sources", () => {
+    const originalWindow = globalThis.window;
+    const scheduled: Array<() => void> = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        requestIdleCallback(callback: () => void) {
+          scheduled.push(callback);
+          return 1;
+        },
+        cancelIdleCallback() {},
+        setTimeout,
+        clearTimeout,
+      },
+    });
+
+    const file = new TFile();
+    file.path = "AnimeList/Covers/deferred.jpg";
+    (file as TFile & { stat: { mtime: number } }).stat = { mtime: 4321 };
+    const app = {
+      vault: {
+        configDir: ".obsidian",
+        adapter: { getResourcePath: (path: string) => `app://${path}` },
+      },
+    } as unknown as App;
+    const cache = new CoverThumbnailCache(app, "animelist");
+
+    try {
+      const sources = cache.getDeferredSources(file);
+      assert.equal(scheduled.length, 0);
+      assert.equal(sources.src, "");
+      assert.equal(scheduled.length, 1);
+      assert.equal(sources.srcset, "");
+      assert.equal(sources.placeholder, "");
+      assert.equal(scheduled.length, 1);
+    } finally {
+      cache.dispose();
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
+  });
+
+  it("queues one idle worker for repeated cache misses without generating synchronously", async () => {
+    const originalWindow = globalThis.window;
+    const scheduled: Array<() => void> = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        requestIdleCallback(callback: () => void) {
+          scheduled.push(callback);
+          return 1;
+        },
+        cancelIdleCallback() {},
+        setTimeout,
+        clearTimeout,
+      },
+    });
+
+    const file = new TFile();
+    file.path = "AnimeList/Covers/example.jpg";
+    (file as TFile & { stat: { mtime: number } }).stat = { mtime: 1234 };
+    let resourceReads = 0;
+    const app = {
+      vault: {
+        configDir: ".obsidian",
+        adapter: {
+          getResourcePath(path: string) {
+            resourceReads += 1;
+            return `app://${path}`;
+          },
+        },
+      },
+    } as unknown as App;
+    const cache = new CoverThumbnailCache(app, "animelist");
+
+    try {
+      assert.equal(cache.getSources(file), undefined);
+      assert.equal(cache.getSources(file), undefined);
+      const result = await cache.optimizeFile(file, false);
+      assert.deepEqual(result, {
+        src: "app://AnimeList/Covers/example.jpg",
+        srcset: "",
+        placeholder: "",
+      });
+      assert.equal(scheduled.length, 1);
+      assert.equal(resourceReads, 1);
+    } finally {
+      cache.dispose();
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
   });
 });

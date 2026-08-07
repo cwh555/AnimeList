@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   captureScrollPosition,
   findNewestSerialLabelInput,
+  scheduleStableSerialEntryFocus,
 } from "../src/serial-entry-scroll-stability";
 
 interface MutableView {
@@ -62,7 +63,7 @@ describe("serial entry scroll stability", () => {
     assert.equal(view.scrollY, 73);
   });
 
-  it("selects the unit input from the newest row, not a segmented date input", () => {
+  it("selects the label input from the newest serial row", () => {
     const previousInput = { value: "1" } as HTMLInputElement;
     const newestInput = { value: "2" } as HTMLInputElement;
     const previousRow = {
@@ -72,7 +73,7 @@ describe("serial entry scroll stability", () => {
       querySelector: (selector: string) => {
         assert.equal(
           selector,
-          ".al-volume-row-fields > .al-form-field:first-child > input",
+          '.al-volume-row-fields > .al-form-field[data-serial-field="label"] > input',
         );
         return newestInput;
       },
@@ -85,4 +86,36 @@ describe("serial entry scroll stability", () => {
 
     assert.equal(findNewestSerialLabelInput(editor), newestInput);
   });
+  it("restores the viewport while focusing the newly added serial label", async () => {
+    let restoreCount = 0;
+    let focusCount = 0;
+    let selectCount = 0;
+    const input = {
+      focus(options?: FocusOptions) {
+        assert.equal(options?.preventScroll, true);
+        focusCount += 1;
+      },
+      select() { selectCount += 1; },
+    } as HTMLInputElement;
+    const row = { querySelector: () => input } as unknown as HTMLElement;
+    const rows = [row] as unknown as NodeListOf<HTMLElement>;
+    Reflect.set(rows, "item", (index: number) => rows[index] ?? null);
+    const view = {
+      setTimeout(callback: () => void) { callback(); return 1; },
+      requestAnimationFrame(callback: FrameRequestCallback) { callback(0); return 1; },
+    } as unknown as Window;
+    const editor = {
+      isConnected: true,
+      ownerDocument: { defaultView: view },
+      querySelectorAll: () => rows,
+    } as unknown as HTMLElement;
+
+    scheduleStableSerialEntryFocus(editor, { restore: () => { restoreCount += 1; } });
+    await Promise.resolve();
+
+    assert.equal(focusCount, 1);
+    assert.equal(selectCount, 1);
+    assert.equal(restoreCount, 6);
+  });
+
 });

@@ -9,6 +9,13 @@ export const COVER_CACHE_POLICY = {
 } as const;
 
 const CACHE_FORMAT_VERSION = "v2";
+const deferredCoverSources = new WeakMap<CoverSources, () => CoverSources | undefined>();
+
+export function peekCoverSources(sources: CoverSources | undefined): CoverSources | undefined {
+  if (!sources) return undefined;
+  const peek = deferredCoverSources.get(sources);
+  return peek ? peek() : sources;
+}
 const WEBP_QUALITY = 0.82;
 const PLACEHOLDER_QUALITY = 0.58;
 
@@ -224,6 +231,30 @@ export class CoverThumbnailCache {
     const sources = this.readSources(file);
     if (!sources) this.enqueue(file);
     return sources;
+  }
+
+  getDeferredSources(file: TFile): CoverSources {
+    this.knownSources.set(file.path, file);
+    const existing = this.readSources(file);
+    if (existing) return existing;
+
+    let requested = false;
+    const request = (): CoverSources | undefined => {
+      const sources = this.readSources(file);
+      if (sources) return sources;
+      if (!requested) {
+        requested = true;
+        this.enqueue(file);
+      }
+      return undefined;
+    };
+    const deferred: CoverSources = {
+      get src() { return request()?.src ?? ""; },
+      get srcset() { return request()?.srcset ?? ""; },
+      get placeholder() { return request()?.placeholder ?? ""; },
+    };
+    deferredCoverSources.set(deferred, () => this.readSources(file));
+    return deferred;
   }
 
   enqueue(file: TFile): boolean {

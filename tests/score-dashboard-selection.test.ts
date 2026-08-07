@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { scoreDashboardDragStackDepth } from "../src/score-dashboard-drag-preview";
-import { ScoreDashboardRefreshGuard } from "../src/score-dashboard-refresh";
+import {
+  ScoreDashboardRefreshGuard,
+  shouldRefreshScoreDashboardMetadata,
+  shouldRefreshScoreDashboardPath,
+  shouldRefreshScoreDashboardRename,
+} from "../src/score-dashboard-refresh";
 import {
   applyScoreDashboardSelectionClick,
   parseScoreDashboardDraggedPaths,
@@ -93,5 +98,44 @@ describe("score dashboard local refresh guard", () => {
     assert.equal(guard.shouldSuppress("anime/expired.md", 2501), false);
     guard.release(["anime/released.md"]);
     assert.equal(guard.shouldSuppress("anime/released.md", 1200), false);
+  });
+});
+
+
+describe("score dashboard refresh scope", () => {
+  const roots = ["AnimeList", "Archive"];
+  const covers = "AnimeList/Covers";
+
+  it("ignores unrelated vault activity while keeping media and cover changes", () => {
+    assert.equal(shouldRefreshScoreDashboardPath("Notes/unrelated.md", roots, covers), false);
+    assert.equal(shouldRefreshScoreDashboardPath("AnimeList/Anime/example.md", roots, covers), true);
+    assert.equal(shouldRefreshScoreDashboardPath("Archive/Manga/example.md", roots, covers), true);
+    assert.equal(shouldRefreshScoreDashboardPath("AnimeList/Covers/example.webp", roots, covers), true);
+  });
+
+  it("checks both sides of a rename", () => {
+    assert.equal(shouldRefreshScoreDashboardRename(
+      "AnimeList/Anime/example.md", "Notes/example.md", roots, covers,
+    ), true);
+    assert.equal(shouldRefreshScoreDashboardRename(
+      "Notes/example.md", "AnimeList/Novel/example.md", roots, covers,
+    ), true);
+    assert.equal(shouldRefreshScoreDashboardRename(
+      "Notes/a.md", "Notes/b.md", roots, covers,
+    ), false);
+  });
+
+  it("preserves local score-write suppression inside the relevant scope", () => {
+    const guard = new ScoreDashboardRefreshGuard(1500);
+    guard.mark(["AnimeList/Anime/example.md"], 1000);
+    assert.equal(shouldRefreshScoreDashboardMetadata(
+      "AnimeList/Anime/example.md", roots, covers, guard, 1000,
+    ), false);
+    assert.equal(shouldRefreshScoreDashboardMetadata(
+      "AnimeList/Anime/other.md", roots, covers, guard, 1000,
+    ), true);
+    assert.equal(shouldRefreshScoreDashboardMetadata(
+      "Notes/unrelated.md", roots, covers, guard, 1000,
+    ), false);
   });
 });

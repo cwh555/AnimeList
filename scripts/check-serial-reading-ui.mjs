@@ -5,7 +5,8 @@ const [
   serialStyles,
   coverStyles,
   progressStyles,
-  buildConfig,
+  styleBundleSource,
+  releaseStyles,
   progressEditorSource,
   segmentedDateSource,
   pickerSource,
@@ -17,7 +18,8 @@ const [
   readFile("styles.serial-reading.css", "utf8"),
   readFile("styles.serial-cover.css", "utf8"),
   readFile("styles.progress.css", "utf8"),
-  readFile("esbuild.config.mjs", "utf8"),
+  readFile("scripts/style-bundle.mjs", "utf8"),
+  readFile("styles.css", "utf8"),
   readFile("src/additional-progress-units-ui.ts", "utf8"),
   readFile("src/segmented-date-input.ts", "utf8"),
   readFile("src/serial-cover-picker.ts", "utf8"),
@@ -55,17 +57,12 @@ assert.match(progressStyles, /\.al-detail-progress/);
 assert.match(progressStyles, /\.al-detail-actions\.has-detail-progress/);
 assert.doesNotMatch(progressStyles, /:has\(/);
 
-assert.match(progressEditorSource, /\.al-volume-editor:not\(\.al-progress-unit-editor\)/);
-assert.match(progressEditorSource, /originalEditor\) => originalEditor\.remove\(\)/);
-assert.doesNotMatch(progressEditorSource, /originalEditor\.hidden/);
-assert.match(progressEditorSource, /\.al-modal-actions > button\.mod-cta/);
-assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.startedAt\)/);
-assert.match(progressEditorSource, /createSegmentedDateInput\(entry\.completedAt \|\| todayString\(\)\)/);
-assert.doesNotMatch(progressEditorSource, /\.type\s*=\s*"date"/);
-assert.match(segmentedDateSource, /createDiv\(\{ cls: "al-date-input" \}\)/);
-assert.match(segmentedDateSource, /bindSegment\(year, 4, month\)/);
-assert.match(segmentedDateSource, /bindSegment\(month, 2, day\)/);
-assert.match(segmentedDateSource, /bindSegment\(day, 2\)/);
+assert.match(progressEditorSource, /READING_EDITOR_STATE_KEY/);
+assert.match(progressEditorSource, /captureScrollPosition\(state\.editor\)/);
+assert.match(progressEditorSource, /scheduleStableSerialEntryFocus\(state\.editor, snapshot\)/);
+assert.doesNotMatch(progressEditorSource, /MutationObserver|Modal\.prototype|processFrontMatter\s*=/);
+assert.match(segmentedDateSource, /SEGMENTED_DATE_PARTS/);
+assert.doesNotMatch(segmentedDateSource, /type\s*=\s*"date"/);
 
 // The whole candidate card is the only action. There is no Select affordance or
 // secondary Apply button/state; clicking a card downloads, commits, and closes.
@@ -91,10 +88,12 @@ assert.equal(
   "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs",
 );
 
-assert.match(buildConfig, /readFile\("styles\.serial-reading\.css", "utf8"\)/);
-assert.match(buildConfig, /readFile\("styles\.serial-cover\.css", "utf8"\)/);
-assert.match(buildConfig, /readFile\("styles\.progress\.css", "utf8"\)/);
-assert.match(buildConfig, /currentStyles\.indexOf\(GENERATED_STYLE_START\)/);
-assert.match(buildConfig, /writeFile\("styles\.css", outputStyles, "utf8"\)/);
+assert.match(styleBundleSource, /"styles\/base\.css"/);
+assert.match(styleBundleSource, /"styles\.serial-reading\.css"/);
+assert.match(styleBundleSource, /"styles\.serial-cover\.css"/);
+assert.match(styleBundleSource, /"styles\.progress\.css"/);
+assert.ok(releaseStyles.includes(serialStyles.trim()));
+assert.ok(releaseStyles.includes(coverStyles.trim()));
+assert.ok(releaseStyles.includes(progressStyles.trim()));
 
 console.log("Serial reading, native cover picker, migration modal, and progress UI checks passed.");

@@ -1,15 +1,8 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
-import { installReliableLibraryNavigation } from "./library-navigation";
-import "./search-pagination";
-import "./search-enhancements";
-import {
-  DEFAULT_SEARCH_LANGUAGES,
-  normalizeSearchLanguageSettings,
-} from "./multilingual-search";
+import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
 import { searchFeatureText } from "./search-feature-text";
 import {
-  DEFAULT_TIMELINE_MAX_STACK_DEPTH,
   MAX_TIMELINE_MAX_STACK_DEPTH,
   MIN_TIMELINE_MAX_STACK_DEPTH,
   normalizeTimelineMaxStackDepth,
@@ -20,6 +13,7 @@ import type {
   SearchLanguageSettings,
   StorageMode,
 } from "./types";
+export { DEFAULT_SETTINGS } from "./settings-model";
 import { uiText } from "./ui-text";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
@@ -27,60 +21,19 @@ const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
 const DEFAULT_COVER_FOLDER = "AnimeList/Covers";
 const DEFAULT_TEMPLATE_FOLDER = "AnimeList/Templates";
 
-export const DEFAULT_SETTINGS: AnimeListSettings = {
-  storageMode: "managed",
-  libraryRoot: "AnimeList",
-  flatMediaFolder: "AnimeList",
-  additionalScanFolders: [],
-  coverFolder: "AnimeList/Covers",
-  templateFolder: "AnimeList/Templates",
-  timelineMaxStackDepth: DEFAULT_TIMELINE_MAX_STACK_DEPTH,
-  googleBooksApiKey: "",
-  providers: {
-    bangumi: true,
-    anilist: true,
-    openlibrary: true,
-  },
-  searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
-  migrations: {
-    mediaStatus: 0,
-  },
-  uiState: {
-    section: "library",
-    type: "all",
-    status: "all",
-    genre: "all",
-    sort: "completed-desc",
-    view: "grid",
-  },
-};
-
 export interface AnimeListSettingsHost {
   app: App;
   settings: AnimeListSettings;
-  loadData(): Promise<unknown>;
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+  getFeatureSettingsSections?(): SettingsSection[];
 }
 
 export interface SettingsSection {
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
-}
-
-export type SettingsSectionExtension = (
-  tab: AnimeListSettingTab,
-) => SettingsSection | SettingsSection[];
-
-const SETTINGS_SECTION_EXTENSIONS = new Map<string, SettingsSectionExtension>();
-
-export function registerSettingsSectionExtension(
-  id: string,
-  extension: SettingsSectionExtension,
-): void {
-  SETTINGS_SECTION_EXTENSIONS.set(id, extension);
 }
 
 function splitFolders(value: string): string[] {
@@ -90,20 +43,13 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
-function rawSearchLanguages(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  return (value as Record<string, unknown>).searchLanguages;
-}
 
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
-  private searchLanguagesHydrated = false;
-  private searchLanguagesHydration: Promise<void> | null = null;
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
-    installReliableLibraryNavigation(plugin);
   }
 
   getSettingDefinitions(): SettingDefinition[] {
@@ -215,9 +161,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         definitions: base.slice(10),
       },
     ];
-    const extensions = [...SETTINGS_SECTION_EXTENSIONS.values()]
-      .flatMap((extension) => extension(this));
-    sections.splice(1, 0, ...extensions);
+    const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
+    sections.splice(1, 0, ...featureSections);
     return sections;
   }
 
@@ -226,25 +171,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
       this.plugin.settings.timelineMaxStackDepth,
     );
     this.renderImperativeSettings();
-    void this.hydrateSearchLanguages();
-  }
-
-  private async hydrateSearchLanguages(): Promise<void> {
-    if (this.searchLanguagesHydrated) return;
-    if (this.searchLanguagesHydration === null) {
-      this.searchLanguagesHydration = (async () => {
-        const loaded = await this.plugin.loadData();
-        this.plugin.settings.searchLanguages = normalizeSearchLanguageSettings(rawSearchLanguages(loaded));
-        this.searchLanguagesHydrated = true;
-        this.renderImperativeSettings();
-      })().catch((error) => {
-        console.warn("AnimeList could not restore search language settings", error);
-        this.searchLanguagesHydrated = true;
-      }).finally(() => {
-        this.searchLanguagesHydration = null;
-      });
-    }
-    await this.searchLanguagesHydration;
   }
 
   private renderImperativeSettings(): void {

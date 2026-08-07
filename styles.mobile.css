@@ -1,0 +1,176 @@
+/* Mobile-first interaction and layout overrides.
+ * This file intentionally sits last in the generated bundle so phone layouts
+ * can change hierarchy without duplicating desktop renderer logic.
+ */
+@media (max-width: 700px) {
+  .animelist-dashboard .markdown-preview-view,
+  .markdown-preview-view.animelist-dashboard { padding-inline: 10px; }
+  .animelist-native-view { padding: 0 10px max(28px, env(safe-area-inset-bottom)); }
+  .al-shell { padding-bottom: 32px; }
+
+  /* Library: compact mobile header, swipeable filters, cover-first cards. */
+  .al-hero { align-items:stretch; flex-direction:column; gap:14px; padding:18px 0 14px; }
+  .al-shell .al-title { font-size:1.7rem; }
+  .al-desc { margin-top:6px; font-size:.78rem; line-height:1.45; }
+  .al-hero-right { width:100%; align-items:stretch; gap:10px; }
+  .al-stats { width:100%; gap:6px; }
+  .al-stat { min-width:0; flex:1 1 0; padding:8px 6px; }
+  .al-stat-number { font-size:.95rem; }
+  .al-stat-label { font-size:.6rem; }
+  .al-hero-actions { display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .al-hero-actions .al-add-button { grid-column:1 / -1; }
+  .al-secondary-button,
+  .al-add-button { min-height:44px; padding-inline:10px; }
+
+  .al-type-tabs,
+  .al-status-bar { width:100%; max-width:none; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
+  .al-type-tabs::-webkit-scrollbar,
+  .al-status-bar::-webkit-scrollbar { display:none; }
+  .al-type-tabs { margin:12px 0 10px; }
+  .al-type-tab { flex:0 0 auto; min-height:42px; padding-inline:12px; scroll-snap-align:start; }
+  .al-status-bar { gap:6px; margin-bottom:16px; padding-bottom:2px; }
+  .al-status-chip { flex:0 0 auto; min-height:38px; padding-inline:12px; }
+
+  .al-toolbar { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+  .al-search { grid-column:1 / -1; min-height:44px; }
+  .al-genre-filter,
+  .al-sort:not(.al-genre-filter) { grid-column:auto; min-width:0; min-height:44px; }
+  .al-genre-filter select,
+  .al-sort select { width:100%; min-width:0; height:42px; }
+  .al-view-switch { grid-column:1 / -1; grid-row:auto; min-height:44px; }
+  .al-view-button { width:auto; min-height:44px; flex:1 1 0; }
+  .al-result-head { margin:16px 0 9px; }
+
+  .al-grid.is-grid,
+  .al-grid.is-poster { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .al-grid.is-grid .al-card,
+  .al-grid.is-poster .al-card { height:auto; min-height:0; max-height:none; flex-direction:column; align-items:stretch; }
+  .al-grid.is-grid .al-cover-wrap,
+  .al-grid.is-poster .al-cover-wrap { width:100%; min-width:0; height:auto; aspect-ratio:2 / 3; }
+  .al-grid.is-grid .al-card-body,
+  .al-grid.is-poster .al-card-body { position:static; inset:auto; height:auto; max-height:none; padding:9px 9px 10px; color:var(--text-normal); background:none; }
+  .al-shell .al-grid.is-grid .al-card-title,
+  .al-shell .al-grid.is-poster .al-card-title { min-height:2.45em; color:var(--text-normal); font-size:.78rem; line-height:1.22; text-shadow:none; }
+  .al-grid.is-grid .al-original-title,
+  .al-grid.is-grid .al-tags,
+  .al-grid.is-grid .al-date-row,
+  .al-grid.is-grid .al-card-footer,
+  .al-grid.is-poster .al-original-title,
+  .al-grid.is-poster .al-facts,
+  .al-grid.is-poster .al-tags,
+  .al-grid.is-poster .al-progress,
+  .al-grid.is-poster .al-date-row,
+  .al-grid.is-poster .al-card-footer,
+  .al-grid.is-poster .al-cover-bottom { display:none; }
+  .al-grid.is-grid .al-facts { margin-top:7px; gap:3px 7px; font-size:.58rem; }
+  .al-grid.is-grid .al-progress { padding-top:8px; }
+  .al-grid.is-grid .al-progress-row { font-size:.57rem; }
+  .al-grid.is-poster .al-cover-shade { height:42%; }
+  .al-grid.is-grid .al-cover-top,
+  .al-grid.is-poster .al-cover-top { top:6px; right:6px; left:6px; }
+  .al-grid.is-grid .al-favorite-button,
+  .al-grid.is-grid .al-edit-button,
+  .al-grid.is-poster .al-favorite-button,
+  .al-grid.is-poster .al-edit-button { width:36px; height:36px; opacity:1; }
+
+  .al-grid.is-list { gap:8px; }
+  .al-grid.is-list .al-card { min-height:126px; }
+  .al-grid.is-list .al-cover-wrap { width:84px; min-width:84px; height:126px; }
+  .al-grid.is-list .al-card-body { padding:10px 11px; }
+  .al-shell .al-grid.is-list .al-card-title { font-size:.9rem; }
+  .al-grid.is-list .al-tags,
+  .al-grid.is-list .al-date-row,
+  .al-grid.is-list .al-card-footer { display:none; }
+
+  /* Score dashboard: score bands become mobile sections with swipeable lanes. */
+  .animelist-score-dashboard-view { padding:0 10px max(28px, env(safe-area-inset-bottom)); }
+  .al-score-dashboard-header { gap:8px; padding:18px 0 14px; }
+  .al-score-dashboard-title { font-size:1.7rem; }
+  .al-score-dashboard-description { line-height:1.45; }
+  .al-score-dashboard-summary { max-width:none; font-size:.68rem; text-align:left; }
+  .al-score-dashboard-controls { position:static; display:grid; grid-template-columns:1fr; gap:8px; padding:10px 0; }
+  .al-score-dashboard-tabs { width:100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .al-score-dashboard-tabs::-webkit-scrollbar { display:none; }
+  .al-score-dashboard-tab { flex:0 0 auto; min-height:42px; }
+  .al-score-dashboard-action-group { width:100%; }
+  .al-score-tool-button { min-height:44px; flex:1 1 0; justify-content:center; }
+  .al-score-dashboard-zoom { order:initial; width:100%; min-height:44px; margin:0; }
+  .al-score-dashboard-zoom input { min-width:0; flex:1; }
+  .al-score-batch-toolbar,
+  .al-score-batch-toolbar.is-visible { position:static; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; }
+  .al-score-batch-count { grid-column:1 / -1; min-width:0; }
+  .al-score-batch-toolbar button,
+  .al-score-batch-target { min-height:44px; width:100%; margin:0; }
+  .al-score-batch-target { grid-column:1 / -1; }
+
+  .al-score-board { overflow:visible; border:0; border-radius:0; background:transparent; }
+  .al-score-group,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-group { display:block; overflow:hidden; margin-bottom:12px; border:1px solid var(--background-modifier-border); border-radius:12px; background:var(--background-primary-alt); }
+  .al-score-major,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-major { min-height:0; flex-direction:row; justify-content:space-between; gap:10px; padding:9px 11px; text-align:left; }
+  .al-score-major-number,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-major-number { font-size:.95rem; }
+  .al-score-major-count,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-major-count { display:block; font-size:.62rem; }
+  .al-score-lane,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-lane { display:block; min-height:0; }
+  .al-score-lane-label,
+  .al-score-dashboard[data-label-layout="compact"] .al-score-lane-label { display:flex; min-height:30px; align-items:center; justify-content:flex-start; padding:6px 10px; border-right:0; border-bottom:1px solid color-mix(in srgb,var(--background-modifier-border) 72%,transparent); font-size:.68rem; }
+  .al-score-lane-posters { flex-wrap:nowrap; align-content:center; overflow-x:auto; overscroll-behavior-inline:contain; padding:9px 10px 11px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+  .al-score-poster { scroll-snap-align:start; }
+
+  /* Media forms and serial-entry editor become touch-first cards. */
+  .modal.animelist-modal { width:calc(100vw - 8px); max-width:none; max-height:calc(100dvh - 8px); }
+  .animelist-modal .modal-content { max-height:calc(100dvh - 18px); overflow-y:auto; padding:0 8px max(12px, env(safe-area-inset-bottom)); }
+  .animelist-modal .al-modal-heading { margin-bottom:13px; }
+  .animelist-modal .al-modal-heading h2 { font-size:1.25rem; }
+  .al-selected-preview { align-items:center; gap:12px; margin-bottom:14px; padding-bottom:14px; }
+  .al-selected-preview img { width:72px; flex:0 0 72px; }
+  .al-selected-preview h2 { font-size:1.08rem; line-height:1.25; }
+  .al-media-form { grid-template-columns:1fr; gap:11px; }
+  .al-form-field:first-child,
+  .al-form-checkbox { grid-column:auto; }
+  .al-form-field input,
+  .al-form-field select,
+  .al-date-input { min-height:44px; }
+  .al-form-field .al-date-input input { min-height:42px; }
+  .al-modal-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding-bottom:max(2px, env(safe-area-inset-bottom)); }
+  .al-modal-actions button { min-height:44px; width:100%; padding-inline:10px; }
+  .al-modal-actions button:only-child { grid-column:1 / -1; }
+
+  .animelist-modal .al-volume-editor { gap:10px; margin-top:14px; padding-top:14px; }
+  .animelist-modal .al-volume-editor-header { align-items:flex-start; flex-direction:column; gap:5px; }
+  .animelist-modal .al-volume-row { display:grid; grid-template-columns:1fr; gap:10px; padding:11px; }
+  .animelist-modal .al-volume-row-fields { grid-template-columns:1fr; width:100%; gap:9px; }
+  .al-serial-cover-panel {
+    width:100%;
+    grid-column:1;
+    grid-row:auto;
+    grid-template-columns:72px minmax(0,1fr);
+    grid-template-rows:auto auto;
+    gap:0 10px;
+    align-items:center;
+    justify-items:stretch;
+  }
+  .al-serial-cover-button { grid-row:1 / span 2; }
+  .al-serial-cover-status { align-self:end; text-align:left; }
+  .al-serial-cover-actions { align-self:start; justify-content:flex-start; }
+  .al-serial-cover-actions button { min-width:44px; min-height:40px; padding:4px 10px; }
+  .animelist-modal .al-volume-row-actions { width:100%; grid-column:1; justify-content:stretch; }
+  .animelist-modal .al-volume-row-actions button { width:100%; min-height:44px; }
+  .animelist-modal .al-volume-editor > .al-secondary-button { width:100%; min-height:44px; }
+
+  /* Timeline chrome becomes full-screen and horizontally scrollable; scene math is untouched. */
+  .modal-container .animelist-timeline-modal.animelist-timeline-modal { width:100vw; height:100dvh; max-height:none; border-radius:0; }
+  .animelist-timeline-modal .modal-content { height:100dvh; }
+  .al-timeline-toolbar { display:grid; grid-template-columns:1fr; gap:8px; padding:10px 10px max(10px, env(safe-area-inset-top)); }
+  .al-timeline-copy { min-width:0; }
+  .al-timeline-type-filters,
+  .al-timeline-controls { width:100%; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .al-timeline-type-filters::-webkit-scrollbar,
+  .al-timeline-controls::-webkit-scrollbar { display:none; }
+  .al-timeline-type-filter { min-height:40px; flex:0 0 auto; padding-inline:12px; }
+  .al-timeline-control-group { flex:0 0 auto; justify-content:flex-start; }
+  .al-timeline-controls button { width:42px; height:42px; flex:0 0 42px; }
+  .al-timeline-control-group button { width:38px; height:38px; flex-basis:38px; }
+}

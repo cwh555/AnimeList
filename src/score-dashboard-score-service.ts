@@ -1,5 +1,6 @@
 import { TFile, type App } from "obsidian";
 import type { ScoreDashboardScoreChange, ScoreDashboardTargetScore } from "./score-dashboard-move";
+import { scoreDashboardText } from "./score-dashboard-text";
 
 interface FrontmatterSnapshot {
   file: TFile;
@@ -33,7 +34,7 @@ function restoreField(
 
 function snapshotFile(app: App, path: string): FrontmatterSnapshot {
   const file = app.vault.getAbstractFileByPath(path);
-  if (!(file instanceof TFile)) throw new Error(`找不到作品筆記：${path}`);
+  if (!(file instanceof TFile)) throw new Error(scoreDashboardText.noteMissing(path));
   const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
   return {
     file,
@@ -75,7 +76,9 @@ export async function applyScoreDashboardChanges(
       }
     }
     const reason = error instanceof Error ? error.message : String(error);
-    const rollback = rollbackFailures.length ? `；回復失敗：${rollbackFailures.join("、")}` : "；已回復先前變更";
-    throw new Error(`更新分數失敗：${reason}${rollback}`);
+    const rollback = rollbackFailures.length
+      ? scoreDashboardText.rollbackFailed(rollbackFailures.join("、"))
+      : scoreDashboardText.rollbackSucceeded;
+    throw new Error(scoreDashboardText.updateFailed(reason, rollback));
   }
 }

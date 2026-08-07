@@ -1,4 +1,5 @@
 import type { MediaType } from "./types";
+import { defineTextCatalog } from "./i18n/catalog";
 import {
   MEDIA_STATUS_FILTER_ORDER,
   MEDIA_STATUS_VALUES,
@@ -95,6 +96,17 @@ export const UI_TEXT = {
   "library.tabAll": "全部作品",
   "library.searchPlaceholder": "搜尋標題、原名、作者、工作室或分類…",
   "library.genreAll": "所有分類",
+  "library.filterButton": "篩選",
+  "library.filterTitle": "篩選作品",
+  "library.filterDescription": "選擇公司、季度與標籤；所有選取條件會同時套用。",
+  "library.filterSearchPlaceholder": "搜尋公司、季度或標籤…",
+  "library.filterCompanies": "公司",
+  "library.filterQuarter": "季度",
+  "library.filterTags": "標籤",
+  "library.filterClear": "清除全部",
+  "library.filterApply": "套用",
+  "library.filterNoMatches": "沒有符合的選項",
+  "library.filterActiveCount": "篩選 {count}",
   "library.sort.completedDesc": "最近完成",
   "library.sort.completedAsc": "最早完成",
   "library.sort.updatedDesc": "最近更新",
@@ -205,8 +217,18 @@ export const UI_TEXT = {
   "add.progressNovelHint": "支援整數、.5 與 EX。",
   "add.total": "作品總數",
   "add.unit": "進度單位",
-  "add.genres": "分類",
-  "add.genresHint": "可用逗號或頓號分隔；常見中英文分類會自動統一。",
+  "add.genres": "標籤",
+  "add.genresHint": "API 會提供預設標籤；可自行新增、移除，收錄後以你的修改為準。",
+  "add.tagsAdd": "新增標籤",
+  "add.tagsPlaceholder": "搜尋既有標籤或輸入新標籤",
+  "add.tagsCreateHint": "按 Enter 建立這個標籤。",
+  "add.tagsRemove": "移除標籤：{tag}",
+  "add.metadataLoading": "正在整理 AniList 作品資料…",
+  "add.metadataTitle": "作品資料",
+  "add.metadataFormat": "作品形式",
+  "add.metadataStudio": "製作公司",
+  "add.metadataAuthors": "作者",
+  "add.metadataSeason": "季度",
   "add.template": "筆記模板",
   "add.templateHint": "模板直接讀取 Templates Folder；可自行新增或修改。",
   "add.noTemplate": "不套用模板",
@@ -216,6 +238,9 @@ export const UI_TEXT = {
 
   "edit.title": "整理：{title}",
   "edit.description": "調整自己的進度、日期與評分；外部作品資料會保持原樣。",
+  "edit.collectionData": "收藏資料",
+  "edit.metadataRefreshing": "正在補齊 AniList 作品資料…",
+  "edit.metadataRefreshUnavailable": "目前無法補齊 AniList 作品資料；既有收藏資料仍可正常編輯。",
 
   "delete.title": "刪除作品？",
   "delete.description": "「{title}」的 Markdown notes 會移到系統垃圾桶；本地封面不會一併刪除。",
@@ -225,6 +250,7 @@ export const UI_TEXT = {
   "detail.library": "回到收藏庫",
   "detail.source": "查看資料來源",
   "detail.noProgress": "尚未記錄進度",
+  "detail.quarter": "季度 {quarter}",
 
   "completion.animeCompleted": "動畫標記為{status}時，進度會與總集數同步，且完成日期為必填。",
   "completion.animeActive": "動畫進度會依目前集數與總集數顯示。",
@@ -269,6 +295,8 @@ export const UI_TEXT = {
   "notice.statusMigrationFailed": "無法完成清單狀態更新：{error}"
 } as const;
 
+const UI_CATALOG = defineTextCatalog("core", UI_TEXT);
+
 export type UiMediaType = "all" | MediaType;
 export type UiStatusFilter = MediaStatusFilter;
 export type UiTextKey = keyof typeof UI_TEXT;
@@ -282,10 +310,7 @@ const STATUS_TEXT_KEYS = {
 } as const satisfies Record<MediaStatus, UiTextKey>;
 
 export function uiText(key: UiTextKey, variables: UiTextVariables = {}): string {
-  const template = UI_TEXT[key];
-  return template.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name: string) => (
-    Object.prototype.hasOwnProperty.call(variables, name) ? String(variables[name]) : match
-  ));
+  return UI_CATALOG.text(key, variables);
 }
 
 export function completedStatusLabel(_mediaType: MediaType): string {

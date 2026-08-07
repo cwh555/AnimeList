@@ -14,7 +14,6 @@
 
 - Support multiple interface languages
 - Export library data as plain text or JSON
-- Add more filtering options
 - Add an image section to notes for storing related images
 - Add a meme section to notes with captions, search, and clipboard copy support
 
@@ -24,5 +23,4 @@
 
 > Performance and usability improvements that preserve existing functionality and behavior.
 
-- Improve media classification and organization
 - Improve layouts and use of available space

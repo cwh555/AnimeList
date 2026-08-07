@@ -1,31 +1,32 @@
-import { Modal, Notice, TFile, setIcon } from "obsidian";
+import { Modal, Notice, setIcon } from "obsidian";
+import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { configureSerialCoverProvider } from "./serial-cover-provider";
 import { directlyApplySerialCover, SerialCoverDirectApply } from "./serial-cover-direct-apply";
 import { SerialCoverLoadQueue } from "./serial-cover-load-queue";
 import { renderSerialCoverCandidateRow } from "./serial-cover-picker";
 import { resolveSerialEntryCoverPaths } from "./serial-cover-timeline";
-import type AnimeListPlugin from "./main";
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "./serial-entry-cover";
 import {
   downloadSelectedSerialCover,
   findSerialCoverCandidates,
   loadConfidentSerialCover,
-  loadMissingSerialCovers,
-  mergeSerialCovers,
   readSerialCovers,
   type SerialCoverLookupContext,
-  type SerialCoverPlugin,
   type StoredSerialCover,
 } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
-import type { ExternalMediaResult, MediaType } from "./types";
+import { READING_EDITOR_STATE_KEY, type ReadingProgressEditorState } from "./additional-progress-units-ui";
+import type { MediaFormContext, MediaFormSubmitContext } from "./ui/media-form-contracts";
+import type { NovelVolumeEntry } from "./types";
 import { uiText } from "./ui-text";
 
+const SERIAL_COVER_EDITOR_STATE_KEY = "serial-cover-editor";
 type AutomaticCoverStatus = "queued" | "loading" | "not-found" | "failed";
 
 interface EditorContext extends SerialCoverLookupContext {
-  modal: HTMLElement;
-  editPath: string | null;
+  host: AnimeListFeatureHost;
+  form: MediaFormContext<AnimeListFeatureHost>;
+  reading: ReadingProgressEditorState;
   covers: Map<string, StoredSerialCover>;
   knownLabels: Set<string>;
   attempted: Set<string>;
@@ -34,30 +35,34 @@ interface EditorContext extends SerialCoverLookupContext {
   rowRenders: Map<HTMLInputElement, () => void>;
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
-function list(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function bindOpenAddModal(
-  plugin: SerialCoverPlugin,
-): (initialType?: MediaType) => void {
-  const method: unknown = Reflect.get(plugin, "openAddModal");
-  if (typeof method !== "function") {
-    throw new TypeError("AnimeList openAddModal must be a function");
-  }
-  return (initialType: MediaType = "anime"): void => {
-    Reflect.apply(method, plugin, [initialType]);
+function storedCover(entry: NovelVolumeEntry): StoredSerialCover | null {
+  if (!entry.cover) return null;
+  return {
+    cover: entry.cover,
+    provider: entry.coverProvider ?? "",
+    sourceId: entry.coverSourceId ?? "",
+    manual: entry.coverManual === true,
   };
+}
+
+export function applySerialCovers(
+  entries: readonly NovelVolumeEntry[],
+  covers: ReadonlyMap<string, StoredSerialCover>,
+): NovelVolumeEntry[] {
+  return entries.map((entry) => {
+    const cover = covers.get(entry.label);
+    if (!cover) {
+      const { cover: _cover, coverProvider: _provider, coverSourceId: _source, coverManual: _manual, ...rest } = entry;
+      return rest;
+    }
+    return {
+      ...entry,
+      cover: cover.cover,
+      coverProvider: cover.provider || undefined,
+      coverSourceId: cover.sourceId || undefined,
+      coverManual: cover.manual || undefined,
+    };
+  });
 }
 
 function refreshRows(context: EditorContext): void {
@@ -76,41 +81,30 @@ class CoverSelector extends Modal {
   private query: string;
 
   constructor(
-    private pluginRef: AnimeListPlugin,
-    private context: EditorContext,
-    private label: string,
+    private readonly host: AnimeListFeatureHost,
+    private readonly context: EditorContext,
+    private readonly label: string,
     candidates: RankedSerialCoverCandidate[],
-    private applyCover: (cover: StoredSerialCover) => void,
+    private readonly applyCover: (cover: StoredSerialCover) => void,
   ) {
-    super(pluginRef.app);
+    super(host.app);
     this.candidates = [...candidates];
     this.query = serialCoverQuery(context.originalTitle, label) ?? context.originalTitle;
   }
 
   onOpen(): void {
     this.modalEl.addClass("animelist-modal", "al-serial-cover-modal");
-    this.titleEl.setText(serialCoverText("selectorTitle", { unit: "entry", label: this.label }));
+    this.titleEl.setText(serialCoverText("selectorTitle", { unit: serialCoverText("entryUnit"), label: this.label }));
     this.contentEl.empty();
-
-    this.contentEl.createEl("p", {
-      cls: "al-modal-hint",
-      text: serialCoverText("selectorDescription"),
-    });
+    this.contentEl.createEl("p", { cls: "al-modal-hint", text: serialCoverText("selectorDescription") });
 
     const searchRow = this.contentEl.createDiv({ cls: "al-modal-search-row" });
     const input = searchRow.createEl("input", { type: "search" });
     input.value = this.query;
     input.placeholder = serialCoverText("searchPlaceholder");
-    const searchButton = searchRow.createEl("button", {
-      cls: "mod-cta",
-      text: uiText("action.search"),
-    });
+    const searchButton = searchRow.createEl("button", { cls: "mod-cta", text: uiText("action.search") });
     searchButton.type = "button";
-
-    this.contentEl.createEl("p", {
-      cls: "al-modal-hint",
-      text: serialCoverText("searchHint"),
-    });
+    this.contentEl.createEl("p", { cls: "al-modal-hint", text: serialCoverText("searchHint") });
     const results = this.contentEl.createDiv({ cls: "al-search-results" });
     let searching = false;
 
@@ -120,50 +114,39 @@ class CoverSelector extends Modal {
       searchButton.disabled = busy;
       searchButton.setText(searching ? serialCoverText("searching") : uiText("action.search"));
     };
-
-    const chooseCandidate = async (candidate: RankedSerialCoverCandidate): Promise<void> => {
-      if (searching || this.directApply.isApplying) return;
-      const operation = directlyApplySerialCover(
-        this.directApply,
-        candidate,
-        (selected) => downloadSelectedSerialCover(this.pluginRef, this.context, selected, true),
-        this.applyCover,
-        () => this.close(),
-      );
-      renderResults();
-      updateControls();
-      try {
-        await operation;
-      } catch (error) {
-        console.error("AnimeList serial cover apply failed", error);
-        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
-        renderResults();
-        updateControls();
-      }
-    };
-
     const renderResults = (): void => {
       results.empty();
-      if (!this.candidates.length) {
-        results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
-        updateControls();
-        return;
-      }
-
+      if (!this.candidates.length) results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
       for (const candidate of this.candidates) {
         const applying = this.directApply.activeSourceId === candidate.sourceId;
         renderSerialCoverCandidateRow(results, candidate, {
           disabled: searching || this.directApply.isApplying,
           applying,
-          matchLabel: applying
-            ? serialCoverText("applying")
-            : serialCoverText("matchScore", { score: Math.round(candidate.score) }),
+          matchLabel: applying ? serialCoverText("applying") : serialCoverText("matchScore", { score: Math.round(candidate.score) }),
           onChoose: () => void chooseCandidate(candidate),
         });
       }
       updateControls();
     };
-
+    const chooseCandidate = async (candidate: RankedSerialCoverCandidate): Promise<void> => {
+      if (searching || this.directApply.isApplying) return;
+      const operation = directlyApplySerialCover(
+        this.directApply,
+        candidate,
+        (selected) => downloadSelectedSerialCover(this.host, this.context, selected, true),
+        this.applyCover,
+        () => this.close(),
+      );
+      renderResults();
+      try {
+        await operation;
+      } catch (error) {
+        console.error("AnimeList serial cover apply failed", error);
+        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
+      } finally {
+        renderResults();
+      }
+    };
     const runSearch = async (): Promise<void> => {
       const query = input.value.trim();
       if (!query) {
@@ -171,22 +154,18 @@ class CoverSelector extends Modal {
         return;
       }
       searching = true;
-      updateControls();
       renderResults();
       try {
         this.query = query;
         this.candidates = await findSerialCoverCandidates(this.context, this.label, query);
-        renderResults();
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
         this.candidates = [];
-        renderResults();
         new Notice(error instanceof Error ? error.message : serialCoverText("notFound"));
       } finally {
         searching = false;
         renderResults();
-        updateControls();
       }
     };
 
@@ -196,50 +175,37 @@ class CoverSelector extends Modal {
       event.preventDefault();
       void runSearch();
     });
-
     renderResults();
-    updateControls();
-    window.setTimeout(() => {
-      input.focus();
-      input.select();
-    }, 0);
+    window.setTimeout(() => { input.focus(); input.select(); }, 0);
   }
 }
 
-function scheduleAutomaticCover(
-  plugin: AnimeListPlugin,
-  context: EditorContext,
-  label: string,
-): void {
+function scheduleAutomaticCover(context: EditorContext, label: string): void {
   if (!serialCoverQuery(context.originalTitle, label)) return;
   if (context.covers.has(label) || context.attempted.has(label)) return;
   context.attempted.add(label);
   context.autoStatus.set(label, "queued");
   refreshRows(context);
-
   void context.autoQueue.enqueue(label, async () => {
     context.autoStatus.set(label, "loading");
     refreshRows(context);
-    return loadConfidentSerialCover(plugin, context, label);
+    return loadConfidentSerialCover(context.host, context, label);
   }).then((cover) => {
     if (cover) {
       context.covers.set(label, cover);
       context.autoStatus.delete(label);
-    } else {
-      context.autoStatus.set(label, "not-found");
-    }
-  }).catch((error) => {
+    } else context.autoStatus.set(label, "not-found");
+  }).catch((error: unknown) => {
     console.error(`AnimeList serial cover automatic lookup failed for ${label}`, error);
     context.autoStatus.set(label, "failed");
   }).finally(() => refreshRows(context));
 }
 
-function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTMLElement): void {
+function configureRow(context: EditorContext, row: HTMLElement): void {
   if (row.dataset.serialCoverReady === "true") return;
   const labelInput = row.querySelector<HTMLInputElement>('.al-volume-row-fields input[type="text"]');
   if (!labelInput) return;
   row.dataset.serialCoverReady = "true";
-
   const panel = row.createDiv({ cls: "al-serial-cover-panel" });
   const coverButton = panel.createEl("button", { cls: "al-serial-cover-button" });
   coverButton.type = "button";
@@ -260,19 +226,16 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
     const stored = context.covers.get(label);
     if (!stored) {
       setIcon(coverButton, "image");
-      const automaticStatus = context.autoStatus.get(label);
-      status.setText(automaticStatus === "queued"
-        ? serialCoverText("queued")
-        : automaticStatus === "loading"
-          ? serialCoverText("loading")
-          : automaticStatus === "not-found" || automaticStatus === "failed"
-            ? serialCoverText("notFound")
+      const automatic = context.autoStatus.get(label);
+      status.setText(automatic === "queued" ? serialCoverText("queued")
+        : automatic === "loading" ? serialCoverText("loading")
+          : automatic === "not-found" || automatic === "failed" ? serialCoverText("notFound")
             : serialCoverText("series"));
       clear.hidden = true;
       return;
     }
     const image = coverButton.createEl("img");
-    image.src = plugin.resolveMediaCoverPath(stored.cover, context.editPath ?? "") || stored.cover;
+    image.src = context.host.resolveMediaCoverPath(stored.cover, context.form.file?.path ?? "") || stored.cover;
     image.alt = `${context.originalTitle} ${labelInput.value}`;
     status.setText(stored.manual ? serialCoverText("manual") : serialCoverText("autoFound"));
     clear.hidden = false;
@@ -286,7 +249,7 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
     status.setText(serialCoverText("loading"));
     try {
       const candidates = await findSerialCoverCandidates(context, label, query);
-      new CoverSelector(plugin, context, label, candidates, (cover) => {
+      new CoverSelector(context.host, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
         context.autoStatus.delete(label);
         refreshRows(context);
@@ -297,14 +260,12 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
       new Notice(error instanceof Error ? error.message : String(error));
     }
   };
-
   const scheduleCurrentLabel = (): void => {
     const label = labelInput.value.trim();
     if (!label || context.knownLabels.has(label)) return;
     context.knownLabels.add(label);
-    scheduleAutomaticCover(plugin, context, label);
+    scheduleAutomaticCover(context, label);
   };
-
   retry.addEventListener("click", () => void search());
   coverButton.addEventListener("click", () => void search());
   clear.addEventListener("click", () => {
@@ -318,158 +279,76 @@ function configureRow(plugin: AnimeListPlugin, context: EditorContext, row: HTML
   scheduleCurrentLabel();
 }
 
-function configureRows(plugin: AnimeListPlugin, context: EditorContext): void {
-  context.modal.querySelectorAll<HTMLElement>(".al-progress-unit-editor .al-volume-row")
-    .forEach((row) => configureRow(plugin, context, row));
+function configureRows(context: EditorContext): void {
+  context.reading.editor.querySelectorAll<HTMLElement>(".al-volume-row")
+    .forEach((row) => configureRow(context, row));
 }
 
-export function installSerialEntryCovers(plugin: SerialCoverPlugin): void {
-  configureSerialCoverProvider({ apiKey: plugin.settings.googleBooksApiKey });
-  const contexts = new WeakMap<HTMLElement, EditorContext>();
-  let activeEditPath: string | null = null;
-  let pendingSave: EditorContext | null = null;
-  let createResult: ExternalMediaResult | null = null;
-
-  const originalCollectMediaItems = plugin.collectMediaItems.bind(plugin);
-  plugin.collectMediaItems = (source?: string) => originalCollectMediaItems(source).map((item) => ({
-    ...item,
-    volumeLog: resolveSerialEntryCoverPaths(item.volumeLog, (cover) => (
-      plugin.resolveMediaCoverPath(cover, item.filePath)
-    )),
-  }));
-
-  const originalOpenEdit = plugin.openEditModal.bind(plugin);
-  plugin.openEditModal = (path: string): void => {
-    activeEditPath = path;
-    originalOpenEdit(path);
-  };
-
-  const configure = (modal: HTMLElement): void => {
-    const existing = contexts.get(modal);
-    if (existing) {
-      configureRows(plugin, existing);
-      return;
-    }
-    if (!modal.querySelector(".al-progress-unit-editor")) return;
-
-    let frontmatter: Record<string, unknown> = {};
-    let mediaType: "manga" | "novel" | null = null;
-    let originalTitle = "";
-    let editPath: string | null = null;
-    if (modal.classList.contains("animelist-edit-modal")) {
-      editPath = activeEditPath;
-      const file = editPath ? plugin.app.vault.getAbstractFileByPath(editPath) : null;
-      if (file instanceof TFile) {
-        frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-      }
-      mediaType = frontmatter.media_type === "manga"
-        ? "manga"
-        : frontmatter.media_type === "novel" ? "novel" : null;
-      originalTitle = selectOriginalTitle(frontmatter.title_original, frontmatter.title_aliases) ?? "";
-    } else if (createResult) {
-      mediaType = createResult.mediaType === "manga"
-        ? "manga"
-        : createResult.mediaType === "novel" ? "novel" : null;
-      originalTitle = selectOriginalTitle(createResult.originalTitle, createResult.searchTitles) ?? "";
-    }
-    if (!mediaType) return;
-
-    const existingEntries = list(frontmatter.volume_log);
-    const context: EditorContext = {
-      modal,
-      editPath,
-      mediaType,
-      originalTitle,
-      covers: readSerialCovers(existingEntries),
-      knownLabels: new Set(existingEntries.flatMap((raw) => {
-        const entry = record(raw);
-        const label = text(entry?.label ?? entry?.volume).trim();
-        return label ? [label] : [];
-      })),
-      attempted: new Set(),
-      autoQueue: new SerialCoverLoadQueue(),
-      autoStatus: new Map(),
-      rowRenders: new Map(),
-    };
-    contexts.set(modal, context);
-    configureRows(plugin, context);
-  };
-
-  const originalOpenAdd = bindOpenAddModal(plugin);
-  plugin.openAddModal = (initialType: MediaType = "anime"): void => {
-    const modalOpen: unknown = Reflect.get(Modal.prototype, "open");
-    if (typeof modalOpen !== "function") {
-      throw new TypeError("Obsidian Modal.open must be a function");
-    }
-    const captured: Array<Modal & { renderDetails?: (result: ExternalMediaResult) => Promise<void> }> = [];
-    Modal.prototype.open = function capture(this: Modal): void {
-      Reflect.apply(modalOpen, this, []);
-      if (this.modalEl.classList.contains("animelist-modal")) captured.push(this);
-    };
-    try {
-      originalOpenAdd(initialType);
-    } finally {
-      Reflect.set(Modal.prototype, "open", modalOpen);
-    }
-    const modal = captured.at(-1);
-    if (!modal || typeof modal.renderDetails !== "function") return;
-    const renderDetails = modal.renderDetails.bind(modal);
-    modal.renderDetails = async (result: ExternalMediaResult) => {
-      createResult = result;
-      await renderDetails(result);
-      configure(modal.modalEl);
-    };
-  };
-
-  const originalCreate = plugin.createMediaNote.bind(plugin);
-  plugin.createMediaNote = async (result, form) => {
-    const file = await originalCreate(result, form);
-    const context = pendingSave;
-    pendingSave = null;
-    if (context) {
-      await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
-        mergeSerialCovers(frontmatter, context.covers);
-      });
-    }
-    return file;
-  };
-
-  const fileManager = plugin.app.fileManager;
-  const originalProcess = fileManager.processFrontMatter.bind(fileManager);
-  fileManager.processFrontMatter = async (file, callback): Promise<void> => {
-    await originalProcess(file, callback);
-    const context = pendingSave?.editPath === file.path ? pendingSave : null;
-    if (!context) return;
-    pendingSave = null;
-    await originalProcess(file, (frontmatter) => mergeSerialCovers(frontmatter, context.covers));
-  };
-
-  const observer = new MutationObserver(() => {
-    document.querySelectorAll<HTMLElement>(".animelist-modal").forEach(configure);
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-
-  const saveCapture = (event: MouseEvent): void => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const modal = target.closest<HTMLButtonElement>(".al-modal-actions > button.mod-cta")
-      ?.closest<HTMLElement>(".animelist-modal");
-    const context = modal ? contexts.get(modal) : null;
-    if (context) pendingSave = context;
-  };
-  document.addEventListener("click", saveCapture, true);
-  plugin.loadMissingSerialCovers = (onProgress, signal) => (
-    loadMissingSerialCovers(plugin, onProgress, signal)
-  );
-
-  plugin.register(() => {
-    observer.disconnect();
-    document.removeEventListener("click", saveCapture, true);
-    plugin.collectMediaItems = originalCollectMediaItems;
-    plugin.openEditModal = originalOpenEdit;
-    plugin.openAddModal = originalOpenAdd;
-    plugin.createMediaNote = originalCreate;
-    fileManager.processFrontMatter = originalProcess;
-    delete plugin.loadMissingSerialCovers;
-  });
+function readingState(context: MediaFormContext<AnimeListFeatureHost>): ReadingProgressEditorState | null {
+  const value = context.state.get(READING_EDITOR_STATE_KEY);
+  return value && typeof value === "object" && "editor" in value
+    ? value as ReadingProgressEditorState
+    : null;
 }
+
+function configureSerialEditor(form: MediaFormContext<AnimeListFeatureHost>): void {
+  const reading = readingState(form);
+  if (!reading || (form.mediaType !== "manga" && form.mediaType !== "novel")) return;
+  const originalTitle = selectOriginalTitle(
+    form.result?.originalTitle ?? form.frontmatter.title_original,
+    form.result?.searchTitles ?? form.frontmatter.title_aliases,
+  ) ?? reading.originalTitle;
+  const covers = readSerialCovers(reading.entries);
+  const context: EditorContext = {
+    host: form.host,
+    form,
+    reading,
+    mediaType: form.mediaType,
+    originalTitle,
+    covers,
+    knownLabels: new Set(reading.entries.map((entry) => entry.label)),
+    attempted: new Set(),
+    autoQueue: new SerialCoverLoadQueue(),
+    autoStatus: new Map(),
+    rowRenders: new Map(),
+  };
+  for (const entry of reading.entries) {
+    const stored = storedCover(entry);
+    if (stored) context.covers.set(entry.label, stored);
+  }
+  form.state.set(SERIAL_COVER_EDITOR_STATE_KEY, context);
+  reading.listeners.add(() => configureRows(context));
+  configureRows(context);
+}
+
+function prepareSerialSubmit(form: MediaFormSubmitContext<AnimeListFeatureHost>): void {
+  const value = form.state.get(SERIAL_COVER_EDITOR_STATE_KEY);
+  if (!value || typeof value !== "object" || !("covers" in value)) return;
+  const context = value as EditorContext;
+  form.form.volumeLog = applySerialCovers(form.form.volumeLog, context.covers);
+}
+
+export const serialEntryCoversFeature = defineFeature<AnimeListFeatureHost>({
+  id: "serial-entry-covers",
+  dependsOn: ["progress-units"],
+  contributions: [{
+    kind: "lifecycle",
+    activate(host) {
+      configureSerialCoverProvider({ apiKey: host.settings.googleBooksApiKey });
+    },
+  }, {
+    kind: "media-item",
+    decorate(item, host) {
+      return {
+        ...item,
+        volumeLog: resolveSerialEntryCoverPaths(item.volumeLog, (cover) => (
+          host.resolveMediaCoverPath(cover, item.filePath)
+        )),
+      };
+    },
+  }, {
+    kind: "media-form",
+    configure: configureSerialEditor,
+    prepareSubmit: prepareSerialSubmit,
+  }],
+});

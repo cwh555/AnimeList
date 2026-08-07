@@ -38,11 +38,52 @@ ANIMELIST_TEST_VAULT=/absolute/path/to/vault npm run test-vault
 
 Use `-- --no-open` when the vault should be prepared without launching Obsidian.
 
+## Targeted automated tests
+
+The complete test command remains:
+
+```bash
+npm test
+```
+
+Tests are cataloged by layer and functionality, so a branch can run the smallest relevant suite while developing:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:contract
+npm run test:legacy
+npm run test:feature -- timeline
+npm run test:feature -- serial-covers
+npm run test:list
+```
+
+`tests/legacy-characterization.test.ts` contains characterization and source-structure checks that protect the current compatibility implementation and is catalogued in the `legacy` suite. New behavior tests belong in dedicated feature-named files or `tests/contracts`; do not add new product behavior only to the legacy suite.
+
 Before opening a pull request, run:
 
 ```bash
 npm run check
+npm run release:check
 ```
+
+`npm run check` includes both the compatibility typecheck and the strict typecheck for new domain, data, i18n, and shared UI modules.
+
+## Architecture and compatibility boundaries
+
+Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before moving shared behavior. New persistence, normalization, provider, or settings rules belong in the responsible typed module, not in `src/main.ts` or `src/legacy.ts`. `src/types.ts` is a compatibility barrel; new modules should import directly from `src/domain`.
+
+User-visible text must be added to `src/ui-text.ts` or a feature `*-text.ts` catalog. Do not locate controls by translated label text; expose a semantic field role or typed integration hook instead.
+
+Styles are maintained as `styles/base.css` plus feature source files. Use:
+
+```bash
+npm run styles:check   # verify the committed release bundle
+npm run styles:build   # intentionally regenerate styles.css
+npm run styles:dev     # watch a disposable development bundle
+```
+
+Ordinary builds must leave the working tree clean.
 
 Do not commit the test vault, its media data, generated fixtures, or Obsidian workspace state.
 

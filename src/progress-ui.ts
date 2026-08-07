@@ -1,4 +1,4 @@
-import { AnimeListUI, DetailActionsRenderChild } from "./legacy";
+import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
 import { normalizeMediaStatus } from "./media-status";
 import { normalizeProgressValue, progressDisplayValue } from "./novel-progress";
 import { progressPresentation } from "./progress-display";
@@ -15,41 +15,12 @@ interface ProgressRenderInput {
   trailingText?: string;
 }
 
-interface LegacyLibraryUi {
-  renderLibrary: (container: HTMLElement, inputItems: unknown[], adapters?: unknown) => void;
-}
-
-interface DetailRenderInstance {
-  plugin: {
-    app: {
-      vault: {
-        getAbstractFileByPath(path: string): unknown;
-      };
-      metadataCache: {
-        getFileCache(file: unknown): { frontmatter?: Record<string, unknown> } | null;
-      };
-    };
-  };
-  sourcePath: string;
-  containerEl: HTMLElement;
-}
-
-type DetailRender = (this: DetailRenderInstance) => void;
-
 function primitiveString(value: unknown, fallback = ""): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
 }
 
 function mediaTypeValue(value: unknown): MediaType {
   return value === "manga" || value === "novel" ? value : "anime";
-}
-
-function legacyLibraryUi(value: unknown): LegacyLibraryUi {
-  return value as LegacyLibraryUi;
-}
-
-function legacyLibraryRender(value: unknown): LegacyLibraryUi["renderLibrary"] {
-  return value as LegacyLibraryUi["renderLibrary"];
 }
 
 function progressStatusFromCard(card: HTMLElement): string {
@@ -112,45 +83,41 @@ function synchronizeLibraryProgress(container: HTMLElement): void {
   });
 }
 
-const libraryUi = legacyLibraryUi(AnimeListUI);
-const originalRenderLibrary = legacyLibraryRender(libraryUi.renderLibrary);
-libraryUi.renderLibrary = (container: HTMLElement, inputItems: unknown[], adapters: unknown = {}) => {
-  originalRenderLibrary.call(libraryUi, container, inputItems, adapters);
-  synchronizeLibraryProgress(container);
-};
+export const progressUiFeature = defineFeature<AnimeListFeatureHost>({
+  id: "progress-display",
+  contributions: [{
+    kind: "library",
+    afterRender({ container }): void {
+      synchronizeLibraryProgress(container);
+    },
+  }, {
+    kind: "detail",
+    afterRender({ container, frontmatter }): void {
+      const mediaType = mediaTypeValue(frontmatter.media_type);
+      const progress = normalizeProgressValue(frontmatter.progress);
+      const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
+      const unit = primitiveString(frontmatter.progress_unit);
+      const summary = container.querySelector<HTMLElement>(".al-detail-summary");
+      const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
+      const text = summaryProgress?.textContent?.trim()
+        || (progress !== 0
+          ? uiText(mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", {
+            progress: progressDisplayValue(progress),
+            unit,
+          })
+          : uiText("detail.noProgress"));
+      summaryProgress?.remove();
 
-const detailPrototype = DetailActionsRenderChild.prototype as unknown as { render: DetailRender };
-const originalDetailRender: DetailRender = detailPrototype.render;
-detailPrototype.render = function renderUnifiedDetailProgress(): void {
-  originalDetailRender.call(this);
-
-  const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
-  if (!file) return;
-  const frontmatter = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-  const mediaType = mediaTypeValue(frontmatter.media_type);
-  const progress = normalizeProgressValue(frontmatter.progress);
-  const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
-  const unit = primitiveString(frontmatter.progress_unit);
-  const summary = this.containerEl.querySelector<HTMLElement>(".al-detail-summary");
-  const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
-  const text = summaryProgress?.textContent?.trim()
-    || (progress !== 0
-      ? uiText(mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", {
-        progress: progressDisplayValue(progress),
+      const progressContainer = container.createDiv({ cls: "al-progress al-detail-progress" });
+      container.querySelector<HTMLElement>(".al-detail-actions")?.addClass("has-detail-progress");
+      renderProgress(progressContainer, {
+        mediaType,
+        status: normalizeMediaStatus(frontmatter.status),
+        progress,
+        total,
         unit,
-      })
-      : uiText("detail.noProgress"));
-  summaryProgress?.remove();
-
-  const progressContainer = this.containerEl.createDiv({ cls: "al-progress al-detail-progress" });
-  this.containerEl.querySelector<HTMLElement>(".al-detail-actions")
-    ?.addClass("has-detail-progress");
-  renderProgress(progressContainer, {
-    mediaType,
-    status: normalizeMediaStatus(frontmatter.status),
-    progress,
-    total,
-    unit,
-    text,
-  });
-};
+        text,
+      });
+    },
+  }],
+});

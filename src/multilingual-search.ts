@@ -16,6 +16,7 @@ export interface SearchProviderAdapter {
   label: string;
   supportsChineseDiscovery?: boolean;
   search(query: string): Promise<ExternalMediaResult[]>;
+  searchMany?(queries: string[]): Promise<ExternalMediaResult[][]>;
 }
 
 export interface MultilingualSearchOptions {
@@ -177,14 +178,22 @@ async function runProviderQueries(
   providers: SearchProviderAdapter[],
   queries: string[],
 ): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-  const tasks: Array<Promise<ProviderQueryOutcome>> = providers.flatMap((provider) => queries.map(async (query) => {
-    try {
-      const results = await provider.search(query);
-      return { provider: provider.label, results } satisfies ProviderQuerySuccess;
-    } catch (error: unknown) {
-      return { provider: provider.label, error } satisfies ProviderQueryFailure;
+  const tasks: Array<Promise<ProviderQueryOutcome>> = providers.flatMap((provider) => {
+    if (provider.searchMany && queries.length > 1) {
+      return [provider.searchMany(queries).then(
+        (batches) => ({ provider: provider.label, results: batches.flat() }) satisfies ProviderQuerySuccess,
+        (error: unknown) => ({ provider: provider.label, error }) satisfies ProviderQueryFailure,
+      )];
     }
-  }));
+    return queries.map(async (query) => {
+      try {
+        const results = await provider.search(query);
+        return { provider: provider.label, results } satisfies ProviderQuerySuccess;
+      } catch (error: unknown) {
+        return { provider: provider.label, error } satisfies ProviderQueryFailure;
+      }
+    });
+  });
   const settled = await Promise.all(tasks);
   const warningByProvider = new Map<string, string>();
   const results: ExternalMediaResult[] = [];
