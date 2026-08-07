@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { access, rm } from "node:fs/promises";
-import net from "node:net";
+import { access, readFile, rm } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 
 async function executable(pathname) {
@@ -34,18 +34,6 @@ async function findChromium() {
   return "";
 }
 
-async function reservePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      assert.ok(address && typeof address === "object");
-      server.close(() => resolve(address.port));
-    });
-  });
-}
-
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export async function runChromiumDatasetTest({
@@ -64,13 +52,12 @@ export async function runChromiumDatasetTest({
     return;
   }
 
-  const debugPort = await reservePort();
   const chrome = spawn(browser, [
     "--headless=new",
     "--no-sandbox",
     "--disable-gpu",
     "--disable-dev-shm-usage",
-    `--remote-debugging-port=${debugPort}`,
+    "--remote-debugging-port=0",
     `--user-data-dir=${profile}`,
     "about:blank",
   ], { stdio: ["ignore", "ignore", "pipe"] });
@@ -80,14 +67,38 @@ export async function runChromiumDatasetTest({
 
   let socket;
   try {
+    let debugPort;
+    const activePortFile = path.join(profile, "DevToolsActivePort");
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      if (chrome.exitCode !== null) break;
+      try {
+        const [portLine] = (await readFile(activePortFile, "utf8")).split(/\r?\n/);
+        const parsedPort = Number.parseInt(portLine, 10);
+        if (Number.isInteger(parsedPort) && parsedPort > 0) {
+          debugPort = parsedPort;
+          break;
+        }
+      } catch {
+        // Chromium has not finished creating its debugger endpoint yet.
+      }
+      await sleep(100);
+    }
+    assert.ok(
+      debugPort,
+      chrome.exitCode === null
+        ? `Chromium did not expose a debugger port within 30 seconds. ${chromeError}`
+        : `Chromium exited before exposing a debugger port (exit ${chrome.exitCode}). ${chromeError}`,
+    );
+
     let target;
     for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (chrome.exitCode !== null) break;
       try {
         const targets = await fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json());
         target = targets.find((candidate) => candidate.type === "page");
         if (target) break;
       } catch {
-        // Chromium has not exposed the debugger socket yet.
+        // The debugger port exists, but the page target is not ready yet.
       }
       await sleep(100);
     }
