@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.3.0 - 2026-08-07
+
+### Added
+
+- Added structured media classification metadata, including format, animation studio or author, anime quarter, filtered AniList media tags, source material, and AniList identity when available.
+- Added one Library filter dialog with animation-company, quarter, and reusable-tag groups. Company and tag selections support multi-select matching, quarter is single-select, and the groups combine together.
+- Added a persistent reusable tag catalog and an English Settings **Tag manager** with search, creation, rename, global delete, usage counts, and per-work removal.
+- Added unified keyboard navigation for manga and novel serial-entry rows: Enter advances through editable fields, Tab follows the same ordered flow, and Backspace can move to the previous field when the current value is empty or fully selected.
+- Added a mobile-first phone layout for the Library, Score Dashboard, Add/Edit dialogs, serial-entry editor, and Timeline without introducing a separate mobile data path.
+
+### Changed
+
+- Reorganized Bangumi, AniList, and Open Library behind typed provider clients so initial search and **Load more** share one transport and pagination path while preserving the existing multi-provider search behavior.
+- Work-level editable tags remain canonical in `genres`; provider classification tags are stored separately in `media_tags` and do not replace user-edited tags.
+- Large Library views now use a scoped `MediaLibraryIndex`, progressive card rendering, on-demand thumbnail generation, and path-scoped refresh handling instead of rebuilding the complete UI for unrelated vault changes.
+- Score Dashboard and Markdown AnimeList views now ignore unrelated vault changes, and Score Dashboard no longer schedules thumbnail generation for every poster simply because the dashboard is opened.
+
+### Improved
+
+- Improved animation-studio selection by using AniList's structured animation-studio flag and Bangumi's structured animation-production person relations instead of treating generic production-company text as an animation studio.
+- Canonicalized animation-studio identity so formatting-only variants such as spacing or punctuation differences collapse to one readable Library filter option.
+- Improved existing-library startup safety so tag catalog initialization does not initialize an empty Library cache before Obsidian metadata is ready, and stale saved filter values are discarded when their options no longer exist.
+- Improved phone usability with touch-sized controls, horizontally swipeable filter/status/score lanes, near-full-screen editors, and full-screen Timeline chrome.
+
+### Compatibility and migration
+
+- Stable 1.2.1 Markdown notes remain readable without an automatic startup migration, and the current media schema remains version 6.
+- Existing notes may not contain the new `studios`, `season`, or `season_year` metadata. Run **Settings → Legacy metadata cleanup → Scan and upgrade** to backfill supported classification data before relying on company or quarter filters for an older library.
+- Legacy `user_tags` and supported `classification_*` fields are read compatibly and can be consolidated into canonical fields by the explicit cleanup flow. Unrelated frontmatter, Obsidian `tags`, source identity, personal progress/rating data, and Markdown body content are preserved.
+- The cleanup is explicit and rate-limited; an unavailable AniList match leaves the note eligible for a later retry, while structured provider studio data can still be retained when available.
+
 ## 1.2.1 - 2026-07-27
 
 ### Fixed
