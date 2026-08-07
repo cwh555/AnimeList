@@ -725,7 +725,7 @@ describe("version documentation", () => {
       packages: Record<string, { version?: string }>;
     };
     const versions = JSON.parse(readFileSync(path.join(process.cwd(), "versions.json"), "utf8")) as Record<string, string>;
-    assert.equal(manifest.version, "1.3.0");
+    assert.equal(manifest.version, "1.3.1");
     assert.equal(packageJson.version, manifest.version);
     assert.equal(packageLock.version, manifest.version);
     assert.equal(packageLock.packages[""]?.version, manifest.version);

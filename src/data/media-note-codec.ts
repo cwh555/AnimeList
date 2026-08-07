@@ -1,4 +1,4 @@
-import { persistedMediaTags } from "../domain/media-classification";
+import { persistedMediaTags, resolveMediaSeasonMetadata } from "../domain/media-classification";
 import { writeCompatibleGenres } from "./media-frontmatter-compat";
 import { normalizeMediaStatus } from "../media-status";
 import { normalizeGenres } from "../domain/media-metadata";
@@ -246,8 +246,21 @@ export function buildMediaMarkdown(
   yamlArray(lines, "source_genres", rawGenres);
   const classification = result.classification;
   yamlArray(lines, "media_tags", persistedMediaTags(classification));
-  if (classification?.season) lines.push(`season: ${yamlScalar(classification.season)}`);
-  if (classification?.seasonYear) lines.push(`season_year: ${classification.seasonYear}`);
+  if (result.mediaType === "anime") {
+    const season = resolveMediaSeasonMetadata({
+      season: classification?.season,
+      seasonYear: classification?.seasonYear,
+      startDate: result.startDate,
+      fallbackYear: result.year,
+    });
+    if (season.season) {
+      lines.push(`season: ${yamlScalar(season.season)}`);
+      if (season.seasonYear !== null) lines.push(`season_year: ${season.seasonYear}`);
+    }
+  } else {
+    if (classification?.season) lines.push(`season: ${yamlScalar(classification.season)}`);
+    if (classification?.seasonYear) lines.push(`season_year: ${classification.seasonYear}`);
+  }
   if (classification?.source) lines.push(`source_material: ${yamlScalar(classification.source)}`);
   if (classification?.anilistId) lines.push(`anilist_id: ${yamlScalar(classification.anilistId)}`);
   yamlArray(lines, "title_aliases", result.searchTitles ?? []);
