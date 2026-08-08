@@ -26,6 +26,12 @@ export interface MigrationSettings {
   mediaStatus: number;
 }
 
+export interface ReleaseTrackingSettings {
+  enabled: boolean;
+  automatic: boolean;
+  lastAutomaticCheckAt: string;
+}
+
 export interface LibraryUiState {
   section: LibrarySection;
   type: "all" | MediaType;
@@ -49,6 +55,7 @@ export interface AnimeListSettings {
   searchLanguages: SearchLanguageSettings;
   tagCatalog: string[];
   specialLabelMode: SpecialLabelMode;
+  releaseTracking: ReleaseTrackingSettings;
   migrations: MigrationSettings;
   uiState: LibraryUiState;
 }

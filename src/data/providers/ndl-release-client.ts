@@ -15,7 +15,11 @@ function descendants(item: Element, localNames: readonly string[]): Element[] {
 }
 
 function firstText(item: Element, localNames: readonly string[]): string {
-  return descendants(item, localNames).map(text).find(Boolean) ?? "";
+  for (const localName of localNames) {
+    const value = descendants(item, [localName]).map(text).find(Boolean);
+    if (value) return value;
+  }
+  return "";
 }
 
 function allText(item: Element, localNames: readonly string[]): string[] {

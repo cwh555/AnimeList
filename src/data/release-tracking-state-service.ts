@@ -86,7 +86,8 @@ export class ReleaseTrackingStateService {
       if (binding.publisher) frontmatter.release_tracking_publisher = binding.publisher;
       else delete frontmatter.release_tracking_publisher;
       frontmatter.release_tracking_status = "verified";
-      frontmatter.release_tracking_verified_at = verifiedAt;
+      frontmatter.release_tracking_checked_at = verifiedAt;
+      delete frontmatter.release_tracking_verified_at;
       if (sourceUrl) frontmatter.release_tracking_source_url = sourceUrl;
       else delete frontmatter.release_tracking_source_url;
       if (mediaType === "manga") {

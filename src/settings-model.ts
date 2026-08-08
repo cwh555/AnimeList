@@ -45,6 +45,11 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
   searchLanguages: { ...DEFAULT_SEARCH_LANGUAGES },
   tagCatalog: [],
   specialLabelMode: "favorite",
+  releaseTracking: {
+    enabled: false,
+    automatic: false,
+    lastAutomaticCheckAt: "",
+  },
   migrations: {
     mediaStatus: 0,
   },
@@ -71,6 +76,7 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
   const loaded = isRecord(value) ? value : {};
   const providers = isRecord(loaded.providers) ? loaded.providers : {};
   const migrations = isRecord(loaded.migrations) ? loaded.migrations : {};
+  const releaseTracking = isRecord(loaded.releaseTracking) ? loaded.releaseTracking : {};
   const uiState = isRecord(loaded.uiState) ? loaded.uiState : {};
   const { genre: legacyGenre, ...retainedUiState } = uiState;
 
@@ -102,6 +108,12 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
     searchLanguages: normalizeSearchLanguageSettings(loaded.searchLanguages),
     tagCatalog: normalizeUserTagCatalog(loaded.tagCatalog),
     specialLabelMode: normalizeSpecialLabelMode(loaded.specialLabelMode),
+    releaseTracking: {
+      ...releaseTracking,
+      enabled: releaseTracking.enabled === true,
+      automatic: releaseTracking.automatic === true,
+      lastAutomaticCheckAt: stringValue(releaseTracking.lastAutomaticCheckAt, ""),
+    },
     migrations: {
       ...migrations,
       mediaStatus: typeof migrations.mediaStatus === "number"

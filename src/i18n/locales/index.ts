@@ -1,3 +1,4 @@
+import "../../release-tracking-text";
 import { registerLocaleMessages } from "../catalog";
 import { EN_CATALOGS } from "./en";
 import { JA_CATALOGS } from "./ja";

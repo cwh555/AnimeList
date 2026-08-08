@@ -129,17 +129,23 @@ export function latestNumericChapter(labels: unknown[]): string {
 export function parsePublishedDate(value: unknown): number | null {
   const text = stringValue(value);
   if (!text) return null;
-  const exact = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const normalized = text
+    .replace(/[年/.]/g, "-")
+    .replace(/月/g, "-")
+    .replace(/日/g, "")
+    .replace(/-+/g, "-")
+    .replace(/-$/, "");
+  const exact = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\D|$)/);
   if (exact) {
     const timestamp = Date.UTC(Number(exact[1]), Number(exact[2]) - 1, Number(exact[3]));
     return Number.isFinite(timestamp) ? timestamp : null;
   }
-  const month = text.match(/^(\d{4})-(\d{2})/);
+  const month = normalized.match(/^(\d{4})-(\d{1,2})(?:\D|$)/);
   if (month) {
     const timestamp = Date.UTC(Number(month[1]), Number(month[2]) - 1, 1);
     return Number.isFinite(timestamp) ? timestamp : null;
   }
-  const year = text.match(/^(\d{4})$/);
+  const year = normalized.match(/^(\d{4})$/);
   if (year) return Date.UTC(Number(year[1]), 0, 1);
   return null;
 }

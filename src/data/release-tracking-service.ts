@@ -124,8 +124,15 @@ export class ReleaseTrackingService {
     message: string;
   }> {
     const lines = await this.novelLines(item);
-    if (lines.length === 1) return { binding: lineBinding(lines[0]), status: "unconfigured", message: "" };
-    if (lines.length > 1) return { binding: null, status: "ambiguous", message: "Multiple NDL/JPRO publication lines matched." };
+    if (lines.length > 0) {
+      return {
+        binding: null,
+        status: "ambiguous",
+        message: lines.length === 1
+          ? "An NDL/JPRO publication line was found but requires confirmation before writing the latest volume."
+          : "Multiple NDL/JPRO publication lines matched and require confirmation.",
+      };
+    }
     return { binding: null, status: "unmatched", message: "No safe NDL/JPRO publication line was found." };
   }
 
@@ -251,6 +258,7 @@ export class ReleaseTrackingService {
         : await this.refreshNovel(item, binding);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await this.state.writeAttention(item.filePath, item.mediaType, "provider_error", message);
       return this.attention(item, item.mediaType === "manga" ? "mangadex" : "ndl-jpro", "provider_error", message);
     }
   }

@@ -4,6 +4,7 @@ import {
   compareChapterLabels,
   groupPublicationLines,
   latestNumericChapter,
+  parsePublishedDate,
   providerResultRegressed,
   selectLatestPublishedRecord,
   type NdlPublicationRecord,
@@ -42,6 +43,15 @@ describe("release tracking domain", () => {
     assert.equal(providerResultRegressed("147", "", "145", "", "mangadex"), true);
     assert.equal(providerResultRegressed("147", "", "147", "", "mangadex"), false);
     assert.equal(providerResultRegressed("147", "", "148", "", "mangadex"), false);
+  });
+
+  it("accepts common NDL/JPRO publication date formats without guessing missing dates", () => {
+    const expected = Date.UTC(2026, 5, 25);
+    assert.equal(parsePublishedDate("2026-06-25"), expected);
+    assert.equal(parsePublishedDate("2026.6.25"), expected);
+    assert.equal(parsePublishedDate("2026/6/25"), expected);
+    assert.equal(parsePublishedDate("2026年6月25日"), expected);
+    assert.equal(parsePublishedDate("unknown"), null);
   });
 
   it("groups NDL records by publication line instead of title alone", () => {

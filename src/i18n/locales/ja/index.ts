@@ -2,6 +2,7 @@ import type { LocaleCatalogs } from "../zh-TW";
 import { JA_CORE_MESSAGES } from "./core";
 import { JA_SEARCH_MESSAGES } from "./search";
 import { JA_RATING_MESSAGES } from "./rating";
+import { JA_RELEASE_TRACKING_MESSAGES } from "./release-tracking";
 import { JA_SERIAL_COVER_MESSAGES } from "./serial-cover";
 import { JA_PROGRESS_UNIT_MESSAGES } from "./progress-unit";
 import { JA_MASTERPIECE_MESSAGES } from "./masterpiece";
@@ -13,6 +14,7 @@ export const JA_CATALOGS = {
   core: JA_CORE_MESSAGES,
   search: JA_SEARCH_MESSAGES,
   rating: JA_RATING_MESSAGES,
+  "release-tracking": JA_RELEASE_TRACKING_MESSAGES,
   "serial-cover": JA_SERIAL_COVER_MESSAGES,
   "progress-unit": JA_PROGRESS_UNIT_MESSAGES,
   masterpiece: JA_MASTERPIECE_MESSAGES,
