@@ -68,7 +68,6 @@ export class MangaDexReleaseClient {
     const parameters = new URLSearchParams({
       limit: "100",
       "order[chapter]": "desc",
-      includeFutureUpdates: "0",
     });
     const response = await requestUrl({
       url: `${MANGADEX_API}/manga/${encodeURIComponent(id)}/feed?${parameters.toString()}`,
