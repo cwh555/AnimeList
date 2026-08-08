@@ -104,7 +104,7 @@ export class ReleaseTrackingStateService {
   async writeAttention(
     path: string,
     mediaType: MediaType,
-    status: Exclude<ReleaseTrackingStatus, "verified" | "disabled" | "unconfigured">,
+    status: Exclude<ReleaseTrackingStatus, "verified" | "disabled">,
     error: string,
   ): Promise<boolean> {
     const current = this.read(path, mediaType);
