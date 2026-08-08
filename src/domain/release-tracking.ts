@@ -160,7 +160,7 @@ function candidateSeriesTitle(record: NdlPublicationRecord): string {
   const normalizedVolume = normalizeTrackingText(volume);
   if (!normalizedVolume || !normalizedTitle.endsWith(normalizedVolume)) return title;
   const rawIndex = title.lastIndexOf(volume);
-  return rawIndex > 0 ? title.slice(0, rawIndex).trim().replace(/[\s　:：\-—]+$/, "") : title;
+  return rawIndex > 0 ? title.slice(0, rawIndex).trim().replace(/[\s\u3000:：\-—]+$/, "") : title;
 }
 
 export function publicationRecordMatchesTitles(
