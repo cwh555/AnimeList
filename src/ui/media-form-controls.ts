@@ -274,6 +274,7 @@ export interface CreateMediaEditorFieldsInput {
   selectedTemplate?: string;
   selectedUnit?: string;
   tagOptions?: readonly string[];
+  tagDisplayLabels?: ReadonlyMap<string, string>;
 }
 
 function progressFieldLabel(mediaType: MediaType): string {
@@ -290,6 +291,7 @@ export function createMediaEditorFields({
   selectedTemplate,
   selectedUnit,
   tagOptions = [],
+  tagDisplayLabels,
 }: CreateMediaEditorFieldsInput): MediaFormFields {
   const title = createLabeledField(
     parent,
@@ -378,6 +380,7 @@ export function createMediaEditorFields({
         ...normalizeUserTags(values.userTags),
       ]),
       suggestions: normalizeUserTags(tagOptions),
+      displayLabels: tagDisplayLabels,
     }),
     uiText("add.genresHint"),
   );

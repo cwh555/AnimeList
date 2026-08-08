@@ -20,10 +20,10 @@ import {
   withActiveLocale,
 } from "../../src/i18n/catalog";
 import {
-  canonicalizeProviderTags,
-  localizeExternalMediaResult,
-  localizeProviderTags,
+  localizeProviderTag,
+  providerTagDisplayLabels,
 } from "../../src/i18n/provider-tag-localization";
+import { libraryProviderTagLabels } from "../../src/ui/library-tag-localization";
 import { UI_TEXT, uiText } from "../../src/ui-text";
 
 function assertNonEmptyCatalog(catalog: Record<string, unknown>): void {
@@ -136,73 +136,40 @@ describe("user-visible text catalog compatibility", () => {
     }
   });
 
-  it("localizes recognized provider tags while preserving unknown custom tags", () => {
-    assert.deepEqual(localizeProviderTags(["動作", "Romance", "Custom tag"], "en"), [
+  it("localizes only values explicitly marked as provider/API tags", () => {
+    const ja = providerTagDisplayLabels([
       "Action",
-      "Romance",
-      "Custom tag",
-    ]);
-    assert.deepEqual(localizeProviderTags(["Action", "Romance", "Custom tag"], "ja"), [
-      "アクション",
-      "恋愛",
-      "Custom tag",
-    ]);
-    assert.deepEqual(localizeProviderTags(["Action", "Mahou Shoujo", "Custom tag"], "ko"), [
-      "액션",
-      "마법소녀",
-      "Custom tag",
-    ]);
-    assert.deepEqual(canonicalizeProviderTags(["アクション", "로맨스", "Custom tag"]), [
       "動作",
-      "戀愛",
-      "Custom tag",
-    ]);
+      "Coming of Age",
+      "Female Protagonist",
+      "Custom API tag",
+    ], "ja");
+    assert.equal(ja.get("Action"), "アクション");
+    assert.equal(ja.get("動作"), "アクション");
+    assert.equal(ja.get("Coming of Age"), "成長");
+    assert.equal(ja.get("Female Protagonist"), "女性主人公");
+    assert.equal(ja.get("Custom API tag"), "Custom API tag");
+    assert.equal(ja.has("Custom user tag"), false);
+
+    const ko = providerTagDisplayLabels(["Romance", "Primarily Female Cast"], "ko");
+    assert.equal(ko.get("Romance"), "로맨스");
+    assert.equal(ko.get("Primarily Female Cast"), "여성 캐릭터 중심");
   });
 
-  it("localizes provider classification copies without changing raw provider genres", () => {
-    const result = localizeExternalMediaResult({
-      provider: "anilist",
-      sourceId: "1",
-      sourceUrl: "",
-      mediaType: "anime",
-      title: "Example",
-      originalTitle: "Example",
-      romajiTitle: "Example",
-      format: "tv",
-      total: 12,
-      unit: "episode",
-      year: 2026,
-      genres: ["動作", "戀愛"],
-      rawGenres: ["Action", "Romance"],
-      people: [],
-      platforms: [],
-      coverUrl: "",
-      summary: "",
-      externalScore: null,
-      releaseStatus: "finished",
-      classification: {
-        anilistId: "1",
-        genres: ["動作"],
-        tags: [{
-          name: "School",
-          category: "Theme",
-          rank: 90,
-          isGeneralSpoiler: false,
-          isMediaSpoiler: false,
-          isAdult: false,
-        }],
-        season: "winter",
-        seasonYear: 2026,
-        studios: [],
-        source: "manga",
-        countryOfOrigin: "JP",
-      },
-    }, "ja");
+  it("localizes Library API tags by per-item provenance without translating user tags", () => {
+    setActiveLocale("ja");
+    assert.deepEqual(
+      libraryProviderTagLabels({
+        genres: ["動作", "收藏", "校園"],
+        apiTagValues: ["Action", "動作", "School", "校園"],
+      }),
+      ["アクション", "收藏", "学園"],
+    );
+  });
 
-    assert.deepEqual(result.genres, ["アクション", "恋愛"]);
-    assert.deepEqual(result.rawGenres, ["Action", "Romance"]);
-    assert.deepEqual(result.classification?.genres, ["アクション"]);
-    assert.equal(result.classification?.tags[0]?.name, "School");
+  it("keeps unknown provider values unchanged instead of guessing a translation", () => {
+    assert.equal(localizeProviderTag("Unknown provider tag", "zh-TW"), "Unknown provider tag");
+    assert.equal(localizeProviderTag("Unknown provider tag", "ja"), "Unknown provider tag");
   });
 
   it("supports partial locale registration with per-key fallback", () => {

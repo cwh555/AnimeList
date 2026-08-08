@@ -10,6 +10,7 @@ export interface TagChipControl extends HTMLDivElement {
 export interface CreateTagChipControlInput {
   values: unknown;
   suggestions?: readonly string[];
+  displayLabels?: ReadonlyMap<string, string>;
 }
 
 export function tagSuggestionValues(
@@ -37,7 +38,7 @@ export function appendReadOnlyTagChips(parent: HTMLElement, values: readonly str
   return set;
 }
 
-export function createTagChipControl({ values, suggestions = [] }: CreateTagChipControlInput): TagChipControl {
+export function createTagChipControl({ values, suggestions = [], displayLabels }: CreateTagChipControlInput): TagChipControl {
   const root = createDiv() as TagChipControl;
   root.className = "al-tag-control";
   root.setAttribute("role", "group");
@@ -68,6 +69,7 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
   root.appendChild(picker);
 
   let selected = normalizeUserTags(values);
+  const displayValue = (value: string): string => displayLabels?.get(value) ?? value;
 
   const emit = (): void => {
     root.dispatchEvent(new Event("change", { bubbles: true }));
@@ -90,9 +92,13 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
 
   const renderSuggestions = (): void => {
     suggestionsEl.replaceChildren();
-    const available = tagSuggestionValues(suggestions, selected, input.value);
+    const query = normalizeUserTag(input.value).toLocaleLowerCase();
+    const available = tagSuggestionValues(suggestions, selected, "")
+      .filter((value) => !query
+        || value.toLocaleLowerCase().includes(query)
+        || displayValue(value).toLocaleLowerCase().includes(query));
     for (const value of available.slice(0, 18)) {
-      const suggestion = makeEl("button", "al-tag-suggestion", value);
+      const suggestion = makeEl("button", "al-tag-suggestion", displayValue(value));
       suggestion.type = "button";
       suggestion.addEventListener("click", (event) => {
         event.preventDefault();
@@ -111,11 +117,11 @@ export function createTagChipControl({ values, suggestions = [] }: CreateTagChip
     for (const value of selected) {
       const chip = createDiv();
       chip.className = "al-tag-chip al-tag-chip-selected";
-      chip.appendChild(makeEl("span", "al-tag-chip-label", value));
+      chip.appendChild(makeEl("span", "al-tag-chip-label", displayValue(value)));
       const remove = makeEl("button", "al-tag-chip-remove", "×");
       remove.type = "button";
-      remove.setAttribute("aria-label", uiText("add.tagsRemove", { tag: value }));
-      remove.title = uiText("add.tagsRemove", { tag: value });
+      remove.setAttribute("aria-label", uiText("add.tagsRemove", { tag: displayValue(value) }));
+      remove.title = uiText("add.tagsRemove", { tag: displayValue(value) });
       remove.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();

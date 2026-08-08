@@ -85,6 +85,7 @@ describe("media repository compatibility", () => {
       year: 2024,
       genres: ["戀愛", "喜劇", "重看", "收藏"],
       mediaTags: ["School", "Coming of Age"],
+      apiTagValues: ["School", "Coming of Age"],
       userTags: ["重看", "收藏"],
       season: "spring",
       seasonYear: 2024,

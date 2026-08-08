@@ -44,6 +44,7 @@ export interface MediaItem {
   year: number | string;
   genres: string[];
   mediaTags?: string[];
+  apiTagValues?: string[];
   userTags?: string[];
   season?: string;
   seasonYear?: number | string;
