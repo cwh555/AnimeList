@@ -17,6 +17,7 @@ async function loadSettings(raw: unknown): Promise<AnimeListPlugin["settings"]> 
 describe("settings compatibility", () => {
   it("loads every core persisted field and normalizes legacy UI state", async () => {
     const settings = await loadSettings({
+      interfaceLanguage: "ja-JP",
       storageMode: "flat",
       libraryRoot: "Library",
       flatMediaFolder: "Media",
@@ -38,6 +39,7 @@ describe("settings compatibility", () => {
       },
     });
 
+    assert.equal(settings.interfaceLanguage, "ja");
     assert.equal(settings.storageMode, "flat");
     assert.equal(settings.flatMediaFolder, "Media");
     assert.deepEqual(settings.additionalScanFolders, ["Archive", "Other"]);
@@ -64,6 +66,7 @@ describe("settings compatibility", () => {
       uiState: { type: "podcast", status: "all", view: "table" },
     });
 
+    assert.equal(settings.interfaceLanguage, "zh-TW");
     assert.equal(settings.storageMode, DEFAULT_SETTINGS.storageMode);
     assert.deepEqual(settings.additionalScanFolders, []);
     assert.deepEqual(settings.tagCatalog, []);

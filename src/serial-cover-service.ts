@@ -233,7 +233,7 @@ export async function loadMissingSerialCovers(
   const records: MissingSerialCoverRecord[] = [];
   const files = new Map<string, TFile>();
   const details: SerialCoverMigrationDetail[] = [];
-  onProgress?.({ completed: 0, total: 0, phase: "scanning", message: "Scanning notes" });
+  onProgress?.({ completed: 0, total: 0, phase: "scanning", message: serialCoverText("migration.scanning") });
 
   for (const file of getScopedMarkdownFiles(plugin.app, plugin.getScanFolders())) {
     const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -263,7 +263,7 @@ export async function loadMissingSerialCovers(
       completed,
       total,
       phase: "resolving",
-      message: `Resolving original title · ${work.title}`,
+      message: `${serialCoverText("migration.resolving")} · ${work.title}`,
     });
 
     let original: string | null;
@@ -290,7 +290,7 @@ export async function loadMissingSerialCovers(
           title: work.title,
           label,
           status: "skipped",
-          message: "Original title unavailable",
+          message: serialCoverText("migration.originalTitleUnavailable"),
         });
         completed += 1;
       }
@@ -304,7 +304,7 @@ export async function loadMissingSerialCovers(
         completed,
         total,
         phase: "loading",
-        message: `Loading cover · ${work.title} · ${label}`,
+        message: `${serialCoverText("migration.loading")} · ${work.title} · ${label}`,
       });
       try {
         const cover = await loadConfidentSerialCover(plugin, context, label);
@@ -321,7 +321,7 @@ export async function loadMissingSerialCovers(
             completed,
             total,
             phase: "saving",
-            message: `Saving cover · ${work.title} · ${label}`,
+            message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
           });
           await plugin.app.fileManager.processFrontMatter(file, (next) => {
             if (!Array.isArray(next.volume_log)) return;
@@ -354,7 +354,12 @@ export async function loadMissingSerialCovers(
         });
       }
       completed += 1;
-      onProgress?.({ completed, total, phase: "loading", message: `${completed} / ${total}` });
+      onProgress?.({
+        completed,
+        total,
+        phase: "loading",
+        message: serialCoverText("settings.progressCount", { completed, total }),
+      });
     }
   }
 

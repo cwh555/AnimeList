@@ -1,0 +1,15 @@
+export const JA_SEARCH_MESSAGES = {
+    "settings.languages.heading": "検索言語",
+    "settings.languages.chinese.name": "中国語タイトル",
+    "settings.languages.chinese.desc": "簡体字・繁体字中国語の提供元別名を使って一致する作品を検索します。",
+    "settings.languages.english.name": "英語タイトル",
+    "settings.languages.english.desc": "英語タイトルや提供元の同義語を使って検索範囲を広げます。",
+    "settings.languages.original.name": "原語タイトル",
+    "settings.languages.original.desc": "原語表記とローマ字表記を使用します。原語は日本語、韓国語などの場合があります。",
+    "library.openFailed": "AnimeList ライブラリを開けませんでした: {message}",
+    "library.setupFailed": "ライブラリは開きましたが、設定済みフォルダを作成できませんでした: {message}",
+    "provider.noneEnabled": "有効なメタデータ提供元がありません。",
+    "duplicate.warning.title": "同じ作品がライブラリにあります",
+    "duplicate.warning.description": "「{title}」が見つかりました。この警告は原題、別の完全な別名、年、形式、既知の話数がすべて一致した場合のみ表示されます。",
+    "duplicate.warning.open": "既存ノートを開く",
+  } as const;

@@ -66,7 +66,6 @@ export class MediaRepository {
     const modified = Number(file.stat?.mtime || 0);
     const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
     const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
-
     return {
       title: stringValue(frontmatter.title, file.basename),
       originalTitle: stringValue(

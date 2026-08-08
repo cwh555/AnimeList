@@ -1,0 +1,22 @@
+import type { LocaleCatalogs } from "../zh-TW";
+import { JA_CORE_MESSAGES } from "./core";
+import { JA_SEARCH_MESSAGES } from "./search";
+import { JA_RATING_MESSAGES } from "./rating";
+import { JA_SERIAL_COVER_MESSAGES } from "./serial-cover";
+import { JA_PROGRESS_UNIT_MESSAGES } from "./progress-unit";
+import { JA_MASTERPIECE_MESSAGES } from "./masterpiece";
+import { JA_SCORE_DASHBOARD_MESSAGES } from "./score-dashboard";
+import { JA_LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
+import { JA_USER_TAG_MESSAGES } from "./user-tag";
+
+export const JA_CATALOGS = {
+  core: JA_CORE_MESSAGES,
+  search: JA_SEARCH_MESSAGES,
+  rating: JA_RATING_MESSAGES,
+  "serial-cover": JA_SERIAL_COVER_MESSAGES,
+  "progress-unit": JA_PROGRESS_UNIT_MESSAGES,
+  masterpiece: JA_MASTERPIECE_MESSAGES,
+  "score-dashboard": JA_SCORE_DASHBOARD_MESSAGES,
+  "legacy-metadata": JA_LEGACY_METADATA_MESSAGES,
+  "user-tag": JA_USER_TAG_MESSAGES,
+} as const satisfies LocaleCatalogs;

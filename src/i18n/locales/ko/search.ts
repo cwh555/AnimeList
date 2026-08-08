@@ -1,0 +1,15 @@
+export const KO_SEARCH_MESSAGES = {
+    "settings.languages.heading": "검색 언어",
+    "settings.languages.chinese.name": "중국어 제목",
+    "settings.languages.chinese.desc": "간체 및 번체 중국어 제공자 별칭을 사용해 일치하는 작품을 검색합니다.",
+    "settings.languages.english.name": "영어 제목",
+    "settings.languages.english.desc": "영어 제목과 제공자 동의어를 사용해 검색 범위를 넓힙니다.",
+    "settings.languages.original.name": "원어 제목",
+    "settings.languages.original.desc": "원어 및 로마자 제목을 사용합니다. 원어는 일본어, 한국어 또는 다른 언어일 수 있습니다.",
+    "library.openFailed": "AnimeList 라이브러리를 열 수 없습니다: {message}",
+    "library.setupFailed": "라이브러리는 열었지만 설정된 폴더를 만들 수 없습니다: {message}",
+    "provider.noneEnabled": "활성화된 메타데이터 제공자가 없습니다.",
+    "duplicate.warning.title": "같은 작품이 이미 라이브러리에 있습니다",
+    "duplicate.warning.description": "“{title}”을 찾았습니다. 이 경고는 원제, 다른 전체 별칭, 연도, 형식과 알려진 화수가 모두 일치할 때만 표시됩니다.",
+    "duplicate.warning.open": "기존 노트 열기",
+  } as const;

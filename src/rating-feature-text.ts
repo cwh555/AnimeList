@@ -1,8 +1,7 @@
 import { defineTextCatalog } from "./i18n/catalog";
+import { RATING_MESSAGES } from "./i18n/locales/zh-TW/rating";
 
-export const RATING_FEATURE_TEXT = {
-  adjusted: "評分 {original} 不符合 0.5 分級距，已四捨五入為 {rounded}。",
-} as const;
+export const RATING_FEATURE_TEXT = RATING_MESSAGES;
 
 const CATALOG = defineTextCatalog("rating", RATING_FEATURE_TEXT);
 
