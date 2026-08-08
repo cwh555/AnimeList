@@ -1,7 +1,6 @@
 import { App, TFile } from "obsidian";
 import type { CoverSources, MediaItem } from "../domain/media-types";
-import { normalizeGenre } from "../domain/media-metadata";
-import { compatibleGenres, compatibleSeasonMetadata, compatibleSourceGenres, compatibleStudios } from "./media-frontmatter-compat";
+import { compatibleGenres, compatibleSeasonMetadata, compatibleStudios } from "./media-frontmatter-compat";
 import {
   formatFileModifiedTime,
   mediaTypeOf,
@@ -67,13 +66,6 @@ export class MediaRepository {
     const modified = Number(file.stat?.mtime || 0);
     const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
     const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
-    const sourceGenres = compatibleSourceGenres(frontmatter);
-    const apiTagValues = [...new Set([
-      ...stringArray(frontmatter.media_tags),
-      ...sourceGenres,
-      ...sourceGenres.map((value) => normalizeGenre(value)).filter(Boolean),
-    ])];
-
     return {
       title: stringValue(frontmatter.title, file.basename),
       originalTitle: stringValue(
@@ -96,7 +88,6 @@ export class MediaRepository {
         : "",
       genres: compatibleGenres(frontmatter),
       mediaTags: stringArray(frontmatter.media_tags),
-      apiTagValues,
       userTags: stringArray(frontmatter.user_tags),
       season: compatibleSeasonMetadata(frontmatter).season ?? "",
       seasonYear: compatibleSeasonMetadata(frontmatter).seasonYear ?? "",

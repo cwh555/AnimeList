@@ -1,13 +1,13 @@
 import type { MediaItem } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
-import { providerTagDisplayLabels } from "../i18n/provider-tag-localization";
+import { localizeProviderTag } from "../i18n/provider-tag-localization";
 
 export function libraryProviderTagLabels(
-  item: Pick<MediaItem, "genres" | "apiTagValues">,
+  item: Pick<MediaItem, "genres">,
 ): readonly string[] {
-  const genres = normalizeGenres(item.genres).slice(0, 4);
-  const labels = providerTagDisplayLabels(item.apiTagValues);
-  return genres.map((genre) => labels.get(genre) ?? genre);
+  return normalizeGenres(item.genres)
+    .slice(0, 4)
+    .map((genre) => localizeProviderTag(genre));
 }
 
 export function localizeLibraryProviderTags(

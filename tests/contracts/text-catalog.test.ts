@@ -156,13 +156,10 @@ describe("user-visible text catalog compatibility", () => {
     assert.equal(ko.get("Primarily Female Cast"), "여성 캐릭터 중심");
   });
 
-  it("localizes Library API tags by per-item provenance without translating user tags", () => {
+  it("localizes known API taxonomy in already-recorded genres while preserving custom tags", () => {
     setActiveLocale("ja");
     assert.deepEqual(
-      libraryProviderTagLabels({
-        genres: ["動作", "收藏", "校園"],
-        apiTagValues: ["Action", "動作", "School", "校園"],
-      }),
+      libraryProviderTagLabels({ genres: ["動作", "收藏", "校園"] }),
       ["アクション", "收藏", "学園"],
     );
   });

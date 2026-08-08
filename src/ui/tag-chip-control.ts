@@ -1,4 +1,5 @@
 import { normalizeUserTag, normalizeUserTags } from "../domain/user-tags";
+import { localizeProviderTag } from "../i18n/provider-tag-localization";
 import { uiText } from "../ui-text";
 import { makeEl } from "./ui-helpers";
 
@@ -69,7 +70,7 @@ export function createTagChipControl({ values, suggestions = [], displayLabels }
   root.appendChild(picker);
 
   let selected = normalizeUserTags(values);
-  const displayValue = (value: string): string => displayLabels?.get(value) ?? value;
+  const displayValue = (value: string): string => displayLabels?.get(value) ?? localizeProviderTag(value);
 
   const emit = (): void => {
     root.dispatchEvent(new Event("change", { bubbles: true }));
