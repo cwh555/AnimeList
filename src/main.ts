@@ -4,8 +4,14 @@ import { AnimeListFeatureRegistry } from "./app/feature-registry";
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
 import { createReliableLibraryOpener } from "./library-navigation";
 import { normalizeLanguagePreference, resolveInterfaceLocale, type LanguagePreference } from "./i18n/locale";
-import { setActiveLocale } from "./i18n/catalog";
+import { getActiveLocale, setActiveLocale } from "./i18n/catalog";
 import { getObsidianInterfaceLanguage } from "./i18n/obsidian-locale";
+import {
+  canonicalizeExternalMediaResultProviderTags,
+  canonicalizeMediaNoteFormProviderTags,
+  localizeExternalMediaResult,
+  localizeMediaItem,
+} from "./i18n/provider-tag-localization";
 import { AnimeListSettingTab } from "./settings";
 import { createDefaultSettings } from "./settings-model";
 import { AnimeListSettingsStore } from "./settings-store";
@@ -225,7 +231,9 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   resolveMediaCoverPath(value: unknown, sourcePath: string): string { return this.services().resolveMediaCoverPath(value, sourcePath); }
 
   collectMediaItems(source?: string): MediaItem[] {
-    return this.features.decorateMediaItems(this.services().collectMediaItems(source), this);
+    return this.features
+      .decorateMediaItems(this.services().collectMediaItems(source), this)
+      .map((item) => localizeMediaItem(item, getActiveLocale()));
   }
 
   async optimizeExistingCovers(): Promise<void> {
@@ -263,19 +271,64 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async deleteMediaFile(file: TFile): Promise<void> { await this.services().deleteMediaFile(file); this.refreshViews(); }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.services().getTemplates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.services().readTemplate(path); }
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.services().searchExternal(mediaType, query); }
-  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.services().searchExternalPage(mediaType, query, page); }
-  async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchBangumi(mediaType, query); }
-  async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.services().searchAniList(mediaType, query); }
-  async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.services().searchOpenLibrary(query); }
-  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> { return this.services().enrichExternalMedia(result); }
-  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> { return this.services().enrichStoredMedia(frontmatter, mediaType); }
+  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
+    const response = await this.services().searchExternal(mediaType, query);
+    return {
+      ...response,
+      results: response.results.map((result) => localizeExternalMediaResult(result, getActiveLocale())),
+    };
+  }
+
+  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
+    const response = await this.services().searchExternalPage(mediaType, query, page);
+    return {
+      ...response,
+      results: response.results.map((result) => localizeExternalMediaResult(result, getActiveLocale())),
+    };
+  }
+
+  async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {
+    return (await this.services().searchBangumi(mediaType, query))
+      .map((result) => localizeExternalMediaResult(result, getActiveLocale()));
+  }
+
+  async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {
+    return (await this.services().searchAniList(mediaType, query))
+      .map((result) => localizeExternalMediaResult(result, getActiveLocale()));
+  }
+
+  async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> {
+    return (await this.services().searchOpenLibrary(query))
+      .map((result) => localizeExternalMediaResult(result, getActiveLocale()));
+  }
+
+  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
+    return localizeExternalMediaResult(
+      await this.services().enrichExternalMedia(canonicalizeExternalMediaResultProviderTags(result)),
+      getActiveLocale(),
+    );
+  }
+
+  async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
+    return localizeExternalMediaResult(
+      await this.services().enrichStoredMedia(frontmatter, mediaType),
+      getActiveLocale(),
+    );
+  }
   async ensureFolder(path: string): Promise<void> { await this.services().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.services().findExistingBySource(provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.services().downloadCover(result); }
-  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> { return this.services().createMediaNote(result, form); }
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> { await this.services().updateMediaNote(file, mediaType, form); }
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
+    return this.services().createMediaNote(
+      canonicalizeExternalMediaResultProviderTags(result),
+      canonicalizeMediaNoteFormProviderTags(form),
+    );
+  }
+
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
+    await this.services().updateMediaNote(file, mediaType, canonicalizeMediaNoteFormProviderTags(form));
+  }
 
   getFeatureSettingsSections(): ReturnType<AnimeListFeatureRegistry<AnimeListFeatureHost>["settingsSections"]> { return this.features.settingsSections(this); }
   afterSearchRender(modal: SearchModalAdapter): void { this.features.afterSearchRender({ host: this, modal }); }

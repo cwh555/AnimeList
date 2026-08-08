@@ -2,6 +2,8 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
+import { getActiveLocale } from "../i18n/catalog";
+import { localizeProviderTags } from "../i18n/provider-tag-localization";
 import { compatibleGenres } from "../data/media-frontmatter-compat";
 import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
@@ -222,7 +224,10 @@ export class AddMediaModal extends Modal {
         favorite: false,
       },
       templateOptions,
-      tagOptions: libraryTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
+      tagOptions: libraryTagOptions(
+        this.plugin,
+        localizeProviderTags(persistedMediaTags(enrichedResult.classification), getActiveLocale()),
+      ),
     });
     this.contentEl.appendChild(form);
 

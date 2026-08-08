@@ -17,7 +17,13 @@ import {
   registerLocaleMessages,
   resetLocaleForTests,
   setActiveLocale,
+  withActiveLocale,
 } from "../../src/i18n/catalog";
+import {
+  canonicalizeProviderTags,
+  localizeExternalMediaResult,
+  localizeProviderTags,
+} from "../../src/i18n/provider-tag-localization";
 import { UI_TEXT, uiText } from "../../src/ui-text";
 
 function assertNonEmptyCatalog(catalog: Record<string, unknown>): void {
@@ -115,6 +121,88 @@ describe("user-visible text catalog compatibility", () => {
     assert.equal(resolveInterfaceLocale("system", "ja-JP"), "ja");
     assert.equal(resolveInterfaceLocale("system", "fr-FR"), "zh-TW");
     assert.equal(resolveInterfaceLocale("en", "ja-JP"), "en");
+  });
+
+
+  it("temporarily scopes locale changes without leaking global state", () => {
+    registerBundledLocales();
+    setActiveLocale("ja");
+    try {
+      assert.equal(uiText("library.title"), "ライブラリ");
+      assert.equal(withActiveLocale("en", () => uiText("library.title")), "Library");
+      assert.equal(uiText("library.title"), "ライブラリ");
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
+  it("localizes recognized provider tags while preserving unknown custom tags", () => {
+    assert.deepEqual(localizeProviderTags(["動作", "Romance", "Custom tag"], "en"), [
+      "Action",
+      "Romance",
+      "Custom tag",
+    ]);
+    assert.deepEqual(localizeProviderTags(["Action", "Romance", "Custom tag"], "ja"), [
+      "アクション",
+      "恋愛",
+      "Custom tag",
+    ]);
+    assert.deepEqual(localizeProviderTags(["Action", "Mahou Shoujo", "Custom tag"], "ko"), [
+      "액션",
+      "마법소녀",
+      "Custom tag",
+    ]);
+    assert.deepEqual(canonicalizeProviderTags(["アクション", "로맨스", "Custom tag"]), [
+      "動作",
+      "戀愛",
+      "Custom tag",
+    ]);
+  });
+
+  it("localizes provider classification copies without changing raw provider genres", () => {
+    const result = localizeExternalMediaResult({
+      provider: "anilist",
+      sourceId: "1",
+      sourceUrl: "",
+      mediaType: "anime",
+      title: "Example",
+      originalTitle: "Example",
+      romajiTitle: "Example",
+      format: "tv",
+      total: 12,
+      unit: "episode",
+      year: 2026,
+      genres: ["動作", "戀愛"],
+      rawGenres: ["Action", "Romance"],
+      people: [],
+      platforms: [],
+      coverUrl: "",
+      summary: "",
+      externalScore: null,
+      releaseStatus: "finished",
+      classification: {
+        anilistId: "1",
+        genres: ["動作"],
+        tags: [{
+          name: "School",
+          category: "Theme",
+          rank: 90,
+          isGeneralSpoiler: false,
+          isMediaSpoiler: false,
+          isAdult: false,
+        }],
+        season: "winter",
+        seasonYear: 2026,
+        studios: [],
+        source: "manga",
+        countryOfOrigin: "JP",
+      },
+    }, "ja");
+
+    assert.deepEqual(result.genres, ["アクション", "恋愛"]);
+    assert.deepEqual(result.rawGenres, ["Action", "Romance"]);
+    assert.deepEqual(result.classification?.genres, ["アクション"]);
+    assert.equal(result.classification?.tags[0]?.name, "School");
   });
 
   it("supports partial locale registration with per-key fallback", () => {

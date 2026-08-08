@@ -24,6 +24,16 @@ export function getActiveLocale(): LocaleCode {
   return activeLocale;
 }
 
+export function withActiveLocale<T>(locale: LocaleCode, callback: () => T): T {
+  const previous = activeLocale;
+  setActiveLocale(locale);
+  try {
+    return callback();
+  } finally {
+    activeLocale = previous;
+  }
+}
+
 export function registerLocaleMessages<T extends TextMessages>(
   namespace: string,
   locale: LocaleCode,

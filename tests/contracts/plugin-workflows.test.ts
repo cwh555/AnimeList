@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { App } from "obsidian";
+import { App, TFile } from "obsidian";
 import AnimeListPlugin from "../../src/main";
 import { createDefaultSettings } from "../../src/settings-model";
+import { resetLocaleForTests, setActiveLocale } from "../../src/i18n/catalog";
 import type { MediaItem } from "../../src/types";
 import { TimelineModal } from "../../src/ui/timeline-modal";
 
@@ -35,6 +36,89 @@ function timelineItem(): MediaItem {
 }
 
 describe("plugin UI workflows", () => {
+
+  it("localizes provider tags at the UI boundary and canonicalizes them before persistence", async () => {
+    const plugin = new AnimeListPlugin();
+    plugin.app = new App();
+    plugin.settings = createDefaultSettings();
+    const item = { ...timelineItem(), genres: ["動作", "Custom tag"], mediaTags: ["School", "Custom API tag"] };
+    const result = {
+      provider: "anilist",
+      sourceId: "1",
+      sourceUrl: "",
+      mediaType: "anime" as const,
+      title: "Example",
+      originalTitle: "Example",
+      romajiTitle: "Example",
+      format: "tv",
+      total: 12,
+      unit: "episode",
+      year: 2026,
+      genres: ["動作", "戀愛"],
+      rawGenres: ["Action", "Romance"],
+      people: [],
+      platforms: [],
+      coverUrl: "",
+      summary: "",
+      externalScore: null,
+      releaseStatus: "finished" as const,
+      classification: {
+        anilistId: "1",
+        genres: ["動作"],
+        tags: [],
+        season: "winter" as const,
+        seasonYear: 2026,
+        studios: [],
+        source: "manga",
+        countryOfOrigin: "JP",
+      },
+    };
+    let savedResult: typeof result | null = null;
+    let savedGenres: string[] = [];
+    const createdFile = new TFile();
+    (plugin as unknown as { application: unknown }).application = {
+      collectMediaItems: () => [item],
+      searchExternal: async () => ({ results: [result], warnings: [] }),
+      createMediaNote: async (nextResult: typeof result, form: { genres: string[] }) => {
+        savedResult = nextResult;
+        savedGenres = form.genres;
+        return createdFile;
+      },
+    };
+
+    setActiveLocale("ja");
+    try {
+      const collected = plugin.collectMediaItems();
+      assert.deepEqual(collected[0]?.genres, ["アクション", "Custom tag"]);
+      assert.deepEqual(collected[0]?.mediaTags, ["学園", "Custom API tag"]);
+
+      const searched = await plugin.searchExternal("anime", "Example");
+      assert.deepEqual(searched.results[0]?.genres, ["アクション", "恋愛"]);
+      assert.deepEqual(searched.results[0]?.rawGenres, ["Action", "Romance"]);
+
+      await plugin.createMediaNote(searched.results[0]!, {
+        title: "Example",
+        status: "planned",
+        releaseStatus: "finished",
+        progress: 0,
+        total: 12,
+        unit: "episode",
+        score: null,
+        favorite: false,
+        startedAt: "",
+        completedAt: "",
+        genres: ["アクション", "Custom tag"],
+        templatePath: "",
+        volumeLog: [],
+      });
+      assert.deepEqual(savedResult?.genres, ["動作", "戀愛"]);
+      assert.deepEqual(savedResult?.classification.genres, ["動作"]);
+      assert.deepEqual(savedGenres, ["動作", "Custom tag"]);
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
   it("opens timeline items in a modal without navigating the library view", async () => {
     const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin;
     plugin.app = new App();

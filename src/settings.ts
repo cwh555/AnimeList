@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
 import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
+import { withActiveLocale } from "./i18n/catalog";
 import { searchFeatureText } from "./search-feature-text";
 import {
   MAX_TIMELINE_MAX_STACK_DEPTH,
@@ -55,15 +56,15 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   getInterfaceLanguageDefinition(): SettingDefinition {
-    return {
+    return withActiveLocale("en", () => ({
       name: uiText("settings.language.name"),
       desc: uiText("settings.language.desc"),
       render: (setting) => this.renderInterfaceLanguage(setting),
-    };
+    }));
   }
 
   getSettingDefinitions(): SettingDefinition[] {
-    return [
+    return withActiveLocale("en", () => [
       {
         name: uiText("settings.storageLayout.name"),
         desc: uiText("settings.storageLayout.desc"),
@@ -126,11 +127,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
         desc: uiText("settings.copyTemplates.desc"),
         render: (setting) => this.renderCopyTemplates(setting),
       },
-    ];
+    ]);
   }
 
   getSearchLanguageDefinitions(): SettingDefinition[] {
-    return [
+    return withActiveLocale("en", () => [
       {
         name: searchFeatureText("settings.languages.chinese.name"),
         desc: searchFeatureText("settings.languages.chinese.desc"),
@@ -146,34 +147,36 @@ export class AnimeListSettingTab extends PluginSettingTab {
         desc: searchFeatureText("settings.languages.original.desc"),
         render: (setting) => this.renderSearchLanguage(setting, "original"),
       },
-    ];
+    ]);
   }
 
   getSettingSections(): SettingsSection[] {
-    const base = this.getSettingDefinitions();
-    const sections: SettingsSection[] = [
-      { definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)] },
-      {
-        heading: uiText("settings.timeline.heading"),
-        description: uiText("settings.timeline.desc"),
-        definitions: base.slice(6, 7),
-      },
-      {
-        heading: searchFeatureText("settings.languages.heading"),
-        definitions: this.getSearchLanguageDefinitions(),
-      },
-      {
-        heading: uiText("settings.providers.heading"),
-        definitions: base.slice(7, 10),
-      },
-      {
-        heading: uiText("settings.setup.heading"),
-        definitions: base.slice(10),
-      },
-    ];
-    const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
-    sections.splice(1, 0, ...featureSections);
-    return sections;
+    return withActiveLocale("en", () => {
+      const base = this.getSettingDefinitions();
+      const sections: SettingsSection[] = [
+        { definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)] },
+        {
+          heading: uiText("settings.timeline.heading"),
+          description: uiText("settings.timeline.desc"),
+          definitions: base.slice(6, 7),
+        },
+        {
+          heading: searchFeatureText("settings.languages.heading"),
+          definitions: this.getSearchLanguageDefinitions(),
+        },
+        {
+          heading: uiText("settings.providers.heading"),
+          definitions: base.slice(7, 10),
+        },
+        {
+          heading: uiText("settings.setup.heading"),
+          definitions: base.slice(10),
+        },
+      ];
+      const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
+      sections.splice(1, 0, ...featureSections);
+      return sections;
+    });
   }
 
   display(): void {
@@ -184,24 +187,26 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   private renderImperativeSettings(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("p", {
-      text: uiText("settings.intro"),
-    });
+    withActiveLocale("en", () => {
+      const { containerEl } = this;
+      containerEl.empty();
+      containerEl.createEl("p", {
+        text: uiText("settings.intro"),
+      });
 
-    for (const section of this.getSettingSections()) {
-      if (section.heading) {
-        const heading = new Setting(containerEl).setName(section.heading).setHeading();
-        if (section.description) heading.setDesc(section.description);
+      for (const section of this.getSettingSections()) {
+        if (section.heading) {
+          const heading = new Setting(containerEl).setName(section.heading).setHeading();
+          if (section.description) heading.setDesc(section.description);
+        }
+        for (const definition of section.definitions) {
+          if (definition.visible && !definition.visible()) continue;
+          const setting = new Setting(containerEl).setName(definition.name);
+          if (definition.desc) setting.setDesc(definition.desc);
+          definition.render?.(setting);
+        }
       }
-      for (const definition of section.definitions) {
-        if (definition.visible && !definition.visible()) continue;
-        const setting = new Setting(containerEl).setName(definition.name);
-        if (definition.desc) setting.setDesc(definition.desc);
-        definition.render?.(setting);
-      }
-    }
+    });
   }
 
   private refreshSettingsTab(): void {
