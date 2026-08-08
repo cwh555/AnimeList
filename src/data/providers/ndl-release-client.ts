@@ -59,7 +59,7 @@ export class NdlReleaseClient {
     if (!normalizedTitle) return [];
     const parameters = new URLSearchParams({
       dpid: "jpro-book",
-      cnt: "100",
+      cnt: "200",
       mediatype: "books",
       title: normalizedTitle,
     });

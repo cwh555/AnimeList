@@ -15,6 +15,7 @@ export interface ReleaseTrackingBinding {
   title?: string;
   creator?: string;
   publisher?: string;
+  imprint?: string;
 }
 
 export interface ReleaseTrackingSnapshot {
@@ -38,10 +39,15 @@ export interface NdlPublicationRecord {
   isbn: string;
 }
 
+export type NdlPublicationMedium = "novel" | "comic" | "unknown";
+
 export interface NdlPublicationLine {
   title: string;
   creator: string;
   publisher: string;
+  imprint: string;
+  medium: NdlPublicationMedium;
+  titleStrength: 1 | 2;
   records: NdlPublicationRecord[];
 }
 
@@ -53,7 +59,7 @@ export function normalizeTrackingText(value: unknown): string {
   return stringValue(value)
     .normalize("NFKC")
     .toLocaleLowerCase()
-    .replace(/[\s\u3000·・:：!！?？'"“”‘’()（）[\]【】{}<>〈〉《》「」『』,，.。\-—_]/g, "");
+    .replace(/[\s\u3000·・:：!！?？'"“”‘’()（）[\]【】{}<>〈〉《》「」『』,，.。\-—_~～]/g, "");
 }
 
 export function normalizeReleaseTrackingStatus(value: unknown): ReleaseTrackingStatus {
@@ -86,6 +92,7 @@ export function releaseTrackingSnapshotFromFrontmatter(
     title: stringValue(frontmatter.release_tracking_title) || undefined,
     creator: stringValue(frontmatter.release_tracking_creator) || undefined,
     publisher: stringValue(frontmatter.release_tracking_publisher) || undefined,
+    imprint: stringValue(frontmatter.release_tracking_imprint) || undefined,
   } : null;
   return {
     status: normalizeReleaseTrackingStatus(frontmatter.release_tracking_status),
@@ -157,72 +164,135 @@ export function isPublishedBy(record: NdlPublicationRecord, now: Date): boolean 
   return timestamp <= today;
 }
 
-function candidateSeriesTitle(record: NdlPublicationRecord): string {
-  if (record.seriesTitle.trim()) return record.seriesTitle.trim();
-  const title = record.title.trim();
-  const volume = record.volume.trim();
-  if (!volume) return title;
-  const normalizedTitle = normalizeTrackingText(title);
-  const normalizedVolume = normalizeTrackingText(volume);
-  if (!normalizedVolume || !normalizedTitle.endsWith(normalizedVolume)) return title;
-  const rawIndex = title.lastIndexOf(volume);
-  return rawIndex > 0 ? title.slice(0, rawIndex).trim().replace(/[\s\u3000:：\-—]+$/, "") : title;
+export function publicationImprint(seriesTitle: unknown): string {
+  return stringValue(seriesTitle).split(/[;；]/, 1)[0]?.trim() ?? "";
+}
+
+export function publicationMedium(seriesTitle: unknown): NdlPublicationMedium {
+  const imprint = publicationImprint(seriesTitle);
+  if (/(コミックス|コミック|漫画|マンガ)/i.test(imprint)) return "comic";
+  if (/(文庫|ブックス|ノベル|novels?|新書)/i.test(imprint)) return "novel";
+  return "unknown";
+}
+
+export function creatorMatches(left: unknown, right: unknown): boolean {
+  const a = normalizeTrackingText(left).replace(/\d+$/g, "");
+  const b = normalizeTrackingText(right).replace(/\d+$/g, "");
+  return Boolean(a && b && (a.includes(b) || b.includes(a)));
+}
+
+export function publicationTitleStrength(actual: unknown, expected: unknown): 0 | 1 | 2 {
+  const a = normalizeTrackingText(actual);
+  const e = normalizeTrackingText(expected);
+  if (!a || !e) return 0;
+  if (a === e) return 2;
+  return a.startsWith(e) ? 1 : 0;
+}
+
+function matchingExpectedTitle(record: NdlPublicationRecord, titles: readonly string[]): { title: string; strength: 1 | 2 } | null {
+  let best: { title: string; strength: 1 | 2 } | null = null;
+  for (const title of titles) {
+    const strength = publicationTitleStrength(record.title, title);
+    if (strength > (best?.strength ?? 0)) best = { title: title.trim(), strength: strength as 1 | 2 };
+  }
+  return best;
+}
+
+export function isSidePublication(record: NdlPublicationRecord): boolean {
+  return /(短編集|\bsss?\b|外伝|番外|アンソロジ|公式ガイド|art\s*works|蛇足編)/i
+    .test(`${record.title} ${record.volume}`);
 }
 
 export function publicationRecordMatchesTitles(
   record: NdlPublicationRecord,
   titles: readonly string[],
 ): boolean {
-  const expected = new Set(titles.map(normalizeTrackingText).filter(Boolean));
-  if (!expected.size) return false;
-  return [candidateSeriesTitle(record), record.seriesTitle, record.title]
-    .map(normalizeTrackingText)
-    .some((value) => value !== "" && expected.has(value));
+  return matchingExpectedTitle(record, titles) !== null;
 }
 
-export function publicationLineKey(record: NdlPublicationRecord): string {
-  const title = normalizeTrackingText(candidateSeriesTitle(record));
-  const creator = normalizeTrackingText(record.creators[0] ?? "");
-  const publisher = normalizeTrackingText(record.publisher);
-  return `${title}\u0000${creator}\u0000${publisher}`;
+function matchingCreator(record: NdlPublicationRecord, creators: readonly string[]): string {
+  if (!creators.length) return record.creators[0] ?? "";
+  for (const expected of creators) {
+    const actual = record.creators.find((value) => creatorMatches(expected, value));
+    if (actual) return expected.trim();
+  }
+  return "";
 }
 
 export function groupPublicationLines(
   records: readonly NdlPublicationRecord[],
   titles: readonly string[],
+  creators: readonly string[] = [],
 ): NdlPublicationLine[] {
   const groups = new Map<string, NdlPublicationLine>();
   for (const record of records) {
-    if (!record.volume.trim() || !publicationRecordMatchesTitles(record, titles)) continue;
-    const key = publicationLineKey(record);
-    if (!key.replaceAll("\u0000", "")) continue;
+    if (!record.volume.trim() || isSidePublication(record)) continue;
+    const titleMatch = matchingExpectedTitle(record, titles);
+    if (!titleMatch) continue;
+    const creator = matchingCreator(record, creators);
+    if (creators.length && !creator) continue;
+    const imprint = publicationImprint(record.seriesTitle);
+    const key = `${normalizeTrackingText(titleMatch.title)}\u0000${normalizeTrackingText(imprint)}`;
     const existing = groups.get(key);
     if (existing) {
       existing.records.push(record);
+      existing.titleStrength = Math.max(existing.titleStrength, titleMatch.strength) as 1 | 2;
+      if (!existing.publisher && record.publisher) existing.publisher = record.publisher;
       continue;
     }
     groups.set(key, {
-      title: candidateSeriesTitle(record),
-      creator: record.creators[0] ?? "",
+      title: titleMatch.title,
+      creator: creator || record.creators[0] || "",
       publisher: record.publisher,
+      imprint,
+      medium: publicationMedium(record.seriesTitle),
+      titleStrength: titleMatch.strength,
       records: [record],
     });
   }
   return [...groups.values()];
 }
 
+function lineRank(line: NdlPublicationLine): readonly [number, number, number] {
+  const mediumRank = line.medium === "novel" ? 2 : line.medium === "unknown" ? 1 : 0;
+  return [line.titleStrength, mediumRank, line.records.length];
+}
+
+function compareLineRank(left: NdlPublicationLine, right: NdlPublicationLine): number {
+  const a = lineRank(left);
+  const b = lineRank(right);
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return a[index] > b[index] ? -1 : 1;
+  }
+  return 0;
+}
+
+export function selectSafeNovelPublicationLine(
+  lines: readonly NdlPublicationLine[],
+  hasCreatorEvidence: boolean,
+): NdlPublicationLine | null {
+  const nonComic = lines.filter((line) => line.medium !== "comic");
+  if (!nonComic.length) return null;
+  const ranked = [...nonComic].sort(compareLineRank);
+  const best = ranked[0];
+  if (!best) return null;
+  if (best.titleStrength < 2 && !(hasCreatorEvidence && best.medium === "novel")) return null;
+  const second = ranked[1];
+  if (second && compareLineRank(best, second) === 0) return null;
+  if (!hasCreatorEvidence && best.medium === "unknown") return null;
+  return best;
+}
+
 export function recordMatchesBinding(
   record: NdlPublicationRecord,
   binding: ReleaseTrackingBinding,
 ): boolean {
-  if (binding.provider !== "ndl-jpro") return false;
-  const title = normalizeTrackingText(binding.title);
-  const creator = normalizeTrackingText(binding.creator);
-  const publisher = normalizeTrackingText(binding.publisher);
-  if (title && normalizeTrackingText(candidateSeriesTitle(record)) !== title) return false;
-  if (creator && !record.creators.some((value) => normalizeTrackingText(value) === creator)) return false;
-  if (publisher && normalizeTrackingText(record.publisher) !== publisher) return false;
-  return Boolean(title || creator || publisher);
+  if (binding.provider !== "ndl-jpro" || isSidePublication(record)) return false;
+  if (binding.title && publicationTitleStrength(record.title, binding.title) === 0) return false;
+  if (binding.creator && !record.creators.some((value) => creatorMatches(binding.creator, value))) return false;
+  if (binding.imprint && normalizeTrackingText(publicationImprint(record.seriesTitle)) !== normalizeTrackingText(binding.imprint)) return false;
+  if (!binding.imprint && binding.publisher && normalizeTrackingText(record.publisher) !== normalizeTrackingText(binding.publisher)) return false;
+  return Boolean(binding.title || binding.creator || binding.publisher || binding.imprint);
 }
 
 export function selectLatestPublishedRecord(

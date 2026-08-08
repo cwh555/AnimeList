@@ -6,6 +6,7 @@ import {
   normalizeTrackingText,
   providerResultRegressed,
   selectLatestPublishedRecord,
+  selectSafeNovelPublicationLine,
   type NdlPublicationLine,
   type ReleaseTrackingBinding,
   type ReleaseTrackingStatus,
@@ -63,17 +64,23 @@ function exactMangaCandidates(
     .some((value) => value && expected.has(value)));
 }
 
+function isMangaVariant(candidate: MangaDexSeriesCandidate): boolean {
+  return /(fan\s*colou?red|official\s*colou?red|colou?red|doujinshi|anthology|pre-serialization|spin.?off|gaiden|外伝|アンソロジ)/i
+    .test(candidate.title);
+}
+
 function lineBinding(line: NdlPublicationLine): ReleaseTrackingBinding {
   return {
     provider: "ndl-jpro",
     title: line.title,
     creator: line.creator || undefined,
     publisher: line.publisher || undefined,
+    imprint: line.imprint || undefined,
   };
 }
 
 function lineDescription(line: NdlPublicationLine): string {
-  return [line.creator, line.publisher].filter(Boolean).join(" · ");
+  return [line.creator, line.imprint, line.publisher].filter(Boolean).join(" · ");
 }
 
 export class ReleaseTrackingService {
@@ -102,20 +109,31 @@ export class ReleaseTrackingService {
   }> {
     const candidates = await this.mangaSearchCandidates(item);
     const exact = exactMangaCandidates(candidates, itemTitles(item));
-    if (exact.length === 1) {
+    const clean = exact.filter((candidate) => !isMangaVariant(candidate));
+    const selected = clean.length === 1 ? clean[0] : exact.length === 1 ? exact[0] : null;
+    if (selected) {
       return {
-        binding: { provider: "mangadex", sourceId: exact[0].id, title: exact[0].title },
+        binding: { provider: "mangadex", sourceId: selected.id, title: selected.title },
         status: "unconfigured",
         message: "",
       };
     }
-    if (exact.length > 1) return { binding: null, status: "ambiguous", message: "Multiple exact MangaDex titles matched." };
+    if (exact.length > 1) return { binding: null, status: "ambiguous", message: "Multiple exact MangaDex editions matched." };
     return { binding: null, status: "unmatched", message: "No safe MangaDex title match was found." };
   }
 
-  private async novelLines(item: MediaItem, creator = ""): Promise<NdlPublicationLine[]> {
-    const records = await this.ndl.searchTitles(itemTitles(item), creator);
-    return groupPublicationLines(records, itemTitles(item));
+  private async novelRecords(item: MediaItem): Promise<Awaited<ReturnType<NdlReleaseClient["searchTitles"]>>> {
+    const creator = item.people.find((value) => value.trim()) ?? "";
+    if (creator) {
+      const filtered = await this.ndl.searchTitles(itemTitles(item), creator);
+      if (filtered.length) return filtered;
+    }
+    return this.ndl.searchTitles(itemTitles(item));
+  }
+
+  private async novelLines(item: MediaItem): Promise<NdlPublicationLine[]> {
+    const records = await this.novelRecords(item);
+    return groupPublicationLines(records, itemTitles(item), item.people);
   }
 
   private async discoverNovelBinding(item: MediaItem): Promise<{
@@ -124,13 +142,13 @@ export class ReleaseTrackingService {
     message: string;
   }> {
     const lines = await this.novelLines(item);
+    const selected = selectSafeNovelPublicationLine(lines, item.people.some((value) => value.trim()));
+    if (selected) return { binding: lineBinding(selected), status: "unconfigured", message: "" };
     if (lines.length > 0) {
       return {
         binding: null,
         status: "ambiguous",
-        message: lines.length === 1
-          ? "An NDL/JPRO publication line was found but requires confirmation before writing the latest volume."
-          : "Multiple NDL/JPRO publication lines matched and require confirmation.",
+        message: "Multiple plausible NDL/JPRO publication lines remain after title, author, and imprint checks.",
       };
     }
     return { binding: null, status: "unmatched", message: "No safe NDL/JPRO publication line was found." };
@@ -210,7 +228,8 @@ export class ReleaseTrackingService {
       }
       binding = discovered.binding;
     }
-    const records = await this.ndl.searchTitles([binding.title], binding.creator ?? "");
+    let records = await this.ndl.searchTitles([binding.title], binding.creator ?? "");
+    if (!records.length && binding.creator) records = await this.ndl.searchTitles([binding.title]);
     const latest = selectLatestPublishedRecord(records, binding, new Date());
     if (!latest) {
       const message = "NDL/JPRO returned no published volume for the verified publication line.";

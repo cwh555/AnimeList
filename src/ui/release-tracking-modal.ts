@@ -8,6 +8,7 @@ import type {
   ReleaseTrackingService,
 } from "../data/release-tracking-service";
 import { releaseTrackingText } from "../release-tracking-text";
+import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 export interface ReleaseTrackingModalActions {
   openMedia(path: string): Promise<void> | void;
@@ -21,12 +22,22 @@ function makeElement<K extends keyof HTMLElementTagNameMap>(tag: K, className = 
   return element;
 }
 
+function icon(name: string, className = ""): HTMLElement {
+  const node = makeElement("span", className);
+  setIcon(node, name);
+  return node;
+}
+
 function providerLabel(provider: ReleaseRefreshItemResult["provider"]): string {
   return provider === "mangadex"
     ? releaseTrackingText("provider.mangadex")
     : provider === "ndl-jpro"
       ? releaseTrackingText("provider.ndl")
       : "";
+}
+
+function mediaTypeLabel(item: MediaItem): string {
+  return MEDIA_UI_LABELS.type[item.mediaType];
 }
 
 function statusLabel(status: ReleaseRefreshItemResult["status"]): string {
@@ -37,62 +48,102 @@ function statusLabel(status: ReleaseRefreshItemResult["status"]): string {
   return releaseTrackingText("status.unconfigured");
 }
 
-function releaseChangeText(result: ReleaseRefreshItemResult): string {
+function releaseValue(result: ReleaseRefreshItemResult, value: string): string {
   const prefix = result.item.mediaType === "manga" ? "Ch." : "Vol.";
-  if (!result.before) return `${prefix}${result.after}`;
-  return `${prefix}${result.before} → ${prefix}${result.after}`;
+  return value ? `${prefix}${value}` : "—";
 }
 
-function summaryStat(label: string): HTMLElement {
-  const node = makeElement("div", "al-stat");
-  node.append(makeElement("strong", "al-stat-number", label));
-  return node;
+function summaryCard(kind: "updated" | "unchanged" | "attention", count: number, label: string): HTMLElement {
+  const card = makeElement("div", `al-release-summary-card is-${kind}`);
+  const badge = icon(kind === "updated" ? "circle-check" : kind === "attention" ? "triangle-alert" : "check", "al-release-summary-icon");
+  const copy = makeElement("div", "al-release-summary-copy");
+  copy.append(makeElement("strong", "al-release-summary-count", String(count)), makeElement("span", "al-release-summary-label", label));
+  card.append(badge, copy);
+  return card;
+}
+
+function rowAction(result: ReleaseRefreshItemResult, actions: ReleaseTrackingModalActions): HTMLButtonElement {
+  const needsReview = result.kind === "attention" && (result.status === "ambiguous" || result.status === "unmatched");
+  const button = makeElement("button", needsReview ? "mod-cta" : "al-secondary-button", needsReview ? releaseTrackingText("modal.review") : releaseTrackingText("modal.open"));
+  button.type = "button";
+  button.addEventListener("click", () => {
+    if (needsReview) actions.reviewItem(result.item);
+    else void actions.openMedia(result.item.filePath);
+  });
+  return button;
 }
 
 function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingModalActions): HTMLElement {
-  const row = makeElement("div", "al-search-result");
-  const marker = makeElement("div", "al-search-result-placeholder");
-  const icon = makeElement("span");
-  setIcon(icon, result.kind === "attention" ? "triangle-alert" : result.kind === "updated" ? "arrow-up" : "check");
-  marker.appendChild(icon);
+  const attention = result.kind === "attention";
+  const row = makeElement("div", `al-release-result-row${attention ? " is-attention" : ""}`);
+  const leading = makeElement("div", "al-release-result-leading");
+  leading.appendChild(icon(attention ? "triangle-alert" : result.kind === "updated" ? "arrow-up-right" : "check", "al-release-result-icon"));
 
-  const copy = makeElement("div", "al-search-result-body");
-  copy.appendChild(makeElement("strong", "", result.item.title));
-  copy.appendChild(makeElement(
-    "span",
-    "",
-    result.kind === "attention" ? (result.message || statusLabel(result.status)) : releaseChangeText(result),
-  ));
-  const provider = providerLabel(result.provider);
-  if (provider) copy.appendChild(makeElement("span", "", provider));
+  const main = makeElement("div", "al-release-result-main");
+  const titleLine = makeElement("div", "al-release-result-title-line");
+  titleLine.append(makeElement("strong", "al-release-result-title", result.item.title), makeElement("span", "al-release-media-chip", mediaTypeLabel(result.item)));
+  main.appendChild(titleLine);
 
-  const actionsEl = makeElement("div");
-  if (result.kind === "attention" && (result.status === "ambiguous" || result.status === "unmatched")) {
-    const review = makeElement("button", "al-secondary-button", releaseTrackingText("modal.review"));
-    review.type = "button";
-    review.addEventListener("click", () => actions.reviewItem(result.item));
-    actionsEl.appendChild(review);
+  if (attention) {
+    main.appendChild(makeElement("div", "al-release-result-message", result.message || statusLabel(result.status)));
+    const meta = makeElement("div", "al-release-result-meta");
+    meta.append(makeElement("span", "al-release-status-chip", statusLabel(result.status)));
+    const provider = providerLabel(result.provider);
+    if (provider) meta.append(makeElement("span", "al-release-provider-label", provider));
+    main.appendChild(meta);
   } else {
-    const open = makeElement("button", "al-secondary-button", releaseTrackingText("modal.open"));
-    open.type = "button";
-    open.addEventListener("click", () => { void actions.openMedia(result.item.filePath); });
-    actionsEl.appendChild(open);
+    const change = makeElement("div", "al-release-change");
+    if (result.before) {
+      change.append(
+        makeElement("span", "al-release-value-before", releaseValue(result, result.before)),
+        icon("arrow-right", "al-release-change-arrow"),
+      );
+    }
+    change.appendChild(makeElement("strong", "al-release-value-after", releaseValue(result, result.after)));
+    main.appendChild(change);
+    const provider = providerLabel(result.provider);
+    if (provider) main.appendChild(makeElement("div", "al-release-provider-label", provider));
   }
-  row.append(marker, copy, actionsEl);
+
+  row.append(leading, main, rowAction(result, actions));
   return row;
 }
 
-function appendResultSection(
-  parent: HTMLElement,
+function resultSection(
+  index: number,
+  kind: "updated" | "initialized" | "attention",
   heading: string,
   results: ReleaseRefreshItemResult[],
   actions: ReleaseTrackingModalActions,
-): void {
-  if (!results.length) return;
-  parent.appendChild(makeElement("h3", "", `${heading} (${results.length})`));
-  const rows = makeElement("div", "al-search-results");
+): HTMLElement | null {
+  if (!results.length) return null;
+  const section = makeElement("section", `al-release-section is-${kind}`);
+  const header = makeElement("div", "al-release-section-header");
+  header.append(
+    makeElement("span", "al-release-section-index", String(index)),
+    icon(kind === "attention" ? "triangle-alert" : kind === "updated" ? "sparkles" : "circle-check", "al-release-section-icon"),
+    makeElement("h3", "al-release-section-title", heading),
+    makeElement("span", "al-release-section-count", String(results.length)),
+  );
+  const rows = makeElement("div", "al-release-result-list");
   results.forEach((result) => rows.appendChild(resultRow(result, actions)));
-  parent.appendChild(rows);
+  section.append(header, rows);
+  return section;
+}
+
+function unchangedSection(results: ReleaseRefreshItemResult[], count: number): HTMLDetailsElement | null {
+  if (!count) return null;
+  const details = makeElement("details", "al-release-unchanged");
+  const summary = makeElement("summary", "al-release-unchanged-summary");
+  summary.append(icon("chevron-right", "al-release-unchanged-chevron"), icon("check", "al-release-unchanged-icon"), makeElement("span", "", releaseTrackingText("modal.unchangedHeading", { count })));
+  const list = makeElement("div", "al-release-unchanged-list");
+  results.slice(0, 30).forEach((result) => {
+    const line = makeElement("div", "al-release-unchanged-row");
+    line.append(makeElement("span", "", result.item.title), makeElement("span", "", releaseValue(result, result.after)));
+    list.appendChild(line);
+  });
+  details.append(summary, list);
+  return details;
 }
 
 export class ReleaseTrackingResultsModal extends Modal {
@@ -104,47 +155,57 @@ export class ReleaseTrackingResultsModal extends Modal {
     this.modalEl.classList.add("animelist-modal", "animelist-release-results-modal");
     this.contentEl.replaceChildren();
 
-    const heading = makeElement("div", "al-modal-heading");
-    const copy = makeElement("div");
+    const header = makeElement("header", "al-release-results-header");
+    const mark = makeElement("div", "al-release-results-mark");
+    mark.appendChild(icon("refresh-cw"));
+    const copy = makeElement("div", "al-release-results-heading-copy");
     copy.append(
       makeElement("h2", "", releaseTrackingText("modal.title")),
       makeElement("p", "", releaseTrackingText("modal.checkedAt", { time: new Date().toLocaleString() })),
     );
-    heading.appendChild(copy);
-    this.contentEl.appendChild(heading);
+    header.append(mark, copy);
+    this.contentEl.appendChild(header);
 
-    const stats = makeElement("div", "al-stats");
+    const stats = makeElement("div", "al-release-summary-grid");
     stats.append(
-      summaryStat(releaseTrackingText("modal.summaryUpdated", { count: this.summary.updated })),
-      summaryStat(releaseTrackingText("modal.summaryUnchanged", { count: this.summary.unchanged })),
-      summaryStat(releaseTrackingText("modal.summaryAttention", { count: this.summary.attention })),
+      summaryCard("updated", this.summary.updated, releaseTrackingText("modal.summaryUpdated", { count: this.summary.updated }).replace(String(this.summary.updated), "").trim()),
+      summaryCard("unchanged", this.summary.unchanged, releaseTrackingText("modal.summaryUnchanged", { count: this.summary.unchanged }).replace(String(this.summary.unchanged), "").trim()),
+      summaryCard("attention", this.summary.attention, releaseTrackingText("modal.summaryAttention", { count: this.summary.attention }).replace(String(this.summary.attention), "").trim()),
     );
-    if (this.summary.initialized > 0) {
-      stats.appendChild(summaryStat(releaseTrackingText("modal.summaryInitialized", { count: this.summary.initialized })));
-    }
     this.contentEl.appendChild(stats);
 
-    appendResultSection(this.contentEl, releaseTrackingText("modal.updatedHeading"), this.summary.results.filter((r) => r.kind === "updated"), this.actions);
-    appendResultSection(this.contentEl, releaseTrackingText("modal.initializedHeading"), this.summary.results.filter((r) => r.kind === "initialized"), this.actions);
-    appendResultSection(this.contentEl, releaseTrackingText("modal.attentionHeading"), this.summary.results.filter((r) => r.kind === "attention"), this.actions);
+    const updated = this.summary.results.filter((result) => result.kind === "updated");
+    const initialized = this.summary.results.filter((result) => result.kind === "initialized");
+    const attention = this.summary.results.filter((result) => result.kind === "attention");
+    const unchanged = this.summary.results.filter((result) => result.kind === "unchanged");
+    const content = makeElement("div", "al-release-results-content");
+    let sectionIndex = 1;
+    const updatedSection = resultSection(sectionIndex, "updated", releaseTrackingText("modal.updatedHeading"), updated, this.actions);
+    if (updatedSection) { content.appendChild(updatedSection); sectionIndex += 1; }
+    const initializedSection = resultSection(sectionIndex, "initialized", releaseTrackingText("modal.initializedHeading"), initialized, this.actions);
+    if (initializedSection) { content.appendChild(initializedSection); sectionIndex += 1; }
+    const attentionSection = resultSection(sectionIndex, "attention", releaseTrackingText("modal.attentionHeading"), attention, this.actions);
+    if (attentionSection) { attentionSection.id = "al-release-attention-section"; content.appendChild(attentionSection); sectionIndex += 1; }
+    const unchangedNode = unchangedSection(unchanged, this.summary.unchanged);
+    if (unchangedNode) content.appendChild(unchangedNode);
+    this.contentEl.appendChild(content);
 
-    if (this.summary.unchanged > 0) {
-      this.contentEl.appendChild(makeElement(
-        "div",
-        "al-modal-warning",
-        releaseTrackingText("modal.unchangedHeading", { count: this.summary.unchanged }),
-      ));
-    }
-
-    const footer = makeElement("div", "al-modal-actions");
-    const close = makeElement("button", "mod-cta", releaseTrackingText("modal.close"));
+    const footer = makeElement("footer", "al-release-results-footer");
+    const note = makeElement("div", "al-release-footer-note");
+    note.append(icon("shield-check"), makeElement("span", "", releaseTrackingText("modal.note")));
+    const actions = makeElement("div", "al-release-footer-actions");
+    const close = makeElement("button", "al-secondary-button", releaseTrackingText("modal.close"));
     close.type = "button";
     close.addEventListener("click", () => this.close());
-    footer.appendChild(close);
-    this.contentEl.append(
-      makeElement("p", "al-modal-hint", releaseTrackingText("modal.note")),
-      footer,
-    );
+    actions.appendChild(close);
+    if (this.summary.attention > 0) {
+      const review = makeElement("button", "mod-cta", releaseTrackingText("modal.attentionHeading"));
+      review.type = "button";
+      review.addEventListener("click", () => this.contentEl.querySelector("#al-release-attention-section")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      actions.appendChild(review);
+    }
+    footer.append(note, actions);
+    this.contentEl.appendChild(footer);
   }
 }
 
@@ -157,16 +218,16 @@ function candidateRow(
   candidate: ReleaseMatchCandidate,
   onUse: (candidate: ReleaseMatchCandidate, button: HTMLButtonElement) => void,
 ): HTMLElement {
-  const row = makeElement("div", "al-search-result");
-  const placeholder = makeElement("div", "al-search-result-placeholder", candidate.provider === "mangadex" ? "MD" : "NDL");
-  const copy = makeElement("div", "al-search-result-body");
+  const row = makeElement("div", "al-release-match-card");
+  const provider = makeElement("div", "al-release-match-provider", candidate.provider === "mangadex" ? "MD" : "NDL");
+  const copy = makeElement("div", "al-release-match-copy");
   copy.appendChild(makeElement("strong", "", candidate.label));
   if (candidate.description) copy.appendChild(makeElement("span", "", candidate.description));
-  copy.appendChild(makeElement("span", "", candidate.provider === "mangadex" ? releaseTrackingText("provider.mangadex") : releaseTrackingText("provider.ndl")));
-  const use = makeElement("button", "al-secondary-button", releaseTrackingText("match.use"));
+  copy.appendChild(makeElement("small", "", candidate.provider === "mangadex" ? releaseTrackingText("provider.mangadex") : releaseTrackingText("provider.ndl")));
+  const use = makeElement("button", "mod-cta", releaseTrackingText("match.use"));
   use.type = "button";
   use.addEventListener("click", () => onUse(candidate, use));
-  row.append(placeholder, copy, use);
+  row.append(provider, copy, use);
   return row;
 }
 
@@ -185,21 +246,21 @@ export class ReleaseTrackingMatchModal extends Modal {
   private async renderCandidates(): Promise<void> {
     const requestId = ++this.requestId;
     this.contentEl.replaceChildren();
-    const heading = makeElement("div", "al-modal-heading");
-    const copy = makeElement("div");
-    copy.append(
-      makeElement("h2", "", releaseTrackingText("match.title")),
-      makeElement("p", "", releaseTrackingText("match.description")),
+    const heading = makeElement("div", "al-release-match-heading");
+    heading.append(
+      icon("search-check", "al-release-match-heading-icon"),
+      makeElement("div", "", ""),
     );
-    heading.appendChild(copy);
-    this.contentEl.append(heading, makeElement("div", "al-modal-hint", releaseTrackingText("match.loading")));
+    const headingCopy = heading.lastElementChild as HTMLElement;
+    headingCopy.append(makeElement("h2", "", releaseTrackingText("match.title")), makeElement("p", "", releaseTrackingText("match.description")));
+    this.contentEl.append(heading, makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
 
     let candidates: ReleaseMatchCandidate[] = [];
     try { candidates = await this.service.matchCandidates(this.item); } catch { candidates = []; }
     if (requestId !== this.requestId) return;
 
-    this.contentEl.querySelector(".al-modal-hint")?.remove();
-    const rows = makeElement("div", "al-search-results");
+    this.contentEl.querySelector(".al-release-match-loading")?.remove();
+    const rows = makeElement("div", "al-release-match-list");
     if (!candidates.length) rows.appendChild(makeElement("div", "al-search-empty", releaseTrackingText("match.empty")));
     for (const candidate of candidates) {
       rows.appendChild(candidateRow(candidate, (selected, button) => {
@@ -214,7 +275,7 @@ export class ReleaseTrackingMatchModal extends Modal {
     }
     this.contentEl.appendChild(rows);
 
-    const footer = makeElement("div", "al-modal-actions");
+    const footer = makeElement("div", "al-release-match-actions");
     const disable = makeElement("button", "al-secondary-button", releaseTrackingText("match.disable"));
     disable.type = "button";
     disable.addEventListener("click", () => {

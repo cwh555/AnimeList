@@ -122,6 +122,7 @@ describe("release tracking provider clients", () => {
     assert.match(request.url, /^https:\/\/ndlsearch\.ndl\.go\.jp\/api\/opensearch\?/);
     assert.match(request.url, /dpid=jpro-book/);
     assert.match(request.url, /mediatype=books/);
+    assert.match(request.url, /cnt=200/);
     assert.match(request.url, /creator=/);
     assert.equal(records.length, 1);
     assert.equal(records[0]?.volume, "45");

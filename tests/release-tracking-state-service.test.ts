@@ -86,22 +86,16 @@ describe("release tracking persistence", () => {
     assert.equal("release_tracking_verified_at" in frontmatter, false);
   });
 
-  it("requires explicit confirmation for a novel publication line even when only one NDL candidate exists", async () => {
+  it("auto-binds a high-confidence novel publication line and writes only release metadata", async () => {
     const { app, file, frontmatter } = harness({ progress: 8, progress_unit: "volume" });
     const mangaDex = {} as MangaDexReleaseClient;
     const ndl = {
       async searchTitles() {
-        return [{
-          sourceId: "book-9",
-          sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-9",
-          title: "Example Novel",
-          seriesTitle: "Example Novel",
-          volume: "9",
-          creators: ["Author"],
-          publisher: "Publisher",
-          publishedAt: "2026-07-01",
-          isbn: "9784000000000",
-        }];
+        return [
+          { sourceId: "book-8", sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-8", title: "Example Novel", seriesTitle: "Example文庫 ; ex-8", volume: "8", creators: ["Author"], publisher: "Old Publisher", publishedAt: "2025", isbn: "" },
+          { sourceId: "book-9", sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-9", title: "Example Novel", seriesTitle: "Example文庫 ; ex-9", volume: "9", creators: ["Author"], publisher: "New Publisher", publishedAt: "2026", isbn: "9784000000000" },
+          { sourceId: "comic-10", sourceUrl: "https://ndlsearch.ndl.go.jp/books/comic-10", title: "Example Novel", seriesTitle: "Exampleコミックス", volume: "10", creators: ["Author", "Artist"], publisher: "Comic Publisher", publishedAt: "2026", isbn: "" },
+        ];
       },
     } as unknown as NdlReleaseClient;
     const service = new ReleaseTrackingService(app, { mangaDex, ndl });
@@ -111,11 +105,36 @@ describe("release tracking persistence", () => {
     novel.people = ["Author"];
 
     const result = await service.refreshItem(novel);
-    assert.equal(result.kind, "attention");
-    assert.equal(result.status, "ambiguous");
-    assert.equal(frontmatter.release_tracking_status, "ambiguous");
-    assert.equal("latest_volume" in frontmatter, false);
+    assert.equal(result.kind, "initialized");
+    assert.equal(result.status, "verified");
+    assert.equal(frontmatter.latest_volume, "9");
+    assert.equal(frontmatter.release_tracking_imprint, "Example文庫");
+    assert.equal(frontmatter.release_tracking_status, "verified");
     assert.equal(frontmatter.progress, 8);
+  });
+
+  it("auto-selects the original MangaDex work when colored editions share the exact title", async () => {
+    const { app, file, frontmatter } = harness({ progress: 120, progress_unit: "chapter" });
+    const mangaDex = {
+      async search() {
+        return [
+          { id: "original", title: "Kaguya-sama: Love Is War", altTitles: ["かぐや様は告らせたい～天才たちの恋愛頭脳戦～"], sourceUrl: "https://mangadex.org/title/original" },
+          { id: "fan", title: "Kaguya-sama wa Kokurasetai (Fan Colored)", altTitles: ["かぐや様は告らせたい～天才たちの恋愛頭脳戦～"], sourceUrl: "https://mangadex.org/title/fan" },
+          { id: "official", title: "Kaguya-sama: Love Is War (Official Colored)", altTitles: ["かぐや様は告らせたい～天才たちの恋愛頭脳戦～"], sourceUrl: "https://mangadex.org/title/official" },
+        ];
+      },
+      async latestChapter(sourceId: string) { assert.equal(sourceId, "original"); return "281.1"; },
+    } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.title = "輝夜姬想讓人告白";
+    manga.originalTitle = "かぐや様は告らせたい～天才たちの恋愛頭脳戦～";
+
+    const result = await service.refreshItem(manga);
+    assert.equal(result.kind, "initialized");
+    assert.equal(result.after, "281.1");
+    assert.equal(frontmatter.release_tracking_ref, "original");
+    assert.equal(frontmatter.latest_chapter, "281.1");
   });
 
   it("persists provider failures while preserving the last verified release", async () => {

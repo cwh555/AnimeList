@@ -16,7 +16,8 @@ function sameBinding(left: ReleaseTrackingBinding | null, right: ReleaseTracking
     && (left.sourceId ?? "") === (right.sourceId ?? "")
     && (left.title ?? "") === (right.title ?? "")
     && (left.creator ?? "") === (right.creator ?? "")
-    && (left.publisher ?? "") === (right.publisher ?? "");
+    && (left.publisher ?? "") === (right.publisher ?? "")
+    && (left.imprint ?? "") === (right.imprint ?? "");
 }
 
 export class ReleaseTrackingStateService {
@@ -52,6 +53,8 @@ export class ReleaseTrackingStateService {
       else delete frontmatter.release_tracking_creator;
       if (binding.publisher) frontmatter.release_tracking_publisher = binding.publisher;
       else delete frontmatter.release_tracking_publisher;
+      if (binding.imprint) frontmatter.release_tracking_imprint = binding.imprint;
+      else delete frontmatter.release_tracking_imprint;
       frontmatter.release_tracking_status = "unconfigured";
       delete frontmatter.release_tracking_error;
     });
@@ -85,6 +88,8 @@ export class ReleaseTrackingStateService {
       else delete frontmatter.release_tracking_creator;
       if (binding.publisher) frontmatter.release_tracking_publisher = binding.publisher;
       else delete frontmatter.release_tracking_publisher;
+      if (binding.imprint) frontmatter.release_tracking_imprint = binding.imprint;
+      else delete frontmatter.release_tracking_imprint;
       frontmatter.release_tracking_status = "verified";
       frontmatter.release_tracking_checked_at = verifiedAt;
       delete frontmatter.release_tracking_verified_at;
