@@ -1,6 +1,6 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../../app-metadata";
-import { latestNumericChapter } from "../../domain/release-tracking";
+import { latestPrimaryMangaChapter } from "../../domain/release-tracking";
 
 const MANGADEX_API = "https://api.mangadex.org";
 const MANGADEX_WEB = "https://mangadex.org/title";
@@ -86,6 +86,6 @@ export class MangaDexReleaseClient {
       }
       return chapter ? [chapter] : [];
     });
-    return latestNumericChapter(labels);
+    return latestPrimaryMangaChapter(labels);
   }
 }

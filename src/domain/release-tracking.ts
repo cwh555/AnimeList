@@ -142,6 +142,23 @@ export function latestNumericChapter(labels: unknown[]): string {
   return latest;
 }
 
+export function latestPrimaryMangaChapter(labels: unknown[]): string {
+  const numeric = labels
+    .map((value) => stringValue(value))
+    .filter((label) => numericChapterParts(label) !== null);
+  const latest = latestNumericChapter(numeric);
+  const parts = numericChapterParts(latest);
+  if (!latest || !parts || parts.length === 1) return latest;
+
+  // MangaDex often numbers a volume extra/omake as a decimal attached to the
+  // final serialized chapter (for example 281.1 after Chapter 281). When the
+  // exact whole-number base is also present, that decimal is supplementary
+  // rather than a newer main chapter. Do not globally discard decimals: a
+  // series whose feed genuinely has only decimal numbering still keeps it.
+  const base = String(parts[0]);
+  return numeric.includes(base) ? base : latest;
+}
+
 export function parsePublishedDate(value: unknown): number | null {
   const text = stringValue(value);
   if (!text) return null;

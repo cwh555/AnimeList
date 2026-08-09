@@ -550,7 +550,22 @@ export class ReleaseTrackingService {
       return candidates;
     }
     if (item.mediaType === "novel") {
-      await this.discoverNovel(item);
+      const discovered = await this.discoverNovel(item);
+      if (discovered.binding) {
+        const binding = discovered.binding;
+        const latest = selectLatestPublishedRecord(discovered.records, binding, new Date());
+        const candidate: ReleaseMatchCandidate = {
+          provider: "ndl-jpro",
+          label: binding.title || item.originalTitle || item.title,
+          description: [binding.creator, binding.imprint, binding.publisher].filter(Boolean).join(" · "),
+          sourceUrl: latest?.sourceUrl ?? "",
+          binding,
+        };
+        const recordsByCatalog = new Map<NdlCatalog, NdlPublicationRecord[]>();
+        if (binding.catalog) recordsByCatalog.set(binding.catalog, discovered.records);
+        this.matchCache.set(item.filePath, { candidates: [candidate], recordsByCatalog });
+        return [candidate];
+      }
       const next = this.matchCache.get(item.filePath);
       return next && !Array.isArray(next) ? next.candidates : [];
     }
