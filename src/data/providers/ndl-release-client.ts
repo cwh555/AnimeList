@@ -1,9 +1,13 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../../app-metadata";
-import type { NdlPublicationRecord } from "../../domain/release-tracking";
+import type { NdlCatalog, NdlPublicationRecord } from "../../domain/release-tracking";
 
 const NDL_OPENSEARCH = "https://ndlsearch.ndl.go.jp/api/opensearch";
-const NDL_PUBLICATION_PROVIDERS = ["jpro-book", "iss-ndl-opac-national"] as const;
+const NDL_CATALOG_DPID: Record<NdlCatalog, string> = {
+  "jpro-book": "jpro-book",
+  "ndl-national": "iss-ndl-opac-national",
+};
+export const NDL_CATALOGS: readonly NdlCatalog[] = ["jpro-book", "ndl-national"];
 
 function text(value: Element | null | undefined): string {
   return value?.textContent?.trim() ?? "";
@@ -27,6 +31,16 @@ function allText(item: Element, localNames: readonly string[]): string[] {
   return [...new Set(descendants(item, localNames).map(text).filter(Boolean))];
 }
 
+function alternativeTitles(item: Element): string[] {
+  const values: string[] = [];
+  for (const alternative of descendants(item, ["alternative", "alternativeTitle"])) {
+    const nestedValue = firstText(alternative, ["value"]);
+    const value = nestedValue || text(alternative);
+    if (value) values.push(value);
+  }
+  return [...new Set(values)];
+}
+
 function isbnFromIdentifiers(values: readonly string[]): string {
   for (const value of values) {
     const normalized = value.replace(/[^0-9Xx]/g, "");
@@ -35,7 +49,7 @@ function isbnFromIdentifiers(values: readonly string[]): string {
   return "";
 }
 
-function parseItem(item: Element): NdlPublicationRecord | null {
+function parseItem(item: Element, catalog: NdlCatalog): NdlPublicationRecord | null {
   const link = firstText(item, ["link"]);
   const guid = firstText(item, ["guid", "identifier"]);
   const title = firstText(item, ["title"]);
@@ -51,22 +65,27 @@ function parseItem(item: Element): NdlPublicationRecord | null {
     publisher: firstText(item, ["publisher"]),
     publishedAt: firstText(item, ["issued", "date", "publicationDate"]),
     isbn: isbnFromIdentifiers(identifiers),
+    alternativeTitles: alternativeTitles(item),
+    catalog,
   };
 }
 
+function recordKey(record: NdlPublicationRecord): string {
+  return record.isbn || record.sourceId || [record.title, record.volume, record.publisher, record.publishedAt]
+    .map((value) => value.trim().normalize("NFKC").toLocaleLowerCase())
+    .join("\u0000");
+}
+
 export class NdlReleaseClient {
-  private async searchProvider(
-    provider: typeof NDL_PUBLICATION_PROVIDERS[number],
-    title: string,
-    creator: string,
-  ): Promise<NdlPublicationRecord[]> {
+  async searchCatalog(catalog: NdlCatalog, title: string): Promise<NdlPublicationRecord[]> {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) return [];
     const parameters = new URLSearchParams({
-      dpid: provider,
+      dpid: NDL_CATALOG_DPID[catalog],
       cnt: "200",
       mediatype: "books",
-      title,
+      title: normalizedTitle,
     });
-    if (creator) parameters.set("creator", creator);
     const response = await requestUrl({
       url: `${NDL_OPENSEARCH}?${parameters.toString()}`,
       method: "GET",
@@ -78,45 +97,36 @@ export class NdlReleaseClient {
     const document = new DOMParser().parseFromString(response.text || "", "application/xml");
     if (document.querySelector("parsererror")) throw new Error("NDL Search returned invalid XML.");
     return Array.from(document.getElementsByTagName("item"))
-      .map(parseItem)
+      .map((item) => parseItem(item, catalog))
       .filter((record): record is NdlPublicationRecord => record !== null);
   }
 
-  async search(title: string, creator = ""): Promise<NdlPublicationRecord[]> {
-    const normalizedTitle = title.trim();
-    if (!normalizedTitle) return [];
-    const normalizedCreator = creator.trim();
+  async search(title: string, catalogs: readonly NdlCatalog[] = NDL_CATALOGS): Promise<NdlPublicationRecord[]> {
     const records = new Map<string, NdlPublicationRecord>();
     const failures: unknown[] = [];
-
-    // JPRO is best for current publication dates; the national bibliography
-    // supplies historical domestic volumes that JPRO may not retain. Both are
-    // queried through the same NDL Search API, sequentially to avoid bursty access.
-    for (const provider of NDL_PUBLICATION_PROVIDERS) {
+    for (const catalog of catalogs) {
       try {
-        for (const record of await this.searchProvider(provider, normalizedTitle, normalizedCreator)) {
-          // Prefer JPRO when both providers describe the same ISBN because it
-          // commonly carries the more precise current release date.
-          const key = record.isbn || [record.title, record.volume, record.publisher, record.publishedAt]
-            .map((value) => value.trim().normalize("NFKC").toLocaleLowerCase())
-            .join("\u0000");
+        for (const record of await this.searchCatalog(catalog, title)) {
+          const key = recordKey(record);
           if (!records.has(key)) records.set(key, record);
         }
       } catch (error) {
         failures.push(error);
       }
     }
-
     if (records.size) return [...records.values()];
-    if (failures.length === NDL_PUBLICATION_PROVIDERS.length) throw failures[0];
+    if (failures.length === catalogs.length && catalogs.length > 0) throw failures[0];
     return [];
   }
 
-  async searchTitles(titles: readonly string[], creator = ""): Promise<NdlPublicationRecord[]> {
+  async searchTitles(
+    titles: readonly string[],
+    catalogs: readonly NdlCatalog[] = NDL_CATALOGS,
+  ): Promise<NdlPublicationRecord[]> {
     const records = new Map<string, NdlPublicationRecord>();
     for (const title of [...new Set(titles.map((value) => value.trim()).filter(Boolean))]) {
-      for (const record of await this.search(title, creator)) {
-        const key = record.isbn || record.sourceId || `${record.title}\u0000${record.volume}\u0000${record.publisher}`;
+      for (const record of await this.search(title, catalogs)) {
+        const key = recordKey(record);
         if (!records.has(key)) records.set(key, record);
       }
     }

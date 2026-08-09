@@ -90,17 +90,17 @@ describe("release tracking provider clients", () => {
     assert.doesNotMatch(request.url, /includeFutureUpdates/);
   });
 
-  it("queries JPRO plus the national bibliography and deduplicates the same ISBN", async () => {
+  it("queries one selected NDL catalog at a time and tags records with catalog provenance", async () => {
     const requests: any[] = [];
     const item = node("item", "", [
       node("title", "Re:ゼロから始める異世界生活"),
       node("link", "https://ndlsearch.ndl.go.jp/books/example"),
       node("identifier", "9784040000000"),
-      node("seriesTitle", "Re:ゼロから始める異世界生活"),
+      node("seriesTitle", "MF文庫J"),
+      node("alternative", "", [node("value", "Re:ゼロから始める異世界生活")]),
       node("volume", "45"),
       node("creator", "長月達平"),
       node("publisher", "KADOKAWA"),
-      node("date", "2026-08-08"),
       node("issued", "2026-06-25"),
     ]);
     const fakeDocument = {
@@ -118,20 +118,19 @@ describe("release tracking provider clients", () => {
       return { text: "<rss />" };
     });
 
-    const records = await new NdlReleaseClient().search("Re:ゼロから始める異世界生活", "長月達平");
-    assert.equal(requests.length, 2);
-    assert.match(requests[0].url, /^https:\/\/ndlsearch\.ndl\.go\.jp\/api\/opensearch\?/);
+    const client = new NdlReleaseClient();
+    const jpro = await client.searchCatalog("jpro-book", "Re:ゼロから始める異世界生活");
+    assert.equal(requests.length, 1);
     assert.match(requests[0].url, /dpid=jpro-book/);
+    assert.doesNotMatch(requests[0].url, /creator=/);
+    assert.equal(jpro[0]?.catalog, "jpro-book");
+    assert.deepEqual(jpro[0]?.alternativeTitles, ["Re:ゼロから始める異世界生活"]);
+
+    const national = await client.searchCatalog("ndl-national", "Re:ゼロから始める異世界生活");
+    assert.equal(requests.length, 2);
     assert.match(requests[1].url, /dpid=iss-ndl-opac-national/);
-    for (const request of requests) {
-      assert.match(request.url, /mediatype=books/);
-      assert.match(request.url, /cnt=200/);
-      assert.match(request.url, /creator=/);
-    }
-    assert.equal(records.length, 1);
-    assert.equal(records[0]?.volume, "45");
-    assert.equal(records[0]?.publisher, "KADOKAWA");
-    assert.equal(records[0]?.publishedAt, "2026-06-25");
-    assert.equal(records[0]?.isbn, "9784040000000");
+    assert.equal(national[0]?.catalog, "ndl-national");
+    assert.equal(national[0]?.volume, "45");
+    assert.equal(national[0]?.publishedAt, "2026-06-25");
   });
 });

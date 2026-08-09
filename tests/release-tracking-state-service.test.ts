@@ -90,11 +90,11 @@ describe("release tracking persistence", () => {
     const { app, file, frontmatter } = harness({ progress: 8, progress_unit: "volume" });
     const mangaDex = {} as MangaDexReleaseClient;
     const ndl = {
-      async searchTitles() {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
         return [
-          { sourceId: "book-8", sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-8", title: "Example Novel", seriesTitle: "Example文庫 ; ex-8", volume: "8", creators: ["Author"], publisher: "Old Publisher", publishedAt: "2025", isbn: "" },
-          { sourceId: "book-9", sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-9", title: "Example Novel", seriesTitle: "Example文庫 ; ex-9", volume: "9", creators: ["Author"], publisher: "New Publisher", publishedAt: "2026", isbn: "9784000000000" },
-          { sourceId: "comic-10", sourceUrl: "https://ndlsearch.ndl.go.jp/books/comic-10", title: "Example Novel", seriesTitle: "Exampleコミックス", volume: "10", creators: ["Author", "Artist"], publisher: "Comic Publisher", publishedAt: "2026", isbn: "" },
+          { sourceId: "book-8", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-8", title: "Example Novel", seriesTitle: "Example文庫 ; ex-8", volume: "8", creators: ["Author"], publisher: "Old Publisher", publishedAt: "2025", isbn: "" },
+          { sourceId: "book-9", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-9", title: "Example Novel", seriesTitle: "Example文庫 ; ex-9", volume: "9", creators: ["Author"], publisher: "New Publisher", publishedAt: "2026", isbn: "9784000000000" },
+          { sourceId: "comic-10", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/comic-10", title: "Example Novel", seriesTitle: "Exampleコミックス", volume: "10", creators: ["Author", "Artist"], publisher: "Comic Publisher", publishedAt: "2026", isbn: "" },
         ];
       },
     } as unknown as NdlReleaseClient;
@@ -126,10 +126,10 @@ describe("release tracking persistence", () => {
       latest_release_date: "2010-04-10",
     });
     const ndl = {
-      async searchTitles() {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
         return [
-          { sourceId: "main-10", sourceUrl: "https://ndlsearch.ndl.go.jp/books/main-10", title: "とらドラ!", seriesTitle: "電撃文庫 ; 1807", volume: "10", creators: ["竹宮ゆゆこ"], publisher: "アスキー・メディアワークス", publishedAt: "2009-03-10", isbn: "9784048675932" },
-          { sourceId: "spin-3", sourceUrl: "https://ndlsearch.ndl.go.jp/books/spin-3", title: "とらドラ・スピンオフ3! 俺の弁当を見てくれ", seriesTitle: "電撃文庫", volume: "3", creators: ["竹宮ゆゆこ"], publisher: "アスキー・メディアワークス", publishedAt: "2010-04-10", isbn: "9784048684569" },
+          { sourceId: "main-10", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/main-10", title: "とらドラ!", seriesTitle: "電撃文庫 ; 1807", volume: "10", creators: ["竹宮ゆゆこ"], publisher: "アスキー・メディアワークス", publishedAt: "2009-03-10", isbn: "9784048675932" },
+          { sourceId: "spin-3", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/spin-3", title: "とらドラ・スピンオフ3! 俺の弁当を見てくれ", seriesTitle: "電撃文庫", volume: "3", creators: ["竹宮ゆゆこ"], publisher: "アスキー・メディアワークス", publishedAt: "2010-04-10", isbn: "9784048684569" },
         ];
       },
     } as unknown as NdlReleaseClient;
@@ -151,9 +151,9 @@ describe("release tracking persistence", () => {
   it("refuses a numeric provider latest below the user's recorded reading progress", async () => {
     const { app, file, frontmatter } = harness({ progress: 8, progress_unit: "volume" });
     const ndl = {
-      async searchTitles() {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
         return [
-          { sourceId: "book-3", sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-3", title: "Example Novel", seriesTitle: "Example文庫", volume: "3", creators: ["Author"], publisher: "Publisher", publishedAt: "2026-01-01", isbn: "" },
+          { sourceId: "book-3", catalog, sourceUrl: "https://ndlsearch.ndl.go.jp/books/book-3", title: "Example Novel", seriesTitle: "Example文庫", volume: "3", creators: ["Author"], publisher: "Publisher", publishedAt: "2026-01-01", isbn: "" },
         ];
       },
     } as unknown as NdlReleaseClient;
@@ -275,4 +275,181 @@ describe("release tracking persistence", () => {
     assert.equal(frontmatter.release_tracking_status, "provider_error");
     assert.equal(frontmatter.release_tracking_error, "temporary outage");
   });
+
+  it("uses one JPRO request for a safely matched first-time novel and persists the trusted catalog", async () => {
+    const { app, file, frontmatter } = harness({ progress: 12, progress_unit: "volume" });
+    let calls = 0;
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national", title: string) {
+        calls += 1;
+        assert.equal(catalog, "jpro-book");
+        assert.equal(title, "ロクでなし魔術講師と禁忌教典");
+        return [
+          { sourceId: "23", sourceUrl: "https://ndl/23", title: "ロクでなし魔術講師と禁忌教典(アカシックレコード)", alternativeTitles: [title], seriesTitle: "", volume: "23", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-06-20", isbn: "", catalog },
+          { sourceId: "24", sourceUrl: "https://ndl/24", title: "ロクでなし魔術講師と禁忌教典(アカシックレコード)", alternativeTitles: [title], seriesTitle: "富士見ファンタジア文庫", volume: "24", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-11-17", isbn: "", catalog },
+        ];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = "不正經的魔術講師與禁忌教典";
+    novel.originalTitle = "ロクでなし魔術講師と禁忌教典";
+    novel.people = ["羊太郎"];
+    novel.progress = 12;
+
+    const result = await service.refreshItem(novel);
+    assert.equal(result.kind, "initialized");
+    assert.equal(result.after, "24");
+    assert.equal(calls, 1);
+    assert.equal(frontmatter.release_tracking_catalog, "jpro-book");
+    assert.equal(frontmatter.release_tracking_status, "verified");
+  });
+
+  it("reuses a persisted trusted NDL catalog on the next refresh without screening the other catalog", async () => {
+    const { app, file } = harness({
+      progress: 8,
+      progress_unit: "volume",
+      release_tracking_provider: "ndl-jpro",
+      release_tracking_title: "オーバーロード",
+      release_tracking_creator: "丸山くがね",
+      release_tracking_catalog: "ndl-national",
+      release_tracking_status: "verified",
+      latest_volume: "16",
+      latest_release_date: "2022-07-29",
+    });
+    const calls: string[] = [];
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
+        calls.push(catalog);
+        return [{ sourceId: "16", sourceUrl: "https://ndl/16", title: "オーバーロード16 半森妖精の神人 下", seriesTitle: "", volume: "16", creators: ["丸山くがね"], publisher: "KADOKAWA", publishedAt: "2022-07-29", isbn: "", catalog }];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = "OVERLORD";
+    novel.originalTitle = "オーバーロード";
+    novel.people = ["丸山くがね"];
+
+    const result = await service.refreshItem(novel);
+    assert.equal(result.kind, "unchanged");
+    assert.deepEqual(calls, ["ndl-national"]);
+  });
+
+  it("falls back to the other NDL catalog only when the stored catalog cannot safely verify the binding", async () => {
+    const { app, file, frontmatter } = harness({
+      progress: 8,
+      progress_unit: "volume",
+      release_tracking_provider: "ndl-jpro",
+      release_tracking_title: "Example Novel",
+      release_tracking_creator: "Author",
+      release_tracking_imprint: "Example文庫",
+      release_tracking_catalog: "jpro-book",
+      release_tracking_status: "verified",
+      latest_volume: "8",
+      latest_release_date: "2025-01-01",
+    });
+    const calls: string[] = [];
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
+        calls.push(catalog);
+        if (catalog === "jpro-book") return [];
+        return [{ sourceId: "9", sourceUrl: "https://ndl/9", title: "Example Novel", seriesTitle: "Example文庫", volume: "9", creators: ["Author"], publisher: "Publisher", publishedAt: "2026-01-01", isbn: "", catalog }];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = novel.originalTitle = "Example Novel";
+    novel.people = ["Author"];
+
+    const result = await service.refreshItem(novel);
+    assert.equal(result.kind, "updated");
+    assert.deepEqual(calls, ["jpro-book", "ndl-national"]);
+    assert.equal(frontmatter.release_tracking_catalog, "ndl-national");
+  });
+
+  it("keeps post-finale side publications in result notes without changing the main latest volume", async () => {
+    const { app, file } = harness({ progress: 10, progress_unit: "volume" });
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
+        return [
+          { sourceId: "main-10", sourceUrl: "https://ndl/main-10", title: "とらドラ!", seriesTitle: "電撃文庫", volume: "10", creators: ["竹宮ゆゆこ"], publisher: "KADOKAWA", publishedAt: "2009-03-10", isbn: "", catalog },
+          { sourceId: "spin-3", sourceUrl: "https://ndl/spin-3", title: "とらドラ・スピンオフ3! 俺の弁当を見てくれ", seriesTitle: "電撃文庫", volume: "3", creators: ["竹宮ゆゆこ"], publisher: "KADOKAWA", publishedAt: "2010-04-10", isbn: "", catalog },
+        ];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = "虎與龍";
+    novel.originalTitle = "とらドラ!";
+    novel.people = ["竹宮ゆゆこ"];
+    novel.progress = 10;
+
+    const result = await service.refreshItem(novel);
+    assert.equal(result.after, "10");
+    assert.equal(result.notes.length, 1);
+    assert.match(result.notes[0] ?? "", /スピンオフ3/);
+  });
+
+  it("persists a manually selected binding atomically instead of returning to ambiguous state", async () => {
+    const { app, file, frontmatter } = harness({ progress: 12, progress_unit: "volume", release_tracking_status: "ambiguous" });
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
+        return [{ sourceId: "24", sourceUrl: "https://ndl/24", title: "ロクでなし魔術講師と禁忌教典", seriesTitle: "富士見ファンタジア文庫", volume: "24", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-11-17", isbn: "", catalog }];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = "不正經的魔術講師與禁忌教典";
+    novel.originalTitle = "ロクでなし魔術講師と禁忌教典";
+    novel.people = ["羊太郎"];
+    novel.progress = 12;
+
+    const result = await service.refreshItem(novel, {
+      provider: "ndl-jpro",
+      title: "ロクでなし魔術講師と禁忌教典",
+      creator: "羊太郎",
+      imprint: "富士見ファンタジア文庫",
+      catalog: "jpro-book",
+    });
+    assert.equal(result.status, "verified");
+    assert.equal(frontmatter.release_tracking_status, "verified");
+    assert.equal(frontmatter.release_tracking_title, "ロクでなし魔術講師と禁忌教典");
+    assert.equal(frontmatter.release_tracking_catalog, "jpro-book");
+  });
+
+  it("excludes titles disabled in Settings from refresh totals and provider requests", async () => {
+    const disabled = harness({ release_tracking_status: "disabled", progress: 120, progress_unit: "chapter" });
+    const enabled = harness({ release_tracking_provider: "mangadex", release_tracking_ref: "series-1", release_tracking_status: "verified", latest_chapter: "147", progress: 120, progress_unit: "chapter" });
+    enabled.file.path = "AnimeList/Manga/Enabled.md";
+    const app = {
+      vault: { getAbstractFileByPath(path: string) { return path === disabled.file.path ? disabled.file : path === enabled.file.path ? enabled.file : null; } },
+      metadataCache: { getFileCache(target: TFile) { return target === disabled.file ? { frontmatter: disabled.frontmatter } : target === enabled.file ? { frontmatter: enabled.frontmatter } : null; } },
+      fileManager: { async processFrontMatter(target: TFile, apply: (value: Record<string, unknown>) => void) { apply(target === disabled.file ? disabled.frontmatter : enabled.frontmatter); } },
+    } as any;
+    let requests = 0;
+    const mangaDex = { async latestChapter() { requests += 1; return "148"; } } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const progress: number[] = [];
+    const summary = await service.refreshAll([item(disabled.file.path), item(enabled.file.path)], (event) => progress.push(event.total));
+    assert.equal(requests, 1);
+    assert.deepEqual(progress, [1, 1]);
+    assert.equal(summary.checked, 1);
+  });
+
+  it("re-enables a Settings-disabled work without erasing its existing release binding or latest value", async () => {
+    const { app, file, frontmatter } = harness({
+      release_tracking_status: "disabled",
+      release_tracking_provider: "ndl-jpro",
+      release_tracking_title: "Example Novel",
+      release_tracking_catalog: "jpro-book",
+      latest_volume: "9",
+    });
+    const state = new ReleaseTrackingStateService(app);
+    assert.equal(await state.enable(file.path, "novel"), true);
+    assert.equal(frontmatter.release_tracking_status, "unconfigured");
+    assert.equal(frontmatter.release_tracking_title, "Example Novel");
+    assert.equal(frontmatter.release_tracking_catalog, "jpro-book");
+    assert.equal(frontmatter.latest_volume, "9");
+  });
+
 });

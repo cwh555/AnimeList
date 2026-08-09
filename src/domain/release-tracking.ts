@@ -1,4 +1,5 @@
 export type ReleaseTrackingProvider = "mangadex" | "ndl-jpro";
+export type NdlCatalog = "jpro-book" | "ndl-national";
 
 export type ReleaseTrackingStatus =
   | "unconfigured"
@@ -16,6 +17,7 @@ export interface ReleaseTrackingBinding {
   creator?: string;
   publisher?: string;
   imprint?: string;
+  catalog?: NdlCatalog;
 }
 
 export interface ReleaseTrackingSnapshot {
@@ -37,6 +39,8 @@ export interface NdlPublicationRecord {
   publisher: string;
   publishedAt: string;
   isbn: string;
+  alternativeTitles?: string[];
+  catalog?: NdlCatalog;
 }
 
 export type NdlPublicationMedium = "novel" | "comic" | "unknown";
@@ -86,13 +90,18 @@ export function releaseTrackingSnapshotFromFrontmatter(
     : mediaType === "novel"
       ? stringValue(frontmatter.latest_volume)
       : "";
-  const binding = provider ? {
+  const catalogValue = stringValue(frontmatter.release_tracking_catalog);
+  const catalog: NdlCatalog | undefined = catalogValue === "jpro-book" || catalogValue === "ndl-national"
+    ? catalogValue
+    : undefined;
+  const binding: ReleaseTrackingBinding | null = provider ? {
     provider,
     sourceId: stringValue(frontmatter.release_tracking_ref) || undefined,
     title: stringValue(frontmatter.release_tracking_title) || undefined,
     creator: stringValue(frontmatter.release_tracking_creator) || undefined,
     publisher: stringValue(frontmatter.release_tracking_publisher) || undefined,
     imprint: stringValue(frontmatter.release_tracking_imprint) || undefined,
+    catalog,
   } : null;
   return {
     status: normalizeReleaseTrackingStatus(frontmatter.release_tracking_status),
@@ -189,16 +198,33 @@ export function publicationTitleStrength(actual: unknown, expected: unknown): 0 
   return a.startsWith(e) ? 1 : 0;
 }
 
-function publicationRecordTitleStrength(record: NdlPublicationRecord, expected: unknown): 0 | 1 | 2 {
-  const direct = publicationTitleStrength(record.title, expected);
+function individualTitleStrength(actualValue: unknown, volumeValue: unknown, expected: unknown): 0 | 1 | 2 {
+  const direct = publicationTitleStrength(actualValue, expected);
   if (direct === 2) return 2;
-  const actual = normalizeTrackingText(record.title);
-  const volume = normalizeTrackingText(record.volume);
+  const actual = normalizeTrackingText(actualValue);
+  const volume = normalizeTrackingText(volumeValue);
   const expectedTitle = normalizeTrackingText(expected);
-  if (!actual || !volume || !expectedTitle || !actual.endsWith(volume) || actual.length <= volume.length) return direct;
-  const titleWithoutTrailingVolume = actual.slice(0, -volume.length);
-  if (titleWithoutTrailingVolume === expectedTitle) return 2;
-  return titleWithoutTrailingVolume.startsWith(expectedTitle) ? Math.max(direct, 1) as 1 : direct;
+  if (!actual || !volume || !expectedTitle || !actual.startsWith(expectedTitle)) return direct;
+  const remainder = actual.slice(expectedTitle.length);
+  // Bibliographic title fields frequently append the volume and then a subtitle
+  // (e.g. `オーバーロード16半森妖精の神人下`). If the text immediately
+  // after the expected base title begins with the structured volume field, it
+  // is still the same publication line. Derived titles such as
+  // `とらドラ・スピンオフ3` do not satisfy this because their remainder
+  // begins with the derived-series marker rather than the volume.
+  if (remainder.startsWith(volume)) return 2;
+  if (actual.endsWith(volume) && actual.slice(0, -volume.length) === expectedTitle) return 2;
+  return direct;
+}
+
+function publicationRecordTitleStrength(record: NdlPublicationRecord, expected: unknown): 0 | 1 | 2 {
+  let best: 0 | 1 | 2 = individualTitleStrength(record.title, record.volume, expected);
+  for (const alternative of record.alternativeTitles ?? []) {
+    const strength = individualTitleStrength(alternative, record.volume, expected);
+    if (strength > best) best = strength;
+    if (best === 2) break;
+  }
+  return best;
 }
 
 function matchingExpectedTitle(record: NdlPublicationRecord, titles: readonly string[]): { title: string; strength: 1 | 2 } | null {
@@ -285,6 +311,64 @@ function compareLineRank(left: NdlPublicationLine, right: NdlPublicationLine): n
   return 0;
 }
 
+export function mergeCompatibleNovelPublicationLines(
+  lines: readonly NdlPublicationLine[],
+): NdlPublicationLine[] {
+  const output: NdlPublicationLine[] = [];
+  const byIdentity = new Map<string, NdlPublicationLine[]>();
+  for (const line of lines) {
+    const creator = normalizeTrackingText(line.creator);
+    const key = `${normalizeTrackingText(line.title)}\u0000${creator}`;
+    const bucket = byIdentity.get(key) ?? [];
+    bucket.push({ ...line, records: [...line.records] });
+    byIdentity.set(key, bucket);
+  }
+
+  for (const bucket of byIdentity.values()) {
+    const exact = bucket.filter((line) => line.titleStrength === 2);
+    const prefix = bucket.filter((line) => line.titleStrength !== 2);
+    const nonEmptyImprints = [...new Set(exact.map((line) => normalizeTrackingText(line.imprint)).filter(Boolean))];
+
+    // Some NDL/JPRO records omit seriesTitle while other records in the same
+    // exact-title/creator publication line carry the actual light-novel imprint.
+    // Merge the blank-imprint fragment only when there is exactly one possible
+    // non-empty imprint; if two distinct imprints exist, keeping it separate is
+    // safer than silently assigning it to the wrong edition.
+    if (nonEmptyImprints.length <= 1 && exact.length > 1) {
+      const targetImprint = nonEmptyImprints[0] ?? "";
+      const compatible = exact.filter((line) => {
+        const imprint = normalizeTrackingText(line.imprint);
+        return !imprint || imprint === targetImprint;
+      });
+      if (compatible.length > 1) {
+        const preferred = compatible.find((line) => normalizeTrackingText(line.imprint) === targetImprint) ?? compatible[0];
+        const merged: NdlPublicationLine = {
+          ...preferred,
+          records: [],
+          medium: compatible.some((line) => line.medium === "novel") ? "novel" : preferred.medium,
+          publisher: preferred.publisher || compatible.find((line) => line.publisher)?.publisher || "",
+          imprint: preferred.imprint || compatible.find((line) => line.imprint)?.imprint || "",
+        };
+        const seen = new Set<string>();
+        for (const line of compatible) {
+          for (const record of line.records) {
+            const key = record.isbn || record.sourceId || `${record.title}\u0000${record.volume}\u0000${record.publishedAt}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.records.push(record);
+          }
+        }
+        output.push(merged);
+        for (const line of exact) if (!compatible.includes(line)) output.push(line);
+        output.push(...prefix);
+        continue;
+      }
+    }
+    output.push(...bucket);
+  }
+  return output;
+}
+
 export function selectSafeNovelPublicationLine(
   lines: readonly NdlPublicationLine[],
   hasCreatorEvidence: boolean,
@@ -321,14 +405,56 @@ export function selectLatestPublishedRecord(
   binding: ReleaseTrackingBinding,
   now: Date,
 ): NdlPublicationRecord | null {
-  return records
-    .filter((record) => record.volume.trim() && recordMatchesBinding(record, binding) && isPublishedBy(record, now))
-    .sort((left, right) => {
-      const leftDate = parsePublishedDate(left.publishedAt) ?? Number.MIN_SAFE_INTEGER;
-      const rightDate = parsePublishedDate(right.publishedAt) ?? Number.MIN_SAFE_INTEGER;
+  const candidates = records
+    .filter((record) => record.volume.trim() && recordMatchesBinding(record, binding) && isPublishedBy(record, now));
+  if (!candidates.length) return null;
+
+  // Purely numeric publication lines are monotonic by volume number. Selecting
+  // by publication date alone is unsafe because reprints/special editions of an
+  // older volume can be issued later than the actual latest main volume.
+  const numeric = candidates.map((record) => ({ record, parts: numericChapterParts(record.volume) }));
+  if (numeric.every((entry) => entry.parts !== null)) {
+    return numeric.sort((left, right) => {
+      const volumeOrder = compareChapterLabels(right.record.volume, left.record.volume);
+      if (volumeOrder !== 0) return volumeOrder;
+      const leftDate = parsePublishedDate(left.record.publishedAt) ?? Number.MIN_SAFE_INTEGER;
+      const rightDate = parsePublishedDate(right.record.publishedAt) ?? Number.MIN_SAFE_INTEGER;
       if (leftDate !== rightDate) return rightDate - leftDate;
-      return right.sourceId.localeCompare(left.sourceId);
-    })[0] ?? null;
+      return right.record.sourceId.localeCompare(left.record.sourceId);
+    })[0]?.record ?? null;
+  }
+
+  // Complex labels such as `3年生編4` do not have a universally safe lexical
+  // ordering, so chronology remains the conservative fallback for those lines.
+  return candidates.sort((left, right) => {
+    const leftDate = parsePublishedDate(left.publishedAt) ?? Number.MIN_SAFE_INTEGER;
+    const rightDate = parsePublishedDate(right.publishedAt) ?? Number.MIN_SAFE_INTEGER;
+    if (leftDate !== rightDate) return rightDate - leftDate;
+    return right.sourceId.localeCompare(left.sourceId);
+  })[0] ?? null;
+}
+
+export function sidePublicationsAfter(
+  records: readonly NdlPublicationRecord[],
+  binding: ReleaseTrackingBinding,
+  main: NdlPublicationRecord,
+  now: Date,
+): NdlPublicationRecord[] {
+  const mainDate = parsePublishedDate(main.publishedAt);
+  if (mainDate === null) return [];
+  return records
+    .filter((record) => {
+      if (!record.volume.trim() || !isSidePublication(record) || !isPublishedBy(record, now)) return false;
+      if (binding.title && publicationTitleStrength(record.title, binding.title) === 0) return false;
+      if (binding.creator && !record.creators.some((value) => creatorMatches(binding.creator, value))) return false;
+      if (binding.imprint) {
+        const imprint = publicationImprint(record.seriesTitle);
+        if (imprint && normalizeTrackingText(imprint) !== normalizeTrackingText(binding.imprint)) return false;
+      }
+      const publishedAt = parsePublishedDate(record.publishedAt);
+      return publishedAt !== null && publishedAt > mainDate;
+    })
+    .sort((left, right) => (parsePublishedDate(right.publishedAt) ?? 0) - (parsePublishedDate(left.publishedAt) ?? 0));
 }
 
 export function providerResultRegressed(

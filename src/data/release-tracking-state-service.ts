@@ -17,7 +17,8 @@ function sameBinding(left: ReleaseTrackingBinding | null, right: ReleaseTracking
     && (left.title ?? "") === (right.title ?? "")
     && (left.creator ?? "") === (right.creator ?? "")
     && (left.publisher ?? "") === (right.publisher ?? "")
-    && (left.imprint ?? "") === (right.imprint ?? "");
+    && (left.imprint ?? "") === (right.imprint ?? "")
+    && (left.catalog ?? "") === (right.catalog ?? "");
 }
 
 export class ReleaseTrackingStateService {
@@ -55,6 +56,8 @@ export class ReleaseTrackingStateService {
       else delete frontmatter.release_tracking_publisher;
       if (binding.imprint) frontmatter.release_tracking_imprint = binding.imprint;
       else delete frontmatter.release_tracking_imprint;
+      if (binding.catalog) frontmatter.release_tracking_catalog = binding.catalog;
+      else delete frontmatter.release_tracking_catalog;
       frontmatter.release_tracking_status = "unconfigured";
       delete frontmatter.release_tracking_error;
     });
@@ -90,6 +93,8 @@ export class ReleaseTrackingStateService {
       else delete frontmatter.release_tracking_publisher;
       if (binding.imprint) frontmatter.release_tracking_imprint = binding.imprint;
       else delete frontmatter.release_tracking_imprint;
+      if (binding.catalog) frontmatter.release_tracking_catalog = binding.catalog;
+      else delete frontmatter.release_tracking_catalog;
       frontmatter.release_tracking_status = "verified";
       frontmatter.release_tracking_checked_at = verifiedAt;
       delete frontmatter.release_tracking_verified_at;
@@ -112,10 +117,26 @@ export class ReleaseTrackingStateService {
     mediaType: MediaType,
     status: Exclude<ReleaseTrackingStatus, "verified" | "disabled">,
     error: string,
+    binding?: ReleaseTrackingBinding,
   ): Promise<boolean> {
     const current = this.read(path, mediaType);
-    if (current.status === status && current.error === error) return false;
+    if (current.status === status && current.error === error && (!binding || sameBinding(current.binding, binding))) return false;
     await this.update(path, (frontmatter) => {
+      if (binding) {
+        frontmatter.release_tracking_provider = binding.provider;
+        if (binding.sourceId) frontmatter.release_tracking_ref = binding.sourceId;
+        else delete frontmatter.release_tracking_ref;
+        if (binding.title) frontmatter.release_tracking_title = binding.title;
+        else delete frontmatter.release_tracking_title;
+        if (binding.creator) frontmatter.release_tracking_creator = binding.creator;
+        else delete frontmatter.release_tracking_creator;
+        if (binding.publisher) frontmatter.release_tracking_publisher = binding.publisher;
+        else delete frontmatter.release_tracking_publisher;
+        if (binding.imprint) frontmatter.release_tracking_imprint = binding.imprint;
+        else delete frontmatter.release_tracking_imprint;
+        if (binding.catalog) frontmatter.release_tracking_catalog = binding.catalog;
+        else delete frontmatter.release_tracking_catalog;
+      }
       frontmatter.release_tracking_status = status;
       frontmatter.release_tracking_error = error;
     });
@@ -127,6 +148,16 @@ export class ReleaseTrackingStateService {
     if (current.status === "disabled") return false;
     await this.update(path, (frontmatter) => {
       frontmatter.release_tracking_status = "disabled";
+      delete frontmatter.release_tracking_error;
+    });
+    return true;
+  }
+
+  async enable(path: string, mediaType: MediaType): Promise<boolean> {
+    const current = this.read(path, mediaType);
+    if (current.status !== "disabled") return false;
+    await this.update(path, (frontmatter) => {
+      frontmatter.release_tracking_status = "unconfigured";
       delete frontmatter.release_tracking_error;
     });
     return true;
