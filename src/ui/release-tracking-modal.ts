@@ -54,6 +54,14 @@ function releaseValue(result: ReleaseRefreshItemResult, value: string): string {
   return value ? `${prefix}${value}` : "—";
 }
 
+function readingProgress(item: MediaItem): string {
+  const value = String(item.progress ?? "").trim();
+  if (!value) return "—";
+  if (item.mediaType === "manga") return `Ch.${value}`;
+  if (item.mediaType === "novel") return `Vol.${value}`;
+  return value;
+}
+
 function resultCover(item: MediaItem, className = "al-release-result-cover"): HTMLElement {
   const cover = makeElement("div", className);
   const source = item.coverSources?.src || item.cover;
@@ -122,6 +130,10 @@ function labeledCell(label: string, className = ""): HTMLElement {
 function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingModalActions): HTMLElement {
   const attention = result.kind === "attention";
   const row = makeElement("div", `al-release-result-row${attention ? " is-attention" : ""}`);
+
+  const progressCell = labeledCell(releaseTrackingText("modal.columnProgress"), "al-release-progress-cell");
+  progressCell.appendChild(makeElement("strong", "al-release-reading-progress", readingProgress(result.item)));
+
   const changeCell = labeledCell(releaseTrackingText("modal.columnChange"), "al-release-change-cell");
   if (attention) {
     changeCell.appendChild(makeElement("div", "al-release-result-message", result.message || statusLabel(result.status)));
@@ -136,6 +148,12 @@ function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingMod
     change.appendChild(makeElement("strong", "al-release-value-after", releaseValue(result, result.after)));
     changeCell.appendChild(change);
   }
+  if (result.notes.length) {
+    const notes = makeElement("div", "al-release-result-notes");
+    notes.appendChild(makeElement("span", "al-release-result-notes-label", `${releaseTrackingText("modal.notes")}:`));
+    for (const note of result.notes) notes.appendChild(makeElement("span", "al-release-result-note", note));
+    changeCell.appendChild(notes);
+  }
 
   const sourceCell = labeledCell(releaseTrackingText("modal.columnSource"), "al-release-source-cell");
   if (attention) sourceCell.appendChild(makeElement("span", "al-release-status-chip", statusLabel(result.status)));
@@ -145,6 +163,7 @@ function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingMod
   row.append(
     resultCover(result.item),
     identityCell(result.item),
+    progressCell,
     changeCell,
     sourceCell,
     rowAction(result, actions),
@@ -154,7 +173,7 @@ function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingMod
 
 function resultSection(
   index: number,
-  kind: "updated" | "initialized" | "attention",
+  kind: "updated" | "initialized" | "attention" | "unchanged",
   heading: string,
   results: ReleaseRefreshItemResult[],
   actions: ReleaseTrackingModalActions,
@@ -162,8 +181,9 @@ function resultSection(
   if (!results.length) return null;
   const section = makeElement("section", `al-release-section is-${kind}`);
   const header = makeElement("div", "al-release-section-header");
+  const iconName = kind === "attention" ? "triangle-alert" : kind === "unchanged" ? "circle-minus" : "circle-check";
   header.append(
-    icon(kind === "attention" ? "triangle-alert" : "circle-check", "al-release-section-icon"),
+    icon(iconName, "al-release-section-icon"),
     makeElement("span", "al-release-section-index", `${index}.`),
     makeElement("h3", "al-release-section-title", heading),
     makeElement("span", "al-release-section-count", `(${results.length})`),
@@ -172,26 +192,6 @@ function resultSection(
   results.forEach((result) => body.appendChild(resultRow(result, actions)));
   section.append(header, body);
   return section;
-}
-
-function unchangedSection(results: ReleaseRefreshItemResult[], count: number, index: number): HTMLDetailsElement | null {
-  if (!count) return null;
-  const details = makeElement("details", "al-release-unchanged");
-  const summary = makeElement("summary", "al-release-unchanged-summary");
-  summary.append(
-    icon("circle-check", "al-release-unchanged-icon"),
-    makeElement("strong", "al-release-unchanged-index", `${index}.`),
-    makeElement("span", "", releaseTrackingText("modal.unchangedHeading", { count })),
-    icon("chevron-right", "al-release-unchanged-chevron"),
-  );
-  const list = makeElement("div", "al-release-unchanged-list");
-  results.slice(0, 30).forEach((result) => {
-    const line = makeElement("div", "al-release-unchanged-row");
-    line.append(makeElement("span", "", result.item.title), makeElement("span", "", releaseValue(result, result.after)));
-    list.appendChild(line);
-  });
-  details.append(summary, list);
-  return details;
 }
 
 export class ReleaseTrackingResultsModal extends Modal {
@@ -348,7 +348,7 @@ export class ReleaseTrackingResultsModal extends Modal {
     if (initializedSection) { content.appendChild(initializedSection); sectionIndex += 1; }
     const attentionSection = resultSection(sectionIndex, "attention", releaseTrackingText("modal.attentionHeading"), attention, this.actions);
     if (attentionSection) { attentionSection.id = "al-release-attention-section"; content.appendChild(attentionSection); sectionIndex += 1; }
-    const unchangedNode = unchangedSection(unchanged, summary.unchanged, sectionIndex);
+    const unchangedNode = resultSection(sectionIndex, "unchanged", releaseTrackingText("modal.unchangedHeading", { count: summary.unchanged }), unchanged, this.actions);
     if (unchangedNode) content.appendChild(unchangedNode);
     this.contentEl.appendChild(content);
 
@@ -444,7 +444,6 @@ export class ReleaseTrackingMatchModal extends Modal {
       rows.appendChild(candidateRow(candidate, (selected, button) => {
         button.disabled = true;
         void (async () => {
-          await this.service.state.writeBinding(this.item.filePath, this.item.mediaType, selected.binding);
           const result = await this.service.refreshItem(this.item, selected.binding);
           await this.options.onResolved(result);
           this.close();
