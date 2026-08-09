@@ -257,6 +257,12 @@
 .animelist-release-dashboard-modal .modal-content {
   display:flex; min-height:0; max-height:min(84vh,860px); flex-direction:column; padding:0;
 }
+.animelist-release-dashboard-modal .al-release-dashboard-header,
+.animelist-release-dashboard-modal .al-release-dashboard-overview,
+.animelist-release-dashboard-modal .al-release-dashboard-progress,
+.animelist-release-dashboard-modal .al-release-dashboard-failure {
+  flex:0 0 auto;
+}
 .animelist-release-dashboard-modal .al-release-dashboard-header {
   display:grid; grid-template-columns:42px minmax(0,1fr) auto; gap:13px; align-items:center;
   padding:20px 22px 15px; border-bottom:1px solid var(--background-modifier-border);
