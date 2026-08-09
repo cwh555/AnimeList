@@ -1,0 +1,146 @@
+name: Test Vault Source Reuse Finalize V3
+
+on:
+  pull_request:
+    branches:
+      - preview
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout staging head
+        uses: actions/checkout@v7
+        with:
+          ref: feature/release-tracking
+          fetch-depth: 0
+
+      - name: Verify staging head
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGING="$(git rev-parse HEAD)"
+          git fetch origin feature/release-tracking
+          test "$(git rev-parse origin/feature/release-tracking)" = "$STAGING"
+
+      - name: Apply the locally validated source-identity fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          checker=Path('scripts/check-test-vault-fixtures.mjs')
+          c=checker.read_text()
+          ordinary='  fs.appendFileSync(path.join(vaultRoot, alyaPath), "\\nUSER EDIT MUST SURVIVE\\n");'
+          missing='  const alyaCover = path.join(vaultRoot, "AnimeList/Covers/novel/不時以俄語遮羞的艾莉同學-bangumi-339092.jpg");'
+          reset='  const unrelated = path.join(vaultRoot, "AnimeList", "Novel", "My manual test note.md");'
+          assert ordinary in c and missing in c and reset in c
+          c=c.replace(ordinary, '  // Ordinary test-vault startup is non-destructive once a collected fixture is current.\n'+ordinary, 1)
+          c=c.replace(missing, '  // A missing cached cover is repaired without rewriting the note.\n'+missing, 1)
+          c=c.replace(reset, '  // Explicit reset restores only the known fixtures; unrelated user-created test files survive.\n'+reset, 1)
+          checker.write_text(c)
+
+          workflow=Path('.github/workflows/test-vault-source-reuse-finalize-v2.yml').read_text()
+          begin="          python <<'PY'\n"
+          end="\n          PY\n          node scripts/check-test-vault-fixtures.mjs"
+          start=workflow.index(begin)+len(begin)
+          stop=workflow.index(end,start)
+          script=textwrap.dedent(workflow[start:stop])
+          exec(compile(script, '<source-reuse-transform>', 'exec'), {})
+          PY
+          node scripts/check-test-vault-fixtures.mjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run complete validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          npm run release:check
+
+      - name: Run exact fresh npm run test-vault
+        shell: bash
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: |
+          set -euo pipefail
+          rm -rf test-vault
+          npm run test-vault | tee /tmp/test-vault-first.log
+          grep -q 'Shared works: 18' /tmp/test-vault-first.log
+          grep -q 'created=18, reused=0, reused by source=0, repaired=0, covers downloaded=18' /tmp/test-vault-first.log
+          test "$(find test-vault/AnimeList/Covers -type f -name '*.jpg' | wc -l)" -eq 18
+          python <<'PY'
+          from pathlib import Path
+          covers=list(Path('test-vault/AnimeList/Covers').rglob('*.jpg'))
+          assert len(covers)==18
+          for cover in covers:
+              data=cover.read_bytes()
+              assert len(data)>1000, (cover, len(data))
+              assert data[:3] == b'\xff\xd8\xff', (cover, data[:8])
+          print('18 real JPEG covers verified')
+          PY
+
+      - name: Verify existing collected work is reused by source identity
+        shell: bash
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          source=Path('test-vault/AnimeList/Manga/葬送的芙莉蓮.md')
+          target=Path('test-vault/AnimeList/Manga/Imported/我已收藏的芙莉蓮.md')
+          target.parent.mkdir(parents=True, exist_ok=True)
+          text=source.read_text()
+          text='\n'.join(line for line in text.splitlines() if not line.startswith('fixture_version:') and not line.startswith('fixture_case:'))+'\n\nUSER-COLLECTED NOTE MUST SURVIVE\n'
+          target.write_text(text)
+          source.unlink()
+          PY
+          node scripts/test-vault.mjs production --no-open | tee /tmp/test-vault-source-reuse.log
+          grep -q 'created=0, reused=18, reused by source=1, repaired=0, covers downloaded=0' /tmp/test-vault-source-reuse.log
+          test ! -e 'test-vault/AnimeList/Manga/葬送的芙莉蓮.md'
+          grep -q 'USER-COLLECTED NOTE MUST SURVIVE' 'test-vault/AnimeList/Manga/Imported/我已收藏的芙莉蓮.md'
+          test "$(grep -R -l '^source_id: "305429"$' test-vault/AnimeList/Manga --include='*.md' | wc -l)" -eq 1
+
+      - name: Verify missing cover repair without note rewrite
+        shell: bash
+        env:
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: |
+          set -euo pipefail
+          NOTE='test-vault/AnimeList/Novel/不時以俄語遮羞的艾莉同學.md'
+          COVER='test-vault/AnimeList/Covers/novel/不時以俄語遮羞的艾莉同學-bangumi-339092.jpg'
+          printf '\nANOTHER USER EDIT MUST SURVIVE\n' >> "$NOTE"
+          rm "$COVER"
+          node scripts/test-vault.mjs production --no-open | tee /tmp/test-vault-cover-repair.log
+          grep -q 'created=0, reused=18, reused by source=1, repaired=0, covers downloaded=1' /tmp/test-vault-cover-repair.log
+          grep -q 'ANOTHER USER EDIT MUST SURVIVE' "$NOTE"
+          test -s "$COVER"
+
+      - name: Commit only the final source-aware tooling fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='586f590a3b621bdd83899ec594d536717208d0c8'
+          STAGING="$(git rev-parse HEAD)"
+          git fetch origin feature/release-tracking
+          test "$(git rev-parse origin/feature/release-tracking)" = "$STAGING"
+          git diff -- CONTRIBUTING.md scripts/test-vault-fixtures.mjs scripts/test-vault.mjs scripts/check-test-vault-fixtures.mjs > /tmp/source-reuse.patch
+          test -s /tmp/source-reuse.patch
+          git checkout -B feature/release-tracking "$BASE"
+          git apply --check /tmp/source-reuse.patch
+          git apply /tmp/source-reuse.patch
+          node scripts/check-test-vault-fixtures.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CONTRIBUTING.md scripts/test-vault-fixtures.mjs scripts/test-vault.mjs scripts/check-test-vault-fixtures.mjs
+          git commit -m 'test: reuse shared test-vault media by source identity'
+          git push --force-with-lease=refs/heads/feature/release-tracking:"$STAGING" origin HEAD:feature/release-tracking
