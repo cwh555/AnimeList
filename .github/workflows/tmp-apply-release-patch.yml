@@ -1,0 +1,47 @@
+name: Temporary apply release patch
+
+on:
+  pull_request:
+    branches:
+      - feature/release-tracking
+    paths:
+      - .tmp/release-patch/**
+      - .tmp/release-patch.sha256
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Verify and apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          readarray -t expected < .tmp/release-patch.sha256
+          test "${#expected[@]}" -eq 2
+          cat .tmp/release-patch/*.part > /tmp/release-patch.gz.b64
+          base64 -d /tmp/release-patch.gz.b64 > /tmp/release-patch.gz
+          echo "${expected[0]}  /tmp/release-patch.gz" | sha256sum -c -
+          gzip -dc /tmp/release-patch.gz > /tmp/release.patch
+          echo "${expected[1]}  /tmp/release.patch" | sha256sum -c -
+          git apply --check /tmp/release.patch
+          git apply /tmp/release.patch
+          rm -rf .tmp
+          git diff --check
+      - name: Commit exact patch to head branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: materialize validated release patch"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
