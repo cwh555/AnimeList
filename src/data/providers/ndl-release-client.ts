@@ -3,6 +3,7 @@ import { USER_AGENT } from "../../app-metadata";
 import type { NdlPublicationRecord } from "../../domain/release-tracking";
 
 const NDL_OPENSEARCH = "https://ndlsearch.ndl.go.jp/api/opensearch";
+const NDL_PUBLICATION_PROVIDERS = ["jpro-book", "iss-ndl-opac-national"] as const;
 
 function text(value: Element | null | undefined): string {
   return value?.textContent?.trim() ?? "";
@@ -54,16 +55,18 @@ function parseItem(item: Element): NdlPublicationRecord | null {
 }
 
 export class NdlReleaseClient {
-  async search(title: string, creator = ""): Promise<NdlPublicationRecord[]> {
-    const normalizedTitle = title.trim();
-    if (!normalizedTitle) return [];
+  private async searchProvider(
+    provider: typeof NDL_PUBLICATION_PROVIDERS[number],
+    title: string,
+    creator: string,
+  ): Promise<NdlPublicationRecord[]> {
     const parameters = new URLSearchParams({
-      dpid: "jpro-book",
+      dpid: provider,
       cnt: "200",
       mediatype: "books",
-      title: normalizedTitle,
+      title,
     });
-    if (creator.trim()) parameters.set("creator", creator.trim());
+    if (creator) parameters.set("creator", creator);
     const response = await requestUrl({
       url: `${NDL_OPENSEARCH}?${parameters.toString()}`,
       method: "GET",
@@ -79,12 +82,42 @@ export class NdlReleaseClient {
       .filter((record): record is NdlPublicationRecord => record !== null);
   }
 
+  async search(title: string, creator = ""): Promise<NdlPublicationRecord[]> {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) return [];
+    const normalizedCreator = creator.trim();
+    const records = new Map<string, NdlPublicationRecord>();
+    const failures: unknown[] = [];
+
+    // JPRO is best for current publication dates; the national bibliography
+    // supplies historical domestic volumes that JPRO may not retain. Both are
+    // queried through the same NDL Search API, sequentially to avoid bursty access.
+    for (const provider of NDL_PUBLICATION_PROVIDERS) {
+      try {
+        for (const record of await this.searchProvider(provider, normalizedTitle, normalizedCreator)) {
+          // Prefer JPRO when both providers describe the same ISBN because it
+          // commonly carries the more precise current release date.
+          const key = record.isbn || [record.title, record.volume, record.publisher, record.publishedAt]
+            .map((value) => value.trim().normalize("NFKC").toLocaleLowerCase())
+            .join("\u0000");
+          if (!records.has(key)) records.set(key, record);
+        }
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+
+    if (records.size) return [...records.values()];
+    if (failures.length === NDL_PUBLICATION_PROVIDERS.length) throw failures[0];
+    return [];
+  }
+
   async searchTitles(titles: readonly string[], creator = ""): Promise<NdlPublicationRecord[]> {
     const records = new Map<string, NdlPublicationRecord>();
     for (const title of [...new Set(titles.map((value) => value.trim()).filter(Boolean))]) {
       for (const record of await this.search(title, creator)) {
-        const key = record.sourceId || `${record.title}\u0000${record.volume}\u0000${record.publisher}`;
-        records.set(key, record);
+        const key = record.isbn || record.sourceId || `${record.title}\u0000${record.volume}\u0000${record.publisher}`;
+        if (!records.has(key)) records.set(key, record);
       }
     }
     return [...records.values()];

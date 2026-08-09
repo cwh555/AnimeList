@@ -94,10 +94,125 @@ describe("release tracking domain", () => {
     const lines = groupPublicationLines([
       record({ sourceId: "main", title: "Re:ゼロから始める異世界生活", seriesTitle: "MF文庫J ; な-07-62", volume: "45", publishedAt: "2026" }),
       record({ sourceId: "short", title: "Re:ゼロから始める異世界生活", seriesTitle: "MF文庫J ; な-07-63", volume: "短編集13", publishedAt: "2025" }),
+      record({ sourceId: "ex", title: "Re:ゼロから始める異世界生活", seriesTitle: "MF文庫J ; な-07-58", volume: "Ex6", publishedAt: "2024" }),
+      record({ sourceId: "alter", title: "Re:ゼロから始める異世界生活", seriesTitle: "MF文庫J", volume: "Alter.2", publishedAt: "2025" }),
       record({ sourceId: "side", title: "無職転生", seriesTitle: "MFブックス", volume: "蛇足編3", creators: ["理不尽な孫の手"], publishedAt: "2025" }),
     ], ["Re:ゼロから始める異世界生活"], ["長月達平"]);
     assert.equal(lines.length, 1);
     assert.deepEqual(lines[0]?.records.map((entry) => entry.sourceId), ["main"]);
+  });
+
+  it("keeps 86 Alter collections out of the numbered main publication line", () => {
+    const lines = groupPublicationLines([
+      record({
+        sourceId: "86-13",
+        title: "86-エイティシックス-",
+        seriesTitle: "電撃文庫 ; 4153",
+        volume: "Ep.13",
+        creators: ["安里アサト"],
+        publisher: "KADOKAWA",
+        publishedAt: "2024-01-10",
+      }),
+      record({
+        sourceId: "86-alter-2",
+        title: "86-エイティシックス-",
+        seriesTitle: "電撃文庫 ; 4265",
+        volume: "Alter.2",
+        creators: ["安里アサト"],
+        publisher: "KADOKAWA",
+        publishedAt: "2025-01-10",
+      }),
+      record({
+        sourceId: "86-14",
+        title: "86-エイティシックス-",
+        seriesTitle: "電撃文庫 ; 4360",
+        volume: "Ep.14",
+        creators: ["安里アサト"],
+        publisher: "KADOKAWA",
+        publishedAt: "2025-09-10",
+      }),
+    ], ["86-エイティシックス-"], ["安里アサト"]);
+
+    assert.equal(lines.length, 1);
+    assert.deepEqual(lines[0]?.records.map((entry) => entry.volume), ["Ep.13", "Ep.14"]);
+    const binding: ReleaseTrackingBinding = {
+      provider: "ndl-jpro",
+      title: "86-エイティシックス-",
+      creator: "安里アサト",
+      imprint: "電撃文庫",
+    };
+    assert.equal(selectLatestPublishedRecord(lines[0]?.records ?? [], binding, new Date("2026-08-09T00:00:00Z"))?.volume, "Ep.14");
+  });
+
+  it("treats provider titles with the same trailing volume label as the exact base title", () => {
+    const lines = groupPublicationLines([
+      record({
+        sourceId: "jpro-45",
+        title: "Ｒｅ：ゼロから始める異世界生活４５",
+        seriesTitle: "MF文庫J",
+        volume: "45",
+        creators: ["長月達平"],
+        publishedAt: "2026-06-25",
+      }),
+    ], ["Re:ゼロから始める異世界生活"], ["長月達平"]);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]?.titleStrength, 2);
+    assert.equal(selectSafeNovelPublicationLine(lines, true)?.title, "Re:ゼロから始める異世界生活");
+  });
+
+  it("keeps Toradora spin-off volumes out of the verified main novel line", () => {
+    const lines = groupPublicationLines([
+      record({
+        sourceId: "toradora-10",
+        title: "とらドラ!",
+        seriesTitle: "電撃文庫",
+        volume: "10",
+        creators: ["竹宮ゆゆこ"],
+        publisher: "アスキー・メディアワークス",
+        publishedAt: "2009-03-10",
+      }),
+      record({
+        sourceId: "toradora-spin-3",
+        title: "とらドラ・スピンオフ3! 俺の弁当を見てくれ",
+        seriesTitle: "電撃文庫",
+        volume: "3",
+        creators: ["竹宮ゆゆこ"],
+        publisher: "アスキー・メディアワークス",
+        publishedAt: "2010-04-10",
+      }),
+    ], ["とらドラ!"], ["竹宮ゆゆこ"]);
+    assert.equal(lines.length, 1);
+    assert.deepEqual(lines[0]?.records.map((entry) => entry.sourceId), ["toradora-10"]);
+    const selected = selectSafeNovelPublicationLine(lines, true);
+    assert.equal(selected?.title, "とらドラ!");
+    const latest = selected
+      ? selectLatestPublishedRecord(
+        [
+          record({ sourceId: "toradora-10", title: "とらドラ!", seriesTitle: "電撃文庫", volume: "10", creators: ["竹宮ゆゆこ"], publishedAt: "2009-03-10" }),
+          record({ sourceId: "toradora-spin-3", title: "とらドラ・スピンオフ3! 俺の弁当を見てくれ", seriesTitle: "電撃文庫", volume: "3", creators: ["竹宮ゆゆこ"], publishedAt: "2010-04-10" }),
+        ],
+        { provider: "ndl-jpro", title: selected.title, creator: selected.creator, imprint: selected.imprint },
+        new Date("2026-08-09T00:00:00Z"),
+      )
+      : null;
+    assert.equal(latest?.volume, "10");
+  });
+
+  it("keeps unrecognized prefix-derived titles as manual candidates instead of auto-binding them", () => {
+    const lines = groupPublicationLines([
+      record({ sourceId: "main", title: "Example Story", seriesTitle: "Example文庫", volume: "8", creators: ["Test Author"], publishedAt: "2024-01-01" }),
+      record({ sourceId: "derived", title: "Example Story Another Chronicle", seriesTitle: "Example文庫", volume: "1", creators: ["Test Author"], publishedAt: "2025-01-01" }),
+    ], ["Example Story"], ["Test Author"]);
+    assert.equal(lines.length, 2);
+    assert.equal(lines.find((line) => line.title === "Example Story")?.titleStrength, 2);
+    assert.equal(lines.find((line) => line.title === "Example Story Another Chronicle")?.titleStrength, 1);
+    assert.equal(selectSafeNovelPublicationLine(lines, true)?.title, "Example Story");
+
+    const prefixOnly = groupPublicationLines([
+      record({ sourceId: "derived", title: "Example Story Another Chronicle", seriesTitle: "Example文庫", volume: "1", creators: ["Test Author"], publishedAt: "2025-01-01" }),
+    ], ["Example Story"], ["Test Author"]);
+    assert.equal(prefixOnly.length, 1);
+    assert.equal(selectSafeNovelPublicationLine(prefixOnly, true), null);
   });
 
   it("selects the newest already-published NDL volume by chronology, not label shape", () => {
@@ -116,8 +231,13 @@ describe("release tracking domain", () => {
     assert.equal(latest?.volume, "3年生編4");
   });
 
-  it("detects NDL chronology regressions without comparing volume labels", () => {
-    assert.equal(providerResultRegressed("45", "2026-06-25", "44", "2025-12-25", "ndl-jpro"), true);
+  it("uses numeric volume order to recover from a previously contaminated NDL result", () => {
+    assert.equal(providerResultRegressed("3", "2010-04-10", "10", "2009-03-10", "ndl-jpro"), false);
+    assert.equal(providerResultRegressed("10", "2009-03-10", "3", "2010-04-10", "ndl-jpro"), true);
+  });
+
+  it("uses publication chronology for complex NDL volume labels", () => {
+    assert.equal(providerResultRegressed("3年生編4", "2026-07-25", "3年生編3", "2026-03-25", "ndl-jpro"), true);
     assert.equal(providerResultRegressed("3年生編4", "2026-07-25", "3年生編4", "2026-07-25", "ndl-jpro"), false);
   });
 });

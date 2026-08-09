@@ -4,6 +4,7 @@ import {
   compareChapterLabels,
   groupPublicationLines,
   normalizeTrackingText,
+  numericChapterParts,
   providerResultRegressed,
   selectLatestPublishedRecord,
   selectSafeNovelPublicationLine,
@@ -37,6 +38,14 @@ export interface ReleaseRefreshSummary {
   attention: number;
 }
 
+export interface ReleaseRefreshProgress {
+  completed: number;
+  total: number;
+  item: MediaItem;
+  provider: "mangadex" | "ndl-jpro";
+  stage: "checking" | "completed";
+}
+
 export type ReleaseMatchCandidate =
   | { provider: "mangadex"; label: string; description: string; sourceUrl: string; binding: ReleaseTrackingBinding }
   | { provider: "ndl-jpro"; label: string; description: string; sourceUrl: string; binding: ReleaseTrackingBinding };
@@ -44,6 +53,11 @@ export type ReleaseMatchCandidate =
 export interface ReleaseTrackingClients {
   mangaDex?: MangaDexReleaseClient;
   ndl?: NdlReleaseClient;
+}
+
+interface PreparedReleaseRefresh {
+  result: ReleaseRefreshItemResult;
+  persist(): Promise<void>;
 }
 
 function itemTitles(item: MediaItem): string[] {
@@ -81,6 +95,17 @@ function lineBinding(line: NdlPublicationLine): ReleaseTrackingBinding {
 
 function lineDescription(line: NdlPublicationLine): string {
   return [line.creator, line.imprint, line.publisher].filter(Boolean).join(" · ");
+}
+
+function providerBehindReadingProgress(item: MediaItem, latest: string): boolean {
+  const expectedUnit = item.mediaType === "manga" ? "chapter" : item.mediaType === "novel" ? "volume" : "";
+  if (!expectedUnit || item.unit !== expectedUnit) return false;
+  if (!numericChapterParts(item.progress) || !numericChapterParts(latest)) return false;
+  return compareChapterLabels(latest, item.progress) < 0;
+}
+
+function providerNameForItem(item: MediaItem): "mangadex" | "ndl-jpro" {
+  return item.mediaType === "manga" ? "mangadex" : "ndl-jpro";
 }
 
 export class ReleaseTrackingService {
@@ -154,58 +179,72 @@ export class ReleaseTrackingService {
     return { binding: null, status: "unmatched", message: "No safe NDL/JPRO publication line was found." };
   }
 
-  private attention(
+  private preparedAttention(
     item: MediaItem,
     provider: "mangadex" | "ndl-jpro" | "",
-    status: ReleaseTrackingStatus,
+    status: Exclude<ReleaseTrackingStatus, "verified" | "disabled">,
     message: string,
-  ): ReleaseRefreshItemResult {
+  ): PreparedReleaseRefresh {
     const current = this.state.read(item.filePath, item.mediaType);
     return {
-      item,
-      kind: "attention",
-      before: current.latest,
-      after: current.latest,
-      provider,
-      status,
-      message,
-      sourceUrl: this.state.sourceUrl(item.filePath),
+      result: {
+        item,
+        kind: "attention",
+        before: current.latest,
+        after: current.latest,
+        provider,
+        status,
+        message,
+        sourceUrl: this.state.sourceUrl(item.filePath),
+      },
+      persist: async () => {
+        await this.state.writeAttention(item.filePath, item.mediaType, status, message);
+      },
     };
   }
 
-  private async refreshManga(item: MediaItem, suppliedBinding?: ReleaseTrackingBinding): Promise<ReleaseRefreshItemResult> {
+  private async prepareManga(item: MediaItem, suppliedBinding?: ReleaseTrackingBinding): Promise<PreparedReleaseRefresh> {
     const current = this.state.read(item.filePath, item.mediaType);
     let binding = suppliedBinding ?? current.binding;
     if (binding?.provider !== "mangadex" || !binding.sourceId) {
       const discovered = await this.discoverMangaBinding(item);
       if (!discovered.binding) {
-        await this.state.writeAttention(item.filePath, item.mediaType, discovered.status, discovered.message);
-        return this.attention(item, "mangadex", discovered.status, discovered.message);
+        return this.preparedAttention(item, "mangadex", discovered.status, discovered.message);
       }
       binding = discovered.binding;
     }
+    if (binding.provider !== "mangadex" || !binding.sourceId) {
+      throw new Error("MangaDex binding is incomplete.");
+    }
     const latest = await this.mangaDex.latestChapter(binding.sourceId);
     if (!latest) {
-      const message = "MangaDex returned no numeric chapter that can be safely tracked.";
-      await this.state.writeAttention(item.filePath, item.mediaType, "unmatched", message);
-      return this.attention(item, "mangadex", "unmatched", message);
+      return this.preparedAttention(
+        item,
+        "mangadex",
+        "unmatched",
+        "MangaDex returned no numeric chapter that can be safely tracked.",
+      );
+    }
+    if (providerBehindReadingProgress(item, latest)) {
+      return this.preparedAttention(
+        item,
+        "mangadex",
+        "source_regressed",
+        `MangaDex returned Ch.${latest}, below the recorded reading progress Ch.${item.progress}; no latest value was changed.`,
+      );
     }
     if (providerResultRegressed(current.latest, current.latestReleaseDate, latest, "", "mangadex")) {
-      const message = `MangaDex returned ${latest}, older than the stored ${current.latest}; the stored value was preserved.`;
-      await this.state.writeAttention(item.filePath, item.mediaType, "source_regressed", message);
-      return this.attention(item, "mangadex", "source_regressed", message);
+      return this.preparedAttention(
+        item,
+        "mangadex",
+        "source_regressed",
+        `MangaDex returned ${latest}, older than the stored ${current.latest}; the stored value was preserved.`,
+      );
     }
     const changed = Boolean(current.latest) && compareChapterLabels(latest, current.latest) > 0;
     const initialized = !current.latest;
-    await this.state.writeVerified(
-      item.filePath,
-      item.mediaType,
-      binding,
-      latest,
-      "",
-      `https://mangadex.org/title/${encodeURIComponent(binding.sourceId)}`,
-    );
-    return {
+    const sourceUrl = `https://mangadex.org/title/${encodeURIComponent(binding.sourceId)}`;
+    const result: ReleaseRefreshItemResult = {
       item,
       kind: initialized ? "initialized" : changed ? "updated" : "unchanged",
       before: current.latest,
@@ -213,45 +252,59 @@ export class ReleaseTrackingService {
       provider: "mangadex",
       status: "verified",
       message: "",
-      sourceUrl: `https://mangadex.org/title/${encodeURIComponent(binding.sourceId)}`,
+      sourceUrl,
+    };
+    return {
+      result,
+      persist: async () => {
+        await this.state.writeVerified(item.filePath, item.mediaType, binding, latest, "", sourceUrl);
+      },
     };
   }
 
-  private async refreshNovel(item: MediaItem, suppliedBinding?: ReleaseTrackingBinding): Promise<ReleaseRefreshItemResult> {
+  private async prepareNovel(item: MediaItem, suppliedBinding?: ReleaseTrackingBinding): Promise<PreparedReleaseRefresh> {
     const current = this.state.read(item.filePath, item.mediaType);
     let binding = suppliedBinding ?? current.binding;
     if (binding?.provider !== "ndl-jpro" || !binding.title) {
       const discovered = await this.discoverNovelBinding(item);
       if (!discovered.binding) {
-        await this.state.writeAttention(item.filePath, item.mediaType, discovered.status, discovered.message);
-        return this.attention(item, "ndl-jpro", discovered.status, discovered.message);
+        return this.preparedAttention(item, "ndl-jpro", discovered.status, discovered.message);
       }
       binding = discovered.binding;
+    }
+    if (binding.provider !== "ndl-jpro" || !binding.title) {
+      throw new Error("NDL/JPRO binding is incomplete.");
     }
     let records = await this.ndl.searchTitles([binding.title], binding.creator ?? "");
     if (!records.length && binding.creator) records = await this.ndl.searchTitles([binding.title]);
     const latest = selectLatestPublishedRecord(records, binding, new Date());
     if (!latest) {
-      const message = "NDL/JPRO returned no published volume for the verified publication line.";
-      await this.state.writeAttention(item.filePath, item.mediaType, "unmatched", message);
-      return this.attention(item, "ndl-jpro", "unmatched", message);
+      return this.preparedAttention(
+        item,
+        "ndl-jpro",
+        "unmatched",
+        "NDL/JPRO returned no published volume for the verified publication line.",
+      );
+    }
+    if (providerBehindReadingProgress(item, latest.volume)) {
+      return this.preparedAttention(
+        item,
+        "ndl-jpro",
+        "source_regressed",
+        `NDL/JPRO returned Vol.${latest.volume}, below the recorded reading progress Vol.${item.progress}; no latest value was changed.`,
+      );
     }
     if (providerResultRegressed(current.latest, current.latestReleaseDate, latest.volume, latest.publishedAt, "ndl-jpro")) {
-      const message = `NDL/JPRO returned an older publication than the stored ${current.latest}; the stored value was preserved.`;
-      await this.state.writeAttention(item.filePath, item.mediaType, "source_regressed", message);
-      return this.attention(item, "ndl-jpro", "source_regressed", message);
+      return this.preparedAttention(
+        item,
+        "ndl-jpro",
+        "source_regressed",
+        `NDL/JPRO returned an older publication than the stored ${current.latest}; the stored value was preserved.`,
+      );
     }
     const initialized = !current.latest;
     const changed = Boolean(current.latest) && current.latest !== latest.volume;
-    await this.state.writeVerified(
-      item.filePath,
-      item.mediaType,
-      binding,
-      latest.volume,
-      latest.publishedAt,
-      latest.sourceUrl,
-    );
-    return {
+    const result: ReleaseRefreshItemResult = {
       item,
       kind: initialized ? "initialized" : changed ? "updated" : "unchanged",
       before: current.latest,
@@ -261,37 +314,77 @@ export class ReleaseTrackingService {
       message: "",
       sourceUrl: latest.sourceUrl,
     };
+    return {
+      result,
+      persist: async () => {
+        await this.state.writeVerified(
+          item.filePath,
+          item.mediaType,
+          binding,
+          latest.volume,
+          latest.publishedAt,
+          latest.sourceUrl,
+        );
+      },
+    };
   }
 
-  async refreshItem(item: MediaItem, binding?: ReleaseTrackingBinding): Promise<ReleaseRefreshItemResult> {
+  private async prepareItem(item: MediaItem, binding?: ReleaseTrackingBinding): Promise<PreparedReleaseRefresh> {
     if (item.mediaType === "anime") {
-      return { item, kind: "skipped", before: "", after: "", provider: "", status: "unconfigured", message: "", sourceUrl: "" };
+      return {
+        result: { item, kind: "skipped", before: "", after: "", provider: "", status: "unconfigured", message: "", sourceUrl: "" },
+        persist: async () => {},
+      };
     }
     const current = this.state.read(item.filePath, item.mediaType);
     if (!binding && current.status === "disabled") {
-      return { item, kind: "skipped", before: current.latest, after: current.latest, provider: "", status: "disabled", message: "", sourceUrl: this.state.sourceUrl(item.filePath) };
+      return {
+        result: { item, kind: "skipped", before: current.latest, after: current.latest, provider: "", status: "disabled", message: "", sourceUrl: this.state.sourceUrl(item.filePath) },
+        persist: async () => {},
+      };
     }
     try {
       return item.mediaType === "manga"
-        ? await this.refreshManga(item, binding)
-        : await this.refreshNovel(item, binding);
+        ? await this.prepareManga(item, binding)
+        : await this.prepareNovel(item, binding);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.state.writeAttention(item.filePath, item.mediaType, "provider_error", message);
-      return this.attention(item, item.mediaType === "manga" ? "mangadex" : "ndl-jpro", "provider_error", message);
+      return this.preparedAttention(
+        item,
+        item.mediaType === "manga" ? "mangadex" : "ndl-jpro",
+        "provider_error",
+        message,
+      );
     }
+  }
+
+  async refreshItem(item: MediaItem, binding?: ReleaseTrackingBinding): Promise<ReleaseRefreshItemResult> {
+    const prepared = await this.prepareItem(item, binding);
+    await prepared.persist();
+    return prepared.result;
   }
 
   async refreshAll(
     items: readonly MediaItem[],
-    onProgress?: (completed: number, total: number) => void,
+    onProgress?: (progress: ReleaseRefreshProgress) => void,
   ): Promise<ReleaseRefreshSummary> {
     const trackable = items.filter((item) => item.mediaType === "manga" || item.mediaType === "novel");
-    const results: ReleaseRefreshItemResult[] = [];
+    const prepared: PreparedReleaseRefresh[] = [];
     for (let index = 0; index < trackable.length; index += 1) {
-      results.push(await this.refreshItem(trackable[index]));
-      onProgress?.(index + 1, trackable.length);
+      const item = trackable[index];
+      const provider = providerNameForItem(item);
+      onProgress?.({ completed: index, total: trackable.length, item, provider, stage: "checking" });
+      prepared.push(await this.prepareItem(item));
+      onProgress?.({ completed: index + 1, total: trackable.length, item, provider, stage: "completed" });
     }
+
+    // Provider requests are intentionally completed before any note is written.
+    // This keeps the Library stable throughout the visible network check; the
+    // final local frontmatter writes then happen as one compact burst and the
+    // existing Library render debounce collapses their metadata events.
+    for (const entry of prepared) await entry.persist();
+
+    const results = prepared.map((entry) => entry.result);
     return {
       results,
       checked: results.filter((result) => result.kind !== "skipped").length,
@@ -313,7 +406,9 @@ export class ReleaseTrackingService {
       }));
     }
     if (item.mediaType === "novel") {
-      return (await this.novelLines(item)).map((line) => ({
+      return (await this.novelLines(item))
+        .filter((line) => line.medium !== "comic")
+        .map((line) => ({
         provider: "ndl-jpro" as const,
         label: line.title,
         description: lineDescription(line),

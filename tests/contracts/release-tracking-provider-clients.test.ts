@@ -90,8 +90,8 @@ describe("release tracking provider clients", () => {
     assert.doesNotMatch(request.url, /includeFutureUpdates/);
   });
 
-  it("queries only JPRO printed-book records and parses publication-line fields", async () => {
-    let request: any;
+  it("queries JPRO plus the national bibliography and deduplicates the same ISBN", async () => {
+    const requests: any[] = [];
     const item = node("item", "", [
       node("title", "Re:ゼロから始める異世界生活"),
       node("link", "https://ndlsearch.ndl.go.jp/books/example"),
@@ -114,16 +114,20 @@ describe("release tracking provider clients", () => {
       },
     });
     setRequestUrlMock((options) => {
-      request = options;
+      requests.push(options);
       return { text: "<rss />" };
     });
 
     const records = await new NdlReleaseClient().search("Re:ゼロから始める異世界生活", "長月達平");
-    assert.match(request.url, /^https:\/\/ndlsearch\.ndl\.go\.jp\/api\/opensearch\?/);
-    assert.match(request.url, /dpid=jpro-book/);
-    assert.match(request.url, /mediatype=books/);
-    assert.match(request.url, /cnt=200/);
-    assert.match(request.url, /creator=/);
+    assert.equal(requests.length, 2);
+    assert.match(requests[0].url, /^https:\/\/ndlsearch\.ndl\.go\.jp\/api\/opensearch\?/);
+    assert.match(requests[0].url, /dpid=jpro-book/);
+    assert.match(requests[1].url, /dpid=iss-ndl-opac-national/);
+    for (const request of requests) {
+      assert.match(request.url, /mediatype=books/);
+      assert.match(request.url, /cnt=200/);
+      assert.match(request.url, /creator=/);
+    }
     assert.equal(records.length, 1);
     assert.equal(records[0]?.volume, "45");
     assert.equal(records[0]?.publisher, "KADOKAWA");
