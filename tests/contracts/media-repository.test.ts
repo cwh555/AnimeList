@@ -106,6 +106,32 @@ describe("media repository compatibility", () => {
     assert.equal(repository.findBySource(["AnimeList"], "AniList", "42"), anime);
   });
 
+
+  it("falls back to cover_remote while a local cover path is not yet available", () => {
+    const file = markdownFile("AnimeList/Manga/frieren.md", 1_700_000_000_000);
+    const remoteCover = "https://lain.bgm.tv/pic/cover/l/a1/bd/305429_axzF3.jpg";
+    const frontmatter = {
+      media_type: "manga",
+      title: "葬送的芙莉蓮",
+      cover: "AnimeList/Covers/manga/frieren.jpg",
+      cover_remote: remoteCover,
+    };
+    const app = {
+      vault: {
+        getAbstractFileByPath: () => null,
+        getResourcePath: () => "",
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter }),
+        getFirstLinkpathDest: () => null,
+      },
+    } as unknown as App;
+
+    const item = new MediaRepository(app).read(file);
+    assert.ok(item);
+    assert.equal(item.cover, remoteCover);
+  });
+
   it("does not expose malformed studio metadata or fall back to anime author fields", () => {
     const file = markdownFile("AnimeList/Anime/composite-studio.md");
     const composite = "コロリド・ツインエンジンパートナーズ (スタジオコロリド・ツインエンジン) スタジオコロリド・STUDIO CHROMATO";

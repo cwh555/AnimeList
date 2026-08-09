@@ -29,6 +29,7 @@ function read(relativePath) {
 }
 
 function allMarkdown(root) {
+  if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) return [];
   const output = [];
   const visit = (folder) => {
     for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
@@ -42,15 +43,22 @@ function allMarkdown(root) {
 }
 
 try {
+  const legacyFixture = path.join(vaultRoot, "AnimeList/Test Fixtures/Anime/01-anime-planned.md");
+  fs.mkdirSync(path.dirname(legacyFixture), { recursive: true });
+  fs.writeFileSync(legacyFixture, "---\ntitle: \"TEST 動畫－未開始\"\nmedia_type: \"anime\"\n---\n");
+
   const first = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
   assert.equal(first.files.length, 18);
   assert.equal(first.fixtureRoot, path.join(vaultRoot, TEST_LIBRARY_ROOT));
   assert.equal(first.checklistPath, path.join(vaultRoot, TEST_CHECKLIST_PATH));
   assert.equal(first.created, 18);
   assert.equal(first.reused, 0);
+  assert.equal(first.reusedBySource, 0);
   assert.equal(first.repaired, 0);
   assert.equal(first.coversDownloaded, 18);
+  assert.equal(first.legacyRemoved, 1);
   assert.equal(fetchCalls, 18);
+  assert.equal(fs.existsSync(legacyFixture), false);
 
   const checklist = read(TEST_CHECKLIST_PATH);
   assert.match(checklist, /same managed folders used by normal collection/);
@@ -62,16 +70,24 @@ try {
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
 
   const mediaNotes = allMarkdown(path.join(vaultRoot, TEST_LIBRARY_ROOT))
-    .filter((file) => !file.includes(`${path.sep}Templates${path.sep}`));
+    .filter((file) => fs.readFileSync(file, "utf8").includes(`fixture_version: ${TEST_FIXTURE_VERSION}`));
   assert.equal(mediaNotes.length, 18);
   const allFixtures = mediaNotes.map((file) => fs.readFileSync(file, "utf8")).join("\n");
   assert.doesNotMatch(allFixtures, /title: "(?:TEST|SPECIAL)/);
   assert.doesNotMatch(allFixtures, /source_provider: "mangadex"/);
+  assert.equal((allFixtures.match(/schema_version: 6/g) ?? []).length, 18);
   assert.equal((allFixtures.match(/source_provider: "bangumi"/g) ?? []).length, 18);
   assert.equal((allFixtures.match(new RegExp(`fixture_version: ${TEST_FIXTURE_VERSION}`, "g")) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover: "AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover_remote: "https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//g) ?? []).length, 18);
   assert.equal((allFixtures.match(/!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
+
+  for (const file of mediaNotes) {
+    const content = fs.readFileSync(file, "utf8");
+    const cover = content.match(/^cover: "([^"]+)"$/m)?.[1] ?? "";
+    assert.ok(cover, `${file} must have a local cover path`);
+    assert.equal(fs.statSync(path.join(vaultRoot, cover), { throwIfNoEntry: false })?.isFile(), true, `${cover} must exist`);
+  }
 
   const frierenMangaPath = "AnimeList/Manga/葬送的芙莉蓮.md";
   const frierenManga = read(frierenMangaPath);
@@ -90,22 +106,39 @@ try {
     .filter((entry) => String(entry).endsWith(".jpg"));
   assert.equal(coverFiles.length, 18);
 
+  const importedFrierenPath = "AnimeList/Manga/Imported/我已收藏的芙莉蓮.md";
+  fs.mkdirSync(path.dirname(path.join(vaultRoot, importedFrierenPath)), { recursive: true });
+  const collectedFrieren = read(frierenMangaPath)
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith("fixture_version:") && !line.startsWith("fixture_case:"))
+    .join("\n") + "\nUSER-COLLECTED NOTE MUST SURVIVE\n";
+  fs.writeFileSync(path.join(vaultRoot, importedFrierenPath), collectedFrieren);
+  fs.rmSync(path.join(vaultRoot, frierenMangaPath));
   fs.appendFileSync(path.join(vaultRoot, alyaPath), "\nUSER EDIT MUST SURVIVE\n");
+
   fetchCalls = 0;
   const second = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
   assert.equal(second.created, 0);
   assert.equal(second.repaired, 0);
   assert.equal(second.reused, 18);
+  assert.equal(second.reusedBySource, 1);
   assert.equal(second.coversDownloaded, 0);
   assert.equal(fetchCalls, 0);
+  assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
+  assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  const frierenSourceMatches = allMarkdown(path.join(vaultRoot, "AnimeList", "Manga"))
+    .filter((file) => /source_id: "305429"/.test(fs.readFileSync(file, "utf8")));
+  assert.equal(frierenSourceMatches.length, 1);
 
   const alyaCover = path.join(vaultRoot, "AnimeList/Covers/novel/不時以俄語遮羞的艾莉同學-bangumi-339092.jpg");
   fs.rmSync(alyaCover);
   fetchCalls = 0;
   const repairedCover = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
   assert.equal(repairedCover.reused, 18);
+  assert.equal(repairedCover.reusedBySource, 1);
   assert.equal(repairedCover.coversDownloaded, 1);
+  assert.equal(repairedCover.refreshed, 1);
   assert.equal(fetchCalls, 1);
   assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
   assert.equal(fs.statSync(alyaCover).size > 0, true);
@@ -115,10 +148,14 @@ try {
   const reset = await prepareTestFixtures(vaultRoot, { reset: true, fetchImpl: fakeFetch });
   assert.equal(reset.files.length, 18);
   assert.equal(fs.existsSync(unrelated), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
+  assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.doesNotMatch(read(alyaPath), /USER EDIT MUST SURVIVE/);
-  assert.equal(reset.repaired, 18);
+  assert.equal(reset.repaired, 17);
+  assert.equal(reset.reused, 1);
+  assert.equal(reset.reusedBySource, 1);
 
-  console.log("Shared Test Vault mirrors collected media: real provider identity, local covers, non-destructive startup, explicit reset.");
+  console.log("Shared Test Vault mirrors collected media: current schema, real local covers, source-ID reuse, legacy fixture cleanup, non-destructive startup, explicit reset.");
 } finally {
   fs.rmSync(vaultRoot, { recursive: true, force: true });
 }

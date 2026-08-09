@@ -5,10 +5,32 @@ import { fileURLToPath } from "node:url";
 
 export const TEST_LIBRARY_ROOT = "AnimeList";
 export const TEST_CHECKLIST_PATH = "_AnimeList Test Checklist.md";
-export const TEST_FIXTURE_VERSION = 2;
+export const TEST_FIXTURE_VERSION = 3;
+const CURRENT_MEDIA_SCHEMA_VERSION = 6;
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
+
+const LEGACY_FIXTURE_RELATIVE_PATHS = [
+  "AnimeList/Test Fixtures/Anime/01-anime-planned.md",
+  "AnimeList/Test Fixtures/Anime/02-anime-watching.md",
+  "AnimeList/Test Fixtures/Anime/03-anime-completed.md",
+  "AnimeList/Test Fixtures/Manga/04-manga-planned.md",
+  "AnimeList/Test Fixtures/Manga/05-manga-reading.md",
+  "AnimeList/Test Fixtures/Manga/06-manga-on-hold.md",
+  "AnimeList/Test Fixtures/Manga/07-manga-dropped.md",
+  "AnimeList/Test Fixtures/Manga/08-manga-completed.md",
+  "AnimeList/Test Fixtures/Novel/09-novel-planned.md",
+  "AnimeList/Test Fixtures/Novel/10-novel-add-volume.md",
+  "AnimeList/Test Fixtures/Novel/11-novel-on-hold.md",
+  "AnimeList/Test Fixtures/Novel/12-novel-dropped.md",
+  "AnimeList/Test Fixtures/Novel/13-novel-completed.md",
+  "AnimeList/Test Fixtures/Special/14-special-legacy-favorite-completed.md",
+  "AnimeList/Test Fixtures/Special/15-special-multi-label-ongoing.md",
+  "AnimeList/Test Fixtures/Special/16-special-shared-label-planned.md",
+  "AnimeList/Test Fixtures/Special/17-special-retained-label-completed.md",
+  "AnimeList/Test Fixtures/Special/18-special-control-planned.md",
+];
 
 function yamlScalar(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -46,6 +68,80 @@ function writeFile(vaultRoot, relativePath, content) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, `${content.trim()}\n`);
   return target;
+}
+
+function frontmatterScalar(content, key) {
+  const block = String(content ?? "").match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? "";
+  const prefix = `${key}:`;
+  const line = block.split(/\r?\n/).find((entry) => entry.startsWith(prefix));
+  if (!line) return "";
+  const raw = line.slice(prefix.length).trim();
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed == null ? "" : String(parsed);
+  } catch {
+    return raw.replace(/^['"]|['"]$/g, "");
+  }
+}
+
+function normalizedLocalCoverPath(value) {
+  const normalized = String(value ?? "")
+    .replace(/^!\[\[/, "")
+    .replace(/^\[\[/, "")
+    .replace(/\]\]$/, "")
+    .split("|")[0]
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "");
+  return /^https?:\/\//i.test(normalized) ? "" : normalized;
+}
+
+function markdownFiles(root) {
+  if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) return [];
+  const output = [];
+  const visit = (folder) => {
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+      const target = path.join(folder, entry.name);
+      if (entry.isDirectory()) visit(target);
+      else if (entry.isFile() && entry.name.toLocaleLowerCase().endsWith(".md")) output.push(target);
+    }
+  };
+  visit(root);
+  return output;
+}
+
+function findBySource(vaultRoot, item) {
+  for (const folder of ["Anime", "Manga", "Novel"]) {
+    const root = path.join(vaultRoot, TEST_LIBRARY_ROOT, folder);
+    for (const file of markdownFiles(root)) {
+      const content = fs.readFileSync(file, "utf8");
+      if (frontmatterScalar(content, "source_provider") === item.sourceProvider
+        && frontmatterScalar(content, "source_id") === item.sourceId) {
+        return { file, content };
+      }
+    }
+  }
+  return null;
+}
+
+function removeEmptyDirectories(root) {
+  if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) return;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (entry.isDirectory()) removeEmptyDirectories(path.join(root, entry.name));
+  }
+  if (fs.readdirSync(root).length === 0) fs.rmdirSync(root);
+}
+
+function cleanupLegacyFixtures(vaultRoot) {
+  let removed = 0;
+  for (const relativePath of LEGACY_FIXTURE_RELATIVE_PATHS) {
+    const target = path.join(vaultRoot, relativePath);
+    if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) continue;
+    fs.rmSync(target);
+    removed += 1;
+  }
+  removeEmptyDirectories(path.join(vaultRoot, "AnimeList", "Test Fixtures"));
+  return removed;
 }
 
 function completedVolumes(count) {
@@ -225,7 +321,7 @@ function mediaNote(item) {
   const coverPath = coverRelativePath(item).split(path.sep).join("/");
   const lines = [
     "---",
-    "schema_version: 5",
+    `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`,
     `fixture_version: ${TEST_FIXTURE_VERSION}`,
     `fixture_case: ${yamlScalar(item.fixtureCase)}`,
     `title: ${yamlScalar(item.title)}`,
@@ -294,8 +390,8 @@ function fixtureLooksCurrent(content, item) {
     && content.includes(`cover_remote: ${yamlScalar(item.coverRemote)}`);
 }
 
-async function downloadCover(vaultRoot, item, fetchImpl) {
-  const relative = coverRelativePath(item);
+async function downloadCover(vaultRoot, item, fetchImpl, relativePath = coverRelativePath(item)) {
+  const relative = relativePath;
   const target = path.join(vaultRoot, relative);
   const existing = fs.statSync(target, { throwIfNoEntry: false });
   if (existing?.isFile() && existing.size > 0) return { path: target, downloaded: false };
@@ -414,28 +510,73 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   if (typeof fetchImpl !== "function") throw new Error("Test Vault cover preparation requires fetch().");
 
+  const legacyRemoved = cleanupLegacyFixtures(resolvedVault);
+  const plans = FIXTURES.map((fixture) => {
+    const relativePath = fixtureRelativePath(fixture);
+    const expectedTarget = path.join(resolvedVault, relativePath);
+    const expectedExists = fs.statSync(expectedTarget, { throwIfNoEntry: false })?.isFile() ?? false;
+    const sourceMatch = expectedExists ? null : findBySource(resolvedVault, fixture);
+    const target = sourceMatch?.file ?? expectedTarget;
+    const existed = fs.statSync(target, { throwIfNoEntry: false })?.isFile() ?? false;
+    const existing = existed ? (sourceMatch?.content ?? fs.readFileSync(target, "utf8")) : "";
+    const generatedFixture = existed && Boolean(frontmatterScalar(existing, "fixture_case"));
+    const storedCoverPath = existed ? normalizedLocalCoverPath(frontmatterScalar(existing, "cover")) : "";
+    const coverPath = generatedFixture || !existed ? coverRelativePath(fixture) : storedCoverPath;
+    return {
+      fixture,
+      expectedTarget,
+      target,
+      existed,
+      existing,
+      generatedFixture,
+      reusedBySource: Boolean(sourceMatch),
+      coverPath,
+      coverDownloaded: false,
+    };
+  });
+
+  let coversDownloaded = 0;
+  for (const plan of plans) {
+    if (!plan.coverPath) continue;
+    const cover = await downloadCover(resolvedVault, plan.fixture, fetchImpl, plan.coverPath);
+    plan.coverDownloaded = cover.downloaded;
+    if (cover.downloaded) coversDownloaded += 1;
+  }
+
   const files = [];
   let created = 0;
   let reused = 0;
+  let reusedBySource = 0;
   let repaired = 0;
-  let coversDownloaded = 0;
+  let refreshed = 0;
 
-  for (const fixture of FIXTURES) {
-    const relativePath = fixtureRelativePath(fixture);
-    const target = path.join(resolvedVault, relativePath);
-    const existed = fs.statSync(target, { throwIfNoEntry: false })?.isFile() ?? false;
-    const existing = existed ? fs.readFileSync(target, "utf8") : "";
-
-    const cover = await downloadCover(resolvedVault, fixture, fetchImpl);
-    if (cover.downloaded) coversDownloaded += 1;
+  for (const plan of plans) {
+    const { fixture, target, existed, existing, generatedFixture } = plan;
+    if (existed && !generatedFixture) {
+      files.push(target);
+      reused += 1;
+      if (plan.reusedBySource) reusedBySource += 1;
+      if (plan.coverDownloaded) {
+        const now = new Date();
+        fs.utimesSync(target, now, now);
+        refreshed += 1;
+      }
+      continue;
+    }
 
     if (!reset && existed && fixtureLooksCurrent(existing, fixture)) {
       files.push(target);
       reused += 1;
+      if (plan.reusedBySource) reusedBySource += 1;
+      if (plan.coverDownloaded) {
+        const now = new Date();
+        fs.utimesSync(target, now, now);
+        refreshed += 1;
+      }
       continue;
     }
 
-    writeFile(resolvedVault, relativePath, mediaNote(fixture));
+    writeFile(resolvedVault, path.relative(resolvedVault, target), mediaNote(fixture));
     files.push(target);
     if (existed) repaired += 1;
     else created += 1;
@@ -448,8 +589,11 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
     files,
     created,
     reused,
+    reusedBySource,
     repaired,
+    refreshed,
     coversDownloaded,
+    legacyRemoved,
   };
 }
 
