@@ -25,6 +25,7 @@ export interface ReleaseTrackingSnapshot {
   binding: ReleaseTrackingBinding | null;
   latest: string;
   latestReleaseDate: string;
+  sourceLabel: string;
   checkedAt: string;
   error: string;
 }
@@ -108,6 +109,7 @@ export function releaseTrackingSnapshotFromFrontmatter(
     binding,
     latest,
     latestReleaseDate: stringValue(frontmatter.latest_release_date),
+    sourceLabel: stringValue(frontmatter.release_tracking_source_label),
     checkedAt: stringValue(frontmatter.release_tracking_checked_at),
     error: stringValue(frontmatter.release_tracking_error),
   };

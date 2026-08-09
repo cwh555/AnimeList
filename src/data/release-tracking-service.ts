@@ -1,6 +1,11 @@
 import type { App } from "obsidian";
 import type { MediaItem } from "../domain/media-types";
 import {
+  latestMangaChapterEvidence,
+  officialMangaReleaseSources,
+  type MangaChapterEvidence,
+} from "../domain/manga-release-sources";
+import {
   compareChapterLabels,
   groupPublicationLines,
   mergeCompatibleNovelPublicationLines,
@@ -16,7 +21,9 @@ import {
   type ReleaseTrackingBinding,
   type ReleaseTrackingStatus,
 } from "../domain/release-tracking";
+import { AniListClient } from "./providers/anilist-client";
 import { MangaDexReleaseClient, type MangaDexSeriesCandidate } from "./providers/mangadex-release-client";
+import { OfficialMangaReleaseClient } from "./providers/official-manga-release-client";
 import { NDL_CATALOGS, NdlReleaseClient } from "./providers/ndl-release-client";
 import { ReleaseTrackingStateService } from "./release-tracking-state-service";
 
@@ -27,10 +34,11 @@ export interface ReleaseRefreshItemResult {
   kind: ReleaseRefreshKind;
   before: string;
   after: string;
-  provider: "mangadex" | "ndl-jpro" | "";
+  provider: "manga" | "ndl-jpro" | "";
   status: ReleaseTrackingStatus;
   message: string;
   sourceUrl: string;
+  sourceLabel: string;
   notes: string[];
 }
 
@@ -47,7 +55,7 @@ export interface ReleaseRefreshProgress {
   completed: number;
   total: number;
   item: MediaItem;
-  provider: "mangadex" | "ndl-jpro";
+  provider: "manga" | "ndl-jpro";
   stage: "checking" | "completed";
 }
 
@@ -57,6 +65,8 @@ export type ReleaseMatchCandidate =
 
 export interface ReleaseTrackingClients {
   mangaDex?: MangaDexReleaseClient;
+  anilist?: AniListClient;
+  officialManga?: OfficialMangaReleaseClient;
   ndl?: NdlReleaseClient;
 }
 
@@ -144,8 +154,8 @@ function providerBehindReadingProgress(item: MediaItem, latest: string): boolean
   return compareChapterLabels(latest, item.progress) < 0;
 }
 
-function providerNameForItem(item: MediaItem): "mangadex" | "ndl-jpro" {
-  return item.mediaType === "manga" ? "mangadex" : "ndl-jpro";
+function providerNameForItem(item: MediaItem): "manga" | "ndl-jpro" {
+  return item.mediaType === "manga" ? "manga" : "ndl-jpro";
 }
 
 function catalogOrder(preferred?: NdlCatalog): NdlCatalog[] {
@@ -166,12 +176,16 @@ function sidePublicationLabel(record: NdlPublicationRecord): string {
 export class ReleaseTrackingService {
   readonly state: ReleaseTrackingStateService;
   private readonly mangaDex: MangaDexReleaseClient;
+  private readonly anilist: AniListClient;
+  private readonly officialManga: OfficialMangaReleaseClient;
   private readonly ndl: NdlReleaseClient;
   private readonly matchCache = new Map<string, NovelDiscoveryCache | ReleaseMatchCandidate[]>();
 
   constructor(app: App, clients: ReleaseTrackingClients = {}) {
     this.state = new ReleaseTrackingStateService(app);
     this.mangaDex = clients.mangaDex ?? new MangaDexReleaseClient();
+    this.anilist = clients.anilist ?? new AniListClient();
+    this.officialManga = clients.officialManga ?? new OfficialMangaReleaseClient();
     this.ndl = clients.ndl ?? new NdlReleaseClient();
   }
 
@@ -325,7 +339,7 @@ export class ReleaseTrackingService {
 
   private preparedAttention(
     item: MediaItem,
-    provider: "mangadex" | "ndl-jpro" | "",
+    provider: "manga" | "ndl-jpro" | "",
     status: Exclude<ReleaseTrackingStatus, "verified" | "disabled">,
     message: string,
     binding?: ReleaseTrackingBinding,
@@ -342,6 +356,7 @@ export class ReleaseTrackingService {
         status,
         message,
         sourceUrl: this.state.sourceUrl(item.filePath),
+        sourceLabel: current.sourceLabel,
         notes,
       },
       persist: async () => {
@@ -350,48 +365,94 @@ export class ReleaseTrackingService {
     };
   }
 
+  private anilistIdForItem(item: MediaItem): string | number | undefined {
+    if (item.anilistId) return item.anilistId;
+    for (const sourceUrl of item.sourceUrls) {
+      const match = sourceUrl.match(/anilist\.co\/(?:manga|anime)\/(\d+)/i);
+      if (match) return match[1];
+    }
+    return undefined;
+  }
+
+  private async officialMangaEvidence(item: MediaItem): Promise<MangaChapterEvidence[]> {
+    const anilistId = this.anilistIdForItem(item);
+    if (!anilistId) return [];
+    try {
+      const media = await this.anilist.fetchMangaReleaseSources(anilistId);
+      if (!media) return [];
+      const sources = officialMangaReleaseSources(media.externalLinks);
+      if (!sources.length) return [];
+      const titles = [...new Set([...media.titles, ...discoveryTitles(item)].map((value) => value.trim()).filter(Boolean))];
+      const settled = await Promise.allSettled(sources.map((source) => this.officialManga.latestChapter(source, titles)));
+      return settled.flatMap((entry) => entry.status === "fulfilled" && entry.value ? [entry.value] : []);
+    } catch {
+      return [];
+    }
+  }
+
   private async prepareManga(item: MediaItem, suppliedBinding?: ReleaseTrackingBinding): Promise<PreparedReleaseRefresh> {
     const current = this.state.read(item.filePath, item.mediaType);
     let binding = suppliedBinding ?? current.binding;
     if (binding?.provider !== "mangadex" || !binding.sourceId) {
       const discovered = await this.discoverMangaBinding(item);
-      if (!discovered.binding) return this.preparedAttention(item, "mangadex", discovered.status, discovered.message);
+      if (!discovered.binding) return this.preparedAttention(item, "manga", discovered.status, discovered.message);
       binding = discovered.binding;
     }
     if (binding.provider !== "mangadex" || !binding.sourceId) throw new Error("MangaDex binding is incomplete.");
-    const latest = await this.mangaDex.latestChapter(binding.sourceId);
-    if (!latest) {
-      return this.preparedAttention(item, "mangadex", "unmatched", "MangaDex returned no numeric chapter that can be safely tracked.", binding);
+
+    const evidence: MangaChapterEvidence[] = [];
+    let mangaDexError = "";
+    try {
+      const mangaDexLatest = await this.mangaDex.latestChapter(binding.sourceId);
+      if (mangaDexLatest) {
+        evidence.push({
+          latest: mangaDexLatest,
+          sourceLabel: "MangaDex",
+          sourceUrl: `https://mangadex.org/title/${encodeURIComponent(binding.sourceId)}`,
+        });
+      }
+    } catch (error) {
+      mangaDexError = error instanceof Error ? error.message : String(error);
     }
+    evidence.push(...await this.officialMangaEvidence(item));
+
+    const selected = latestMangaChapterEvidence(evidence);
+    if (!selected) {
+      const message = mangaDexError
+        ? mangaDexError
+        : "No supported manga release source returned a numeric chapter that can be safely tracked.";
+      return this.preparedAttention(item, "manga", mangaDexError ? "provider_error" : "unmatched", message, binding);
+    }
+    const latest = selected.latest;
     if (providerBehindReadingProgress(item, latest)) {
       return this.preparedAttention(
-        item, "mangadex", "source_regressed",
-        `MangaDex returned Ch.${latest}, below the recorded reading progress Ch.${item.progress}; no latest value was changed.`, binding,
+        item, "manga", "source_regressed",
+        `${selected.sourceLabel} returned Ch.${latest}, below the recorded reading progress Ch.${item.progress}; no latest value was changed.`, binding,
       );
     }
     if (providerResultRegressed(current.latest, current.latestReleaseDate, latest, "", "mangadex")) {
       return this.preparedAttention(
-        item, "mangadex", "source_regressed",
-        `MangaDex returned ${latest}, older than the stored ${current.latest}; the stored value was preserved.`, binding,
+        item, "manga", "source_regressed",
+        `${selected.sourceLabel} returned ${latest}, older than the stored ${current.latest}; the stored value was preserved.`, binding,
       );
     }
     const changed = Boolean(current.latest) && compareChapterLabels(latest, current.latest) > 0;
     const initialized = !current.latest;
-    const sourceUrl = `https://mangadex.org/title/${encodeURIComponent(binding.sourceId)}`;
     return {
       result: {
         item,
         kind: initialized ? "initialized" : changed ? "updated" : "unchanged",
         before: current.latest,
         after: latest,
-        provider: "mangadex",
+        provider: "manga",
         status: "verified",
         message: "",
-        sourceUrl,
+        sourceUrl: selected.sourceUrl,
+        sourceLabel: selected.sourceLabel,
         notes: [],
       },
       persist: async () => {
-        await this.state.writeVerified(item.filePath, item.mediaType, binding, latest, "", sourceUrl);
+        await this.state.writeVerified(item.filePath, item.mediaType, binding, latest, "", selected.sourceUrl, selected.sourceLabel);
       },
     };
   }
@@ -479,10 +540,11 @@ export class ReleaseTrackingService {
         status: "verified",
         message: "",
         sourceUrl: latest.sourceUrl,
+        sourceLabel: "NDL / JPRO",
         notes,
       },
       persist: async () => {
-        await this.state.writeVerified(item.filePath, item.mediaType, binding, latest.volume, latest.publishedAt, latest.sourceUrl);
+        await this.state.writeVerified(item.filePath, item.mediaType, binding, latest.volume, latest.publishedAt, latest.sourceUrl, "NDL / JPRO");
         this.matchCache.delete(item.filePath);
       },
     };
@@ -491,14 +553,14 @@ export class ReleaseTrackingService {
   private async prepareItem(item: MediaItem, binding?: ReleaseTrackingBinding): Promise<PreparedReleaseRefresh> {
     if (item.mediaType === "anime") {
       return {
-        result: { item, kind: "skipped", before: "", after: "", provider: "", status: "unconfigured", message: "", sourceUrl: "", notes: [] },
+        result: { item, kind: "skipped", before: "", after: "", provider: "", status: "unconfigured", message: "", sourceUrl: "", sourceLabel: "", notes: [] },
         persist: async () => {},
       };
     }
     const current = this.state.read(item.filePath, item.mediaType);
     if (!binding && current.status === "disabled") {
       return {
-        result: { item, kind: "skipped", before: current.latest, after: current.latest, provider: "", status: "disabled", message: "", sourceUrl: this.state.sourceUrl(item.filePath), notes: [] },
+        result: { item, kind: "skipped", before: current.latest, after: current.latest, provider: "", status: "disabled", message: "", sourceUrl: this.state.sourceUrl(item.filePath), sourceLabel: current.sourceLabel, notes: [] },
         persist: async () => {},
       };
     }
@@ -506,7 +568,7 @@ export class ReleaseTrackingService {
       return item.mediaType === "manga" ? await this.prepareManga(item, binding) : await this.prepareNovel(item, binding);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return this.preparedAttention(item, item.mediaType === "manga" ? "mangadex" : "ndl-jpro", "provider_error", message, binding);
+      return this.preparedAttention(item, item.mediaType === "manga" ? "manga" : "ndl-jpro", "provider_error", message, binding);
     }
   }
 

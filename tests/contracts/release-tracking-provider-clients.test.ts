@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { setRequestUrlMock } from "../mocks/obsidian";
 import { MangaDexReleaseClient } from "../../src/data/providers/mangadex-release-client";
+import { OfficialMangaReleaseClient } from "../../src/data/providers/official-manga-release-client";
 import { NdlReleaseClient } from "../../src/data/providers/ndl-release-client";
 
 interface FakeNode {
@@ -94,6 +95,72 @@ describe("release tracking provider clients", () => {
     assert.equal(request.url, "https://api.mangadex.org/manga/series-1/aggregate");
     assert.doesNotMatch(request.url, /feed/);
     assert.doesNotMatch(request.url, /limit=100/);
+  });
+
+  it("follows Comic DAYS exact-title latest links instead of treating an old episode URL as current", async () => {
+    const requests: string[] = [];
+    setRequestUrlMock((options) => {
+      requests.push(options.url);
+      if (options.url.startsWith("https://comic-days.com/search?")) {
+        return {
+          text: `
+            <ul class="series-list">
+              <li data-title="ぐらんぶる 偽物">
+                <a href="https://comic-days.com/episode/wrong" class="sub-link">最新話を読む</a>
+              </li>
+              <li data-title="ぐらんぶる">
+                <div class="title-box">
+                  <p class="series-title">ぐらんぶる</p>
+                  <a href="https://comic-days.com/episode/latest-111" class="sub-link">最新話を読む</a>
+                </div>
+              </li>
+            </ul>`,
+        };
+      }
+      assert.equal(options.url, "https://comic-days.com/episode/latest-111");
+      return { text: "<title>ぐらんぶる / 〖第111話後編〗勘違い | コミックDAYS</title><h1>〖第111話後編〗勘違い</h1>" };
+    });
+
+    const result = await new OfficialMangaReleaseClient().latestChapter(
+      { id: "comic-days", label: "Comic DAYS", url: "https://comic-days.com/episode/old" },
+      ["ぐらんぶる", "Grand Blue"],
+    );
+    assert.equal(result?.latest, "111");
+    assert.equal(result?.sourceLabel, "Comic DAYS");
+    assert.equal(result?.sourceUrl, "https://comic-days.com/episode/latest-111");
+    assert.match(requests[0] ?? "", /^https:\/\/comic-days\.com\/search\?q=/);
+    assert.equal(requests.length, 2);
+  });
+
+  it("reads numeric chapter evidence from supported official title pages", async () => {
+    setRequestUrlMock((options) => {
+      if (options.url.includes("viz.com")) {
+        return { text: "<li>Chapter 145</li><li>Chapter 146</li><li>Chapter 147</li>" };
+      }
+      if (options.url.includes("comic-walker.com")) {
+        return { text: '{"title":"第71話"}{"title":"第72話"}' };
+      }
+      if (options.url.includes("championcross.jp")) {
+        return { text: "<span>第452話</span><span>第453話</span>" };
+      }
+      throw new Error(`unexpected URL ${options.url}`);
+    });
+    const client = new OfficialMangaReleaseClient();
+    const viz = await client.latestChapter(
+      { id: "viz", label: "VIZ", url: "https://www.viz.com/vizmanga/chapters/frieren-the-journeys-end" },
+      [],
+    );
+    const kadocomi = await client.latestChapter(
+      { id: "kadocomi", label: "Kadocomi", url: "https://comic-walker.com/detail/example" },
+      [],
+    );
+    const champion = await client.latestChapter(
+      { id: "champion-cross", label: "Champion Cross", url: "https://championcross.jp/series/example" },
+      [],
+    );
+    assert.equal(viz?.latest, "147");
+    assert.equal(kadocomi?.latest, "72");
+    assert.equal(champion?.latest, "453");
   });
 
   it("queries one selected NDL catalog at a time and tags records with catalog provenance", async () => {

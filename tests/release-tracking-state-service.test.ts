@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import { TFile } from "obsidian";
 import { ReleaseTrackingService } from "../src/data/release-tracking-service";
 import { ReleaseTrackingStateService } from "../src/data/release-tracking-state-service";
+import type { AniListClient } from "../src/data/providers/anilist-client";
 import type { MangaDexReleaseClient } from "../src/data/providers/mangadex-release-client";
+import type { OfficialMangaReleaseClient } from "../src/data/providers/official-manga-release-client";
 import type { NdlReleaseClient } from "../src/data/providers/ndl-release-client";
 import type { MediaItem } from "../src/domain/media-types";
 
@@ -73,6 +75,7 @@ describe("release tracking persistence", () => {
       "147",
       "",
       "https://mangadex.org/title/series-1",
+      "MangaDex",
     );
 
     assert.equal(frontmatter.progress, 120);
@@ -82,6 +85,7 @@ describe("release tracking persistence", () => {
     assert.equal(frontmatter.latest_chapter, "147");
     assert.equal(frontmatter.release_tracking_status, "verified");
     assert.equal(frontmatter.release_tracking_ref, "series-1");
+    assert.equal(frontmatter.release_tracking_source_label, "MangaDex");
     assert.equal(typeof frontmatter.release_tracking_checked_at, "string");
     assert.equal("release_tracking_verified_at" in frontmatter, false);
   });
@@ -235,6 +239,93 @@ describe("release tracking persistence", () => {
     assert.equal(result.after, "281");
     assert.equal(frontmatter.release_tracking_ref, "original");
     assert.equal(frontmatter.latest_chapter, "281");
+  });
+
+  it("uses a verified official source to advance beyond stale MangaDex coverage", async () => {
+    const { app, file, frontmatter } = harness({
+      progress: 108,
+      progress_unit: "chapter",
+      release_tracking_provider: "mangadex",
+      release_tracking_ref: "grand-blue",
+      release_tracking_title: "Grand Blue",
+      release_tracking_status: "verified",
+      latest_chapter: "108",
+      release_tracking_source_label: "MangaDex",
+    });
+    const mangaDex = { async latestChapter() { return "108"; } } as unknown as MangaDexReleaseClient;
+    const anilist = {
+      async fetchMangaReleaseSources() {
+        return {
+          id: 87395,
+          titles: ["Grand Blue", "ぐらんぶる"],
+          externalLinks: [
+            { site: "Comic Days", url: "https://comic-days.com/episode/old", type: "STREAMING", language: "Japanese" },
+          ],
+        };
+      },
+    } as unknown as AniListClient;
+    const officialManga = {
+      async latestChapter() {
+        return { latest: "111", sourceLabel: "Comic DAYS", sourceUrl: "https://comic-days.com/episode/latest-111" };
+      },
+    } as unknown as OfficialMangaReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, anilist, officialManga, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.title = "碧藍之海";
+    manga.originalTitle = "ぐらんぶる";
+    manga.progress = 108;
+    manga.anilistId = "87395";
+
+    const result = await service.refreshItem(manga);
+    assert.equal(result.kind, "updated");
+    assert.equal(result.after, "111");
+    assert.equal(result.provider, "manga");
+    assert.equal(result.sourceLabel, "Comic DAYS");
+    assert.equal(result.sourceUrl, "https://comic-days.com/episode/latest-111");
+    assert.equal(frontmatter.latest_chapter, "111");
+    assert.equal(frontmatter.progress, 108);
+    assert.equal(frontmatter.release_tracking_source_label, "Comic DAYS");
+  });
+
+  it("keeps newer MangaDex evidence when a verified official web source is temporarily behind", async () => {
+    const { app, file, frontmatter } = harness({
+      progress: 450,
+      progress_unit: "chapter",
+      release_tracking_provider: "mangadex",
+      release_tracking_ref: "iruma",
+      release_tracking_title: "Iruma-kun",
+      release_tracking_status: "verified",
+      latest_chapter: "453",
+    });
+    const mangaDex = { async latestChapter() { return "454"; } } as unknown as MangaDexReleaseClient;
+    const anilist = {
+      async fetchMangaReleaseSources() {
+        return {
+          id: 99324,
+          titles: ["Mairimashita! Iruma-kun", "魔入りました！入間くん"],
+          externalLinks: [
+            { site: "Champion Cross", url: "https://championcross.jp/series/example", type: "STREAMING", language: "Japanese" },
+          ],
+        };
+      },
+    } as unknown as AniListClient;
+    const officialManga = {
+      async latestChapter() {
+        return { latest: "453", sourceLabel: "Champion Cross", sourceUrl: "https://championcross.jp/series/example" };
+      },
+    } as unknown as OfficialMangaReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, anilist, officialManga, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.title = "入間同學入魔了";
+    manga.originalTitle = "魔入りました！入間くん";
+    manga.progress = 450;
+    manga.anilistId = "99324";
+
+    const result = await service.refreshItem(manga);
+    assert.equal(result.after, "454");
+    assert.equal(result.sourceLabel, "MangaDex");
+    assert.equal(frontmatter.latest_chapter, "454");
+    assert.equal(frontmatter.release_tracking_source_label, "MangaDex");
   });
 
   it("reports visible start and completion progress for every manual-refresh item", async () => {

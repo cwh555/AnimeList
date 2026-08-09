@@ -71,6 +71,7 @@ export class ReleaseTrackingStateService {
     latest: string,
     latestReleaseDate = "",
     sourceUrl = "",
+    sourceLabel = "",
   ): Promise<boolean> {
     const current = this.read(path, mediaType);
     if (
@@ -78,6 +79,7 @@ export class ReleaseTrackingStateService {
       && sameBinding(current.binding, binding)
       && current.latest === latest
       && current.latestReleaseDate === latestReleaseDate
+      && current.sourceLabel === sourceLabel
       && !current.error
     ) return false;
     const verifiedAt = new Date().toISOString();
@@ -100,6 +102,8 @@ export class ReleaseTrackingStateService {
       delete frontmatter.release_tracking_verified_at;
       if (sourceUrl) frontmatter.release_tracking_source_url = sourceUrl;
       else delete frontmatter.release_tracking_source_url;
+      if (sourceLabel) frontmatter.release_tracking_source_label = sourceLabel;
+      else delete frontmatter.release_tracking_source_label;
       if (mediaType === "manga") {
         frontmatter.latest_chapter = latest;
       } else if (mediaType === "novel") {
