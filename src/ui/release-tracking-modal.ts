@@ -411,6 +411,9 @@ function candidateRow(
 
 export class ReleaseTrackingMatchModal extends Modal {
   private requestId = 0;
+  private busy = false;
+  private candidates: ReleaseMatchCandidate[] = [];
+  private failure = "";
 
   constructor(app: App, private readonly service: ReleaseTrackingService, private readonly item: MediaItem, private readonly options: ReleaseTrackingMatchModalOptions) {
     super(app);
@@ -418,12 +421,15 @@ export class ReleaseTrackingMatchModal extends Modal {
 
   onOpen(): void {
     this.modalEl.classList.add("animelist-modal", "animelist-release-match-modal");
-    void this.renderCandidates();
+    void this.loadCandidates();
   }
 
-  private async renderCandidates(): Promise<void> {
-    const requestId = ++this.requestId;
-    this.contentEl.replaceChildren();
+  close(): void {
+    if (this.busy) return;
+    super.close();
+  }
+
+  private renderHeading(): void {
     const heading = makeElement("div", "al-release-match-heading");
     heading.append(
       icon("search-check", "al-release-match-heading-icon"),
@@ -431,39 +437,121 @@ export class ReleaseTrackingMatchModal extends Modal {
     );
     const headingCopy = heading.lastElementChild as HTMLElement;
     headingCopy.append(makeElement("h2", "", releaseTrackingText("match.title")), makeElement("p", "", releaseTrackingText("match.description")));
-    this.contentEl.append(heading, makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
+    this.contentEl.appendChild(heading);
+  }
+
+  private async loadCandidates(): Promise<void> {
+    const requestId = ++this.requestId;
+    this.contentEl.replaceChildren();
+    this.renderHeading();
+    this.contentEl.appendChild(makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
 
     let candidates: ReleaseMatchCandidate[] = [];
     try { candidates = await this.service.matchCandidates(this.item); } catch { candidates = []; }
     if (requestId !== this.requestId) return;
+    this.candidates = candidates;
+    this.failure = "";
 
-    this.contentEl.querySelector(".al-release-match-loading")?.remove();
+    if (candidates.length === 1) {
+      this.renderCandidates(candidates, true);
+      await this.resolveCandidate(candidates[0], true);
+      return;
+    }
+    this.renderCandidates(candidates, false);
+  }
+
+  private renderCandidates(candidates: ReleaseMatchCandidate[], autoResolving: boolean): void {
+    this.contentEl.replaceChildren();
+    this.renderHeading();
+
+    if (autoResolving) {
+      const single = makeElement("div", "al-release-match-single");
+      single.append(icon("sparkles"), makeElement("span", "", releaseTrackingText("match.single")));
+      this.contentEl.appendChild(single);
+    }
+    if (this.failure) {
+      const failure = makeElement("div", "al-release-match-failure");
+      failure.append(icon("triangle-alert"), makeElement("span", "", releaseTrackingText("match.failed", { message: this.failure })));
+      this.contentEl.appendChild(failure);
+    }
+
     const rows = makeElement("div", "al-release-match-list");
     if (!candidates.length) rows.appendChild(makeElement("div", "al-search-empty", releaseTrackingText("match.empty")));
     for (const candidate of candidates) {
-      rows.appendChild(candidateRow(candidate, (selected, button) => {
-        button.disabled = true;
-        void (async () => {
-          const result = await this.service.refreshItem(this.item, selected.binding);
-          await this.options.onResolved(result);
-          this.close();
-        })().finally(() => { button.disabled = false; });
-      }));
+      rows.appendChild(candidateRow(candidate, (selected) => { void this.resolveCandidate(selected, false); }));
     }
     this.contentEl.appendChild(rows);
 
     const footer = makeElement("div", "al-release-match-actions");
     const disable = makeElement("button", "al-secondary-button", releaseTrackingText("match.disable"));
     disable.type = "button";
-    disable.addEventListener("click", () => {
-      disable.disabled = true;
-      void (async () => {
-        await this.service.state.disable(this.item.filePath, this.item.mediaType);
-        await this.options.onDisabled();
-        this.close();
-      })().finally(() => { disable.disabled = false; });
-    });
+    disable.disabled = this.busy;
+    disable.addEventListener("click", () => { void this.disableTracking(); });
     footer.appendChild(disable);
     this.contentEl.appendChild(footer);
+
+    if (this.busy) this.appendBusyProgress();
+    this.setButtonsDisabled(this.busy);
+  }
+
+  private appendBusyProgress(): void {
+    const progress = makeElement("div", "al-release-match-progress");
+    const label = makeElement("div", "al-release-match-progress-label");
+    label.append(icon("loader-circle"), makeElement("span", "", releaseTrackingText("match.resolving")));
+    const track = makeElement("div", "al-release-match-progress-track");
+    track.appendChild(makeElement("div", "al-release-match-progress-fill"));
+    progress.append(label, track);
+    this.contentEl.appendChild(progress);
+  }
+
+  private setButtonsDisabled(disabled: boolean): void {
+    this.contentEl.querySelectorAll<HTMLButtonElement>("button").forEach((button) => { button.disabled = disabled; });
+  }
+
+  private async resolveCandidate(candidate: ReleaseMatchCandidate, automatic: boolean): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.failure = "";
+    this.modalEl.classList.add("is-busy");
+    this.renderCandidates(this.candidates, automatic);
+    try {
+      const result = await this.service.refreshItem(this.item, candidate.binding);
+      if (result.status === "verified") {
+        this.busy = false;
+        this.modalEl.classList.remove("is-busy");
+        await this.options.onResolved(result);
+        super.close();
+        return;
+      }
+      this.failure = result.message || statusLabel(result.status);
+    } catch (error) {
+      this.failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      if (this.busy) {
+        this.busy = false;
+        this.modalEl.classList.remove("is-busy");
+        this.renderCandidates(this.candidates, false);
+      }
+    }
+  }
+
+  private async disableTracking(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.modalEl.classList.add("is-busy");
+    this.renderCandidates(this.candidates, false);
+    try {
+      await this.service.state.disable(this.item.filePath, this.item.mediaType);
+      await this.options.onDisabled();
+      this.busy = false;
+      this.modalEl.classList.remove("is-busy");
+      super.close();
+    } finally {
+      if (this.busy) {
+        this.busy = false;
+        this.modalEl.classList.remove("is-busy");
+        this.renderCandidates(this.candidates, false);
+      }
+    }
   }
 }
