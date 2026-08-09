@@ -180,7 +180,7 @@ describe("release tracking persistence", () => {
           { id: "official", title: "Kaguya-sama: Love Is War (Official Colored)", altTitles: ["かぐや様は告らせたい～天才たちの恋愛頭脳戦～"], sourceUrl: "https://mangadex.org/title/official" },
         ];
       },
-      async latestChapter(sourceId: string) { assert.equal(sourceId, "original"); return "281.1"; },
+      async latestChapter(sourceId: string) { assert.equal(sourceId, "original"); return "281"; },
     } as unknown as MangaDexReleaseClient;
     const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
     const manga = item(file.path, "manga");
@@ -189,9 +189,9 @@ describe("release tracking persistence", () => {
 
     const result = await service.refreshItem(manga);
     assert.equal(result.kind, "initialized");
-    assert.equal(result.after, "281.1");
+    assert.equal(result.after, "281");
     assert.equal(frontmatter.release_tracking_ref, "original");
-    assert.equal(frontmatter.latest_chapter, "281.1");
+    assert.equal(frontmatter.latest_chapter, "281");
   });
 
   it("reports visible start and completion progress for every manual-refresh item", async () => {
@@ -415,6 +415,32 @@ describe("release tracking persistence", () => {
     assert.equal(frontmatter.release_tracking_status, "verified");
     assert.equal(frontmatter.release_tracking_title, "ロクでなし魔術講師と禁忌教典");
     assert.equal(frontmatter.release_tracking_catalog, "jpro-book");
+  });
+
+  it("returns a newly unique novel candidate for stale attention and verifies it without a second catalog request", async () => {
+    const { app, file, frontmatter } = harness({ progress: 12, progress_unit: "volume", release_tracking_status: "ambiguous" });
+    let calls = 0;
+    const ndl = {
+      async searchCatalog(catalog: "jpro-book" | "ndl-national") {
+        calls += 1;
+        return [{ sourceId: "24", sourceUrl: "https://ndl/24", title: "ロクでなし魔術講師と禁忌教典", seriesTitle: "富士見ファンタジア文庫", volume: "24", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-11-17", isbn: "", catalog }];
+      },
+    } as unknown as NdlReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex: {} as MangaDexReleaseClient, ndl });
+    const novel = item(file.path, "novel");
+    novel.title = "不正經的魔術講師與禁忌教典";
+    novel.originalTitle = "ロクでなし魔術講師と禁忌教典";
+    novel.people = ["羊太郎"];
+    novel.progress = 12;
+
+    const candidates = await service.matchCandidates(novel);
+    assert.equal(candidates.length, 1);
+    assert.equal(calls, 1);
+    const result = await service.refreshItem(novel, candidates[0]?.binding);
+    assert.equal(result.status, "verified");
+    assert.equal(result.after, "24");
+    assert.equal(calls, 1);
+    assert.equal(frontmatter.release_tracking_status, "verified");
   });
 
   it("excludes titles disabled in Settings from refresh totals and provider requests", async () => {

@@ -4,6 +4,7 @@ import {
   compareChapterLabels,
   groupPublicationLines,
   latestNumericChapter,
+  latestPrimaryMangaChapter,
   parsePublishedDate,
   providerResultRegressed,
   selectLatestPublishedRecord,
@@ -38,6 +39,13 @@ describe("release tracking domain", () => {
   it("ignores non-numeric manga labels for the tracked latest chapter", () => {
     assert.equal(latestNumericChapter(["Extra", "Oneshot", "12.5", "12"]), "12.5");
     assert.equal(latestNumericChapter(["Extra", "Oneshot"]), "");
+  });
+
+  it("keeps decimal MangaDex extras from replacing the latest main chapter", () => {
+    assert.equal(latestPrimaryMangaChapter(["280", "281", "281.1"]), "281");
+    assert.equal(latestPrimaryMangaChapter(["12", "12.5"]), "12");
+    assert.equal(latestPrimaryMangaChapter(["12.1", "12.5"]), "12.5");
+    assert.equal(latestPrimaryMangaChapter(["Extra", "Oneshot"]), "");
   });
 
   it("never treats an older MangaDex chapter as a valid forward refresh", () => {

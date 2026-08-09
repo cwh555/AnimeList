@@ -71,6 +71,7 @@ describe("release tracking provider clients", () => {
         json: {
           data: [
             { attributes: { chapter: "242", publishAt: "2026-08-01T00:00:00Z" } },
+            { attributes: { chapter: "242.1", title: "Volume extra", publishAt: "2026-08-02T00:00:00Z" } },
             { attributes: { chapter: "243", publishAt: "2026-09-01T00:00:00Z" } },
             { attributes: { chapter: "241.5", publishAt: "2026-07-20T00:00:00Z" } },
             { attributes: { chapter: "Extra", publishAt: "2026-07-25T00:00:00Z" } },
