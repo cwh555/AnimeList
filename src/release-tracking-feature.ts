@@ -41,6 +41,7 @@ function serviceFor(host: AnimeListFeatureHost): ReleaseTrackingService {
 }
 
 function providerLabel(snapshot: ReleaseTrackingSnapshot): string {
+  if (snapshot.sourceLabel) return snapshot.sourceLabel;
   return snapshot.binding?.provider === "mangadex"
     ? releaseTrackingText("provider.mangadex")
     : snapshot.binding?.provider === "ndl-jpro"

@@ -262,7 +262,11 @@ export class ReleaseTrackingDashboardModal extends Modal {
 
     const progress = this.cell(releaseTrackingText("modal.columnProgress"), readingProgress(item), "al-release-dashboard-reading");
     const latestCell = this.cell(releaseTrackingText("dashboard.latest"), releaseValue(item, latest), "al-release-dashboard-latest");
-    const source = this.cell(releaseTrackingText("modal.columnSource"), providerLabel(provider), "");
+    const source = this.cell(
+      releaseTrackingText("modal.columnSource"),
+      result?.sourceLabel || snapshot.sourceLabel || providerLabel(provider),
+      "",
+    );
 
     const state = el("div", "al-release-dashboard-state");
     state.append(el("span", `al-release-dashboard-status is-${status}${result ? ` is-${result.kind}` : ""}`, statusText(status, result)));

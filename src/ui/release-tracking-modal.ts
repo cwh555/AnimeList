@@ -30,8 +30,8 @@ function icon(name: string, className = ""): HTMLElement {
 }
 
 function providerLabel(provider: ReleaseRefreshItemResult["provider"] | ReleaseRefreshProgress["provider"]): string {
-  return provider === "mangadex"
-    ? releaseTrackingText("provider.mangadex")
+  return provider === "manga"
+    ? releaseTrackingText("provider.manga")
     : provider === "ndl-jpro"
       ? releaseTrackingText("provider.ndl")
       : "";
@@ -157,7 +157,7 @@ function resultRow(result: ReleaseRefreshItemResult, actions: ReleaseTrackingMod
 
   const sourceCell = labeledCell(releaseTrackingText("modal.columnSource"), "al-release-source-cell");
   if (attention) sourceCell.appendChild(makeElement("span", "al-release-status-chip", statusLabel(result.status)));
-  const provider = providerLabel(result.provider);
+  const provider = result.sourceLabel || providerLabel(result.provider);
   if (provider) sourceCell.appendChild(makeElement("span", "al-release-provider-label", provider));
 
   row.append(
