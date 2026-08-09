@@ -5,7 +5,7 @@ on:
     branches:
       - feature/release-tracking
     paths:
-      - .tmp/release-patch.gz.b64
+      - .tmp/release-patch/**
       - .tmp/release-patch.sha256
 
 permissions:
@@ -27,7 +27,8 @@ jobs:
           set -euo pipefail
           readarray -t expected < .tmp/release-patch.sha256
           test "${#expected[@]}" -eq 2
-          base64 -d .tmp/release-patch.gz.b64 > /tmp/release-patch.gz
+          cat .tmp/release-patch/*.part > /tmp/release-patch.gz.b64
+          base64 -d /tmp/release-patch.gz.b64 > /tmp/release-patch.gz
           echo "${expected[0]}  /tmp/release-patch.gz" | sha256sum -c -
           gzip -dc /tmp/release-patch.gz > /tmp/release.patch
           echo "${expected[1]}  /tmp/release.patch" | sha256sum -c -
