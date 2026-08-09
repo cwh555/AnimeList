@@ -231,6 +231,20 @@ function individualTitleStrength(actualValue: unknown, volumeValue: unknown, exp
   // begins with the derived-series marker rather than the volume.
   if (remainder.startsWith(volume)) return 2;
   if (actual.endsWith(volume) && actual.slice(0, -volume.length) === expectedTitle) return 2;
+
+  // NDL can expose a parallel title in the bibliographic title itself, e.g.
+  // `オーバーロード = OVERLORD. 16`. The structured numeric volume remains
+  // authoritative evidence that this is the numbered main line. Restrict this
+  // promotion to a leading parallel-title separator and a pure numeric volume;
+  // derived works such as `オーバーロード : ... special edition. 上` stay
+  // prefix-only candidates instead of being silently auto-bound.
+  const rawActual = stringValue(actualValue).normalize("NFKC");
+  const rawExpected = stringValue(expected).normalize("NFKC");
+  const numericVolume = numericChapterParts(volumeValue);
+  if (numericVolume?.length === 1 && rawExpected && rawActual.startsWith(rawExpected)) {
+    const rawRemainder = rawActual.slice(rawExpected.length).trim();
+    if (rawRemainder.startsWith("=") && normalizeTrackingText(rawRemainder).endsWith(volume)) return 2;
+  }
   return direct;
 }
 
@@ -482,7 +496,16 @@ export function providerResultRegressed(
   provider: ReleaseTrackingProvider,
 ): boolean {
   if (!previousLatest || !nextLatest) return false;
-  if (provider === "mangadex") return compareChapterLabels(nextLatest, previousLatest) < 0;
+  if (provider === "mangadex") {
+    const previousParts = numericChapterParts(previousLatest);
+    const nextParts = numericChapterParts(nextLatest);
+    // A previously stored supplementary label such as 281.1 may normalize back
+    // to the main serialized chapter 281 after provider cleanup. That is not a
+    // backwards release; only a lower whole-number base is a true regression.
+    if (previousParts && previousParts.length > 1 && nextParts?.length === 1
+      && previousParts[0] === nextParts[0]) return false;
+    return compareChapterLabels(nextLatest, previousLatest) < 0;
+  }
   const previousNumeric = numericChapterParts(previousLatest);
   const nextNumeric = numericChapterParts(nextLatest);
   if (previousNumeric && nextNumeric) return compareChapterLabels(nextLatest, previousLatest) < 0;

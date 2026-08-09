@@ -130,7 +130,17 @@ function lineDescription(line: NdlPublicationLine): string {
 function providerBehindReadingProgress(item: MediaItem, latest: string): boolean {
   const expectedUnit = item.mediaType === "manga" ? "chapter" : item.mediaType === "novel" ? "volume" : "";
   if (!expectedUnit || item.unit !== expectedUnit) return false;
-  if (!numericChapterParts(item.progress) || !numericChapterParts(latest)) return false;
+  const progressParts = numericChapterParts(item.progress);
+  const latestParts = numericChapterParts(latest);
+  if (!progressParts || !latestParts) return false;
+  if (item.mediaType === "manga" && progressParts.length > 1 && latestParts.length === 1) {
+    // Reading progress may include a volume extra/omake (281.1) while release
+    // tracking intentionally reports the main serialized chapter (281). Treat
+    // those as the same main-chapter floor, but still reject a genuinely older
+    // provider result such as 280 < 281.1.
+    const progressBase = String(progressParts[0]);
+    if (compareChapterLabels(latest, progressBase) >= 0) return false;
+  }
   return compareChapterLabels(latest, item.progress) < 0;
 }
 

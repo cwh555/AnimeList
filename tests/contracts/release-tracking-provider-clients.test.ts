@@ -63,32 +63,37 @@ describe("release tracking provider clients", () => {
     }]);
   });
 
-  it("uses the documented chapter feed ordering and rejects future/non-numeric chapters", async () => {
+  it("uses MangaDex aggregate metadata so translation duplicates cannot exhaust a feed page", async () => {
     let request: any;
     setRequestUrlMock((options) => {
       request = options;
       return {
         json: {
-          data: [
-            { attributes: { chapter: "242", publishAt: "2026-08-01T00:00:00Z" } },
-            { attributes: { chapter: "242.1", title: "Volume extra", publishAt: "2026-08-02T00:00:00Z" } },
-            { attributes: { chapter: "243", publishAt: "2026-09-01T00:00:00Z" } },
-            { attributes: { chapter: "241.5", publishAt: "2026-07-20T00:00:00Z" } },
-            { attributes: { chapter: "Extra", publishAt: "2026-07-25T00:00:00Z" } },
-          ],
+          result: "ok",
+          volumes: {
+            "20": {
+              volume: "20",
+              count: 103,
+              chapters: {
+                "241.5": { chapter: "241.5", count: 4, id: "ch-241-5", others: [] },
+                "242": { chapter: "242", count: 96, id: "ch-242", others: [] },
+                "242.1": { chapter: "242.1", count: 3, id: "ch-242-1", others: [] },
+                "243": { chapter: "243", count: 1, id: "ch-243", others: [], isUnavailable: true },
+                "extra": { chapter: "Extra", count: 1, id: "extra", others: [] },
+              },
+            },
+          },
         },
         text: "",
       };
     });
 
-    const latest = await new MangaDexReleaseClient().latestChapter(
-      "series-1",
-      new Date("2026-08-08T12:00:00Z"),
-    );
+    const latest = await new MangaDexReleaseClient().latestChapter("series-1");
     assert.equal(latest, "242");
-    assert.match(request.url, /limit=100/);
-    assert.match(request.url, /order%5Bchapter%5D=desc/);
-    assert.doesNotMatch(request.url, /includeFutureUpdates/);
+    assert.equal(request.method, "GET");
+    assert.equal(request.url, "https://api.mangadex.org/manga/series-1/aggregate");
+    assert.doesNotMatch(request.url, /feed/);
+    assert.doesNotMatch(request.url, /limit=100/);
   });
 
   it("queries one selected NDL catalog at a time and tags records with catalog provenance", async () => {

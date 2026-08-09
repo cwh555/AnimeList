@@ -62,29 +62,25 @@ export class MangaDexReleaseClient {
       .filter((candidate): candidate is MangaDexSeriesCandidate => candidate !== null);
   }
 
-  async latestChapter(sourceId: string, now = new Date()): Promise<string> {
+  async latestChapter(sourceId: string): Promise<string> {
     const id = sourceId.trim();
     if (!id) return "";
-    const parameters = new URLSearchParams({
-      limit: "100",
-      "order[chapter]": "desc",
-    });
     const response = await requestUrl({
-      url: `${MANGADEX_API}/manga/${encodeURIComponent(id)}/feed?${parameters.toString()}`,
+      url: `${MANGADEX_API}/manga/${encodeURIComponent(id)}/aggregate`,
       method: "GET",
       headers: { Accept: "application/json", "User-Agent": USER_AGENT },
     });
     const payload = record(response.json ?? JSON.parse(response.text || "{}"));
-    const nowTimestamp = now.getTime();
-    const labels = array(payload.data).flatMap((value) => {
-      const attributes = record(record(value).attributes);
-      const chapter = stringValue(attributes.chapter);
-      const publishedAt = stringValue(attributes.publishAt || attributes.readableAt || attributes.createdAt);
-      if (publishedAt) {
-        const timestamp = Date.parse(publishedAt);
-        if (Number.isFinite(timestamp) && timestamp > nowTimestamp) return [];
-      }
-      return chapter ? [chapter] : [];
+    const volumes = Array.isArray(payload.volumes) ? payload.volumes : Object.values(record(payload.volumes));
+    const labels = volumes.flatMap((volumeValue) => {
+      const chaptersValue = record(volumeValue).chapters;
+      const chapters = Array.isArray(chaptersValue) ? chaptersValue : Object.values(record(chaptersValue));
+      return chapters.flatMap((chapterValue) => {
+        const chapter = record(chapterValue);
+        if (chapter.isUnavailable === true) return [];
+        const label = stringValue(chapter.chapter);
+        return label ? [label] : [];
+      });
     });
     return latestPrimaryMangaChapter(labels);
   }

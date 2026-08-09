@@ -52,6 +52,8 @@ describe("release tracking domain", () => {
     assert.equal(providerResultRegressed("147", "", "145", "", "mangadex"), true);
     assert.equal(providerResultRegressed("147", "", "147", "", "mangadex"), false);
     assert.equal(providerResultRegressed("147", "", "148", "", "mangadex"), false);
+    assert.equal(providerResultRegressed("281.1", "", "281", "", "mangadex"), false);
+    assert.equal(providerResultRegressed("281.1", "", "280", "", "mangadex"), true);
   });
 
   it("accepts common NDL/JPRO publication date formats without guessing missing dates", () => {
@@ -96,6 +98,24 @@ describe("release tracking domain", () => {
     const selected = selectSafeNovelPublicationLine(lines, true);
     assert.equal(selected?.medium, "unknown");
     assert.equal(selected?.records.length, 2);
+  });
+
+  it("recognizes NDL parallel-title numbered records as one exact main novel line", () => {
+    const lines = groupPublicationLines([
+      record({ sourceId: "novel-15", title: "オーバーロード = OVERLORD. 15", seriesTitle: "", volume: "15", creators: ["丸山, くがね"], publisher: "KADOKAWA", publishedAt: "2022-06" }),
+      record({ sourceId: "novel-16", title: "オーバーロード = OVERLORD. 16", seriesTitle: "", volume: "16", creators: ["丸山くがね"], publisher: "KADOKAWA", publishedAt: "2022-07" }),
+      record({ sourceId: "ghost-up", title: "オーバーロード = Overlord : カッツェ平野の幽霊船 : special edition. 上", seriesTitle: "", volume: "上", creators: ["丸山くがね"], publisher: "KADOKAWA", publishedAt: "2024" }),
+      record({ sourceId: "comic-19", title: "オーバーロード", seriesTitle: "角川コミックス・エース", volume: "19", creators: ["丸山くがね", "深山フギン"], publisher: "KADOKAWA", publishedAt: "2023-12" }),
+    ], ["オーバーロード"], ["丸山くがね"]);
+
+    const selected = selectSafeNovelPublicationLine(lines, true);
+    assert.equal(selected?.title, "オーバーロード");
+    assert.deepEqual(selected?.records.map((entry) => entry.volume), ["15", "16"]);
+    assert.equal(selectLatestPublishedRecord(
+      selected?.records ?? [],
+      { provider: "ndl-jpro", title: "オーバーロード", creator: "丸山くがね", publisher: "KADOKAWA" },
+      new Date("2026-08-09T00:00:00Z"),
+    )?.volume, "16");
   });
 
   it("excludes side-story labels from the main publication line", () => {

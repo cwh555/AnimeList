@@ -170,6 +170,49 @@ describe("release tracking persistence", () => {
     assert.equal(frontmatter.progress, 8);
   });
 
+  it("does not treat supplementary manga reading progress as a false main-chapter regression", async () => {
+    const { app, file, frontmatter } = harness({ progress: "281.1", progress_unit: "chapter" });
+    const mangaDex = {
+      async search() {
+        return [{ id: "kaguya", title: "かぐや様は告らせたい～天才たちの恋愛頭脳戦～", altTitles: [], sourceUrl: "https://mangadex.org/title/kaguya" }];
+      },
+      async latestChapter() { return "281"; },
+    } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.title = "輝夜姬想讓人告白";
+    manga.originalTitle = "かぐや様は告らせたい～天才たちの恋愛頭脳戦～";
+    manga.progress = "281.1";
+
+    const result = await service.refreshItem(manga);
+    assert.equal(result.kind, "initialized");
+    assert.equal(result.status, "verified");
+    assert.equal(result.after, "281");
+    assert.equal(frontmatter.latest_chapter, "281");
+    assert.equal(frontmatter.progress, "281.1");
+  });
+
+  it("still rejects a MangaDex main chapter below the whole-number base of supplementary reading progress", async () => {
+    const { app, file, frontmatter } = harness({ progress: "281.1", progress_unit: "chapter" });
+    const mangaDex = {
+      async search() {
+        return [{ id: "kaguya", title: "かぐや様は告らせたい～天才たちの恋愛頭脳戦～", altTitles: [], sourceUrl: "https://mangadex.org/title/kaguya" }];
+      },
+      async latestChapter() { return "280"; },
+    } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.title = "輝夜姬想讓人告白";
+    manga.originalTitle = "かぐや様は告らせたい～天才たちの恋愛頭脳戦～";
+    manga.progress = "281.1";
+
+    const result = await service.refreshItem(manga);
+    assert.equal(result.kind, "attention");
+    assert.equal(result.status, "source_regressed");
+    assert.equal(frontmatter.latest_chapter, undefined);
+    assert.equal(frontmatter.progress, "281.1");
+  });
+
   it("auto-selects the original MangaDex work when colored editions share the exact title", async () => {
     const { app, file, frontmatter } = harness({ progress: 120, progress_unit: "chapter" });
     const mangaDex = {
