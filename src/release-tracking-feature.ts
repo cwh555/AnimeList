@@ -11,12 +11,10 @@ import {
 } from "./domain/release-tracking";
 import type { MediaItem, MediaType } from "./domain/media-types";
 import { releaseTrackingText } from "./release-tracking-text";
-import {
-  ReleaseTrackingMatchModal,
-  ReleaseTrackingResultsModal,
-} from "./ui/release-tracking-modal";
+import { ReleaseTrackingMatchModal } from "./ui/release-tracking-modal";
+import { ReleaseTrackingDashboardModal } from "./ui/release-tracking-dashboard-modal";
 import { ReleaseTrackingManagerModal } from "./ui/release-tracking-manager-modal";
-import { errorMessage, makeEl, setAnimeListIcon } from "./ui/ui-helpers";
+import { makeEl, setAnimeListIcon } from "./ui/ui-helpers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const AUTO_POLL_MS = 60 * 60 * 1000;
@@ -74,11 +72,16 @@ function snapshotForItem(service: ReleaseTrackingService, item: MediaItem): Rele
   }
 }
 
-function openMatchModal(host: AnimeListFeatureHost, item: MediaItem): void {
+function openMatchModal(
+  host: AnimeListFeatureHost,
+  item: MediaItem,
+  onResolved?: (result: Awaited<ReturnType<ReleaseTrackingService["refreshItem"]>>) => void,
+): void {
   const service = serviceFor(host);
   new ReleaseTrackingMatchModal(host.app, service, item, {
     async onResolved(result) {
       host.refreshViews();
+      onResolved?.(result);
       if (result.kind === "updated") {
         new Notice(releaseTrackingText("notice.updated", { count: 1 }));
       } else if (result.kind === "attention") {
@@ -119,34 +122,30 @@ async function performReleaseCheck(
   return active.promise;
 }
 
-async function runManualReleaseCheck(
-  host: AnimeListFeatureHost,
-  onProgress?: ReleaseProgressListener,
-): Promise<void> {
+async function performReleaseItemCheck(host: AnimeListFeatureHost, item: MediaItem) {
+  const existing = activeChecks.get(host);
+  if (existing) {
+    const summary = await existing.promise;
+    const result = summary.results.find((entry) => entry.item.filePath === item.filePath);
+    if (result) return result;
+  }
+  return serviceFor(host).refreshItem(item);
+}
+
+function openReleaseDashboard(host: AnimeListFeatureHost): void {
   if (!host.settings.releaseTracking.enabled) {
     new Notice(releaseTrackingText("notice.disabled"));
     return;
   }
 
-  const modal = new ReleaseTrackingResultsModal(host.app, {
+  const service = serviceFor(host);
+  new ReleaseTrackingDashboardModal(host.app, service, host.collectMediaItems(), {
+    refreshAll: (onProgress) => performReleaseCheck(host, onProgress),
+    refreshItem: (item) => performReleaseItemCheck(host, item),
+    reviewItem: (item, onResolved) => openMatchModal(host, item, onResolved),
     openMedia: (path) => host.openMediaFile(path),
-    reviewItem: (item) => openMatchModal(host, item),
-  });
-  modal.open();
-  const progressListener: ReleaseProgressListener = (progress) => {
-    modal.showProgress(progress);
-    onProgress?.(progress);
-  };
-
-  try {
-    const summary = await performReleaseCheck(host, progressListener);
-    host.refreshViews();
-    modal.showResults(summary);
-  } catch (error) {
-    const message = errorMessage(error);
-    modal.showFailure(message);
-    new Notice(releaseTrackingText("notice.failed", { message }));
-  }
+    onChanged: () => host.refreshViews(),
+  }).open();
 }
 
 function automaticCheckDue(host: AnimeListFeatureHost, now = Date.now()): boolean {
@@ -241,16 +240,7 @@ function installLibraryRefreshButton(
   };
   render(releaseTrackingText("library.check"));
   button.addEventListener("click", () => {
-    button.disabled = true;
-    void runManualReleaseCheck(host, (progress) => {
-      render(releaseTrackingText("library.checking", {
-        completed: progress.completed,
-        total: progress.total,
-      }));
-    }).finally(() => {
-      button.disabled = false;
-      render(releaseTrackingText("library.check"));
-    });
+    openReleaseDashboard(host);
   });
   const add = actions.querySelector<HTMLElement>(".al-add-button");
   actions.insertBefore(button, add ?? null);
@@ -350,7 +340,7 @@ export function createReleaseTrackingSettingsSection(host: AnimeListFeatureHost)
       render: (setting: Setting) => {
         setting.addButton((button) => {
           button.setButtonText(releaseTrackingText("settings.checkNow.button"));
-          button.onClick(() => { void runManualReleaseCheck(host); });
+          button.onClick(() => { openReleaseDashboard(host); });
         });
       },
     }],

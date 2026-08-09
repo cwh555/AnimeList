@@ -249,6 +249,210 @@
 .animelist-release-match-modal .al-release-match-actions { display:flex; justify-content:flex-end; margin-top:14px; }
 
 
+
+/* Release tracking dashboard: passive overview first, refresh only on demand. */
+.modal.animelist-release-dashboard-modal {
+  width:min(1040px,calc(100vw - 32px)); max-width:1040px; max-height:min(84vh,860px); overflow:hidden;
+}
+.animelist-release-dashboard-modal .modal-content {
+  display:flex; min-height:0; max-height:min(84vh,860px); flex-direction:column; padding:0;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-header {
+  display:grid; grid-template-columns:42px minmax(0,1fr) auto; gap:13px; align-items:center;
+  padding:20px 22px 15px; border-bottom:1px solid var(--background-modifier-border);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-mark {
+  display:grid; width:42px; height:42px; place-items:center; border-radius:12px;
+  color:var(--interactive-accent); background:color-mix(in srgb,var(--interactive-accent) 12%,transparent);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-mark svg { width:20px; height:20px; }
+.animelist-release-dashboard-modal .al-release-dashboard-heading { min-width:0; }
+.animelist-release-dashboard-modal .al-release-dashboard-heading h2 { margin:0 0 4px; font-size:1.2rem; line-height:1.2; }
+.animelist-release-dashboard-modal .al-release-dashboard-heading p {
+  max-width:680px; margin:0; color:var(--text-muted); font-size:.68rem; line-height:1.5;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-refresh-all {
+  display:inline-flex; min-height:38px; align-items:center; gap:7px; padding-inline:14px; white-space:nowrap;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-refresh-all svg { width:15px; height:15px; }
+.animelist-release-dashboard-modal.is-busy .al-release-dashboard-refresh-all svg { animation:animelist-release-spin .9s linear infinite; }
+
+.animelist-release-dashboard-modal .al-release-dashboard-overview {
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); margin:12px 22px 0;
+  overflow:hidden; border:1px solid var(--background-modifier-border); border-radius:11px;
+  background:var(--background-secondary);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-metric {
+  display:grid; grid-template-columns:24px auto minmax(0,1fr); min-width:0; align-items:center; gap:7px;
+  min-height:48px; padding:8px 11px;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-metric + .al-release-dashboard-metric {
+  border-left:1px solid var(--background-modifier-border);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-metric > svg,
+.animelist-release-dashboard-modal .al-release-dashboard-metric > span:first-child {
+  display:grid; width:24px; height:24px; place-items:center; border-radius:7px; color:var(--text-muted);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-metric > span:first-child svg { width:14px; height:14px; }
+.animelist-release-dashboard-modal .al-release-dashboard-metric strong { font-size:.9rem; font-variant-numeric:tabular-nums; }
+.animelist-release-dashboard-modal .al-release-dashboard-metric > span:last-child {
+  overflow:hidden; color:var(--text-muted); font-size:.61rem; white-space:nowrap; text-overflow:ellipsis;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-metric.is-positive > span:first-child,
+.animelist-release-dashboard-modal .al-release-dashboard-metric.is-positive strong { color:var(--text-success); }
+.animelist-release-dashboard-modal .al-release-dashboard-metric.is-attention > span:first-child,
+.animelist-release-dashboard-modal .al-release-dashboard-metric.is-attention strong { color:var(--text-warning); }
+
+.animelist-release-dashboard-modal .al-release-dashboard-progress {
+  margin:10px 22px 0; padding:10px 12px; border:1px solid color-mix(in srgb,var(--interactive-accent) 30%,var(--background-modifier-border));
+  border-radius:10px; background:color-mix(in srgb,var(--interactive-accent) 5%,var(--background-secondary));
+}
+.animelist-release-dashboard-modal .al-release-dashboard-progress-head {
+  display:flex; min-width:0; align-items:center; justify-content:space-between; gap:12px; margin-bottom:7px;
+  color:var(--text-muted); font-size:.62rem;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-progress-head > span {
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-progress-head strong { flex:0 0 auto; color:var(--text-normal); font-variant-numeric:tabular-nums; }
+.animelist-release-dashboard-modal .al-release-dashboard-progress-track,
+.animelist-release-match-modal .al-release-match-progress-track {
+  overflow:hidden; height:4px; border-radius:999px; background:var(--background-modifier-border);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-progress-fill {
+  height:100%; border-radius:inherit; background:var(--interactive-accent); transition:width .18s ease;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-failure {
+  display:flex; align-items:center; gap:8px; margin:10px 22px 0; padding:9px 11px; border-radius:9px;
+  color:var(--text-error); background:color-mix(in srgb,var(--text-error) 8%,transparent); font-size:.65rem;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-failure svg { flex:0 0 auto; width:15px; height:15px; }
+
+.animelist-release-dashboard-modal .al-release-dashboard-content {
+  min-height:0; flex:1 1 auto; overflow:auto; padding:14px 22px 18px;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-section + .al-release-dashboard-section { margin-top:17px; }
+.animelist-release-dashboard-modal .al-release-dashboard-section-head {
+  display:flex; height:28px; align-items:center; gap:7px; padding:0 2px 7px;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-section-head > span:first-child { display:grid; place-items:center; }
+.animelist-release-dashboard-modal .al-release-dashboard-section-head svg { width:14px; height:14px; color:var(--text-muted); }
+.animelist-release-dashboard-modal .al-release-dashboard-section.is-attention .al-release-dashboard-section-head svg { color:var(--text-warning); }
+.animelist-release-dashboard-modal .al-release-dashboard-section-head h3 { margin:0; font-size:.76rem; font-weight:700; }
+.animelist-release-dashboard-modal .al-release-dashboard-section-head > span:last-child {
+  display:grid; min-width:21px; height:20px; place-items:center; padding-inline:6px; border-radius:999px;
+  color:var(--text-muted); background:var(--background-modifier-hover); font-size:.56rem; font-variant-numeric:tabular-nums;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-list {
+  overflow:hidden; border:1px solid var(--background-modifier-border); border-radius:11px; background:var(--background-secondary);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-row {
+  position:relative; display:grid;
+  grid-template-columns:46px minmax(150px,1.45fr) 88px 96px 112px minmax(130px,1fr) auto;
+  min-height:69px; align-items:center; gap:10px; padding:8px 10px;
+  transition:background-color .12s ease;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-row + .al-release-dashboard-row { border-top:1px solid var(--background-modifier-border); }
+.animelist-release-dashboard-modal .al-release-dashboard-row:hover { background:var(--background-modifier-hover); }
+.animelist-release-dashboard-modal .al-release-dashboard-row.is-attention {
+  box-shadow:inset 3px 0 0 color-mix(in srgb,var(--text-warning) 70%,transparent);
+  background:color-mix(in srgb,var(--text-warning) 4%,var(--background-secondary));
+}
+.animelist-release-dashboard-modal .al-release-dashboard-cover {
+  display:grid; overflow:hidden; width:42px; height:54px; place-items:center; border-radius:6px;
+  color:var(--text-faint); background:var(--background-primary-alt);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-cover img { width:100%; height:100%; object-fit:cover; }
+.animelist-release-dashboard-modal .al-release-dashboard-cover svg { width:16px; height:16px; }
+.animelist-release-dashboard-modal .al-release-dashboard-identity { display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:5px; }
+.animelist-release-dashboard-modal .al-release-dashboard-title {
+  overflow:hidden; max-width:100%; padding:0; border:0; box-shadow:none; color:var(--text-normal); background:transparent;
+  font-size:.72rem; font-weight:700; line-height:1.3; text-align:left; white-space:nowrap; text-overflow:ellipsis;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-title:hover { color:var(--interactive-accent); background:transparent; }
+.animelist-release-dashboard-modal .al-release-media-chip { font-size:.54rem; }
+.animelist-release-dashboard-modal .al-release-dashboard-cell { display:flex; min-width:0; flex-direction:column; gap:4px; }
+.animelist-release-dashboard-modal .al-release-dashboard-cell > span {
+  color:var(--text-faint); font-size:.52rem; line-height:1; white-space:nowrap;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-cell strong {
+  overflow:hidden; color:var(--text-normal); font-size:.68rem; line-height:1.25; white-space:nowrap; text-overflow:ellipsis;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-cell .al-release-dashboard-latest { color:var(--interactive-accent); }
+.animelist-release-dashboard-modal .al-release-dashboard-state { display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:4px; }
+.animelist-release-dashboard-modal .al-release-dashboard-status {
+  display:inline-flex; max-width:100%; min-height:21px; align-items:center; padding:2px 7px; border-radius:999px;
+  color:var(--text-muted); background:var(--background-modifier-hover); font-size:.55rem; font-weight:650; white-space:nowrap;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-verified,
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-unchanged,
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-initialized {
+  color:var(--text-success); background:color-mix(in srgb,var(--text-success) 10%,transparent);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-updated {
+  color:var(--interactive-accent); background:color-mix(in srgb,var(--interactive-accent) 11%,transparent);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-ambiguous,
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-unmatched,
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-provider_error,
+.animelist-release-dashboard-modal .al-release-dashboard-status.is-source_regressed {
+  color:var(--text-warning); background:color-mix(in srgb,var(--text-warning) 11%,transparent);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-state small {
+  overflow:hidden; width:100%; color:var(--text-faint); font-size:.51rem; line-height:1.3; white-space:nowrap; text-overflow:ellipsis;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:6px; }
+.animelist-release-dashboard-modal .al-release-dashboard-choose { min-height:30px; padding:4px 9px; font-size:.59rem; white-space:nowrap; }
+.animelist-release-dashboard-modal .al-release-dashboard-refresh-one { display:grid; flex:0 0 30px; width:30px; height:30px; place-items:center; border-radius:7px; }
+.animelist-release-dashboard-modal .al-release-dashboard-refresh-one svg { width:14px; height:14px; }
+.animelist-release-dashboard-modal .al-release-dashboard-row.is-busy .al-release-dashboard-refresh-one svg { animation:animelist-release-spin .9s linear infinite; }
+.animelist-release-dashboard-modal .al-release-dashboard-row-progress {
+  position:absolute; right:0; bottom:0; left:0; overflow:hidden; height:3px; background:var(--background-modifier-border);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-row-progress-fill,
+.animelist-release-match-modal .al-release-match-progress-fill {
+  width:38%; height:100%; border-radius:inherit; background:var(--interactive-accent);
+  animation:animelist-release-indeterminate 1.1s ease-in-out infinite;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-empty {
+  padding:38px 16px; color:var(--text-muted); font-size:.7rem; text-align:center;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-footer {
+  display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; gap:15px;
+  padding:11px 22px 14px; border-top:1px solid var(--background-modifier-border); background:var(--background-primary);
+}
+.animelist-release-dashboard-modal .al-release-dashboard-note {
+  display:flex; min-width:0; align-items:center; gap:7px; color:var(--text-faint); font-size:.58rem; line-height:1.4;
+}
+.animelist-release-dashboard-modal .al-release-dashboard-note svg { flex:0 0 auto; width:14px; height:14px; color:var(--text-success); }
+.animelist-release-dashboard-modal .al-release-dashboard-footer button { min-height:34px; padding-inline:13px; }
+
+/* Source resolution is explicit and visibly active instead of looking frozen. */
+.animelist-release-match-modal .al-release-match-single,
+.animelist-release-match-modal .al-release-match-failure {
+  display:flex; align-items:flex-start; gap:8px; margin-bottom:10px; padding:9px 10px; border-radius:9px; font-size:.64rem; line-height:1.45;
+}
+.animelist-release-match-modal .al-release-match-single {
+  color:var(--text-muted); background:color-mix(in srgb,var(--interactive-accent) 7%,var(--background-secondary));
+}
+.animelist-release-match-modal .al-release-match-single svg { flex:0 0 auto; width:15px; height:15px; color:var(--interactive-accent); }
+.animelist-release-match-modal .al-release-match-failure { color:var(--text-error); background:color-mix(in srgb,var(--text-error) 8%,transparent); }
+.animelist-release-match-modal .al-release-match-failure svg { flex:0 0 auto; width:15px; height:15px; }
+.animelist-release-match-modal .al-release-match-progress {
+  position:sticky; bottom:0; z-index:2; margin-top:12px; padding:10px 0 1px;
+  border-top:1px solid var(--background-modifier-border); background:var(--background-primary);
+}
+.animelist-release-match-modal .al-release-match-progress-label {
+  display:flex; align-items:center; gap:7px; margin-bottom:7px; color:var(--text-muted); font-size:.62rem;
+}
+.animelist-release-match-modal .al-release-match-progress-label svg { width:14px; height:14px; animation:animelist-release-spin .9s linear infinite; }
+
+@keyframes animelist-release-indeterminate {
+  0% { transform:translateX(-120%); }
+  55% { transform:translateX(95%); }
+  100% { transform:translateX(260%); }
+}
+
 .modal.animelist-release-manager-modal { width:min(760px,calc(100vw - 28px)); max-width:760px; }
 .animelist-release-manager-modal .al-release-manager-heading {
   display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;
@@ -285,6 +489,30 @@
 .animelist-release-manager-modal .al-release-manager-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 
 @media (max-width:700px) {
+
+  .modal.animelist-release-dashboard-modal { width:calc(100vw - 10px); max-width:none; max-height:92vh; }
+  .animelist-release-dashboard-modal .modal-content { max-height:92vh; }
+  .animelist-release-dashboard-modal .al-release-dashboard-header { grid-template-columns:38px minmax(0,1fr); padding:15px 14px 12px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-mark { width:38px; height:38px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-refresh-all { grid-column:1 / -1; width:100%; justify-content:center; }
+  .animelist-release-dashboard-modal .al-release-dashboard-overview { grid-template-columns:repeat(2,minmax(0,1fr)); margin:10px 14px 0; }
+  .animelist-release-dashboard-modal .al-release-dashboard-metric:nth-child(3) { border-left:0; border-top:1px solid var(--background-modifier-border); }
+  .animelist-release-dashboard-modal .al-release-dashboard-metric:nth-child(4) { border-top:1px solid var(--background-modifier-border); }
+  .animelist-release-dashboard-modal .al-release-dashboard-progress,
+  .animelist-release-dashboard-modal .al-release-dashboard-failure { margin-inline:14px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-content { padding:12px 14px 15px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-row {
+    grid-template-columns:42px minmax(0,1fr) auto; gap:7px 10px; padding:9px 10px 10px;
+  }
+  .animelist-release-dashboard-modal .al-release-dashboard-cover { grid-row:1 / span 3; width:40px; height:52px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-identity { grid-column:2; }
+  .animelist-release-dashboard-modal .al-release-dashboard-row-actions { grid-column:3; grid-row:1; }
+  .animelist-release-dashboard-modal .al-release-dashboard-cell { grid-column:2; flex-direction:row; align-items:baseline; gap:6px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-cell > span { min-width:52px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-state { grid-column:2 / -1; margin-top:2px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-choose { max-width:95px; overflow:hidden; text-overflow:ellipsis; }
+  .animelist-release-dashboard-modal .al-release-dashboard-footer { align-items:stretch; flex-direction:column; padding:10px 14px 13px; }
+  .animelist-release-dashboard-modal .al-release-dashboard-footer button { width:100%; }
   .modal.animelist-release-manager-modal { width:calc(100vw - 10px); max-width:none; }
   .animelist-release-manager-modal .al-release-manager-toolbar { flex-wrap:wrap; }
   .animelist-release-manager-modal .al-release-manager-count { width:100%; margin-right:0; }
