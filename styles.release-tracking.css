@@ -77,6 +77,7 @@
   display:grid; place-items:center; color:#61cf87;
 }
 .animelist-release-results-modal .al-release-section.is-attention .al-release-section-icon { color:#f1b23f; }
+.animelist-release-results-modal .al-release-section.is-unchanged .al-release-section-icon { color:var(--text-muted); }
 .animelist-release-results-modal .al-release-section-icon svg { width:16px; height:16px; }
 .animelist-release-results-modal .al-release-section-index {
   color:inherit; font-size:.78rem; font-weight:750;
@@ -84,6 +85,9 @@
 .animelist-release-results-modal .al-release-section.is-attention .al-release-section-index,
 .animelist-release-results-modal .al-release-section.is-attention .al-release-section-title,
 .animelist-release-results-modal .al-release-section.is-attention .al-release-section-count { color:#f1b23f; }
+.animelist-release-results-modal .al-release-section.is-unchanged .al-release-section-index,
+.animelist-release-results-modal .al-release-section.is-unchanged .al-release-section-title,
+.animelist-release-results-modal .al-release-section.is-unchanged .al-release-section-count { color:var(--text-muted); }
 .animelist-release-results-modal .al-release-section-title { margin:0; font-size:.78rem; color:#61cf87; }
 .animelist-release-results-modal .al-release-section-count { color:#61cf87; font-size:.7rem; }
 .animelist-release-results-modal .al-release-section-body {
@@ -92,7 +96,7 @@
 }
 .animelist-release-results-modal .al-release-result-row {
   display:grid;
-  grid-template-columns:48px minmax(145px,1.2fr) minmax(160px,1.45fr) minmax(110px,.8fr) auto;
+  grid-template-columns:48px minmax(125px,1.05fr) minmax(90px,.65fr) minmax(160px,1.35fr) minmax(100px,.75fr) auto;
   gap:11px; align-items:center; min-height:76px; padding:9px 11px;
 }
 .animelist-release-results-modal .al-release-result-row + .al-release-result-row {
@@ -154,29 +158,15 @@
 .animelist-release-results-modal .al-release-row-action-icon { display:grid; place-items:center; }
 .animelist-release-results-modal .al-release-row-action-icon svg { width:13px; height:13px; }
 
-.animelist-release-results-modal .al-release-unchanged {
-  overflow:hidden; border:1px solid var(--background-modifier-border); border-radius:10px;
-  background:color-mix(in srgb,var(--background-secondary) 84%,transparent);
+.animelist-release-results-modal .al-release-reading-progress {
+  color:var(--text-normal); font-size:.72rem; font-weight:700;
 }
-.animelist-release-results-modal .al-release-unchanged-summary {
-  display:grid; grid-template-columns:auto auto 1fr auto; min-height:43px; align-items:center; gap:7px;
-  padding:0 12px; cursor:pointer; color:var(--text-muted); font-size:.7rem; list-style:none;
+.animelist-release-results-modal .al-release-result-notes {
+  display:flex; min-width:0; flex-direction:column; gap:2px; margin-top:2px;
+  color:var(--text-faint); font-size:.58rem; line-height:1.4;
 }
-.animelist-release-results-modal .al-release-unchanged-summary::-webkit-details-marker { display:none; }
-.animelist-release-results-modal .al-release-unchanged-icon { display:grid; place-items:center; color:var(--text-muted); }
-.animelist-release-results-modal .al-release-unchanged-icon svg,
-.animelist-release-results-modal .al-release-unchanged-chevron svg { width:14px; height:14px; }
-.animelist-release-results-modal .al-release-unchanged-index { font-size:.72rem; }
-.animelist-release-results-modal .al-release-unchanged-chevron {
-  display:grid; place-items:center; transition:transform .15s ease;
-}
-.animelist-release-results-modal .al-release-unchanged[open] .al-release-unchanged-chevron { transform:rotate(90deg); }
-.animelist-release-results-modal .al-release-unchanged-list { padding:0 12px 10px 38px; }
-.animelist-release-results-modal .al-release-unchanged-row {
-  display:flex; justify-content:space-between; gap:16px; padding:6px 0;
-  border-top:1px solid color-mix(in srgb,var(--background-modifier-border) 70%,transparent);
-  color:var(--text-faint); font-size:.62rem;
-}
+.animelist-release-results-modal .al-release-result-notes-label { color:var(--text-muted); font-weight:650; }
+.animelist-release-results-modal .al-release-result-note { overflow-wrap:anywhere; }
 
 .animelist-release-results-modal .al-release-results-footer {
   display:flex; align-items:center; justify-content:space-between; gap:15px; padding:13px 24px 17px;
@@ -258,7 +248,46 @@
 .animelist-release-match-modal .al-release-match-card button { min-height:35px; }
 .animelist-release-match-modal .al-release-match-actions { display:flex; justify-content:flex-end; margin-top:14px; }
 
+
+.modal.animelist-release-manager-modal { width:min(760px,calc(100vw - 28px)); max-width:760px; }
+.animelist-release-manager-modal .al-release-manager-heading {
+  display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;
+}
+.animelist-release-manager-modal .al-release-manager-heading > .al-release-manager-icon {
+  display:grid; place-items:center; flex:0 0 38px; width:38px; height:38px; border-radius:11px;
+  color:var(--interactive-accent); background:color-mix(in srgb,var(--interactive-accent) 12%,transparent);
+}
+.animelist-release-manager-modal .al-release-manager-heading h2 { margin:0 0 5px; font-size:1.15rem; }
+.animelist-release-manager-modal .al-release-manager-heading p { margin:0; color:var(--text-muted); font-size:.7rem; line-height:1.5; }
+.animelist-release-manager-modal .al-release-manager-toolbar {
+  display:flex; align-items:center; gap:8px; margin-bottom:10px;
+}
+.animelist-release-manager-modal .al-release-manager-count { margin-right:auto; color:var(--text-muted); font-size:.68rem; }
+.animelist-release-manager-modal .al-release-manager-list {
+  overflow:auto; max-height:55vh; border:1px solid var(--background-modifier-border); border-radius:10px;
+  background:var(--background-secondary);
+}
+.animelist-release-manager-modal .al-release-manager-row {
+  display:grid; grid-template-columns:auto 42px minmax(0,1fr); align-items:center; gap:11px;
+  min-height:62px; padding:8px 11px; cursor:pointer;
+}
+.animelist-release-manager-modal .al-release-manager-row + .al-release-manager-row { border-top:1px solid var(--background-modifier-border); }
+.animelist-release-manager-modal .al-release-manager-checkbox { width:16px; height:16px; margin:0; }
+.animelist-release-manager-modal .al-release-manager-cover {
+  display:grid; overflow:hidden; width:42px; height:52px; place-items:center; border-radius:6px;
+  color:var(--text-faint); background:var(--background-primary-alt);
+}
+.animelist-release-manager-modal .al-release-manager-cover img { width:100%; height:100%; object-fit:cover; }
+.animelist-release-manager-modal .al-release-manager-cover svg { width:17px; height:17px; }
+.animelist-release-manager-modal .al-release-manager-copy { display:flex; min-width:0; flex-direction:column; gap:4px; }
+.animelist-release-manager-modal .al-release-manager-copy strong { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:.75rem; }
+.animelist-release-manager-modal .al-release-manager-copy span { color:var(--text-muted); font-size:.6rem; }
+.animelist-release-manager-modal .al-release-manager-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+
 @media (max-width:700px) {
+  .modal.animelist-release-manager-modal { width:calc(100vw - 10px); max-width:none; }
+  .animelist-release-manager-modal .al-release-manager-toolbar { flex-wrap:wrap; }
+  .animelist-release-manager-modal .al-release-manager-count { width:100%; margin-right:0; }
   .modal.animelist-release-results-modal,
   .modal.animelist-release-match-modal { width:calc(100vw - 10px); max-width:none; }
   .animelist-release-results-modal .al-release-results-header { padding:16px 15px 13px; }
@@ -275,6 +304,7 @@
   }
   .animelist-release-results-modal .al-release-result-cover { grid-row:1 / span 2; width:42px; height:56px; }
   .animelist-release-results-modal .al-release-result-identity { grid-column:2; }
+  .animelist-release-results-modal .al-release-progress-cell,
   .animelist-release-results-modal .al-release-change-cell,
   .animelist-release-results-modal .al-release-source-cell { grid-column:2; }
   .animelist-release-results-modal .al-release-source-cell { flex-direction:row; flex-wrap:wrap; align-items:center; }

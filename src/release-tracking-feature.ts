@@ -15,6 +15,7 @@ import {
   ReleaseTrackingMatchModal,
   ReleaseTrackingResultsModal,
 } from "./ui/release-tracking-modal";
+import { ReleaseTrackingManagerModal } from "./ui/release-tracking-manager-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui/ui-helpers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -327,6 +328,19 @@ export function createReleaseTrackingSettingsSection(host: AnimeListFeatureHost)
             if (automatic) host.settings.releaseTracking.lastAutomaticCheckAt = "";
             await host.saveSettings();
             if (automatic) void runAutomaticReleaseCheck(host);
+          });
+        });
+      },
+    }, {
+      name: releaseTrackingText("settings.manage.name"),
+      desc: releaseTrackingText("settings.manage.desc"),
+      render: (setting: Setting) => {
+        setting.addButton((button) => {
+          button.setButtonText(releaseTrackingText("settings.manage.button"));
+          button.onClick(() => {
+            new ReleaseTrackingManagerModal(host.app, serviceFor(host), host.collectMediaItems(), {
+              onApplied() { host.refreshViews(); },
+            }).open();
           });
         });
       },

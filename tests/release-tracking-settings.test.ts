@@ -21,6 +21,7 @@ describe("release tracking settings", () => {
     assert.deepEqual(section.definitions.map((definition) => definition.name), [
       "Fetch latest release information",
       "Check automatically once per day",
+      "維護追蹤作品",
       "Check now",
     ]);
     for (const definition of section.definitions) {
