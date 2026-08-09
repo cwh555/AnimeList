@@ -240,4 +240,46 @@ describe("release tracking domain", () => {
     assert.equal(providerResultRegressed("3年生編4", "2026-07-25", "3年生編3", "2026-03-25", "ndl-jpro"), true);
     assert.equal(providerResultRegressed("3年生編4", "2026-07-25", "3年生編4", "2026-07-25", "ndl-jpro"), false);
   });
+
+  it("treats a base title followed by its volume and subtitle as the same main publication line", () => {
+    const lines = groupPublicationLines([
+      record({
+        sourceId: "overlord-16",
+        title: "オーバーロード16 半森妖精の神人 下",
+        seriesTitle: "",
+        volume: "16",
+        creators: ["丸山くがね"],
+        publisher: "KADOKAWA",
+        publishedAt: "2022-07-29",
+      }),
+    ], ["オーバーロード"], ["丸山くがね"]);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]?.titleStrength, 2);
+  });
+
+  it("keeps the highest numbered OVERLORD main volume when an older volume is reissued later", () => {
+    const binding: ReleaseTrackingBinding = {
+      provider: "ndl-jpro",
+      title: "オーバーロード",
+      creator: "丸山くがね",
+    };
+    const latest = selectLatestPublishedRecord([
+      record({ sourceId: "ol-16", title: "オーバーロード16 半森妖精の神人 下", volume: "16", creators: ["丸山くがね"], seriesTitle: "", publishedAt: "2022-07-29" }),
+      record({ sourceId: "ol-15-reprint", title: "オーバーロード15 半森妖精の神人 上", volume: "15", creators: ["丸山くがね"], seriesTitle: "", publishedAt: "2025-02-01" }),
+    ], binding, new Date("2026-08-09T00:00:00Z"));
+    assert.equal(latest?.volume, "16");
+  });
+
+  it("merges an exact-title blank-imprint fragment into one uniquely identified novel imprint", async () => {
+    const { mergeCompatibleNovelPublicationLines } = await import("../src/domain/release-tracking");
+    const lines = mergeCompatibleNovelPublicationLines(groupPublicationLines([
+      record({ sourceId: "rokudenashi-23", title: "ロクでなし魔術講師と禁忌教典", seriesTitle: "", volume: "23", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-06-20" }),
+      record({ sourceId: "rokudenashi-24", title: "ロクでなし魔術講師と禁忌教典", seriesTitle: "富士見ファンタジア文庫", volume: "24", creators: ["羊太郎"], publisher: "KADOKAWA", publishedAt: "2023-11-17" }),
+    ], ["ロクでなし魔術講師と禁忌教典"], ["羊太郎"]));
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]?.imprint, "富士見ファンタジア文庫");
+    assert.equal(lines[0]?.records.length, 2);
+    assert.equal(selectSafeNovelPublicationLine(lines, true)?.imprint, "富士見ファンタジア文庫");
+  });
+
 });
