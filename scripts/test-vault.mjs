@@ -101,8 +101,10 @@ function printSummary(fixtures) {
   console.log(`Vault: ${vaultRoot}`);
   console.log(`Plugin: ${pluginRoot}`);
   console.log(`Checklist: ${fixtures.checklistPath}`);
-  console.log(`Generated fixtures: ${fixtures.files.length}`);
-  console.log("Reset only the generated data with: npm run test-vault:fixtures");
+  console.log(`Shared works: ${fixtures.files.length}`);
+  console.log(`Fixture preparation: created=${fixtures.created}, reused=${fixtures.reused}, repaired=${fixtures.repaired}, covers downloaded=${fixtures.coversDownloaded}`);
+  console.log("Normal test-vault startup preserves existing fixture edits and covers.");
+  console.log("Reset the 18 baseline works explicitly with: npm run test-vault:fixtures");
 }
 
 async function runDevelopmentWatcher() {
@@ -155,7 +157,7 @@ fs.mkdirSync(pluginsRoot, { recursive: true });
 removePluginInstallation();
 enablePlugin();
 createDefaultAppConfig();
-const fixtures = prepareTestFixtures(vaultRoot);
+const fixtures = await prepareTestFixtures(vaultRoot, { reset: false });
 
 if (mode === "production") {
   copyReleaseFiles();
