@@ -1,6 +1,10 @@
 import { Notice, type Setting } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost, type FeatureSettingsSection } from "./app/feature-types";
-import { ReleaseTrackingService, type ReleaseRefreshSummary } from "./data/release-tracking-service";
+import {
+  ReleaseTrackingService,
+  type ReleaseRefreshProgress,
+  type ReleaseRefreshSummary,
+} from "./data/release-tracking-service";
 import {
   releaseTrackingSnapshotFromFrontmatter,
   type ReleaseTrackingSnapshot,
@@ -18,7 +22,15 @@ const AUTO_POLL_MS = 60 * 60 * 1000;
 const INITIAL_AUTO_DELAY_MS = 10_000;
 
 const services = new WeakMap<AnimeListFeatureHost, ReleaseTrackingService>();
-const activeChecks = new WeakMap<AnimeListFeatureHost, Promise<ReleaseRefreshSummary>>();
+type ReleaseProgressListener = (progress: ReleaseRefreshProgress) => void;
+
+interface ActiveReleaseCheck {
+  promise: Promise<ReleaseRefreshSummary>;
+  listeners: Set<ReleaseProgressListener>;
+  latest?: ReleaseRefreshProgress;
+}
+
+const activeChecks = new WeakMap<AnimeListFeatureHost, ActiveReleaseCheck>();
 
 function serviceFor(host: AnimeListFeatureHost): ReleaseTrackingService {
   let service = services.get(host);
@@ -80,34 +92,59 @@ function openMatchModal(host: AnimeListFeatureHost, item: MediaItem): void {
 
 async function performReleaseCheck(
   host: AnimeListFeatureHost,
-  onProgress?: (completed: number, total: number) => void,
+  onProgress?: ReleaseProgressListener,
 ): Promise<ReleaseRefreshSummary> {
   const existing = activeChecks.get(host);
-  if (existing !== undefined) return existing;
+  if (existing) {
+    if (onProgress) {
+      existing.listeners.add(onProgress);
+      if (existing.latest) onProgress(existing.latest);
+    }
+    return existing.promise;
+  }
+
+  const listeners = new Set<ReleaseProgressListener>();
+  if (onProgress) listeners.add(onProgress);
+  const active = {} as ActiveReleaseCheck;
+  active.listeners = listeners;
   const service = serviceFor(host);
-  const promise = service.refreshAll(host.collectMediaItems(), onProgress)
+  active.promise = Promise.resolve()
+    .then(() => service.refreshAll(host.collectMediaItems(), (progress) => {
+      active.latest = progress;
+      active.listeners.forEach((listener) => listener(progress));
+    }))
     .finally(() => activeChecks.delete(host));
-  activeChecks.set(host, promise);
-  return promise;
+  activeChecks.set(host, active);
+  return active.promise;
 }
 
 async function runManualReleaseCheck(
   host: AnimeListFeatureHost,
-  onProgress?: (completed: number, total: number) => void,
+  onProgress?: ReleaseProgressListener,
 ): Promise<void> {
   if (!host.settings.releaseTracking.enabled) {
     new Notice(releaseTrackingText("notice.disabled"));
     return;
   }
+
+  const modal = new ReleaseTrackingResultsModal(host.app, {
+    openMedia: (path) => host.openMediaFile(path),
+    reviewItem: (item) => openMatchModal(host, item),
+  });
+  modal.open();
+  const progressListener: ReleaseProgressListener = (progress) => {
+    modal.showProgress(progress);
+    onProgress?.(progress);
+  };
+
   try {
-    const summary = await performReleaseCheck(host, onProgress);
+    const summary = await performReleaseCheck(host, progressListener);
     host.refreshViews();
-    new ReleaseTrackingResultsModal(host.app, summary, {
-      openMedia: (path) => host.openMediaFile(path),
-      reviewItem: (item) => openMatchModal(host, item),
-    }).open();
+    modal.showResults(summary);
   } catch (error) {
-    new Notice(releaseTrackingText("notice.failed", { message: errorMessage(error) }));
+    const message = errorMessage(error);
+    modal.showFailure(message);
+    new Notice(releaseTrackingText("notice.failed", { message }));
   }
 }
 
@@ -204,8 +241,11 @@ function installLibraryRefreshButton(
   render(releaseTrackingText("library.check"));
   button.addEventListener("click", () => {
     button.disabled = true;
-    void runManualReleaseCheck(host, (completed, total) => {
-      render(releaseTrackingText("library.checking", { completed, total }));
+    void runManualReleaseCheck(host, (progress) => {
+      render(releaseTrackingText("library.checking", {
+        completed: progress.completed,
+        total: progress.total,
+      }));
     }).finally(() => {
       button.disabled = false;
       render(releaseTrackingText("library.check"));
