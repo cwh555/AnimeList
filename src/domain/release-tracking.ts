@@ -189,18 +189,31 @@ export function publicationTitleStrength(actual: unknown, expected: unknown): 0 
   return a.startsWith(e) ? 1 : 0;
 }
 
+function publicationRecordTitleStrength(record: NdlPublicationRecord, expected: unknown): 0 | 1 | 2 {
+  const direct = publicationTitleStrength(record.title, expected);
+  if (direct === 2) return 2;
+  const actual = normalizeTrackingText(record.title);
+  const volume = normalizeTrackingText(record.volume);
+  const expectedTitle = normalizeTrackingText(expected);
+  if (!actual || !volume || !expectedTitle || !actual.endsWith(volume) || actual.length <= volume.length) return direct;
+  const titleWithoutTrailingVolume = actual.slice(0, -volume.length);
+  if (titleWithoutTrailingVolume === expectedTitle) return 2;
+  return titleWithoutTrailingVolume.startsWith(expectedTitle) ? Math.max(direct, 1) as 1 : direct;
+}
+
 function matchingExpectedTitle(record: NdlPublicationRecord, titles: readonly string[]): { title: string; strength: 1 | 2 } | null {
   let best: { title: string; strength: 1 | 2 } | null = null;
   for (const title of titles) {
-    const strength = publicationTitleStrength(record.title, title);
+    const strength = publicationRecordTitleStrength(record, title);
     if (strength > (best?.strength ?? 0)) best = { title: title.trim(), strength: strength as 1 | 2 };
   }
   return best;
 }
 
 export function isSidePublication(record: NdlPublicationRecord): boolean {
-  return /(短編集|\bsss?\b|外伝|番外|アンソロジ|公式ガイド|art\s*works|蛇足編)/i
-    .test(`${record.title} ${record.volume}`);
+  const value = `${record.title} ${record.volume}`.normalize("NFKC");
+  return /(短編(?:集)?|短篇(?:集)?|\bsss?\d*\b|\bex\s*\d+(?:\.\d+)?\b|\balter\s*[.\s-]?\s*\d+\b|外伝|番外(?:編)?|アンソロジ|公式ガイド|公式ファンブック|ファンブック|ショートストーリ|art\s*works|蛇足編|スピンオフ|spin[\s-]*off|side[\s-]*stor(?:y|ies))/i
+    .test(value);
 }
 
 export function publicationRecordMatchesTitles(
@@ -232,7 +245,12 @@ export function groupPublicationLines(
     const creator = matchingCreator(record, creators);
     if (creators.length && !creator) continue;
     const imprint = publicationImprint(record.seriesTitle);
-    const key = `${normalizeTrackingText(titleMatch.title)}\u0000${normalizeTrackingText(imprint)}`;
+    // Prefix matches are useful for manual discovery, but they must never be
+    // collapsed into the exact-title publication line. Otherwise a derived
+    // title such as "とらドラ・スピンオフ3" can contaminate the main
+    // "とらドラ!" line simply because it shares author and imprint.
+    const groupedTitle = titleMatch.strength === 2 ? titleMatch.title : record.title.trim();
+    const key = `${normalizeTrackingText(groupedTitle)}\u0000${normalizeTrackingText(imprint)}`;
     const existing = groups.get(key);
     if (existing) {
       existing.records.push(record);
@@ -241,7 +259,7 @@ export function groupPublicationLines(
       continue;
     }
     groups.set(key, {
-      title: titleMatch.title,
+      title: groupedTitle,
       creator: creator || record.creators[0] || "",
       publisher: record.publisher,
       imprint,
@@ -276,7 +294,10 @@ export function selectSafeNovelPublicationLine(
   const ranked = [...nonComic].sort(compareLineRank);
   const best = ranked[0];
   if (!best) return null;
-  if (best.titleStrength < 2 && !(hasCreatorEvidence && best.medium === "novel")) return null;
+  // Automatic binding is deliberately stricter than candidate discovery. A
+  // creator/imprint match does not make a prefix-derived title the same work.
+  // Prefix-only lines stay available for human review but are never auto-bound.
+  if (best.titleStrength !== 2) return null;
   const second = ranked[1];
   if (second && compareLineRank(best, second) === 0) return null;
   if (!hasCreatorEvidence && best.medium === "unknown") return null;
@@ -288,7 +309,7 @@ export function recordMatchesBinding(
   binding: ReleaseTrackingBinding,
 ): boolean {
   if (binding.provider !== "ndl-jpro" || isSidePublication(record)) return false;
-  if (binding.title && publicationTitleStrength(record.title, binding.title) === 0) return false;
+  if (binding.title && publicationRecordTitleStrength(record, binding.title) !== 2) return false;
   if (binding.creator && !record.creators.some((value) => creatorMatches(binding.creator, value))) return false;
   if (binding.imprint && normalizeTrackingText(publicationImprint(record.seriesTitle)) !== normalizeTrackingText(binding.imprint)) return false;
   if (!binding.imprint && binding.publisher && normalizeTrackingText(record.publisher) !== normalizeTrackingText(binding.publisher)) return false;
@@ -319,6 +340,9 @@ export function providerResultRegressed(
 ): boolean {
   if (!previousLatest || !nextLatest) return false;
   if (provider === "mangadex") return compareChapterLabels(nextLatest, previousLatest) < 0;
+  const previousNumeric = numericChapterParts(previousLatest);
+  const nextNumeric = numericChapterParts(nextLatest);
+  if (previousNumeric && nextNumeric) return compareChapterLabels(nextLatest, previousLatest) < 0;
   const previousTimestamp = parsePublishedDate(previousDate);
   const nextTimestamp = parsePublishedDate(nextDate);
   return previousTimestamp !== null && nextTimestamp !== null && nextTimestamp < previousTimestamp;
