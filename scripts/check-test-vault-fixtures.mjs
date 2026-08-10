@@ -8,6 +8,10 @@ import {
   TEST_FIXTURE_VERSION,
   TEST_LIBRARY_ROOT,
 } from "./test-vault-fixtures.mjs";
+import {
+  applyReleaseTrackingTestFixtureMetadata,
+  RELEASE_TRACKING_MANGA_ANILIST_IDS,
+} from "./release-tracking-test-fixtures.mjs";
 
 const vaultRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animelist-test-vault-"));
 let fetchCalls = 0;
@@ -48,6 +52,8 @@ try {
   fs.writeFileSync(legacyFixture, "---\ntitle: \"TEST 動畫－未開始\"\nmedia_type: \"anime\"\n---\n");
 
   const first = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const firstReleaseTracking = applyReleaseTrackingTestFixtureMetadata(first);
+  assert.deepEqual(firstReleaseTracking, { updated: 5, verified: 5 });
   assert.equal(first.files.length, 18);
   assert.equal(first.fixtureRoot, path.join(vaultRoot, TEST_LIBRARY_ROOT));
   assert.equal(first.checklistPath, path.join(vaultRoot, TEST_CHECKLIST_PATH));
@@ -67,6 +73,12 @@ try {
   assert.match(checklist, /Wishlist \/ Planned: \*\*5\*\*/);
   assert.match(checklist, /Release Tracking live-provider check/);
   assert.match(checklist, /source_provider.*must not be MangaDex/i);
+  assert.match(checklist, /Official-source coverage expectations/);
+  assert.match(checklist, /anilist_id.*official external-link path/i);
+  assert.match(checklist, /Ch\.111/);
+  assert.match(checklist, /Ch\.147/);
+  assert.match(checklist, /Ch\.72/);
+  assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
 
   const mediaNotes = allMarkdown(path.join(vaultRoot, TEST_LIBRARY_ROOT))
@@ -77,6 +89,7 @@ try {
   assert.doesNotMatch(allFixtures, /source_provider: "mangadex"/);
   assert.equal((allFixtures.match(/schema_version: 6/g) ?? []).length, 18);
   assert.equal((allFixtures.match(/source_provider: "bangumi"/g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/anilist_id: "\d+"/g) ?? []).length, 5);
   assert.equal((allFixtures.match(new RegExp(`fixture_version: ${TEST_FIXTURE_VERSION}`, "g")) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover: "AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover_remote: "https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//g) ?? []).length, 18);
@@ -94,7 +107,17 @@ try {
   assert.match(frierenManga, /title_original: "葬送のフリーレン"/);
   assert.match(frierenManga, /source_provider: "bangumi"/);
   assert.match(frierenManga, /source_id: "305429"/);
+  assert.match(frierenManga, /anilist_id: "118586"/);
   assert.match(frierenManga, /cover: "AnimeList\/Covers\/manga\/葬送的芙莉蓮-bangumi-305429\.jpg"/);
+
+  for (const [bangumiId, anilistId] of RELEASE_TRACKING_MANGA_ANILIST_IDS) {
+    const matches = mediaNotes.filter((file) => {
+      const content = fs.readFileSync(file, "utf8");
+      return content.includes(`source_id: "${bangumiId}"`);
+    });
+    assert.equal(matches.length, 1, `Bangumi ${bangumiId} must identify exactly one controlled manga fixture`);
+    assert.match(fs.readFileSync(matches[0], "utf8"), new RegExp(`anilist_id: "${anilistId}"`));
+  }
 
   const alyaPath = "AnimeList/Novel/不時以俄語遮羞的艾莉同學.md";
   const alya = read(alyaPath);
@@ -118,6 +141,8 @@ try {
 
   fetchCalls = 0;
   const second = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const secondReleaseTracking = applyReleaseTrackingTestFixtureMetadata(second);
+  assert.deepEqual(secondReleaseTracking, { updated: 0, verified: 4 });
   assert.equal(second.created, 0);
   assert.equal(second.repaired, 0);
   assert.equal(second.reused, 18);
@@ -135,6 +160,8 @@ try {
   fs.rmSync(alyaCover);
   fetchCalls = 0;
   const repairedCover = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const repairedReleaseTracking = applyReleaseTrackingTestFixtureMetadata(repairedCover);
+  assert.deepEqual(repairedReleaseTracking, { updated: 0, verified: 4 });
   assert.equal(repairedCover.reused, 18);
   assert.equal(repairedCover.reusedBySource, 1);
   assert.equal(repairedCover.coversDownloaded, 1);
@@ -146,6 +173,8 @@ try {
   const unrelated = path.join(vaultRoot, "AnimeList", "Novel", "My manual test note.md");
   fs.writeFileSync(unrelated, "# keep me\n");
   const reset = await prepareTestFixtures(vaultRoot, { reset: true, fetchImpl: fakeFetch });
+  const resetReleaseTracking = applyReleaseTrackingTestFixtureMetadata(reset);
+  assert.deepEqual(resetReleaseTracking, { updated: 4, verified: 4 });
   assert.equal(reset.files.length, 18);
   assert.equal(fs.existsSync(unrelated), true);
   assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
