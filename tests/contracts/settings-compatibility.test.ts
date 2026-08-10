@@ -57,6 +57,24 @@ describe("settings compatibility", () => {
     });
   });
 
+  it("loads release tracking as an explicit opt-in feature", async () => {
+    const disabled = await loadSettings({});
+    assert.deepEqual(disabled.releaseTracking, {
+      enabled: false,
+      automatic: false,
+      lastAutomaticCheckAt: "",
+    });
+
+    const enabled = await loadSettings({
+      releaseTracking: { enabled: true, automatic: true, lastAutomaticCheckAt: "2026-08-08T00:00:00.000Z" },
+    });
+    assert.deepEqual(enabled.releaseTracking, {
+      enabled: true,
+      automatic: true,
+      lastAutomaticCheckAt: "2026-08-08T00:00:00.000Z",
+    });
+  });
+
   it("falls back deterministically when stored settings are missing or malformed", async () => {
     const settings = await loadSettings({
       storageMode: "unknown",

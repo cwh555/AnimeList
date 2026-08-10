@@ -12,7 +12,7 @@ For development with an Obsidian test vault:
 npm run test-vault:dev
 ```
 
-This creates the ignored local `test-vault`, writes the development bundle directly into its plugin directory, generates deterministic test fixtures, opens `_AnimeList Test Checklist.md`, and watches source files. Reload AnimeList in Obsidian after a rebuild.
+This creates the ignored local `test-vault`, writes the development bundle directly into its plugin directory, prepares the shared real-work library, opens `_AnimeList Test Checklist.md`, and watches source files. Reload AnimeList in Obsidian after a rebuild.
 
 Before a release, run the production-equivalent manual test setup:
 
@@ -20,15 +20,17 @@ Before a release, run the production-equivalent manual test setup:
 npm run test-vault
 ```
 
-This runs the complete repository checks, verifies release consistency, installs only `main.js`, `manifest.json`, and `styles.css`, regenerates the local fixtures, and opens the checklist in the ignored test vault. This mode deliberately avoids repository-directory symlinks so it matches a manual GitHub Release installation.
+This runs the complete repository checks, verifies release consistency, installs only `main.js`, `manifest.json`, and `styles.css`, prepares the shared library, and opens the checklist in the ignored test vault. This mode deliberately avoids repository-directory symlinks so it matches a manual GitHub Release installation.
 
-To discard manual fixture edits and restore only the generated baseline data:
+`npm run test-vault` is intentionally non-destructive for media data. Existing current fixtures and downloaded covers are reused, so edits made during manual testing survive reopening the vault and duplicate media are not created. A missing cached cover is repaired without rewriting the note.
+
+To intentionally restore the 18 controlled baseline works:
 
 ```bash
 npm run test-vault:fixtures
 ```
 
-The generated data lives under `test-vault/AnimeList/Test Fixtures`, while the entry page is `test-vault/_AnimeList Test Checklist.md`. Both remain local and ignored by Git.
+The shared Test Vault uses the same managed-library layout as normal collection (`test-vault/AnimeList/Anime`, `Manga`, `Novel`) and local covers under `test-vault/AnimeList/Covers/<type>`. Fixture notes retain real Bangumi source identity plus local/remote cover metadata, while user status/progress/dates remain controlled test scenarios. The entry page is `test-vault/_AnimeList Test Checklist.md`. Reset only rewrites the known fixture notes; unrelated manual test notes are preserved. All Test Vault files remain local and ignored by Git.
 
 To use another disposable vault:
 

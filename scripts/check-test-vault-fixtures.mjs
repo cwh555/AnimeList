@@ -2,86 +2,189 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { prepareTestFixtures, TEST_CHECKLIST_PATH, TEST_FIXTURE_ROOT } from "./test-vault-fixtures.mjs";
+import {
+  prepareTestFixtures,
+  TEST_CHECKLIST_PATH,
+  TEST_FIXTURE_VERSION,
+  TEST_LIBRARY_ROOT,
+} from "./test-vault-fixtures.mjs";
+import {
+  applyReleaseTrackingTestFixtureMetadata,
+  RELEASE_TRACKING_MANGA_ANILIST_IDS,
+} from "./release-tracking-test-fixtures.mjs";
 
 const vaultRoot = fs.mkdtempSync(path.join(os.tmpdir(), "animelist-test-vault-"));
+let fetchCalls = 0;
 
-function readFixture(relativePath) {
-  return fs.readFileSync(path.join(vaultRoot, TEST_FIXTURE_ROOT, relativePath), "utf8");
+const fakeFetch = async (url) => {
+  fetchCalls += 1;
+  assert.match(String(url), /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//);
+  const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: (name) => name.toLowerCase() === "content-type" ? "image/jpeg" : "" },
+    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  };
+};
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(vaultRoot, relativePath), "utf8");
+}
+
+function allMarkdown(root) {
+  if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) return [];
+  const output = [];
+  const visit = (folder) => {
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+      const file = path.join(folder, entry.name);
+      if (entry.isDirectory()) visit(file);
+      else if (entry.isFile() && file.endsWith(".md")) output.push(file);
+    }
+  };
+  visit(root);
+  return output;
 }
 
 try {
-  const first = prepareTestFixtures(vaultRoot);
+  const legacyFixture = path.join(vaultRoot, "AnimeList/Test Fixtures/Anime/01-anime-planned.md");
+  fs.mkdirSync(path.dirname(legacyFixture), { recursive: true });
+  fs.writeFileSync(legacyFixture, "---\ntitle: \"TEST 動畫－未開始\"\nmedia_type: \"anime\"\n---\n");
+
+  const first = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const firstReleaseTracking = applyReleaseTrackingTestFixtureMetadata(first);
+  assert.deepEqual(firstReleaseTracking, { updated: 5, verified: 5 });
   assert.equal(first.files.length, 18);
-  assert.equal(first.fixtureRoot, path.join(vaultRoot, TEST_FIXTURE_ROOT));
+  assert.equal(first.fixtureRoot, path.join(vaultRoot, TEST_LIBRARY_ROOT));
   assert.equal(first.checklistPath, path.join(vaultRoot, TEST_CHECKLIST_PATH));
-  assert.equal(fs.existsSync(first.checklistPath), true);
+  assert.equal(first.created, 18);
+  assert.equal(first.reused, 0);
+  assert.equal(first.reusedBySource, 0);
+  assert.equal(first.repaired, 0);
+  assert.equal(first.coversDownloaded, 18);
+  assert.equal(first.legacyRemoved, 1);
+  assert.equal(fetchCalls, 18);
+  assert.equal(fs.existsSync(legacyFixture), false);
 
-  const checklist = fs.readFileSync(first.checklistPath, "utf8");
-  assert.match(checklist, /source: AnimeList\/Test Fixtures/);
-  assert.match(checklist, /All: \*\*5\*\* SPECIAL titles/);
-  assert.match(checklist, /Favorite: \*\*3\*\* titles/);
-  assert.match(checklist, /Completed: \*\*2\*\* titles/);
-  assert.match(checklist, /Wishlist: \*\*2\*\* titles/);
-  assert.match(checklist, /Ongoing: \*\*1\*\* title/);
-  assert.match(checklist, /exactly one list button must be active/);
-  assert.match(checklist, /Masterpiece → Favorite → Masterpiece/);
-  assert.match(checklist, /must not show category inventory, rename, delete, or add controls/);
-  assert.match(checklist, /must not contain a separate \*\*移除 masterpiece\*\* button/);
-  assert.match(checklist, /uncheck every category, and save/);
-  assert.match(checklist, /fixture_preservation_marker/);
-  assert.match(checklist, /add volume/i);
+  const checklist = read(TEST_CHECKLIST_PATH);
+  assert.match(checklist, /same managed folders used by normal collection/);
+  assert.match(checklist, /Favorite: \*\*3\*\*/);
+  assert.match(checklist, /Completed: \*\*5\*\*/);
+  assert.match(checklist, /Wishlist \/ Planned: \*\*5\*\*/);
+  assert.match(checklist, /Release Tracking live-provider check/);
+  assert.match(checklist, /source_provider.*must not be MangaDex/i);
+  assert.match(checklist, /Official-source coverage expectations/);
+  assert.match(checklist, /anilist_id.*official external-link path/i);
+  assert.match(checklist, /Ch\.111/);
+  assert.match(checklist, /Ch\.147/);
+  assert.match(checklist, /Ch\.72/);
+  assert.match(checklist, /Ch\.281/);
+  assert.match(checklist, /npm run test-vault.*must not reset edits/i);
 
-  const novel = readFixture(path.join("Novel", "10-novel-add-volume.md"));
-  assert.match(novel, /status: "reading"/);
-  assert.match(novel, /progress: 14/);
-  assert.match(novel, /volume_log:/);
-  assert.match(novel, /label: "14"/);
+  const mediaNotes = allMarkdown(path.join(vaultRoot, TEST_LIBRARY_ROOT))
+    .filter((file) => fs.readFileSync(file, "utf8").includes(`fixture_version: ${TEST_FIXTURE_VERSION}`));
+  assert.equal(mediaNotes.length, 18);
+  const allFixtures = mediaNotes.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+  assert.doesNotMatch(allFixtures, /title: "(?:TEST|SPECIAL)/);
+  assert.doesNotMatch(allFixtures, /source_provider: "mangadex"/);
+  assert.equal((allFixtures.match(/schema_version: 6/g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/source_provider: "bangumi"/g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/anilist_id: "\d+"/g) ?? []).length, 5);
+  assert.equal((allFixtures.match(new RegExp(`fixture_version: ${TEST_FIXTURE_VERSION}`, "g")) ?? []).length, 18);
+  assert.equal((allFixtures.match(/cover: "AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/cover_remote: "https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
 
-  const plannedManga = readFixture(path.join("Manga", "04-manga-planned.md"));
-  assert.match(plannedManga, /status: "planned"/);
-  assert.match(plannedManga, /progress: 0/);
+  for (const file of mediaNotes) {
+    const content = fs.readFileSync(file, "utf8");
+    const cover = content.match(/^cover: "([^"]+)"$/m)?.[1] ?? "";
+    assert.ok(cover, `${file} must have a local cover path`);
+    assert.equal(fs.statSync(path.join(vaultRoot, cover), { throwIfNoEntry: false })?.isFile(), true, `${cover} must exist`);
+  }
 
-  const legacyFavorite = readFixture(path.join("Special", "14-special-legacy-favorite-completed.md"));
-  assert.match(legacyFavorite, /status: "completed"/);
-  assert.match(legacyFavorite, /favorite: true/);
-  assert.doesNotMatch(legacyFavorite, /masterpiece_labels:/);
-  assert.match(legacyFavorite, /fixture_preservation_marker: "legacy-favorite-completed"/);
-  assert.match(legacyFavorite, /> PRESERVE BODY: legacy-favorite-completed/);
+  const frierenMangaPath = "AnimeList/Manga/葬送的芙莉蓮.md";
+  const frierenManga = read(frierenMangaPath);
+  assert.match(frierenManga, /title_original: "葬送のフリーレン"/);
+  assert.match(frierenManga, /source_provider: "bangumi"/);
+  assert.match(frierenManga, /source_id: "305429"/);
+  assert.match(frierenManga, /anilist_id: "118586"/);
+  assert.match(frierenManga, /cover: "AnimeList\/Covers\/manga\/葬送的芙莉蓮-bangumi-305429\.jpg"/);
 
-  const multiLabel = readFixture(path.join("Special", "15-special-multi-label-ongoing.md"));
-  assert.match(multiLabel, /status: "ongoing"/);
-  assert.match(multiLabel, /favorite: true/);
-  assert.match(multiLabel, /masterpiece_labels:/);
-  assert.match(multiLabel, /- "戀愛"/);
-  assert.match(multiLabel, /- "年度"/);
-  assert.doesNotMatch(multiLabel, /戀愛 masterpiece/);
-  assert.match(multiLabel, /fixture_preservation_marker: "multi-label-ongoing"/);
-  assert.match(multiLabel, /> PRESERVE BODY: multi-label-ongoing/);
+  for (const [bangumiId, anilistId] of RELEASE_TRACKING_MANGA_ANILIST_IDS) {
+    const matches = mediaNotes.filter((file) => {
+      const content = fs.readFileSync(file, "utf8");
+      return content.includes(`source_id: "${bangumiId}"`);
+    });
+    assert.equal(matches.length, 1, `Bangumi ${bangumiId} must identify exactly one controlled manga fixture`);
+    assert.match(fs.readFileSync(matches[0], "utf8"), new RegExp(`anilist_id: "${anilistId}"`));
+  }
 
-  const sharedLabel = readFixture(path.join("Special", "16-special-shared-label-planned.md"));
-  assert.match(sharedLabel, /status: "planned"/);
-  assert.match(sharedLabel, /favorite: true/);
-  assert.match(sharedLabel, /- "戀愛"/);
+  const alyaPath = "AnimeList/Novel/不時以俄語遮羞的艾莉同學.md";
+  const alya = read(alyaPath);
+  assert.match(alya, /source_id: "339092"/);
+  assert.match(alya, /authors:\n  - "燦々SUN"/);
+  assert.match(alya, /volume_log:/);
 
-  const retainedLabel = readFixture(path.join("Special", "17-special-retained-label-completed.md"));
-  assert.match(retainedLabel, /status: "completed"/);
-  assert.match(retainedLabel, /favorite: false/);
-  assert.match(retainedLabel, /- "保留分類"/);
-  assert.match(retainedLabel, /fixture_preservation_marker: "retained-label-completed"/);
-  assert.match(retainedLabel, /> PRESERVE BODY: retained-label-completed/);
+  const coverFiles = fs.readdirSync(path.join(vaultRoot, "AnimeList", "Covers"), { recursive: true })
+    .filter((entry) => String(entry).endsWith(".jpg"));
+  assert.equal(coverFiles.length, 18);
 
-  const control = readFixture(path.join("Special", "18-special-control-planned.md"));
-  assert.match(control, /status: "planned"/);
-  assert.match(control, /favorite: false/);
-  assert.doesNotMatch(control, /masterpiece_labels:/);
+  const importedFrierenPath = "AnimeList/Manga/Imported/我已收藏的芙莉蓮.md";
+  fs.mkdirSync(path.dirname(path.join(vaultRoot, importedFrierenPath)), { recursive: true });
+  const collectedFrieren = read(frierenMangaPath)
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith("fixture_version:") && !line.startsWith("fixture_case:"))
+    .join("\n") + "\nUSER-COLLECTED NOTE MUST SURVIVE\n";
+  fs.writeFileSync(path.join(vaultRoot, importedFrierenPath), collectedFrieren);
+  fs.rmSync(path.join(vaultRoot, frierenMangaPath));
+  fs.appendFileSync(path.join(vaultRoot, alyaPath), "\nUSER EDIT MUST SURVIVE\n");
 
-  fs.writeFileSync(path.join(first.fixtureRoot, "temporary-edit.txt"), "discard me\n");
-  const second = prepareTestFixtures(vaultRoot);
-  assert.equal(fs.existsSync(path.join(second.fixtureRoot, "temporary-edit.txt")), false);
-  assert.equal(second.files.length, 18);
+  fetchCalls = 0;
+  const second = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const secondReleaseTracking = applyReleaseTrackingTestFixtureMetadata(second);
+  assert.deepEqual(secondReleaseTracking, { updated: 0, verified: 4 });
+  assert.equal(second.created, 0);
+  assert.equal(second.repaired, 0);
+  assert.equal(second.reused, 18);
+  assert.equal(second.reusedBySource, 1);
+  assert.equal(second.coversDownloaded, 0);
+  assert.equal(fetchCalls, 0);
+  assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
+  assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
+  assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  const frierenSourceMatches = allMarkdown(path.join(vaultRoot, "AnimeList", "Manga"))
+    .filter((file) => /source_id: "305429"/.test(fs.readFileSync(file, "utf8")));
+  assert.equal(frierenSourceMatches.length, 1);
 
-  console.log("Generated test-vault fixtures are valid and reset deterministically.");
+  const alyaCover = path.join(vaultRoot, "AnimeList/Covers/novel/不時以俄語遮羞的艾莉同學-bangumi-339092.jpg");
+  fs.rmSync(alyaCover);
+  fetchCalls = 0;
+  const repairedCover = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
+  const repairedReleaseTracking = applyReleaseTrackingTestFixtureMetadata(repairedCover);
+  assert.deepEqual(repairedReleaseTracking, { updated: 0, verified: 4 });
+  assert.equal(repairedCover.reused, 18);
+  assert.equal(repairedCover.reusedBySource, 1);
+  assert.equal(repairedCover.coversDownloaded, 1);
+  assert.equal(repairedCover.refreshed, 1);
+  assert.equal(fetchCalls, 1);
+  assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  assert.equal(fs.statSync(alyaCover).size > 0, true);
+
+  const unrelated = path.join(vaultRoot, "AnimeList", "Novel", "My manual test note.md");
+  fs.writeFileSync(unrelated, "# keep me\n");
+  const reset = await prepareTestFixtures(vaultRoot, { reset: true, fetchImpl: fakeFetch });
+  const resetReleaseTracking = applyReleaseTrackingTestFixtureMetadata(reset);
+  assert.deepEqual(resetReleaseTracking, { updated: 4, verified: 4 });
+  assert.equal(reset.files.length, 18);
+  assert.equal(fs.existsSync(unrelated), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
+  assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
+  assert.doesNotMatch(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  assert.equal(reset.repaired, 17);
+  assert.equal(reset.reused, 1);
+  assert.equal(reset.reusedBySource, 1);
+
+  console.log("Shared Test Vault mirrors collected media: current schema, real local covers, source-ID reuse, legacy fixture cleanup, non-destructive startup, explicit reset.");
 } finally {
   fs.rmSync(vaultRoot, { recursive: true, force: true });
 }

@@ -24,6 +24,7 @@ export type {
   LanguagePreference,
   MigrationSettings,
   ProviderSettings,
+  ReleaseTrackingSettings,
   SearchLanguage,
   SearchLanguageSettings,
   StorageMode,

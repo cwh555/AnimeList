@@ -17,6 +17,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.library-filters.css",
   "styles.user-tags.css",
   "styles.mobile.css",
+  "styles.release-tracking.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {

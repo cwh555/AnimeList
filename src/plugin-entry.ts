@@ -6,6 +6,7 @@ import { masterpieceFeature } from "./masterpiece-ui";
 import { legacyMetadataSettingsFeature } from "./legacy-metadata-settings";
 import { progressUiFeature } from "./progress-ui";
 import { ratingFeature } from "./rating-ui";
+import { releaseTrackingFeature } from "./release-tracking-feature";
 import { scoreDashboardFeature } from "./score-dashboard-feature";
 import { searchEnhancementsFeature } from "./search-enhancements";
 import { searchPaginationFeature } from "./search-pagination";
@@ -20,6 +21,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   searchPaginationFeature,
   searchEnhancementsFeature,
   ratingFeature,
+  releaseTrackingFeature,
   additionalProgressUnitsFeature,
   serialEntryCoversFeature,
   serialCoverSettingsFeature,
