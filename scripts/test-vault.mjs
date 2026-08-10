@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { prepareTestFixtures, TEST_CHECKLIST_PATH } from "./test-vault-fixtures.mjs";
+import { applyReleaseTrackingTestFixtureMetadata } from "./release-tracking-test-fixtures.mjs";
 
 const RELEASE_FILES = ["main.js", "manifest.json", "styles.css"];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -158,6 +159,7 @@ removePluginInstallation();
 enablePlugin();
 createDefaultAppConfig();
 const fixtures = await prepareTestFixtures(vaultRoot, { reset: false });
+applyReleaseTrackingTestFixtureMetadata(fixtures);
 
 if (mode === "production") {
   copyReleaseFiles();
