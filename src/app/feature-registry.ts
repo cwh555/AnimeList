@@ -1,3 +1,4 @@
+import { settingsPageForFeature } from "../settings-layout";
 import type { MediaItem } from "../types";
 import type { LibraryRenderAdapters, LibraryRenderContext } from "../ui/library-contracts";
 import type { MediaFormContext, MediaFormSubmitContext } from "../ui/media-form-contracts";
@@ -17,6 +18,11 @@ import type {
   SearchContribution,
   SettingsContribution,
 } from "./feature-types";
+
+interface SettingsRegistration<Host extends AnimeListFeatureHost> {
+  featureId: string;
+  contribution: SettingsContribution<Host>;
+}
 
 function validateManifest<Host extends AnimeListFeatureHost>(
   features: readonly AnimeListFeature<Host>[],
@@ -47,7 +53,7 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
   private readonly search: SearchContribution<Host>[] = [];
   private readonly mediaForms: MediaFormContribution<Host>[] = [];
   private readonly favorites: FavoriteContribution<Host>[] = [];
-  private readonly settings: SettingsContribution<Host>[] = [];
+  private readonly settings: SettingsRegistration<Host>[] = [];
   private readonly details: DetailContribution<Host>[] = [];
   private loaded = false;
   private activated = false;
@@ -65,7 +71,7 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
           case "search": this.search.push(contribution); break;
           case "media-form": this.mediaForms.push(contribution); break;
           case "favorite": this.favorites.push(contribution); break;
-          case "settings": this.settings.push(contribution); break;
+          case "settings": this.settings.push({ featureId: feature.id, contribution }); break;
           case "detail": this.details.push(contribution); break;
         }
       }
@@ -124,9 +130,13 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
   }
 
   settingsSections(host: Host): FeatureSettingsSection[] {
-    return this.settings.flatMap((contribution) => {
+    return this.settings.flatMap(({ featureId, contribution }) => {
       const value = contribution.sections(host);
-      return Array.isArray(value) ? value : [value];
+      const sections = Array.isArray(value) ? value : [value];
+      return sections.map((section) => ({
+        ...section,
+        page: section.page ?? settingsPageForFeature(featureId),
+      }));
     });
   }
 

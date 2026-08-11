@@ -4,6 +4,12 @@ import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
 import { withActiveLocale } from "./i18n/catalog";
 import { searchFeatureText } from "./search-feature-text";
 import {
+  SETTINGS_PAGES,
+  normalizeSettingsPage,
+  settingsPageForKey,
+  type SettingsPageId,
+} from "./settings-layout";
+import {
   MAX_TIMELINE_MAX_STACK_DEPTH,
   MIN_TIMELINE_MAX_STACK_DEPTH,
   normalizeTimelineMaxStackDepth,
@@ -34,6 +40,7 @@ export interface AnimeListSettingsHost {
 }
 
 export interface SettingsSection {
+  page?: SettingsPageId;
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
@@ -46,9 +53,9 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
-
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private activePage: SettingsPageId = "general";
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
@@ -154,29 +161,52 @@ export class AnimeListSettingTab extends PluginSettingTab {
     return withActiveLocale("en", () => {
       const base = this.getSettingDefinitions();
       const sections: SettingsSection[] = [
-        { definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)] },
         {
+          page: "general",
+          definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)],
+        },
+        {
+          page: "general",
           heading: uiText("settings.timeline.heading"),
           description: uiText("settings.timeline.desc"),
           definitions: base.slice(6, 7),
         },
         {
+          page: "search-metadata",
           heading: searchFeatureText("settings.languages.heading"),
           definitions: this.getSearchLanguageDefinitions(),
         },
         {
+          page: "search-metadata",
           heading: uiText("settings.providers.heading"),
           definitions: base.slice(7, 10),
         },
         {
+          page: "maintenance",
           heading: uiText("settings.setup.heading"),
           definitions: base.slice(10),
         },
       ];
-      const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
+      const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
+        ...section,
+        page: section.page ?? "features" as const,
+      }));
       sections.splice(1, 0, ...featureSections);
       return sections;
     });
+  }
+
+  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
+    const sections = this.getSettingSections().filter((section) => section.page === page);
+    if (page !== "general") return sections;
+    const core = sections.find((section) => !section.heading);
+    if (!core) return sections;
+    return [
+      { page: "general", heading: "Interface", definitions: core.definitions.slice(0, 1) },
+      { page: "general", heading: "Library & storage", definitions: core.definitions.slice(1, 5) },
+      { page: "general", heading: "File locations", definitions: core.definitions.slice(5) },
+      ...sections.filter((section) => section !== core),
+    ];
   }
 
   display(): void {
@@ -186,34 +216,123 @@ export class AnimeListSettingTab extends PluginSettingTab {
     this.renderImperativeSettings();
   }
 
+  private renderPageTabs(containerEl: HTMLElement): void {
+    const tabList = containerEl.createDiv({ cls: "animelist-settings-tabs" });
+    tabList.setAttribute("role", "tablist");
+    tabList.setAttribute("aria-label", "Settings pages");
+
+    for (const page of SETTINGS_PAGES) {
+      const active = page.id === this.activePage;
+      const button = tabList.createEl("button", { text: page.label });
+      button.type = "button";
+      button.id = `animelist-settings-tab-${page.id}`;
+      button.dataset.settingsPage = page.id;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(active));
+      button.setAttribute("aria-controls", `animelist-settings-panel-${page.id}`);
+      button.tabIndex = active ? 0 : -1;
+      button.toggleClass("mod-cta", active);
+      button.addEventListener("click", () => {
+        if (page.id !== this.activePage) this.openSettingsPage(page.id);
+      });
+      button.addEventListener("keydown", (event) => {
+        const next = settingsPageForKey(page.id, event.key);
+        if (!next) return;
+        event.preventDefault();
+        this.openSettingsPage(next, true);
+      });
+      tabList.append(" ");
+    }
+  }
+
+  private openSettingsPage(page: SettingsPageId, focusTab = false): void {
+    this.activePage = normalizeSettingsPage(page);
+    this.renderImperativeSettings();
+    if (!focusTab) return;
+    this.containerEl
+      .querySelector<HTMLButtonElement>(`button[data-settings-page="${this.activePage}"]`)
+      ?.focus();
+  }
+
   private renderImperativeSettings(): void {
     withActiveLocale("en", () => {
       const { containerEl } = this;
       containerEl.empty();
-      containerEl.createEl("p", {
+      this.activePage = normalizeSettingsPage(this.activePage);
+      this.renderPageTabs(containerEl);
+
+      const panel = containerEl.createDiv({ cls: "animelist-settings-page" });
+      panel.id = `animelist-settings-panel-${this.activePage}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", `animelist-settings-tab-${this.activePage}`);
+      const intro = panel.createEl("p", {
         text: uiText("settings.intro"),
       });
+      intro.setCssStyles({
+        margin: "var(--size-4-3) 0 var(--size-4-5)",
+        color: "var(--text-muted)",
+      });
 
-      for (const section of this.getSettingSections()) {
+      for (const section of this.getSettingsPageSections(this.activePage)) {
+        const sectionEl = panel.createEl("section", { cls: "animelist-settings-section" });
+        sectionEl.setCssStyles({
+          margin: "0 0 var(--size-4-6)",
+          overflow: "hidden",
+          border: "1px solid var(--background-modifier-border)",
+          borderRadius: "var(--radius-l)",
+          background: "var(--background-secondary)",
+        });
         if (section.heading) {
-          const heading = new Setting(containerEl).setName(section.heading).setHeading();
-          if (section.description) heading.setDesc(section.description);
+          const headerEl = sectionEl.createDiv({ cls: "animelist-settings-section-header" });
+          headerEl.setCssStyles({
+            background: "var(--background-secondary-alt)",
+            borderBottom: "1px solid var(--background-modifier-border)",
+          });
+          const heading = new Setting(headerEl).setName(section.heading).setHeading();
+          heading.settingEl.setCssStyles({
+            margin: "0",
+            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
+            border: "0",
+            borderRadius: "0",
+            background: "transparent",
+            boxShadow: "none",
+          });
+          if (section.description) {
+            heading.setDesc(section.description);
+            heading.descEl.setCssStyles({
+              marginTop: "var(--size-4-1)",
+              color: "var(--text-muted)",
+            });
+          }
         }
+
+        const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });
+        let renderedDefinitions = 0;
         for (const definition of section.definitions) {
           if (definition.visible && !definition.visible()) continue;
-          const setting = new Setting(containerEl).setName(definition.name);
+          const setting = new Setting(bodyEl).setName(definition.name);
+          setting.settingEl.setCssStyles({
+            margin: "0",
+            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
+            border: "0",
+            borderTop: renderedDefinitions > 0
+              ? "1px solid var(--background-modifier-border)"
+              : "0",
+            borderRadius: "0",
+            background: "transparent",
+            boxShadow: "none",
+          });
+          setting.nameEl.setCssStyles({ fontWeight: "var(--font-medium)" });
           if (definition.desc) setting.setDesc(definition.desc);
           definition.render?.(setting);
+          renderedDefinitions += 1;
         }
+        if (renderedDefinitions === 0) sectionEl.remove();
       }
     });
   }
 
   private refreshSettingsTab(): void {
-    if (typeof this.update === "function") {
-      this.update();
-      return;
-    }
     this.renderImperativeSettings();
   }
 
