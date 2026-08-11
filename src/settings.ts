@@ -160,25 +160,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
   getSettingSections(): SettingsSection[] {
     return withActiveLocale("en", () => {
       const base = this.getSettingDefinitions();
-      const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
-        ...section,
-        page: section.page ?? "features" as const,
-      }));
-      return [
+      const sections: SettingsSection[] = [
         {
           page: "general",
-          heading: "Interface",
-          definitions: [this.getInterfaceLanguageDefinition()],
-        },
-        {
-          page: "general",
-          heading: "Library & storage",
-          definitions: base.slice(0, 4),
-        },
-        {
-          page: "general",
-          heading: "File locations",
-          definitions: base.slice(4, 6),
+          definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)],
         },
         {
           page: "general",
@@ -186,7 +171,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
           description: uiText("settings.timeline.desc"),
           definitions: base.slice(6, 7),
         },
-        ...featureSections,
         {
           page: "search-metadata",
           heading: searchFeatureText("settings.languages.heading"),
@@ -203,11 +187,26 @@ export class AnimeListSettingTab extends PluginSettingTab {
           definitions: base.slice(10),
         },
       ];
+      const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
+        ...section,
+        page: section.page ?? "features" as const,
+      }));
+      sections.splice(1, 0, ...featureSections);
+      return sections;
     });
   }
 
   getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
-    return this.getSettingSections().filter((section) => section.page === page);
+    const sections = this.getSettingSections().filter((section) => section.page === page);
+    if (page !== "general") return sections;
+    const core = sections.find((section) => !section.heading);
+    if (!core) return sections;
+    return [
+      { page: "general", heading: "Interface", definitions: core.definitions.slice(0, 1) },
+      { page: "general", heading: "Library & storage", definitions: core.definitions.slice(1, 5) },
+      { page: "general", heading: "File locations", definitions: core.definitions.slice(5) },
+      ...sections.filter((section) => section !== core),
+    ];
   }
 
   display(): void {
@@ -220,12 +219,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
   private renderPageTabs(containerEl: HTMLElement): void {
     const tabList = containerEl.createDiv({ cls: "animelist-settings-tabs" });
     tabList.setAttribute("role", "tablist");
-    tabList.setAttribute("aria-label", "AnimeList settings pages");
-    tabList.style.display = "flex";
-    tabList.style.gap = "var(--size-4-2)";
-    tabList.style.overflowX = "auto";
-    tabList.style.paddingBottom = "var(--size-4-2)";
-    tabList.style.marginBottom = "var(--size-4-2)";
+    tabList.setAttribute("aria-label", "Settings pages");
 
     for (const page of SETTINGS_PAGES) {
       const active = page.id === this.activePage;
@@ -247,6 +241,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
         event.preventDefault();
         this.openSettingsPage(next, true);
       });
+      tabList.append(" ");
     }
   }
 
