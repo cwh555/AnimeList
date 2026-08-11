@@ -5,10 +5,11 @@ import { configureSerialCoverProvider } from "./serial-cover-provider";
 import type { SerialCoverPlugin } from "./serial-cover-service";
 import { serialCoverText } from "./serial-cover-text";
 
-export function createSerialCoverSettingsSection(
+export function createSerialCoverSettingsSections(
   plugin: SerialCoverPlugin,
-): FeatureSettingsSection {
-  return {
+): FeatureSettingsSection[] {
+  const apiKey: FeatureSettingsSection = {
+    page: "features",
     heading: serialCoverText("settings.heading"),
     definitions: [{
       name: serialCoverText("settings.apiKeyName"),
@@ -24,7 +25,12 @@ export function createSerialCoverSettingsSection(
           });
         });
       },
-    }, {
+    }],
+  };
+  const recovery: FeatureSettingsSection = {
+    page: "maintenance",
+    heading: serialCoverText("settings.maintenanceHeading"),
+    definitions: [{
       name: serialCoverText("settings.name"),
       desc: serialCoverText("settings.desc"),
       render: (setting: Setting) => {
@@ -38,6 +44,7 @@ export function createSerialCoverSettingsSection(
       },
     }],
   };
+  return [apiKey, recovery];
 }
 
 export const serialCoverSettingsFeature = defineFeature<AnimeListFeatureHost>({
@@ -46,7 +53,7 @@ export const serialCoverSettingsFeature = defineFeature<AnimeListFeatureHost>({
   contributions: [{
     kind: "settings",
     sections(host) {
-      return createSerialCoverSettingsSection(host);
+      return createSerialCoverSettingsSections(host);
     },
   }],
 });

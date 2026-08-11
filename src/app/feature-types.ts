@@ -1,4 +1,5 @@
 import type { Plugin, SettingDefinition, TFile } from "obsidian";
+import type { SettingsPageId } from "../settings-layout";
 import type {
   AnimeListSettings,
   ExternalMediaResult,
@@ -18,6 +19,7 @@ import type {
 import type { SearchRenderContext } from "../ui/search-contracts";
 
 export interface FeatureSettingsSection {
+  page?: SettingsPageId;
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
