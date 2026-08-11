@@ -4,6 +4,12 @@ import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
 import { withActiveLocale } from "./i18n/catalog";
 import { searchFeatureText } from "./search-feature-text";
 import {
+  SETTINGS_PAGES,
+  normalizeSettingsPage,
+  settingsPageForKey,
+  type SettingsPageId,
+} from "./settings-layout";
+import {
   MAX_TIMELINE_MAX_STACK_DEPTH,
   MIN_TIMELINE_MAX_STACK_DEPTH,
   normalizeTimelineMaxStackDepth,
@@ -34,6 +40,7 @@ export interface AnimeListSettingsHost {
 }
 
 export interface SettingsSection {
+  page?: SettingsPageId;
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
@@ -46,9 +53,9 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
-
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private activePage: SettingsPageId = "general";
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
@@ -153,30 +160,54 @@ export class AnimeListSettingTab extends PluginSettingTab {
   getSettingSections(): SettingsSection[] {
     return withActiveLocale("en", () => {
       const base = this.getSettingDefinitions();
-      const sections: SettingsSection[] = [
-        { definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)] },
+      const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
+        ...section,
+        page: section.page ?? "features" as const,
+      }));
+      return [
         {
+          page: "general",
+          heading: "Interface",
+          definitions: [this.getInterfaceLanguageDefinition()],
+        },
+        {
+          page: "general",
+          heading: "Library & storage",
+          definitions: base.slice(0, 4),
+        },
+        {
+          page: "general",
+          heading: "File locations",
+          definitions: base.slice(4, 6),
+        },
+        {
+          page: "general",
           heading: uiText("settings.timeline.heading"),
           description: uiText("settings.timeline.desc"),
           definitions: base.slice(6, 7),
         },
+        ...featureSections,
         {
+          page: "search-metadata",
           heading: searchFeatureText("settings.languages.heading"),
           definitions: this.getSearchLanguageDefinitions(),
         },
         {
+          page: "search-metadata",
           heading: uiText("settings.providers.heading"),
           definitions: base.slice(7, 10),
         },
         {
+          page: "maintenance",
           heading: uiText("settings.setup.heading"),
           definitions: base.slice(10),
         },
       ];
-      const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
-      sections.splice(1, 0, ...featureSections);
-      return sections;
     });
+  }
+
+  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
+    return this.getSettingSections().filter((section) => section.page === page);
   }
 
   display(): void {
@@ -186,22 +217,71 @@ export class AnimeListSettingTab extends PluginSettingTab {
     this.renderImperativeSettings();
   }
 
+  private renderPageTabs(containerEl: HTMLElement): void {
+    const tabList = containerEl.createDiv({ cls: "animelist-settings-tabs" });
+    tabList.setAttribute("role", "tablist");
+    tabList.setAttribute("aria-label", "AnimeList settings pages");
+    tabList.style.display = "flex";
+    tabList.style.gap = "var(--size-4-2)";
+    tabList.style.overflowX = "auto";
+    tabList.style.paddingBottom = "var(--size-4-2)";
+    tabList.style.marginBottom = "var(--size-4-2)";
+
+    for (const page of SETTINGS_PAGES) {
+      const active = page.id === this.activePage;
+      const button = tabList.createEl("button", { text: page.label });
+      button.type = "button";
+      button.id = `animelist-settings-tab-${page.id}`;
+      button.dataset.settingsPage = page.id;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(active));
+      button.setAttribute("aria-controls", `animelist-settings-panel-${page.id}`);
+      button.tabIndex = active ? 0 : -1;
+      button.toggleClass("mod-cta", active);
+      button.addEventListener("click", () => {
+        if (page.id !== this.activePage) this.openSettingsPage(page.id);
+      });
+      button.addEventListener("keydown", (event) => {
+        const next = settingsPageForKey(page.id, event.key);
+        if (!next) return;
+        event.preventDefault();
+        this.openSettingsPage(next, true);
+      });
+    }
+  }
+
+  private openSettingsPage(page: SettingsPageId, focusTab = false): void {
+    this.activePage = normalizeSettingsPage(page);
+    this.renderImperativeSettings();
+    if (!focusTab) return;
+    this.containerEl
+      .querySelector<HTMLButtonElement>(`button[data-settings-page="${this.activePage}"]`)
+      ?.focus();
+  }
+
   private renderImperativeSettings(): void {
     withActiveLocale("en", () => {
       const { containerEl } = this;
       containerEl.empty();
-      containerEl.createEl("p", {
+      this.activePage = normalizeSettingsPage(this.activePage);
+      this.renderPageTabs(containerEl);
+
+      const panel = containerEl.createDiv({ cls: "animelist-settings-page" });
+      panel.id = `animelist-settings-panel-${this.activePage}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", `animelist-settings-tab-${this.activePage}`);
+      panel.createEl("p", {
         text: uiText("settings.intro"),
       });
 
-      for (const section of this.getSettingSections()) {
+      for (const section of this.getSettingsPageSections(this.activePage)) {
         if (section.heading) {
-          const heading = new Setting(containerEl).setName(section.heading).setHeading();
+          const heading = new Setting(panel).setName(section.heading).setHeading();
           if (section.description) heading.setDesc(section.description);
         }
         for (const definition of section.definitions) {
           if (definition.visible && !definition.visible()) continue;
-          const setting = new Setting(containerEl).setName(definition.name);
+          const setting = new Setting(panel).setName(definition.name);
           if (definition.desc) setting.setDesc(definition.desc);
           definition.render?.(setting);
         }
@@ -210,10 +290,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   private refreshSettingsTab(): void {
-    if (typeof this.update === "function") {
-      this.update();
-      return;
-    }
     this.renderImperativeSettings();
   }
 
