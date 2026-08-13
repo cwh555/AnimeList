@@ -11,7 +11,7 @@ import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
-import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
+import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { getScopedMarkdownFiles } from "../vault-scope";
 
 export interface AnimeListApplicationCallbacks {
@@ -21,6 +21,7 @@ export interface AnimeListApplicationCallbacks {
 
 export class AnimeListApplicationServices {
   private coverCache?: CoverThumbnailCache;
+  private imageThumbnailCache?: CoverThumbnailCache;
   private mediaRepository?: MediaRepository;
   private mediaIndex?: MediaLibraryIndex;
   private classificationService?: MediaClassificationService;
@@ -40,12 +41,17 @@ export class AnimeListApplicationServices {
 
   async initialize(): Promise<void> {
     this.coverCache = new CoverThumbnailCache(this.app, this.pluginId, () => this.callbacks.refreshViews());
-    await this.coverCache.initialize();
+    this.imageThumbnailCache = new CoverThumbnailCache(this.app, this.pluginId, () => this.callbacks.refreshViews(), "images");
+    await Promise.all([this.coverCache.initialize(), this.imageThumbnailCache.initialize()]);
     this.mediaRepository = new MediaRepository(this.app, (file) => this.coverCache?.getDeferredSources(file));
     this.coverCache.scheduleCleanup();
+    this.imageThumbnailCache.scheduleCleanup();
   }
 
-  dispose(): void { this.coverCache?.dispose(); }
+  dispose(): void {
+    this.coverCache?.dispose();
+    this.imageThumbnailCache?.dispose();
+  }
 
   private libraryStorage(): LibraryStorage {
     this.storage ??= new LibraryStorage(this.app, this.settings);
@@ -174,6 +180,10 @@ export class AnimeListApplicationServices {
   ): Promise<{ optimized: number; failed: number }> {
     if (!this.coverCache) throw new Error("Cover cache is not initialized");
     return this.coverCache.optimizeFiles(files, onProgress);
+  }
+
+  getImageThumbnailSources(file: TFile): CoverSources | undefined {
+    return this.imageThumbnailCache?.getSources(file);
   }
 
   async clearCoverCache(): Promise<number> {
