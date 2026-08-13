@@ -3,6 +3,7 @@ export const SETTINGS_PAGE_IDS = [
   "search-metadata",
   "features",
   "maintenance",
+  "updates-cleanup",
 ] as const;
 
 export type SettingsPageId = typeof SETTINGS_PAGE_IDS[number];
@@ -17,6 +18,7 @@ export const SETTINGS_PAGES: readonly SettingsPageDefinition[] = [
   { id: "search-metadata", label: "Search & metadata" },
   { id: "features", label: "Features" },
   { id: "maintenance", label: "Maintenance" },
+  { id: "updates-cleanup", label: "Updates & cleanup" },
 ];
 
 const FEATURE_SETTINGS_PAGES: Readonly<Record<string, SettingsPageId>> = Object.freeze({
@@ -24,7 +26,8 @@ const FEATURE_SETTINGS_PAGES: Readonly<Record<string, SettingsPageId>> = Object.
   "serial-cover-settings": "features",
   "user-tag-catalog": "features",
   masterpiece: "features",
-  "legacy-metadata-cleanup-settings": "maintenance",
+  "legacy-metadata-cleanup-settings": "updates-cleanup",
+  "version-cleanup-settings": "updates-cleanup",
 });
 
 export function normalizeSettingsPage(value: unknown): SettingsPageId {

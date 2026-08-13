@@ -69,7 +69,7 @@ function appendResult(parent: HTMLElement, detail: LegacyMetadataCleanupDetail):
 function setProgress(fill: HTMLElement, completed: number, total: number): number {
   const ratio = total > 0 ? Math.round((completed / total) * 100) : 0;
   const percent = Math.min(100, Math.max(0, ratio));
-  fill.style.width = `${percent}%`;
+  fill.setCssStyles({ width: `${percent}%` });
   return percent;
 }
 
@@ -81,8 +81,33 @@ export class LegacyMetadataCleanupModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass("animelist-modal", "al-legacy-metadata-cleanup-modal");
     this.titleEl.setText(legacyMetadataText("settings.modalTitle"));
-    this.contentEl.empty();
+    this.renderConfirmation();
+  }
 
+  private renderConfirmation(): void {
+    this.contentEl.empty();
+    this.contentEl.createEl("p", {
+      cls: "al-modal-hint",
+      text: "Review this legacy metadata update before the plugin writes any notes.",
+    });
+    const rules = this.contentEl.createEl("ul", { cls: "al-version-cleanup-rules" });
+    rules.createEl("li", { text: "Scan media notes in the configured library folders." });
+    rules.createEl("li", { text: "Normalize legacy genre, studio, tag, season, and classification metadata." });
+    rules.createEl("li", { text: "When required, query current provider metadata to repair incomplete legacy fields." });
+    rules.createEl("li", { text: "Preserve unrelated frontmatter and note body content." });
+    rules.createEl("li", { text: "This operation can modify many notes; Cancel makes no changes." });
+
+    const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
+    const cancel = footer.createEl("button", { text: "Cancel" });
+    cancel.type = "button";
+    cancel.addEventListener("click", () => this.close());
+    const confirm = footer.createEl("button", { cls: "mod-cta", text: "Confirm and run" });
+    confirm.type = "button";
+    confirm.addEventListener("click", () => this.runCleanup());
+  }
+
+  private runCleanup(): void {
+    this.contentEl.empty();
     this.contentEl.createEl("p", {
       cls: "al-modal-hint",
       text: legacyMetadataText("settings.modalDescription"),
@@ -98,9 +123,7 @@ export class LegacyMetadataCleanupModal extends Modal {
       cls: "al-result-meta",
       text: legacyMetadataText("settings.progress", { completed: 0, total: 0 }),
     });
-    const message = progressCard.createEl("p", {
-      text: legacyMetadataText("settings.preparing"),
-    });
+    const message = progressCard.createEl("p", { text: legacyMetadataText("settings.preparing") });
     const progressTrack = progressCard.createDiv({ cls: "al-progress-track" });
     const progressFill = progressTrack.createDiv({ cls: "al-progress-fill" });
     setProgress(progressFill, 0, 1);
@@ -138,10 +161,7 @@ export class LegacyMetadataCleanupModal extends Modal {
     }).then((summary) => {
       phase.setText(legacyMetadataText("settings.phase.completed"));
       message.setText(summaryText(summary));
-      count.setText(legacyMetadataText("settings.progress", {
-        completed: summary.scanned,
-        total: summary.scanned,
-      }));
+      count.setText(legacyMetadataText("settings.progress", { completed: summary.scanned, total: summary.scanned }));
       current.setText(legacyMetadataText("settings.progressComplete"));
       percent.setText(`${setProgress(progressFill, summary.scanned, summary.scanned)}%`);
 
@@ -157,10 +177,7 @@ export class LegacyMetadataCleanupModal extends Modal {
       if (summary.details.length) {
         for (const detail of summary.details) appendResult(results, detail);
       } else {
-        results.createDiv({
-          cls: "al-search-empty",
-          text: legacyMetadataText("settings.result.empty"),
-        });
+        results.createDiv({ cls: "al-search-empty", text: legacyMetadataText("settings.result.empty") });
       }
       completion.hidden = false;
       close.disabled = false;
