@@ -22,6 +22,7 @@
     "test:unit": "node scripts/run-tests.mjs --suite unit",
     "test:integration": "node scripts/run-tests.mjs --suite integration",
     "test:contract": "node scripts/run-tests.mjs --suite contract",
+    "test:legacy-update": "node scripts/run-tests.mjs --suite legacy-update",
     "test:legacy": "node scripts/run-tests.mjs --suite legacy",
     "test:feature": "node scripts/run-tests.mjs --feature",
     "test:list": "node scripts/run-tests.mjs --list",

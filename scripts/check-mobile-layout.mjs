@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { build } from "esbuild";
 import { runChromiumDatasetTest } from "./browser/chromium-page-runner.mjs";
 
 const root = process.cwd();
@@ -77,6 +78,76 @@ function fixture(mode) {
   </body></html>`;
 }
 
+async function imageSectionExpandFixture() {
+  const anchorBundle = await build({
+    stdin: {
+      contents: `import { captureViewportAnchor } from "./src/ui/viewport-anchor.ts"; window.captureViewportAnchor = captureViewportAnchor;`,
+      resolveDir: root,
+      sourcefile: "image-section-anchor-fixture.ts",
+    },
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    write: false,
+  });
+  const anchorScript = anchorBundle.outputFiles[0].text;
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+    :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; }
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;} body{font-family:sans-serif;} ${styles}
+    #editor-scroll{height:800px;overflow-y:auto}.spacer{height:900px}.tail{height:1400px}.al-image-item{height:180px}
+  </style></head><body data-result="pending"><div id="editor-scroll" class="cm-scroller"><div class="spacer"></div>
+    <section id="section" class="animelist-image-section">
+      <div id="viewport" class="al-image-gallery-viewport"><div class="al-image-masonry">${'<div class="al-image-item"></div>'.repeat(14)}</div></div>
+      <button id="toggle" class="al-image-expand-button" type="button">Show all images</button>
+    </section><div class="tail"></div></div>
+    <script>${anchorScript}</script>
+    <script>
+      const scroller = document.querySelector('#editor-scroll');
+      const section = document.querySelector('#section');
+      const viewport = document.querySelector('#viewport');
+      const toggle = document.querySelector('#toggle');
+      let editorMouseDown = false;
+      scroller.addEventListener('mousedown', () => { editorMouseDown = true; });
+      section.addEventListener('mousedown', (event) => {
+        if (!event.target.closest('button, a, input, textarea, select, [role="button"]')) return;
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      toggle.scrollIntoView({ block: 'center' });
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const beforeTop = section.getBoundingClientRect().top;
+        const beforeHeight = viewport.getBoundingClientRect().height;
+        const anchor = window.captureViewportAnchor(section);
+        toggle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        viewport.classList.add('is-expanded');
+        anchor.restore();
+        anchor.stabilize(12);
+        requestAnimationFrame(() => {
+          // Model the delayed scroll correction Live Preview/CodeMirror can apply
+          // after a block widget changes height. The image section must undo this
+          // without moving the user's visible anchor.
+          scroller.scrollTop += 240;
+        });
+        let frames = 0;
+        const check = () => {
+          frames += 1;
+          if (frames < 14) { requestAnimationFrame(check); return; }
+          const afterTop = section.getBoundingClientRect().top;
+          const afterHeight = viewport.getBoundingClientRect().height;
+          const details = {
+            sectionAnchorStable: Math.abs(afterTop - beforeTop) <= 1,
+            contentExpandedDownward: afterHeight > beforeHeight + 100,
+            editorMouseDownBlocked: !editorMouseDown,
+          };
+          document.body.dataset.details = JSON.stringify(details);
+          document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
+        };
+        requestAnimationFrame(check);
+      }));
+    </script>
+  </body></html>`;
+}
+
 try {
   await runChromiumDatasetTest({
     html: fixture("mobile"),
@@ -88,6 +159,12 @@ try {
     html: fixture("desktop"),
     profile: path.join(output, "desktop-profile"),
     testName: "AnimeList desktop layout regression",
+    viewport: { width: 1200, height: 800, mobile: false },
+  });
+  await runChromiumDatasetTest({
+    html: await imageSectionExpandFixture(),
+    profile: path.join(output, "image-section-expand-profile"),
+    testName: "AnimeList image section expansion anchor",
     viewport: { width: 1200, height: 800, mobile: false },
   });
 } finally {

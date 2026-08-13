@@ -1,6 +1,4 @@
 import { defineFeature, type AnimeListFeatureHost } from "./app/feature-types";
-import { normalizeMediaStatus } from "./media-status";
-import { normalizeProgressValue, progressDisplayValue } from "./novel-progress";
 import { progressPresentation } from "./progress-display";
 import { uiText } from "./ui-text";
 import type { MediaType, ProgressValue } from "./types";
@@ -13,14 +11,6 @@ interface ProgressRenderInput {
   unit: string;
   text: string;
   trailingText?: string;
-}
-
-function primitiveString(value: unknown, fallback = ""): string {
-  return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
-}
-
-function mediaTypeValue(value: unknown): MediaType {
-  return value === "manga" || value === "novel" ? value : "anime";
 }
 
 function progressStatusFromCard(card: HTMLElement): string {
@@ -90,34 +80,6 @@ export const progressUiFeature = defineFeature<AnimeListFeatureHost>({
     afterRender({ container }): void {
       synchronizeLibraryProgress(container);
     },
-  }, {
-    kind: "detail",
-    afterRender({ container, frontmatter }): void {
-      const mediaType = mediaTypeValue(frontmatter.media_type);
-      const progress = normalizeProgressValue(frontmatter.progress);
-      const total = mediaType === "anime" ? normalizeProgressValue(frontmatter.progress_total) : 0;
-      const unit = primitiveString(frontmatter.progress_unit);
-      const summary = container.querySelector<HTMLElement>(".al-detail-summary");
-      const summaryProgress = summary?.querySelector<HTMLElement>("span:not(.al-status):not(.al-detail-score)");
-      const text = summaryProgress?.textContent?.trim()
-        || (progress !== 0
-          ? uiText(mediaType === "anime" ? "library.watchedProgress" : "library.readProgress", {
-            progress: progressDisplayValue(progress),
-            unit,
-          })
-          : uiText("detail.noProgress"));
-      summaryProgress?.remove();
-
-      const progressContainer = container.createDiv({ cls: "al-progress al-detail-progress" });
-      container.querySelector<HTMLElement>(".al-detail-actions")?.addClass("has-detail-progress");
-      renderProgress(progressContainer, {
-        mediaType,
-        status: normalizeMediaStatus(frontmatter.status),
-        progress,
-        total,
-        unit,
-        text,
-      });
-    },
-  }],
+  },
+  ],
 });

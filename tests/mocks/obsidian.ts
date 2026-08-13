@@ -46,12 +46,38 @@ export class TAbstractFile {
 export class TFile extends TAbstractFile {
   basename = "";
   extension = "md";
+  stat = { ctime: 0, mtime: 0, size: 0 };
 }
 export class TFolder extends TAbstractFile {
   children: TAbstractFile[] = [];
 }
 export class Notice { constructor(_message?: string) {} }
 export class App {}
+
+export class MenuItem {
+  title = "";
+  icon: string | null = null;
+  section = "";
+  click: ((event?: any) => unknown) | null = null;
+  submenu: Menu | null = null;
+  setTitle(title: string): this { this.title = title; return this; }
+  setIcon(icon: string | null): this { this.icon = icon; return this; }
+  setWarning(): this { return this; }
+  setIsLabel(): this { return this; }
+  setSection(section: string): this { this.section = section; return this; }
+  onClick(callback: (event?: any) => unknown): this { this.click = callback; return this; }
+  setSubmenu(): Menu { this.submenu = new Menu(); return this.submenu; }
+}
+
+
+export class Menu {
+  items: MenuItem[] = [];
+  addItem(callback: (item: MenuItem) => unknown): this { const item = new MenuItem(); this.items.push(item); callback(item); return this; }
+  showAtPosition(): this { return this; }
+  showAtMouseEvent(): this { return this; }
+  hide(): this { return this; }
+}
+
 
 export class PluginSettingTab {
   app: any;

@@ -287,15 +287,7 @@ export function buildMediaMarkdown(
     summary: result.summary,
     sourceUrl: result.sourceUrl,
   });
-  let body = ensureDetailBlock(applied, title);
-  if (coverPath && !body.includes(coverPath)) {
-    body = body.replace(/(```animelist-detail\n```)/, `$1\n\n![[${coverPath}|260]]`);
-  } else if (!coverPath && result.coverUrl && !body.includes(result.coverUrl)) {
-    body = body.replace(
-      /(```animelist-detail\n```)/,
-      `$1\n\n![${uiText("library.coverAlt", { title })}](${result.coverUrl})`,
-    );
-  }
+  const body = ensureDetailBlock(applied, title);
   lines.push(body.trim(), "");
   return lines.join("\n");
 }

@@ -59,9 +59,11 @@ describe("media note Markdown compatibility", () => {
     assert.match(yaml, /^score: 8\.5$/m);
     assert.match(yaml, /^started_at: "2026-01-01"$/m);
     assert.match(yaml, /^completed_at: "2026-01-02"$/m);
+    const body = markdown.split("---").slice(2).join("---");
+    assert.match(body, /```animelist-detail\n```/);
+    assert.doesNotMatch(body, /!\[\[AnimeList\/Covers\/anime\/example\.webp\|260]]/);
     assert.match(yaml, /^cover: "AnimeList\/Covers\/anime\/example\.webp"$/m);
     assert.doesNotMatch(yaml, /^updated_at:/m);
-    assert.match(markdown, /!\[\[AnimeList\/Covers\/anime\/example\.webp\|260]]/);
   });
 
   it("keeps serial-entry metadata and unrelated fields when writing a novel note", () => {

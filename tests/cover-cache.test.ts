@@ -17,6 +17,14 @@ describe("cover thumbnail cache", () => {
     assert.notEqual(coverCacheKey("AnimeList/Covers/a.jpg", 1234), coverCacheKey("AnimeList/Covers/a.jpg", 1235));
   });
 
+  it("can isolate image-section thumbnails from the cover cache without duplicating cache logic", () => {
+    const app = { vault: { configDir: ".obsidian" } } as unknown as App;
+    const covers = new CoverThumbnailCache(app, "animelist");
+    const images = new CoverThumbnailCache(app, "animelist", undefined, "images");
+    assert.equal(covers.root, ".obsidian/plugins/animelist/cache/covers");
+    assert.equal(images.root, ".obsidian/plugins/animelist/cache/images");
+  });
+
   it("creates a complete immutable thumbnail group", () => {
     const paths = coverCachePaths(".obsidian/plugins/animelist/cache/covers", "Covers/a.jpg", 42);
     assert.match(paths.placeholder, /-24\.webp$/);

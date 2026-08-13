@@ -1,8 +1,10 @@
-export const TEST_SUITES = ["unit", "integration", "contract", "legacy"];
+export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", "legacy"];
 
 export const TEST_FEATURES = [
   "covers",
+  "image-sections",
   "library",
+  "legacy-update",
   "markdown",
   "masterpiece",
   "progress",
@@ -23,6 +25,10 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
+  { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
+  { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },
 
   { path: "tests/masterpiece-labels.test.ts", kind: "test", suite: "unit", features: ["masterpiece"] },
   { path: "tests/masterpiece-decoration-cache.test.ts", kind: "test", suite: "unit", features: ["masterpiece", "library"] },
@@ -78,7 +84,8 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/media-classification-service.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
   { path: "tests/contracts/media-classification-fields.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
   { path: "tests/contracts/media-quarter-metadata.test.ts", kind: "test", suite: "contract", features: ["search", "markdown", "settings"] },
-  { path: "tests/contracts/legacy-metadata-cleanup.test.ts", kind: "test", suite: "contract", features: ["settings", "markdown", "search"] },
+  { path: "tests/contracts/legacy-metadata-cleanup.test.ts", kind: "test", suite: "legacy-update", features: ["legacy-update", "settings", "markdown", "search"] },
+  { path: "tests/legacy-update/version-cleanup.test.ts", kind: "test", suite: "legacy-update", features: ["legacy-update", "settings", "markdown", "covers"] },
   { path: "tests/contracts/existing-library-initialization.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },

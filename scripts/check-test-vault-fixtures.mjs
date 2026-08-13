@@ -47,6 +47,10 @@ function allMarkdown(root) {
 }
 
 try {
+  // Simulate a Test Vault that carries the previous image-fixture marker but
+  // is missing the image blocks. The next revision must seed them once.
+  fs.writeFileSync(path.join(vaultRoot, ".animelist-test-image-sections-v5"), "stale previous image fixture marker\n");
+
   const legacyFixture = path.join(vaultRoot, "AnimeList/Test Fixtures/Anime/01-anime-planned.md");
   fs.mkdirSync(path.dirname(legacyFixture), { recursive: true });
   fs.writeFileSync(legacyFixture, "---\ntitle: \"TEST 動畫－未開始\"\nmedia_type: \"anime\"\n---\n");
@@ -80,6 +84,33 @@ try {
   assert.match(checklist, /Ch\.72/);
   assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
+  assert.match(checklist, /Reusable image sections/);
+  assert.match(checklist, /real works and real downloaded cover images/i);
+  assert.match(checklist, /Add modal uses the available width without horizontal scrolling/i);
+  assert.match(checklist, /Updates & cleanup/i);
+  assert.match(checklist, /old default duplicate cover embed/i);
+  assert.equal(first.imageSectionDemos.demoPaths.length, 3);
+  assert.equal(first.imageSectionDemos.assetPaths.length, 14);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
+  for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
+  for (const asset of first.imageSectionDemos.assetPaths) {
+    const file = path.join(vaultRoot, asset);
+    assert.equal(fs.statSync(file).isFile(), true);
+    assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  }
+  const frierenAnimePath = "AnimeList/Anime/葬送的芙莉蓮.md";
+  const kaguyaAnimePath = "AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~.md";
+  const overlordPath = "AnimeList/Novel/OVERLORD.md";
+  assert.equal((read(frierenAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 12);
+  assert.match(read(frierenAnimePath), /animelist-test-image-sections:start/);
+  assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
+  assert.equal((read(kaguyaAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 10);
+  assert.match(read(overlordPath), /```animelist-images\n```/);
+  for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {
+    assert.doesNotMatch(read(demoPath), /!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//);
+  }
+  assert.match(read(overlordPath), /!\[\[AnimeList\/Covers\/novel\/overlord-bangumi-101929\.jpg\|260\]\]/);
+  assert.equal(fs.existsSync(path.join(vaultRoot, "_AnimeList Image Section Demos")), false);
 
   const mediaNotes = allMarkdown(path.join(vaultRoot, TEST_LIBRARY_ROOT))
     .filter((file) => fs.readFileSync(file, "utf8").includes(`fixture_version: ${TEST_FIXTURE_VERSION}`));
@@ -93,7 +124,7 @@ try {
   assert.equal((allFixtures.match(new RegExp(`fixture_version: ${TEST_FIXTURE_VERSION}`, "g")) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover: "AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
   assert.equal((allFixtures.match(/cover_remote: "https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//g) ?? []).length, 18);
-  assert.equal((allFixtures.match(/!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 18);
+  assert.equal((allFixtures.match(/!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//g) ?? []).length, 1);
 
   for (const file of mediaNotes) {
     const content = fs.readFileSync(file, "utf8");
@@ -138,6 +169,8 @@ try {
   fs.writeFileSync(path.join(vaultRoot, importedFrierenPath), collectedFrieren);
   fs.rmSync(path.join(vaultRoot, frierenMangaPath));
   fs.appendFileSync(path.join(vaultRoot, alyaPath), "\nUSER EDIT MUST SURVIVE\n");
+  const imageDemoPath = kaguyaAnimePath;
+  fs.appendFileSync(path.join(vaultRoot, imageDemoPath), "\nIMAGE SECTION DEMO EDIT MUST SURVIVE\n");
 
   fetchCalls = 0;
   const second = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
@@ -152,6 +185,7 @@ try {
   assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
   assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  assert.match(read(imageDemoPath), /IMAGE SECTION DEMO EDIT MUST SURVIVE/);
   const frierenSourceMatches = allMarkdown(path.join(vaultRoot, "AnimeList", "Manga"))
     .filter((file) => /source_id: "305429"/.test(fs.readFileSync(file, "utf8")));
   assert.equal(frierenSourceMatches.length, 1);
@@ -180,6 +214,7 @@ try {
   assert.equal(fs.existsSync(path.join(vaultRoot, frierenMangaPath)), false);
   assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.doesNotMatch(read(alyaPath), /USER EDIT MUST SURVIVE/);
+  assert.doesNotMatch(read(imageDemoPath), /IMAGE SECTION DEMO EDIT MUST SURVIVE/);
   assert.equal(reset.repaired, 17);
   assert.equal(reset.reused, 1);
   assert.equal(reset.reusedBySource, 1);

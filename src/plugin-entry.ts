@@ -3,7 +3,7 @@ import { registerBundledLocales } from "./i18n/locales";
 import { additionalProgressUnitsFeature } from "./additional-progress-units-ui";
 import AnimeListPlugin from "./main";
 import { masterpieceFeature } from "./masterpiece-ui";
-import { legacyMetadataSettingsFeature } from "./legacy-metadata-settings";
+import { imageSectionFeature } from "./image-section-feature";
 import { progressUiFeature } from "./progress-ui";
 import { ratingFeature } from "./rating-ui";
 import { releaseTrackingFeature } from "./release-tracking-feature";
@@ -13,6 +13,7 @@ import { searchPaginationFeature } from "./search-pagination";
 import { serialEntryCoversFeature } from "./serial-cover-feature";
 import { serialCoverSettingsFeature } from "./serial-cover-settings";
 import { userTagSettingsFeature } from "./user-tag-settings";
+import { versionCleanupSettingsFeature } from "./version-cleanup-settings";
 
 registerBundledLocales();
 
@@ -21,11 +22,12 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   searchPaginationFeature,
   searchEnhancementsFeature,
   ratingFeature,
+  imageSectionFeature,
   releaseTrackingFeature,
   additionalProgressUnitsFeature,
   serialEntryCoversFeature,
   serialCoverSettingsFeature,
-  legacyMetadataSettingsFeature,
+  versionCleanupSettingsFeature,
   userTagSettingsFeature,
   masterpieceFeature,
   scoreDashboardFeature,

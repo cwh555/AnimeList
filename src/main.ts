@@ -12,7 +12,7 @@ import { AnimeListSettingsStore } from "./settings-store";
 import { searchFeatureText } from "./search-feature-text";
 import { loadMissingSerialCovers, type SerialCoverMigrationProgress, type SerialCoverMigrationSummary } from "./serial-cover-service";
 import { MEDIA_STATUS_MIGRATION_VERSION, migrateMediaStatusNotes } from "./schema-migration";
-import type { AnimeListSettings, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "./types";
+import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "./types";
 import { uiText } from "./ui-text";
 import { AnimeListUI } from "./ui/library-renderer";
 import { LibraryFilterModal } from "./ui/library-filter-modal";
@@ -297,6 +297,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async ensureFolder(path: string): Promise<void> { await this.services().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.services().findExistingBySource(provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }
+  getImageThumbnailSources(file: TFile): CoverSources | undefined { return this.services().getImageThumbnailSources(file); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.services().downloadCover(result); }
   async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
     return this.services().createMediaNote(result, form);
