@@ -70,6 +70,158 @@ function writeFile(vaultRoot, relativePath, content) {
   return target;
 }
 
+
+const IMAGE_SECTION_DEMO_ROOT = "_AnimeList Image Section Demos";
+const IMAGE_SECTION_ASSET_ROOT = "AnimeList/Images/test-vault";
+const IMAGE_SECTION_FIXTURE_MARKER = ".animelist-test-image-sections-v6";
+const IMAGE_SECTION_PREVIOUS_MARKER = ".animelist-test-image-sections-v5";
+const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
+const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
+const IMAGE_LAYOUT_SOURCE_IDS = [
+  400602, 305429, 328609, 248175, 135218, 118165, 210505,
+  267222, 339092, 101929, 10380, 975, 266498, 302189,
+];
+
+function fixtureBySourceId(sourceId) {
+  const fixture = FIXTURES.find((entry) => String(entry.sourceId) === String(sourceId));
+  if (!fixture) throw new Error(`Missing Test Vault fixture for source ${sourceId}`);
+  return fixture;
+}
+
+function galleryAssetRelativePath(sourceFixture) {
+  return `${IMAGE_SECTION_ASSET_ROOT}/${sourceFixture.mediaType}-${sourceFixture.sourceId}.jpg`;
+}
+
+function copyRealGalleryAsset(vaultRoot, sourceFixture) {
+  const sourceRelative = coverRelativePath(sourceFixture).split(path.sep).join("/");
+  const source = path.join(vaultRoot, sourceRelative);
+  if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`Real image-section source cover is missing: ${sourceRelative}`);
+  }
+  const targetRelative = galleryAssetRelativePath(sourceFixture);
+  const target = path.join(vaultRoot, targetRelative);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(source, target);
+  return targetRelative;
+}
+
+function imageBlock(paths) {
+  return ["```animelist-images", ...paths.map((value) => `- ${value}`), "```"].join("\n");
+}
+
+function stripMarkedImageFixture(content) {
+  const start = content.indexOf(IMAGE_SECTION_FIXTURE_START);
+  if (start < 0) return content;
+  const end = content.indexOf(IMAGE_SECTION_FIXTURE_END, start);
+  if (end < 0) return content;
+  const after = end + IMAGE_SECTION_FIXTURE_END.length;
+  return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
+}
+
+function stripLegacyV2ImageFixture(content, kind) {
+  let next = content;
+  if (kind === "frieren") {
+    next = next.replace(/\n\n## 圖片牆\n\n```animelist-images\n(?:- AnimeList\/Images\/test-vault\/[^\n]+\n)+```\n\n> 真實測資：動畫版與漫畫版的實際封面圖片。\n?/u, "");
+  } else if (kind === "kaguya") {
+    next = next.replace(/\n\n## 動畫圖\n\n```animelist-images\n(?:- AnimeList\/Images\/test-vault\/[^\n]+\n)+```\n\n這段文字刻意放在兩個 image sections 中間，確認正文與區塊互不干擾。\n\n## 漫畫圖\n\n```animelist-images\n(?:- AnimeList\/Images\/test-vault\/[^\n]+\n)+```\n?/u, "");
+  } else if (kind === "overlord") {
+    next = next.replace(/\n\n## 圖片收藏\n\n```animelist-images\n```\n\n> 真實作品的空 image section，用來驗證選檔、拖放、貼上與 URL 新增。\n?/u, "");
+  }
+  return next.trimEnd();
+}
+
+function seedRealImageSections(vaultRoot, fixture, kind, body, migrateV2) {
+  const relativePath = fixtureRelativePath(fixture).split(path.sep).join("/");
+  const target = path.join(vaultRoot, relativePath);
+  if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`Real image-section Test Vault note is missing: ${relativePath}`);
+  }
+  let content = fs.readFileSync(target, "utf8").trimEnd();
+  content = stripMarkedImageFixture(content);
+  if (migrateV2) content = stripLegacyV2ImageFixture(content, kind);
+  const coverPath = coverRelativePath(fixture).split(path.sep).join("/");
+  content = content.replace(`\n\n![[${coverPath}|260]]`, "");
+  const fixtureBody = [IMAGE_SECTION_FIXTURE_START, body.trim(), IMAGE_SECTION_FIXTURE_END].join("\n");
+  fs.writeFileSync(target, `${content}\n\n${fixtureBody}\n`);
+  return target;
+}
+
+
+function seedLegacyDefaultCoverEmbed(vaultRoot, fixture) {
+  const relativePath = fixtureRelativePath(fixture).split(path.sep).join("/");
+  const target = path.join(vaultRoot, relativePath);
+  let content = fs.readFileSync(target, "utf8").trimEnd();
+  const coverPath = coverRelativePath(fixture).split(path.sep).join("/");
+  const detail = "```animelist-detail\n```";
+  if (!content.includes(detail)) throw new Error(`Legacy-update Test Vault note has no animelist-detail block: ${relativePath}`);
+  if (!content.includes(`![[${coverPath}|260]]`)) {
+    content = content.replace(detail, `${detail}\n\n![[${coverPath}|260]]`);
+  }
+  fs.writeFileSync(target, `${content}\n`);
+}
+
+function imageFixturePaths(vaultRoot) {
+  const frierenAnime = fixtureBySourceId(400602);
+  const kaguyaAnime = fixtureBySourceId(248175);
+  const overlordNovel = fixtureBySourceId(101929);
+  return {
+    demoPaths: [frierenAnime, kaguyaAnime, overlordNovel]
+      .map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
+    assetPaths: IMAGE_LAYOUT_SOURCE_IDS.map((id) => galleryAssetRelativePath(fixtureBySourceId(id))),
+  };
+}
+
+async function prepareImageSectionDemos(vaultRoot, reset) {
+  const marker = path.join(vaultRoot, IMAGE_SECTION_FIXTURE_MARKER);
+  const previousMarker = path.join(vaultRoot, IMAGE_SECTION_PREVIOUS_MARKER);
+  const known = imageFixturePaths(vaultRoot);
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) return known;
+
+  const migrateV2 = !reset && fs.statSync(previousMarker, { throwIfNoEntry: false })?.isFile();
+  fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_DEMO_ROOT), { recursive: true, force: true });
+  fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_ASSET_ROOT), { recursive: true, force: true });
+
+  const assetPaths = IMAGE_LAYOUT_SOURCE_IDS.map((id) => copyRealGalleryAsset(vaultRoot, fixtureBySourceId(id)));
+  const frierenAnime = fixtureBySourceId(400602);
+  const kaguyaAnime = fixtureBySourceId(248175);
+  const overlordNovel = fixtureBySourceId(101929);
+
+  const demoPaths = [
+    seedRealImageSections(vaultRoot, frierenAnime, "frieren", [
+      "## 圖片牆",
+      "",
+      imageBlock(assetPaths.slice(0, 12)),
+      "",
+      "> 版面測試使用 shared Test Vault 已下載的真實作品圖片，用來確認 masonry、預設捲動高度與展開功能。",
+    ].join("\n"), migrateV2),
+    seedRealImageSections(vaultRoot, kaguyaAnime, "kaguya", [
+      "## 動畫圖",
+      "",
+      imageBlock(assetPaths.slice(0, 5)),
+      "",
+      "這段文字刻意放在兩個 image sections 中間，確認正文與區塊互不干擾。",
+      "",
+      "## 漫畫圖",
+      "",
+      imageBlock(assetPaths.slice(5, 10)),
+    ].join("\n"), migrateV2),
+    seedRealImageSections(vaultRoot, overlordNovel, "overlord", [
+      "## 圖片收藏",
+      "",
+      "```animelist-images",
+      "```",
+      "",
+      "> 真實作品的空 image section，用來驗證右鍵插入後的區塊與選檔、拖放、貼上、URL 新增。",
+    ].join("\n"), migrateV2),
+  ];
+
+  // Keep one intentional old-default note so Updates & cleanup can be verified manually.
+  seedLegacyDefaultCoverEmbed(vaultRoot, overlordNovel);
+
+  fs.writeFileSync(marker, "Image-section real-work fixtures v6 seeded. OVERLORD intentionally retains one legacy duplicate cover for update-cleanup testing.\n");
+  return { demoPaths, assetPaths };
+}
+
 function frontmatterScalar(content, key) {
   const block = String(content ?? "").match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? "";
   const prefix = `${key}:`;
@@ -372,8 +524,6 @@ function mediaNote(item) {
     "```animelist-detail",
     "```",
     "",
-    `![[${coverPath}|260]]`,
-    "",
     item.preservationMarker
       ? `> PRESERVE BODY: ${item.preservationMarker}`
       : "> Shared Test Vault fixture based on a real collected work. User status/progress/dates are controlled test scenarios.",
@@ -501,6 +651,36 @@ After **Check updates**:
 - Needs-review rows explain why nothing was overwritten.
 - Unchanged items are collapsed by default.
 - Footer states that release metadata is updated without changing reading progress.
+
+## 7. Reusable image sections
+
+Use these **real works and real downloaded cover images** for manual verification:
+
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — one populated section with **12 real downloaded work images** for masonry/scroll/expand review.
+- [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — two independent populated sections with ordinary Markdown text between them.
+- [[AnimeList/Novel/OVERLORD|OVERLORD]] — a real-work empty image section for Add and insertion testing.
+
+Check the approved image-section behavior:
+
+- **The Add icon is at the upper-left** of each image section and never overlaps Obsidian's source/code-block control.
+- The Add modal uses the available width without horizontal scrolling; queued previews wrap to new rows.
+- A populated section is collapsed to roughly two image rows by default, scrolls vertically inside that area, and shows a bottom **Show all images** control when content overflows.
+- Show all expands the complete masonry wall; Collapse returns to the bounded scrolling view.
+- Right-click inside a real media note: the context menu has **AnimeList › Add image section**. It inserts an empty \`animelist-images\` block at the cursor without replacing existing text.
+- OVERLORD's empty section accepts **Choose files / drag & drop / paste / URL**.
+- OVERLORD intentionally starts with one **old default duplicate cover embed** below \`animelist-detail\`. In Settings → **Updates & cleanup** → **Remove duplicate note covers**, Review cleanup must list OVERLORD before confirmation.
+- Confirming that cleanup must remove only the duplicate standalone cover line; OVERLORD's frontmatter, image section, and other body text must remain unchanged.
+- Real images render as a clean Pinterest/masonry wall without captions or editing controls.
+- Click an image to open the original in the lightbox; left/right arrows navigate within that image section and Esc closes the modal.
+- Copy the current image with **Cmd/Ctrl+C** in the lightbox, or use **Copy image** from an image right-click menu; paste it into another image section and confirm it behaves like a normal image paste.
+- Add the exact same file again under a different filename, then copy/paste an existing image back into the same section. Both must be skipped as duplicates instead of creating a second entry.
+- Gallery rendering should use cached thumbnails after the background cache is ready; the lightbox and clipboard copy still use the original file.
+- Every image exposes **Copy image**, **Set as cover**, and **Delete**.
+- Setting an image as cover updates the media note cover without duplicating the image.
+- 輝夜姬 keeps two independent \`animelist-images\` blocks with normal Markdown text between them.
+- The \`animelist-detail\` note header is a compact single-row control strip like the approved mockup; it must not render a second progress card/bar underneath.
+- Run \`npm run test-vault\` again and confirm edits to these seeded sections are preserved; only \`npm run test-vault:fixtures\` intentionally resets the controlled work fixtures.
+
 `;
 }
 
@@ -582,10 +762,12 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
     else created += 1;
   }
 
+  const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset);
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return {
     fixtureRoot: path.join(resolvedVault, TEST_LIBRARY_ROOT),
     checklistPath,
+    imageSectionDemos,
     files,
     created,
     reused,

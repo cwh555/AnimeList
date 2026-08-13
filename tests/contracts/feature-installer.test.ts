@@ -69,7 +69,7 @@ test("feature registry assigns settings sections to stable pages and preserves o
     registry.settingsSections(host).map((section) => [section.heading, section.page]),
     [
       ["Release tracking", "features"],
-      ["Legacy metadata", "maintenance"],
+      ["Legacy metadata", "updates-cleanup"],
       ["Custom", "search-metadata"],
     ],
   );

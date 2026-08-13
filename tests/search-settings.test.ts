@@ -78,7 +78,7 @@ describe("search language settings", () => {
     }
   });
 
-  it("organizes core settings into four top-level pages with titled sections", () => {
+  it("organizes core settings into five top-level pages with titled sections", () => {
     const tab = new AnimeListSettingTab(new App(), createHost());
 
     assert.deepEqual(SETTINGS_PAGES.map((page) => page.label), [
@@ -86,6 +86,7 @@ describe("search language settings", () => {
       "Search & metadata",
       "Features",
       "Maintenance",
+      "Updates & cleanup",
     ]);
     assert.deepEqual(tab.getSettingsPageSections("general").map((section) => section.heading), [
       "Interface",
@@ -97,6 +98,7 @@ describe("search language settings", () => {
       "Search languages",
       "Metadata providers",
     ]);
+    assert.deepEqual(tab.getSettingsPageSections("updates-cleanup").map((section) => section.heading), []);
     assert.deepEqual(tab.getSettingsPageSections("maintenance").map((section) => section.heading), [
       "Library setup",
     ]);
@@ -104,9 +106,9 @@ describe("search language settings", () => {
 
   it("supports standard keyboard navigation across the top-level pages", () => {
     assert.equal(settingsPageForKey("general", "ArrowRight"), "search-metadata");
-    assert.equal(settingsPageForKey("general", "ArrowLeft"), "maintenance");
+    assert.equal(settingsPageForKey("general", "ArrowLeft"), "updates-cleanup");
     assert.equal(settingsPageForKey("features", "Home"), "general");
-    assert.equal(settingsPageForKey("features", "End"), "maintenance");
+    assert.equal(settingsPageForKey("features", "End"), "updates-cleanup");
     assert.equal(settingsPageForKey("features", "Enter"), null);
   });
 });

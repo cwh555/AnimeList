@@ -168,8 +168,9 @@ describe("media note generation", () => {
     const body = markdown.split("---").slice(2).join("---").trim();
     assert.match(
       body,
-      /^# Example\n\n```animelist-detail\n```\n\n!\[\[AnimeList\/Covers\/anime\/example\.webp\|260]]\n\n> Added on \d{4}-\d{2}-\d{2} at \d{2}:\d{2}\.$/,
+      /^# Example\n\n```animelist-detail\n```\n\n> Added on \d{4}-\d{2}-\d{2} at \d{2}:\d{2}\.$/,
     );
+    assert.ok(!body.includes("AnimeList/Covers/anime/example.webp"));
     assert.ok(!body.includes("## 作品簡介"));
     assert.ok(!body.includes("## 資料來源"));
   });
