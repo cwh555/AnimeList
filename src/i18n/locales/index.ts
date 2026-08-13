@@ -1,4 +1,5 @@
 import "../../release-tracking-text";
+import "../../image-section-text";
 import { registerLocaleMessages } from "../catalog";
 import { EN_CATALOGS } from "./en";
 import { JA_CATALOGS } from "./ja";

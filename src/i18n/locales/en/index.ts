@@ -9,6 +9,7 @@ import { EN_MASTERPIECE_MESSAGES } from "./masterpiece";
 import { EN_SCORE_DASHBOARD_MESSAGES } from "./score-dashboard";
 import { EN_LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { EN_USER_TAG_MESSAGES } from "./user-tag";
+import { EN_IMAGE_SECTION_MESSAGES } from "./image-section";
 
 export const EN_CATALOGS = {
   core: EN_CORE_MESSAGES,
@@ -21,4 +22,5 @@ export const EN_CATALOGS = {
   "score-dashboard": EN_SCORE_DASHBOARD_MESSAGES,
   "legacy-metadata": EN_LEGACY_METADATA_MESSAGES,
   "user-tag": EN_USER_TAG_MESSAGES,
+  "image-section": EN_IMAGE_SECTION_MESSAGES,
 } as const satisfies LocaleCatalogs;

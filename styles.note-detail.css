@@ -1,0 +1,204 @@
+/* Media note detail header — visual hierarchy matches the approved note mockup. */
+.block-language-animelist-detail { overflow:visible; }
+
+.al-detail-card {
+  margin:10px 0 18px;
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--background-modifier-border) 92%,transparent);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--background-secondary) 58%,var(--background-primary));
+  box-shadow:0 8px 24px color-mix(in srgb,#000 10%,transparent);
+}
+
+.al-detail-topbar {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px 18px;
+  padding:10px 12px;
+  border-bottom:1px solid color-mix(in srgb,var(--background-modifier-border) 76%,transparent);
+  background:color-mix(in srgb,var(--background-secondary-alt) 38%,transparent);
+}
+
+.al-detail-summary {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px 14px;
+}
+
+.al-detail-stat {
+  display:inline-flex;
+  min-width:0;
+  align-items:center;
+  gap:6px;
+}
+
+.al-detail-stat-label {
+  color:var(--text-faint);
+  font-size:.64rem;
+  font-weight:650;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+.al-detail-stat-value,
+.al-detail-status-chip {
+  display:inline-flex;
+  min-height:26px;
+  align-items:center;
+  padding:2px 8px;
+  border:1px solid color-mix(in srgb,var(--background-modifier-border) 80%,transparent);
+  border-radius:8px;
+  color:var(--text-normal);
+  background:color-mix(in srgb,var(--background-primary) 56%,transparent);
+  font-size:.68rem;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+.al-detail-status-chip {
+  border:0;
+  border-radius:999px;
+  color:#fff;
+  font-weight:720;
+}
+
+.al-detail-progress-value {
+  border-color:color-mix(in srgb,var(--interactive-accent) 42%,var(--background-modifier-border));
+  color:color-mix(in srgb,var(--interactive-accent) 76%,var(--text-normal));
+}
+
+.al-detail-score {
+  border:0;
+  color:#e9bb5d;
+  background:transparent;
+  font-weight:760;
+}
+
+.al-detail-buttons {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+}
+
+.al-detail-buttons button {
+  display:inline-flex;
+  min-height:30px;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:0 9px;
+  border:1px solid var(--background-modifier-border);
+  border-radius:8px;
+  color:var(--text-muted);
+  background:color-mix(in srgb,var(--background-primary) 62%,transparent);
+  box-shadow:none;
+  cursor:pointer;
+  font-size:.68rem;
+  white-space:nowrap;
+  transition:border-color .12s ease,color .12s ease,background .12s ease;
+}
+
+.al-detail-buttons button:hover,
+.al-detail-buttons button:focus-visible {
+  border-color:color-mix(in srgb,var(--interactive-accent) 42%,var(--background-modifier-border));
+  color:var(--text-normal);
+  background:var(--background-modifier-hover);
+  outline:none;
+}
+
+.al-detail-buttons .al-detail-favorite,
+.al-detail-buttons .al-detail-more {
+  width:32px;
+  padding:0;
+}
+
+.al-detail-buttons .al-detail-favorite svg,
+.al-detail-buttons .al-detail-more svg { width:16px; height:16px; }
+
+.al-detail-favorite.is-active {
+  border-color:color-mix(in srgb,#e8bb5b 48%,var(--background-modifier-border));
+  color:#e8bb5b;
+  background:color-mix(in srgb,#e8bb5b 8%,transparent);
+}
+
+.al-detail-body {
+  display:grid;
+  grid-template-columns:minmax(126px,168px) minmax(0,1fr);
+  gap:14px 18px;
+  align-items:start;
+  padding:12px;
+}
+
+.al-detail-cover {
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--background-modifier-border) 86%,transparent);
+  border-radius:8px;
+  background:var(--background-secondary);
+}
+
+.al-detail-cover img {
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:248px;
+  margin:0;
+  object-fit:cover;
+}
+
+.al-detail-metadata {
+  display:grid;
+  min-width:0;
+  gap:7px;
+  margin:0;
+  padding:2px 0;
+}
+
+.al-detail-meta-row {
+  display:grid;
+  grid-template-columns:minmax(92px,116px) minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  margin:0;
+}
+
+.al-detail-meta-label {
+  margin:0;
+  color:var(--text-faint);
+  font-size:.66rem;
+  font-weight:650;
+}
+
+.al-detail-meta-value {
+  min-width:0;
+  margin:0;
+  overflow-wrap:anywhere;
+  color:var(--text-normal);
+  font-size:.69rem;
+  line-height:1.45;
+}
+
+.al-detail-source-value a {
+  color:var(--text-accent);
+  text-decoration:none;
+}
+.al-detail-source-value a:hover { text-decoration:underline; }
+
+.animelist-detail-legacy-cover { display:none; }
+
+@media (max-width:760px) {
+  .al-detail-topbar { align-items:flex-start; flex-direction:column; }
+  .al-detail-buttons { width:100%; justify-content:flex-start; }
+  .al-detail-body { grid-template-columns:112px minmax(0,1fr); gap:12px; }
+  .al-detail-meta-row { grid-template-columns:82px minmax(0,1fr); }
+}
+
+@media (max-width:480px) {
+  .al-detail-body { grid-template-columns:1fr; }
+  .al-detail-cover { width:min(180px,58vw); }
+}

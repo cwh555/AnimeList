@@ -8,6 +8,7 @@ import { SCORE_DASHBOARD_MESSAGES } from "./score-dashboard";
 import { SEARCH_MESSAGES } from "./search";
 import { SERIAL_COVER_MESSAGES } from "./serial-cover";
 import { USER_TAG_MESSAGES } from "./user-tag";
+import { IMAGE_SECTION_MESSAGES } from "./image-section";
 
 export {
   CORE_MESSAGES,
@@ -20,6 +21,7 @@ export {
   SEARCH_MESSAGES,
   SERIAL_COVER_MESSAGES,
   USER_TAG_MESSAGES,
+  IMAGE_SECTION_MESSAGES,
 };
 
 export const ZH_TW_CATALOGS = {
@@ -33,6 +35,7 @@ export const ZH_TW_CATALOGS = {
   "score-dashboard": SCORE_DASHBOARD_MESSAGES,
   "legacy-metadata": LEGACY_METADATA_MESSAGES,
   "user-tag": USER_TAG_MESSAGES,
+  "image-section": IMAGE_SECTION_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

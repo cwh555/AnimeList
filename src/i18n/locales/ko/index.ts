@@ -9,6 +9,7 @@ import { KO_MASTERPIECE_MESSAGES } from "./masterpiece";
 import { KO_SCORE_DASHBOARD_MESSAGES } from "./score-dashboard";
 import { KO_LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { KO_USER_TAG_MESSAGES } from "./user-tag";
+import { KO_IMAGE_SECTION_MESSAGES } from "./image-section";
 
 export const KO_CATALOGS = {
   core: KO_CORE_MESSAGES,
@@ -21,4 +22,5 @@ export const KO_CATALOGS = {
   "score-dashboard": KO_SCORE_DASHBOARD_MESSAGES,
   "legacy-metadata": KO_LEGACY_METADATA_MESSAGES,
   "user-tag": KO_USER_TAG_MESSAGES,
+  "image-section": KO_IMAGE_SECTION_MESSAGES,
 } as const satisfies LocaleCatalogs;
