@@ -142,6 +142,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
 
     const row = makeEl("div", "al-moment-image-row");
     row.setAttribute("role", "list");
+    row.dataset.imageCount = String(moment.images.length);
     for (const path of moment.images) {
       const frame = makeEl("button", "al-moment-image");
       frame.type = "button";
@@ -185,16 +186,23 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-moments-section");
 
+    const moments = parseMomentsSource(this.source);
     const toolbar = makeEl("div", "al-moments-toolbar");
+    const identity = makeEl("div", "al-moments-identity");
+    const identityIcon = makeEl("span", "al-moments-icon");
+    setAnimeListIcon(identityIcon, "clapperboard");
+    identity.append(
+      identityIcon,
+      makeEl("span", "al-moments-title", "Moments"),
+      makeEl("span", "al-moments-count", moments.length),
+    );
     const add = makeEl("button", "al-moments-add");
     add.type = "button";
-    add.setAttribute("aria-label", "Add moment");
+    add.setAttribute("aria-label", momentsText("addMoment"));
     setAnimeListIcon(add, "plus");
     add.addEventListener("click", (event) => { event.stopPropagation(); this.openAdd(); });
-    toolbar.appendChild(add);
+    toolbar.append(identity, add);
     this.containerEl.appendChild(toolbar);
-
-    const moments = parseMomentsSource(this.source);
     if (!moments.length) {
       this.containerEl.appendChild(makeEl("div", "al-moments-empty", momentsText("empty")));
       return;
