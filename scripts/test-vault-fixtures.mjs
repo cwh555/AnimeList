@@ -788,7 +788,7 @@ Use these real media notes and the already-downloaded real Test Vault images:
 Check the approved Moments behavior:
 
 - Each Moment is **text + 1..N related images**. Text preserves multiple lines.
-- All images belonging to one Moment stay in **one horizontal row**; the seven-image Frieren Moment must scroll left/right instead of wrapping.
+- On desktop, each Moment uses the approved **split card**: quote/text on the left and related images grouped as a compact mosaic on the right. The seven-image Frieren Moment must form multiple mosaic rows instead of a long horizontal strip. On narrow/mobile widths, text stacks above a two-column image mosaic without horizontal page overflow.
 - Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
 - Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
 - Edit keeps the same stable \`id\`, supports replacing text and adding/removing images, and never duplicates an existing ID.

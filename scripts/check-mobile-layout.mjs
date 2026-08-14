@@ -79,31 +79,50 @@ function fixture(mode) {
 }
 
 
-function momentsRowFixture() {
+function momentsSplitFixture(isMobile) {
+  const fixtureWidth = isMobile ? 360 : 860;
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-    :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; }
-    html,body{margin:0;width:100%;min-height:100%;} body{font-family:sans-serif;padding:24px;} ${styles}
-    #fixture{width:560px;max-width:calc(100vw - 48px)}
-  </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section"><article class="al-moment-card">
-    <div class="al-moment-head"><div class="al-moment-text">A moment with seven related images.</div></div>
-    <div id="row" class="al-moment-image-row">${'<button class="al-moment-image" type="button"><span style="display:block;width:180px;height:100%"></span></button>'.repeat(7)}</div>
-  </article></section>
+    :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --background-modifier-hover:#2a2a2a; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; --text-faint:#777; }
+    html,body{margin:0;width:100%;min-height:100%;} body{font-family:sans-serif;padding:16px;box-sizing:border-box;} ${styles}
+    #fixture{width:${fixtureWidth}px;max-width:100%;}
+  </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section">
+    <div class="al-moments-toolbar"><div class="al-moments-identity"><span class="al-moments-icon"></span><span class="al-moments-title">Moments</span><span class="al-moments-count">5</span></div><button class="al-moments-add" type="button">+</button></div>
+    <div class="al-moments-list"><article id="card" class="al-moment-card">
+      <div id="copy" class="al-moment-head"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-actions" type="button">⋯</button></div>
+      <div id="gallery" class="al-moment-image-row" data-image-count="5">${'<button class="al-moment-image" type="button"><span style="display:block;width:100%;height:100%"></span></button>'.repeat(5)}</div>
+    </article></div>
+  </section>
   <script>
     try {
-    const row = document.querySelector('#row');
-    const items = [...row.querySelectorAll('.al-moment-image')];
-    const top = items[0].getBoundingClientRect().top;
-    row.style.scrollBehavior = 'auto';
-    row.scrollLeft = 180;
-    const details = {
-      oneHorizontalRow: items.every((item) => Math.abs(item.getBoundingClientRect().top - top) <= 1),
-      horizontalOverflow: row.scrollWidth > row.clientWidth + 20,
-      horizontalScrolling: row.scrollLeft > 0,
-      noVerticalOverflow: row.scrollHeight <= row.clientHeight + 2,
-      nativeHorizontalScroller: getComputedStyle(row).overflowX === 'auto' && getComputedStyle(row).flexWrap === 'nowrap',
-    };
-    document.body.dataset.details = JSON.stringify(details);
-    document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
+      const cols = (element) => getComputedStyle(element).gridTemplateColumns.split(/\s+/).filter(Boolean).length;
+      const card = document.querySelector('#card');
+      const copy = document.querySelector('#copy');
+      const gallery = document.querySelector('#gallery');
+      const items = [...gallery.querySelectorAll('.al-moment-image')];
+      const cardRect = card.getBoundingClientRect();
+      const copyRect = copy.getBoundingClientRect();
+      const galleryRect = gallery.getBoundingClientRect();
+      const tops = items.map((item) => Math.round(item.getBoundingClientRect().top));
+      const uniqueRows = [...new Set(tops)];
+      const details = ${isMobile} ? {
+        stackedCard: galleryRect.top >= copyRect.bottom - 2 && Math.abs(galleryRect.left - copyRect.left) <= 2 && Math.abs(galleryRect.right - copyRect.right) <= 2,
+        galleryBelowCopy: galleryRect.top >= copyRect.bottom - 2,
+        twoColumnMosaic: items[1].getBoundingClientRect().left > items[0].getBoundingClientRect().left + 2 && Math.abs(items[0].getBoundingClientRect().width - items[1].getBoundingClientRect().width) <= 2 && items[2].getBoundingClientRect().top > items[0].getBoundingClientRect().top + 2,
+        firstTwoShareRow: tops[0] === tops[1],
+        laterRowExists: uniqueRows.length >= 3,
+        noHorizontalPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
+        noGalleryScroller: gallery.scrollWidth <= gallery.clientWidth + 1,
+      } : {
+        splitCard: copyRect.width > 0 && galleryRect.width > 0 && copyRect.right <= galleryRect.left + 2 && Math.abs(copyRect.top - galleryRect.top) <= 2,
+        copyLeftOfGallery: copyRect.right <= galleryRect.left + 2,
+        firstThreeShareRow: tops[0] === tops[1] && tops[1] === tops[2],
+        lastTwoShareRow: tops[3] === tops[4] && tops[3] > tops[0],
+        twoMosaicRows: uniqueRows.length === 2,
+        noHorizontalGalleryOverflow: gallery.scrollWidth <= gallery.clientWidth + 1,
+        boundedCard: cardRect.width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
+      };
+      document.body.dataset.details = JSON.stringify(details);
+      document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
     } catch (error) { document.body.dataset.details = String(error?.stack || error); document.body.dataset.result = 'fail'; }
   </script></body></html>`;
 }
@@ -198,10 +217,16 @@ try {
     viewport: { width: 1200, height: 800, mobile: false },
   });
   await runChromiumDatasetTest({
-    html: momentsRowFixture(),
-    profile: path.join(output, "moments-row-profile"),
-    testName: "AnimeList moments horizontal image row",
-    viewport: { width: 1200, height: 800, mobile: false },
+    html: momentsSplitFixture(false),
+    profile: path.join(output, "moments-split-desktop-profile"),
+    testName: "AnimeList moments desktop split-card mosaic",
+    viewport: { width: 1200, height: 900, mobile: false },
+  });
+  await runChromiumDatasetTest({
+    html: momentsSplitFixture(true),
+    profile: path.join(output, "moments-split-mobile-profile"),
+    testName: "AnimeList moments mobile stacked mosaic",
+    viewport: { width: 390, height: 844, mobile: true },
   });
 } finally {
   await rm(output, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
