@@ -82,9 +82,78 @@ const IMAGE_LAYOUT_SOURCE_IDS = [
   267222, 339092, 101929, 10380, 975, 266498, 302189,
 ];
 
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v1";
+const MOMENTS_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/moments`;
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v2";
+const MOMENTS_PREVIOUS_MARKER = ".animelist-test-moments-v1";
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
+const MOMENTS_SCENE_SOURCES = [
+  {
+    key: "frieren-ep01-01",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_01.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-02",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_02.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-03",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_03.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-04",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_04.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-05",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_05.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-06",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_06.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-07",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_07.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-08",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_08.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-09",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_09.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-10",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_10.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "kaguya-s1-ep01-01",
+    remote: "https://kaguya.love/1st/assets/img/story/01/01.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+  {
+    key: "kaguya-s1-ep01-02",
+    remote: "https://kaguya.love/1st/assets/img/story/01/02.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+  {
+    key: "kaguya-s1-ep01-03",
+    remote: "https://kaguya.love/1st/assets/img/story/01/03.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+];
 
 function momentsBlock(items) {
   const lines = ["```animelist-moments", "moments:"];
@@ -119,64 +188,138 @@ function seedMomentsFixture(vaultRoot, fixture, body) {
   return target;
 }
 
-async function prepareMomentsDemos(vaultRoot, reset, imageSectionDemos) {
-  const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
+function momentSceneRelativePath(scene) {
+  return `${MOMENTS_SCENE_ASSET_ROOT}/${scene.key}.jpg`;
+}
+
+async function ensureMomentSceneAssets(vaultRoot, fetchImpl) {
+  const assetPaths = [];
+  for (const scene of MOMENTS_SCENE_SOURCES) {
+    const relative = momentSceneRelativePath(scene);
+    const target = path.join(vaultRoot, relative);
+    const existing = fs.statSync(target, { throwIfNoEntry: false });
+    if (existing?.isFile() && existing.size > 0) {
+      assetPaths.push(relative);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const response = await fetchImpl(scene.remote, {
+      headers: {
+        Accept: "image/avif,image/webp,image/png,image/jpeg,*/*",
+        "Accept-Language": "ja,en;q=0.8",
+        Referer: scene.referer,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/150 Safari/537.36",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Moment scene download failed (${response.status}) for ${scene.remote}`);
+    }
+    const contentType = response.headers?.get?.("content-type") ?? "";
+    if (contentType && !/^image\//i.test(contentType)) {
+      throw new Error(`Unexpected Moment scene content type ${contentType} for ${scene.remote}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) throw new Error(`Empty Moment scene response for ${scene.remote}`);
+    fs.writeFileSync(target, buffer);
+    assetPaths.push(relative);
+  }
+  return assetPaths;
+}
+
+function momentsFixturePaths(vaultRoot) {
   const frieren = fixtureBySourceId(400602);
   const kaguya = fixtureBySourceId(248175);
-  const demoPaths = [frieren, kaguya].map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture)));
-  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) return { demoPaths };
+  return {
+    demoPaths: [frieren, kaguya].map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
+    assetPaths: MOMENTS_SCENE_SOURCES.map(momentSceneRelativePath),
+  };
+}
 
-  const images = imageSectionDemos.assetPaths.map((value) => value.split(path.sep).join("/"));
+async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
+  const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
+  const previousMarker = path.join(vaultRoot, MOMENTS_PREVIOUS_MARKER);
+  const known = momentsFixturePaths(vaultRoot);
+  const assetPaths = await ensureMomentSceneAssets(vaultRoot, fetchImpl);
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
+    return { ...known, assetPaths };
+  }
+
+  const byKey = new Map(MOMENTS_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
+  const scene = (key) => {
+    const value = byKey.get(key);
+    if (!value) throw new Error(`Missing prepared Moment scene ${key}`);
+    return value;
+  };
+  const frieren = fixtureBySourceId(400602);
+  const kaguya = fixtureBySourceId(248175);
+
   seedMomentsFixture(vaultRoot, frieren, [
-    "## 名場面",
+    "## 第 1 話・冒險的終點",
     "",
     momentsBlock([
       {
         id: "m_test_frieren_quote_01",
-        text: "人類的壽命太短了。\n為什麼我當時沒有更了解他呢？",
-        images: images.slice(0, 2),
+        text: "人間的壽命明明這麼短……\n我當時為什麼沒想過要更了解他呢……",
+        images: [scene("frieren-ep01-07"), scene("frieren-ep01-08")],
       },
       {
         id: "m_test_frieren_journey_02",
-        text: "旅途的意義，不在於目的地，而在於與你並肩看過的風景。",
-        images: images.slice(2, 9),
+        text: "那就下次吧。\n五十年後，我知道一個能看得更漂亮的地方，到時候帶你們去。",
+        images: [
+          scene("frieren-ep01-01"), scene("frieren-ep01-02"), scene("frieren-ep01-03"),
+          scene("frieren-ep01-04"), scene("frieren-ep01-05"), scene("frieren-ep01-06"),
+          scene("frieren-ep01-07"),
+        ],
       },
       {
         id: "m_test_frieren_short_03",
-        text: "值得記住的一幕。",
-        images: images.slice(9, 10),
+        text: "好美。",
+        images: [scene("frieren-ep01-05")],
       },
     ]),
     "",
     "這段普通 Markdown 刻意放在兩個 Moments sections 中間。",
     "",
-    "## 梗圖 / 語錄",
+    "## 第 1 話・旅途的記憶",
     "",
     momentsBlock([
       {
-        id: "m_test_frieren_meme_04",
-        text: "當你以為今天會很高效，結果又在看天空發呆。",
-        images: images.slice(10, 11),
+        id: "m_test_frieren_promise_04",
+        text: "雖然只是很短的一段時間。",
+        images: [scene("frieren-ep01-04"), scene("frieren-ep01-05"), scene("frieren-ep01-06")],
       },
       {
-        id: "m_test_frieren_group_05",
-        text: "同一段文字可以搭配多張相關圖片。",
-        images: images.slice(11, 14),
+        id: "m_test_frieren_magic_05",
+        text: "我會繼續收集魔法。",
+        images: [scene("frieren-ep01-09"), scene("frieren-ep01-10")],
       },
     ]),
+    "",
+    "> Test Vault scene source: TV anime Frieren episode 1 official STORY stills.",
   ].join("\n"));
 
   seedMomentsFixture(vaultRoot, kaguya, [
-    "## Moments 測試",
+    "## 第 1 話・戀愛頭腦戰",
     "",
     momentsBlock([
-      { id: "m_test_kaguya_01", text: "短文字 + 雙圖測試。", images: images.slice(3, 5) },
-      { id: "m_test_kaguya_02", text: "第二筆 Moment，確認不同作品資料互不干擾。", images: images.slice(5, 8) },
+      {
+        id: "m_test_kaguya_01",
+        text: "戀愛就是告白的一方輸了！",
+        images: [scene("kaguya-s1-ep01-01"), scene("kaguya-s1-ep01-02")],
+      },
+      {
+        id: "m_test_kaguya_02",
+        text: "真可愛呢……",
+        images: [scene("kaguya-s1-ep01-03")],
+      },
     ]),
+    "",
+    "> Test Vault scene source: Kaguya-sama season 1 episode 1 official STORY stills.",
   ].join("\n"));
 
-  fs.writeFileSync(marker, "Moments real-work fixtures v1 seeded. Ordinary test-vault runs preserve later edits.\n");
-  return { demoPaths };
+  fs.rmSync(previousMarker, { force: true });
+  fs.writeFileSync(marker, "Moments official episode-scene fixtures v2 seeded. Ordinary test-vault runs preserve later edits.\n");
+  return { ...known, assetPaths };
 }
 
 function fixtureBySourceId(sourceId) {
@@ -780,10 +923,11 @@ Check the approved image-section behavior:
 
 ## 8. Moments sections
 
-Use these real media notes and the already-downloaded real Test Vault images:
+Use these real media notes with **official episode stills downloaded into the Test Vault at fixture-preparation time**. Moments no longer reuse unrelated cover images:
 
-- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — **two independent \`animelist-moments\` sections** with five Moment cards total.
-- [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — another populated Moments section for cross-note verification.
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — episode 1 official STORY stills, split across **two independent \`animelist-moments\` sections** with five real-scene Moment cards total.
+- [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — season 1 episode 1 official STORY stills with short recognizable dialogue for cross-note verification.
+- Scene images are stored under \`AnimeList/Images/test-vault/moments/\`; they are downloaded from the official anime STORY pages and are not committed to the repository.
 
 Check the approved Moments behavior:
 
@@ -882,7 +1026,7 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
   }
 
   const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset);
-  const momentsDemos = await prepareMomentsDemos(resolvedVault, reset, imageSectionDemos);
+  const momentsDemos = await prepareMomentsDemos(resolvedVault, reset, fetchImpl);
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return {
     fixtureRoot: path.join(resolvedVault, TEST_LIBRARY_ROOT),

@@ -18,7 +18,10 @@ let fetchCalls = 0;
 
 const fakeFetch = async (url) => {
   fetchCalls += 1;
-  assert.match(String(url), /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//);
+  const value = String(url);
+  const isCover = /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//.test(value);
+  const isMomentScene = /^https:\/\/(?:frieren-anime\.jp\/wp-content\/uploads\/2023\/09\/01_\d{2}\.jpg|kaguya\.love\/1st\/assets\/img\/story\/01\/\d{2}\.jpg)$/.test(value);
+  assert.ok(isCover || isMomentScene, `unexpected Test Vault image URL: ${value}`);
   const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
   return {
     ok: true,
@@ -67,7 +70,7 @@ try {
   assert.equal(first.repaired, 0);
   assert.equal(first.coversDownloaded, 18);
   assert.equal(first.legacyRemoved, 1);
-  assert.equal(fetchCalls, 18);
+  assert.equal(fetchCalls, 31);
   assert.equal(fs.existsSync(legacyFixture), false);
 
   const checklist = read(TEST_CHECKLIST_PATH);
@@ -91,10 +94,19 @@ try {
   assert.match(checklist, /old default duplicate cover embed/i);
   assert.match(checklist, /## 8\. Moments sections/);
   assert.match(checklist, /seven-image Frieren Moment/i);
+  assert.match(checklist, /official episode stills/i);
+  assert.match(checklist, /not committed to the repository/i);
   assert.equal(first.imageSectionDemos.demoPaths.length, 3);
   assert.equal(first.imageSectionDemos.assetPaths.length, 14);
   assert.equal(first.momentsDemos.demoPaths.length, 2);
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v1")), true);
+  assert.equal(first.momentsDemos.assetPaths.length, 13);
+  for (const asset of first.momentsDemos.assetPaths) {
+    const file = path.join(vaultRoot, asset);
+    assert.equal(fs.statSync(file).isFile(), true);
+    assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  }
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v1")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
   for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
   for (const asset of first.imageSectionDemos.assetPaths) {
@@ -110,10 +122,11 @@ try {
   assert.match(read(frierenAnimePath), /animelist-test-moments:start/);
   assert.equal((read(frierenAnimePath).match(/```animelist-moments/g) ?? []).length, 2);
   assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 5);
-  assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/moments\/frieren-ep01-/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-moments/g) ?? []).length, 1);
   assert.equal((read(kaguyaAnimePath).match(/^  - id: "m_test_kaguya_/gm) ?? []).length, 2);
+  assert.match(read(kaguyaAnimePath), /AnimeList\/Images\/test-vault\/moments\/kaguya-s1-ep01-/);
   assert.equal((read(kaguyaAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 10);
   assert.match(read(overlordPath), /```animelist-images\n```/);
   for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {
