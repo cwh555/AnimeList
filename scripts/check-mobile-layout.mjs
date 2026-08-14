@@ -78,6 +78,36 @@ function fixture(mode) {
   </body></html>`;
 }
 
+
+function momentsRowFixture() {
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+    :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; }
+    html,body{margin:0;width:100%;min-height:100%;} body{font-family:sans-serif;padding:24px;} ${styles}
+    #fixture{width:560px;max-width:calc(100vw - 48px)}
+  </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section"><article class="al-moment-card">
+    <div class="al-moment-head"><div class="al-moment-text">A moment with seven related images.</div></div>
+    <div id="row" class="al-moment-image-row">${'<button class="al-moment-image" type="button"><span style="display:block;width:180px;height:100%"></span></button>'.repeat(7)}</div>
+  </article></section>
+  <script>
+    try {
+    const row = document.querySelector('#row');
+    const items = [...row.querySelectorAll('.al-moment-image')];
+    const top = items[0].getBoundingClientRect().top;
+    row.style.scrollBehavior = 'auto';
+    row.scrollLeft = 180;
+    const details = {
+      oneHorizontalRow: items.every((item) => Math.abs(item.getBoundingClientRect().top - top) <= 1),
+      horizontalOverflow: row.scrollWidth > row.clientWidth + 20,
+      horizontalScrolling: row.scrollLeft > 0,
+      noVerticalOverflow: row.scrollHeight <= row.clientHeight + 2,
+      nativeHorizontalScroller: getComputedStyle(row).overflowX === 'auto' && getComputedStyle(row).flexWrap === 'nowrap',
+    };
+    document.body.dataset.details = JSON.stringify(details);
+    document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
+    } catch (error) { document.body.dataset.details = String(error?.stack || error); document.body.dataset.result = 'fail'; }
+  </script></body></html>`;
+}
+
 async function imageSectionExpandFixture() {
   const anchorBundle = await build({
     stdin: {
@@ -165,6 +195,12 @@ try {
     html: await imageSectionExpandFixture(),
     profile: path.join(output, "image-section-expand-profile"),
     testName: "AnimeList image section expansion anchor",
+    viewport: { width: 1200, height: 800, mobile: false },
+  });
+  await runChromiumDatasetTest({
+    html: momentsRowFixture(),
+    profile: path.join(output, "moments-row-profile"),
+    testName: "AnimeList moments horizontal image row",
     viewport: { width: 1200, height: 800, mobile: false },
   });
 } finally {

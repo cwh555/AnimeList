@@ -82,6 +82,103 @@ const IMAGE_LAYOUT_SOURCE_IDS = [
   267222, 339092, 101929, 10380, 975, 266498, 302189,
 ];
 
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v1";
+const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
+const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
+
+function momentsBlock(items) {
+  const lines = ["```animelist-moments", "moments:"];
+  for (const item of items) {
+    lines.push(`  - id: ${JSON.stringify(item.id)}`);
+    lines.push("    text: |-");
+    String(item.text).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    lines.push("    images:");
+    item.images.forEach((image) => lines.push(`      - ${JSON.stringify(image)}`));
+  }
+  lines.push("```");
+  return lines.join("\n");
+}
+
+function stripMarkedMomentsFixture(content) {
+  const start = content.indexOf(MOMENTS_FIXTURE_START);
+  if (start < 0) return content;
+  const end = content.indexOf(MOMENTS_FIXTURE_END, start);
+  if (end < 0) return content;
+  const after = end + MOMENTS_FIXTURE_END.length;
+  return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
+}
+
+function seedMomentsFixture(vaultRoot, fixture, body) {
+  const target = path.join(vaultRoot, fixtureRelativePath(fixture));
+  if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`Moments Test Vault note is missing: ${fixtureRelativePath(fixture)}`);
+  }
+  const content = stripMarkedMomentsFixture(fs.readFileSync(target, "utf8").trimEnd());
+  const fixtureBody = [MOMENTS_FIXTURE_START, body.trim(), MOMENTS_FIXTURE_END].join("\n");
+  fs.writeFileSync(target, `${content}\n\n${fixtureBody}\n`);
+  return target;
+}
+
+async function prepareMomentsDemos(vaultRoot, reset, imageSectionDemos) {
+  const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
+  const frieren = fixtureBySourceId(400602);
+  const kaguya = fixtureBySourceId(248175);
+  const demoPaths = [frieren, kaguya].map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture)));
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) return { demoPaths };
+
+  const images = imageSectionDemos.assetPaths.map((value) => value.split(path.sep).join("/"));
+  seedMomentsFixture(vaultRoot, frieren, [
+    "## 名場面",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_frieren_quote_01",
+        text: "人類的壽命太短了。\n為什麼我當時沒有更了解他呢？",
+        images: images.slice(0, 2),
+      },
+      {
+        id: "m_test_frieren_journey_02",
+        text: "旅途的意義，不在於目的地，而在於與你並肩看過的風景。",
+        images: images.slice(2, 9),
+      },
+      {
+        id: "m_test_frieren_short_03",
+        text: "值得記住的一幕。",
+        images: images.slice(9, 10),
+      },
+    ]),
+    "",
+    "這段普通 Markdown 刻意放在兩個 Moments sections 中間。",
+    "",
+    "## 梗圖 / 語錄",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_frieren_meme_04",
+        text: "當你以為今天會很高效，結果又在看天空發呆。",
+        images: images.slice(10, 11),
+      },
+      {
+        id: "m_test_frieren_group_05",
+        text: "同一段文字可以搭配多張相關圖片。",
+        images: images.slice(11, 14),
+      },
+    ]),
+  ].join("\n"));
+
+  seedMomentsFixture(vaultRoot, kaguya, [
+    "## Moments 測試",
+    "",
+    momentsBlock([
+      { id: "m_test_kaguya_01", text: "短文字 + 雙圖測試。", images: images.slice(3, 5) },
+      { id: "m_test_kaguya_02", text: "第二筆 Moment，確認不同作品資料互不干擾。", images: images.slice(5, 8) },
+    ]),
+  ].join("\n"));
+
+  fs.writeFileSync(marker, "Moments real-work fixtures v1 seeded. Ordinary test-vault runs preserve later edits.\n");
+  return { demoPaths };
+}
+
 function fixtureBySourceId(sourceId) {
   const fixture = FIXTURES.find((entry) => String(entry.sourceId) === String(sourceId));
   if (!fixture) throw new Error(`Missing Test Vault fixture for source ${sourceId}`);
@@ -681,6 +778,27 @@ Check the approved image-section behavior:
 - The \`animelist-detail\` note header is a compact single-row control strip like the approved mockup; it must not render a second progress card/bar underneath.
 - Run \`npm run test-vault\` again and confirm edits to these seeded sections are preserved; only \`npm run test-vault:fixtures\` intentionally resets the controlled work fixtures.
 
+## 8. Moments sections
+
+Use these real media notes and the already-downloaded real Test Vault images:
+
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — **two independent \`animelist-moments\` sections** with five Moment cards total.
+- [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — another populated Moments section for cross-note verification.
+
+Check the approved Moments behavior:
+
+- Each Moment is **text + 1..N related images**. Text preserves multiple lines.
+- All images belonging to one Moment stay in **one horizontal row**; the seven-image Frieren Moment must scroll left/right instead of wrapping.
+- Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
+- Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
+- Edit keeps the same stable \`id\`, supports replacing text and adding/removing images, and never duplicates an existing ID.
+- \`Copy text\` copies only the Moment text. \`Copy images\` copies the Moment image set; pasting into an AnimeList image picker should restore all images when the platform falls back to the AnimeList HTML clipboard format.
+- Deleting a Moment removes its YAML item. Managed images are moved through Obsidian trash only when no Image Section, other Moment, or current cover still references them.
+- Right-click a media note: **AnimeList › Add moments section** appears in the same native submenu as **Add image section**.
+- A note may contain multiple Moments sections named by ordinary Markdown headings.
+- Source mode remains human-readable YAML-like data under \`moments:\` with stable \`m_...\` IDs.
+- Run \`npm run test-vault\` again and confirm manual Moment edits are preserved; \`npm run test-vault:fixtures\` intentionally resets controlled fixtures.
+
 `;
 }
 
@@ -763,11 +881,13 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
   }
 
   const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset);
+  const momentsDemos = await prepareMomentsDemos(resolvedVault, reset, imageSectionDemos);
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return {
     fixtureRoot: path.join(resolvedVault, TEST_LIBRARY_ROOT),
     checklistPath,
     imageSectionDemos,
+    momentsDemos,
     files,
     created,
     reused,
