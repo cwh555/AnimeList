@@ -79,8 +79,10 @@ function fixture(mode) {
 }
 
 
-function momentsSplitFixture(isMobile) {
+function momentsFilmstripFixture(isMobile) {
   const fixtureWidth = isMobile ? 360 : 860;
+  const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+  const image = `<button class="al-moment-image" type="button" style="--al-moment-image-ratio:.72"><img alt="" src="${pixel}"></button>`;
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
     :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --background-modifier-hover:#2a2a2a; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; --text-faint:#777; }
     html,body{margin:0;width:100%;min-height:100%;} body{font-family:sans-serif;padding:16px;box-sizing:border-box;} ${styles}
@@ -89,36 +91,39 @@ function momentsSplitFixture(isMobile) {
     <div class="al-moments-toolbar"><div class="al-moments-identity"><span class="al-moments-icon"></span><span class="al-moments-title">Moments</span><span class="al-moments-count">5</span></div><button class="al-moments-add" type="button">+</button></div>
     <div class="al-moments-list"><article id="card" class="al-moment-card">
       <div id="copy" class="al-moment-head"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-actions" type="button">⋯</button></div>
-      <div id="gallery" class="al-moment-image-row" data-image-count="5">${'<button class="al-moment-image" type="button"><span style="display:block;width:100%;height:100%"></span></button>'.repeat(5)}</div>
+      <div id="media" class="al-moment-media is-scrollable"><div class="al-moment-image-viewport"><div id="gallery" class="al-moment-image-row" data-image-count="7">${image.repeat(7)}</div></div></div>
     </article></div>
   </section>
   <script>
     try {
-      const cols = (element) => getComputedStyle(element).gridTemplateColumns.split(/\s+/).filter(Boolean).length;
       const card = document.querySelector('#card');
       const copy = document.querySelector('#copy');
+      const media = document.querySelector('#media');
       const gallery = document.querySelector('#gallery');
       const items = [...gallery.querySelectorAll('.al-moment-image')];
+      const images = [...gallery.querySelectorAll('img')];
       const cardRect = card.getBoundingClientRect();
       const copyRect = copy.getBoundingClientRect();
-      const galleryRect = gallery.getBoundingClientRect();
+      const mediaRect = media.getBoundingClientRect();
       const tops = items.map((item) => Math.round(item.getBoundingClientRect().top));
       const uniqueRows = [...new Set(tops)];
+      gallery.style.scrollBehavior = 'auto'; gallery.scrollLeft = 180;
+      const shared = {
+        singleHorizontalRow: uniqueRows.length === 1,
+        horizontalOverflow: gallery.scrollWidth > gallery.clientWidth + 20,
+        horizontalScrolling: gallery.scrollLeft > 0,
+        nativeHorizontalScroller: getComputedStyle(gallery).overflowX === 'auto' && getComputedStyle(gallery).flexWrap === 'nowrap',
+        imagesUseContain: images.every((image) => getComputedStyle(image).objectFit === 'contain'),
+        noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
+      };
       const details = ${isMobile} ? {
-        stackedCard: galleryRect.top >= copyRect.bottom - 2 && Math.abs(galleryRect.left - copyRect.left) <= 2 && Math.abs(galleryRect.right - copyRect.right) <= 2,
-        galleryBelowCopy: galleryRect.top >= copyRect.bottom - 2,
-        twoColumnMosaic: items[1].getBoundingClientRect().left > items[0].getBoundingClientRect().left + 2 && Math.abs(items[0].getBoundingClientRect().width - items[1].getBoundingClientRect().width) <= 2 && items[2].getBoundingClientRect().top > items[0].getBoundingClientRect().top + 2,
-        firstTwoShareRow: tops[0] === tops[1],
-        laterRowExists: uniqueRows.length >= 3,
-        noHorizontalPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
-        noGalleryScroller: gallery.scrollWidth <= gallery.clientWidth + 1,
+        ...shared,
+        stackedCard: mediaRect.top >= copyRect.bottom - 2 && Math.abs(mediaRect.left - copyRect.left) <= 2 && Math.abs(mediaRect.right - copyRect.right) <= 2,
+        mediaBelowCopy: mediaRect.top >= copyRect.bottom - 2,
       } : {
-        splitCard: copyRect.width > 0 && galleryRect.width > 0 && copyRect.right <= galleryRect.left + 2 && Math.abs(copyRect.top - galleryRect.top) <= 2,
-        copyLeftOfGallery: copyRect.right <= galleryRect.left + 2,
-        firstThreeShareRow: tops[0] === tops[1] && tops[1] === tops[2],
-        lastTwoShareRow: tops[3] === tops[4] && tops[3] > tops[0],
-        twoMosaicRows: uniqueRows.length === 2,
-        noHorizontalGalleryOverflow: gallery.scrollWidth <= gallery.clientWidth + 1,
+        ...shared,
+        splitCard: copyRect.width > 0 && mediaRect.width > 0 && copyRect.right <= mediaRect.left + 2 && Math.abs(copyRect.top - mediaRect.top) <= 2,
+        copyLeftOfFilmstrip: copyRect.right <= mediaRect.left + 2,
         boundedCard: cardRect.width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
       };
       document.body.dataset.details = JSON.stringify(details);
@@ -217,15 +222,15 @@ try {
     viewport: { width: 1200, height: 800, mobile: false },
   });
   await runChromiumDatasetTest({
-    html: momentsSplitFixture(false),
-    profile: path.join(output, "moments-split-desktop-profile"),
-    testName: "AnimeList moments desktop split-card mosaic",
+    html: momentsFilmstripFixture(false),
+    profile: path.join(output, "moments-filmstrip-desktop-profile"),
+    testName: "AnimeList moments desktop split-card filmstrip",
     viewport: { width: 1200, height: 900, mobile: false },
   });
   await runChromiumDatasetTest({
-    html: momentsSplitFixture(true),
-    profile: path.join(output, "moments-split-mobile-profile"),
-    testName: "AnimeList moments mobile stacked mosaic",
+    html: momentsFilmstripFixture(true),
+    profile: path.join(output, "moments-filmstrip-mobile-profile"),
+    testName: "AnimeList moments mobile stacked filmstrip",
     viewport: { width: 390, height: 844, mobile: true },
   });
 } finally {

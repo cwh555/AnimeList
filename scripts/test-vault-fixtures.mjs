@@ -788,7 +788,8 @@ Use these real media notes and the already-downloaded real Test Vault images:
 Check the approved Moments behavior:
 
 - Each Moment is **text + 1..N related images**. Text preserves multiple lines.
-- On desktop, each Moment uses the approved **split card**: quote/text on the left and related images grouped as a compact mosaic on the right. The seven-image Frieren Moment must form multiple mosaic rows instead of a long horizontal strip. On narrow/mobile widths, text stacks above a two-column image mosaic without horizontal page overflow.
+- On desktop, each Moment uses the approved **editorial split card**: quote/text on the left and a single-row horizontal image filmstrip on the right. Every image must remain fully visible without cropping. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text stacks above the same single-row filmstrip without horizontal page overflow.
+- When a filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
 - Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
 - Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
 - Edit keeps the same stable \`id\`, supports replacing text and adding/removing images, and never duplicates an existing ID.
