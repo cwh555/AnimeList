@@ -105,8 +105,8 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), true);
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v1")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
   for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
   for (const asset of first.imageSectionDemos.assetPaths) {

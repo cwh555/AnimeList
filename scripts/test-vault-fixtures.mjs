@@ -83,8 +83,8 @@ const IMAGE_LAYOUT_SOURCE_IDS = [
 ];
 
 const MOMENTS_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/moments`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v2";
-const MOMENTS_PREVIOUS_MARKER = ".animelist-test-moments-v1";
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v3";
+const MOMENTS_PREVIOUS_MARKER = ".animelist-test-moments-v2";
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
 const MOMENTS_SCENE_SOURCES = [
@@ -318,7 +318,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   ].join("\n"));
 
   fs.rmSync(previousMarker, { force: true });
-  fs.writeFileSync(marker, "Moments official episode-scene fixtures v2 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v3 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
