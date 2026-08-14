@@ -6,6 +6,11 @@ export const MOMENTS_LANGUAGE = "animelist-moments";
 export interface MomentItem {
   id: string;
   text: string;
+  source?: string;
+  position?: string;
+  speaker?: string;
+  tags?: string[];
+  note?: string;
   images: string[];
 }
 
@@ -59,6 +64,23 @@ function quoteYaml(value: string): string {
   return JSON.stringify(value);
 }
 
+function normalizeOptional(value: unknown): string | undefined {
+  const normalized = stringValue(value).replace(/\r\n?/g, "\n").trim();
+  return normalized || undefined;
+}
+
+function normalizeTags(value: Iterable<string> | undefined): string[] | undefined {
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of value ?? []) {
+    const normalized = stringValue(entry).trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    tags.push(normalized);
+  }
+  return tags.length ? tags : undefined;
+}
+
 function normalizedMoment(input: Partial<MomentItem>): MomentItem {
   const images: string[] = [];
   const seen = new Set<string>();
@@ -68,11 +90,38 @@ function normalizedMoment(input: Partial<MomentItem>): MomentItem {
     seen.add(path);
     images.push(path);
   }
+  const source = normalizeOptional(input.source);
+  const position = normalizeOptional(input.position);
+  const speaker = normalizeOptional(input.speaker);
+  const tags = normalizeTags(input.tags);
+  const note = normalizeOptional(input.note);
   return {
     id: stringValue(input.id).trim(),
     text: stringValue(input.text).replace(/\r\n?/g, "\n").replace(/\n+$/g, ""),
+    ...(source ? { source } : {}),
+    ...(position ? { position } : {}),
+    ...(speaker ? { speaker } : {}),
+    ...(tags ? { tags } : {}),
+    ...(note ? { note } : {}),
     images,
   };
+}
+
+function parseBlockText(lines: string[], indexRef: { value: number }): string {
+  indexRef.value += 1;
+  const body: string[] = [];
+  while (indexRef.value < lines.length) {
+    const textLine = lines[indexRef.value];
+    if (textLine.trim() === "") {
+      body.push("");
+      indexRef.value += 1;
+      continue;
+    }
+    if (!/^\s{6}/.test(textLine)) break;
+    body.push(textLine.slice(6));
+    indexRef.value += 1;
+  }
+  return body.join("\n").replace(/\n+$/g, "");
 }
 
 export function parseMomentsSource(source: unknown): MomentItem[] {
@@ -96,26 +145,59 @@ export function parseMomentsSource(source: unknown): MomentItem[] {
       const current = lines[index];
       const textBlock = /^\s{4}text:\s*\|[-+]?\s*$/.exec(current);
       if (textBlock) {
-        index += 1;
-        const body: string[] = [];
-        while (index < lines.length) {
-          const textLine = lines[index];
-          if (textLine.trim() === "") {
-            body.push("");
-            index += 1;
-            continue;
-          }
-          if (!/^\s{6}/.test(textLine)) break;
-          body.push(textLine.slice(6));
-          index += 1;
-        }
-        item.text = body.join("\n").replace(/\n+$/g, "");
+        const holder = { value: index };
+        item.text = parseBlockText(lines, holder);
+        index = holder.value;
+        continue;
+      }
+      const noteBlock = /^\s{4}note:\s*\|[-+]?\s*$/.exec(current);
+      if (noteBlock) {
+        const holder = { value: index };
+        item.note = parseBlockText(lines, holder);
+        index = holder.value;
         continue;
       }
       const textScalar = /^\s{4}text:\s*(.*)$/.exec(current);
       if (textScalar) {
         item.text = parseScalar(textScalar[1]);
         index += 1;
+        continue;
+      }
+      const sourceScalar = /^\s{4}source:\s*(.*)$/.exec(current);
+      if (sourceScalar) {
+        item.source = parseScalar(sourceScalar[1]);
+        index += 1;
+        continue;
+      }
+      const positionScalar = /^\s{4}position:\s*(.*)$/.exec(current);
+      if (positionScalar) {
+        item.position = parseScalar(positionScalar[1]);
+        index += 1;
+        continue;
+      }
+      const speakerScalar = /^\s{4}speaker:\s*(.*)$/.exec(current);
+      if (speakerScalar) {
+        item.speaker = parseScalar(speakerScalar[1]);
+        index += 1;
+        continue;
+      }
+      const noteScalar = /^\s{4}note:\s*(.*)$/.exec(current);
+      if (noteScalar) {
+        item.note = parseScalar(noteScalar[1]);
+        index += 1;
+        continue;
+      }
+      if (/^\s{4}tags:\s*(?:\[\s*\])?\s*$/.test(current)) {
+        index += 1;
+        const tags: string[] = [];
+        while (index < lines.length) {
+          const tagLine = /^\s{6}-\s*(.*)$/.exec(lines[index]);
+          if (!tagLine) break;
+          const value = parseScalar(tagLine[1]);
+          if (value) tags.push(value);
+          index += 1;
+        }
+        item.tags = tags;
         continue;
       }
       if (/^\s{4}images:\s*(?:\[\s*\])?\s*$/.test(current)) {
@@ -144,10 +226,23 @@ export function serializeMomentsSource(values: Iterable<MomentItem>): string {
   const lines = ["moments:"];
   for (const moment of moments) {
     lines.push(`  - id: ${quoteYaml(moment.id)}`);
-    lines.push("    text: |-" );
+    lines.push("    text: |-");
     const textLines = moment.text.split("\n");
     if (textLines.length === 1 && textLines[0] === "") lines.push("      ");
     else textLines.forEach((line) => lines.push(`      ${line}`));
+    if (moment.source) lines.push(`    source: ${quoteYaml(moment.source)}`);
+    if (moment.position) lines.push(`    position: ${quoteYaml(moment.position)}`);
+    if (moment.speaker) lines.push(`    speaker: ${quoteYaml(moment.speaker)}`);
+    if (moment.tags?.length) {
+      lines.push("    tags:");
+      moment.tags.forEach((tag) => lines.push(`      - ${quoteYaml(tag)}`));
+    }
+    if (moment.note) {
+      lines.push("    note: |-");
+      const noteLines = moment.note.split("\n");
+      if (noteLines.length === 1 && noteLines[0] === "") lines.push("      ");
+      else noteLines.forEach((line) => lines.push(`      ${line}`));
+    }
     if (moment.images.length) {
       lines.push("    images:");
       moment.images.forEach((path) => lines.push(`      - ${quoteYaml(path)}`));

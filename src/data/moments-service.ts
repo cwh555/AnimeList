@@ -16,6 +16,11 @@ import { normalizeImageSectionPath } from "../domain/image-section";
 
 export interface MomentEditorInput {
   text: string;
+  source?: string;
+  position?: string;
+  speaker?: string;
+  tags?: readonly string[];
+  note?: string;
   retainedImages: readonly string[];
   newAssets: readonly ImageSectionAssetInput[];
 }
@@ -28,6 +33,41 @@ export interface MomentMutationResult {
 
 function normalizedText(value: string): string {
   return value.replace(/\r\n?/g, "\n").trim();
+}
+
+function normalizedOptional(value: string | undefined): string | undefined {
+  const normalized = (value ?? "").replace(/\r\n?/g, "\n").trim();
+  return normalized || undefined;
+}
+
+function normalizedTags(values: readonly string[] | undefined): string[] | undefined {
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values ?? []) {
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    tags.push(normalized);
+  }
+  return tags.length ? tags : undefined;
+}
+
+function buildMomentPayload(id: string, input: MomentEditorInput, images: string[]): MomentItem {
+  const source = normalizedOptional(input.source);
+  const position = normalizedOptional(input.position);
+  const speaker = normalizedOptional(input.speaker);
+  const tags = normalizedTags(input.tags);
+  const note = normalizedOptional(input.note);
+  return {
+    id,
+    text: normalizedText(input.text),
+    ...(source ? { source } : {}),
+    ...(position ? { position } : {}),
+    ...(speaker ? { speaker } : {}),
+    ...(tags ? { tags } : {}),
+    ...(note ? { note } : {}),
+    images,
+  };
 }
 
 export class MomentsService {
@@ -58,7 +98,7 @@ export class MomentsService {
         throw new Error("This note has missing or duplicate Moment IDs; fix the YAML before adding another moment");
       }
       const id = createMomentId(allMomentIds(markdown));
-      const moment: MomentItem = { id, text, images: stored.paths };
+      const moment = buildMomentPayload(id, input, stored.paths);
       const next = [...current, moment];
       await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
       return { source: serializeMomentsSource(next), moment, duplicatesSkipped: stored.duplicatesSkipped };
@@ -92,7 +132,7 @@ export class MomentsService {
       throw new Error("A moment must keep at least one image");
     }
 
-    const nextMoment: MomentItem = { id: previous.id, text, images: stored.paths };
+    const nextMoment = buildMomentPayload(previous.id, input, stored.paths);
     const next = current.map((moment, position) => position === index ? nextMoment : moment);
     const note = this.noteFile(sourcePath);
     try {
