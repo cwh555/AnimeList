@@ -162,6 +162,60 @@
   box-shadow: 48px 0 0 color-mix(in srgb, var(--background-modifier-border) 62%, transparent);
 }
 
+.al-moment-copy {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 0.72rem;
+}
+
+.al-moment-meta,
+.al-moment-note {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.al-moment-meta-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.55rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.al-moment-meta-label {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--interactive-accent) 58%, var(--text-muted));
+  font-weight: 650;
+}
+
+.al-moment-meta-value,
+.al-moment-note-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.al-moment-tags {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.al-moment-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+}
+
 .al-moment-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -256,6 +310,23 @@
 .al-moment-image-row::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+}
+
+/* A single still is a featured image, not a filmstrip: it must fit the media pane without scrolling. */
+.al-moment-image-row[data-image-count="1"] {
+  overflow-x: hidden;
+  scroll-snap-type: none;
+  scrollbar-width: none;
+}
+
+.al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
+
+.al-moment-image-row[data-image-count="1"] .al-moment-image {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .al-moment-image {
@@ -408,6 +479,24 @@
   margin-top: 1rem;
 }
 
+.al-moment-editor-metadata {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.al-moment-editor-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.al-moment-editor-note {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+
 .al-moment-editor-add-images {
   display: inline-flex;
   align-items: center;
@@ -508,6 +597,7 @@
 }
 
 @media (max-width: 640px) {
+  .al-moment-editor-metadata-grid,
   .al-moment-editor-url-row {
     grid-template-columns: 1fr;
   }

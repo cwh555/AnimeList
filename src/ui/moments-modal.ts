@@ -21,6 +21,11 @@ function assetPreview(asset: ImageSectionAssetInput): string {
 export class MomentEditorModal extends Modal {
   private readonly isEdit: boolean;
   private textValue: string;
+  private sourceValue: string;
+  private positionValue: string;
+  private speakerValue: string;
+  private tagsValue: string;
+  private noteValue: string;
   private retainedImages: string[];
   private pending: PendingAsset[] = [];
   private nextKey = 1;
@@ -37,6 +42,11 @@ export class MomentEditorModal extends Modal {
     super(app);
     this.isEdit = initial !== null;
     this.textValue = initial?.text ?? "";
+    this.sourceValue = initial?.source ?? "";
+    this.positionValue = initial?.position ?? "";
+    this.speakerValue = initial?.speaker ?? "";
+    this.tagsValue = (initial?.tags ?? []).join(", ");
+    this.noteValue = initial?.note ?? "";
     this.retainedImages = [...(initial?.images ?? [])];
   }
 
@@ -121,6 +131,11 @@ export class MomentEditorModal extends Modal {
     try {
       await this.onSave({
         text: this.textValue,
+        source: this.sourceValue,
+        position: this.positionValue,
+        speaker: this.speakerValue,
+        tags: this.tagsValue.split(/[\n,，、]/).map((value) => value.trim()).filter(Boolean),
+        note: this.noteValue,
         retainedImages: this.retainedImages,
         newAssets: this.pending.map((entry) => entry.asset),
       });
@@ -130,6 +145,44 @@ export class MomentEditorModal extends Modal {
       new Notice(momentsText("saveFailed", { error: errorMessage(error) }));
       this.render();
     }
+  }
+
+  private renderMetadataFields(): HTMLElement {
+    const grid = makeEl("div", "al-moment-editor-metadata-grid");
+
+    const createInputField = (labelKey: Parameters<typeof momentsText>[0], value: string, onInput: (value: string) => void, placeholderKey?: Parameters<typeof momentsText>[0]): HTMLElement => {
+      const field = makeEl("label", "al-moment-editor-field");
+      field.appendChild(makeEl("span", "al-moment-editor-label", momentsText(labelKey)));
+      const input = makeEl("input");
+      input.type = "text";
+      input.value = value;
+      input.disabled = this.busy;
+      if (placeholderKey) input.placeholder = momentsText(placeholderKey);
+      input.addEventListener("input", () => onInput(input.value));
+      field.appendChild(input);
+      return field;
+    };
+
+    grid.append(
+      createInputField("sourceLabel", this.sourceValue, (value) => { this.sourceValue = value; }, "sourcePlaceholder"),
+      createInputField("positionLabel", this.positionValue, (value) => { this.positionValue = value; }, "positionPlaceholder"),
+      createInputField("speakerLabel", this.speakerValue, (value) => { this.speakerValue = value; }, "speakerPlaceholder"),
+      createInputField("tagsLabel", this.tagsValue, (value) => { this.tagsValue = value; }, "tagsPlaceholder"),
+    );
+
+    const noteField = makeEl("label", "al-moment-editor-field al-moment-editor-note-field");
+    noteField.appendChild(makeEl("span", "al-moment-editor-label", momentsText("noteLabel")));
+    const note = makeEl("textarea", "al-moment-editor-note");
+    note.value = this.noteValue;
+    note.placeholder = momentsText("notePlaceholder");
+    note.rows = 3;
+    note.disabled = this.busy;
+    note.addEventListener("input", () => { this.noteValue = note.value; });
+    noteField.appendChild(note);
+
+    const wrapper = makeEl("div", "al-moment-editor-metadata");
+    wrapper.append(grid, noteField);
+    return wrapper;
   }
 
   private renderImageRow(): HTMLElement {
@@ -194,6 +247,7 @@ export class MomentEditorModal extends Modal {
     textarea.addEventListener("input", () => { this.textValue = textarea.value; });
     textGroup.appendChild(textarea);
     this.contentEl.appendChild(textGroup);
+    this.contentEl.appendChild(this.renderMetadataFields());
 
     const imageHead = makeEl("div", "al-moment-editor-image-head");
     imageHead.appendChild(makeEl("span", "al-moment-editor-label", momentsText("imagesLabel")));

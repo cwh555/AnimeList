@@ -176,12 +176,56 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     window.requestAnimationFrame(sync);
   }
 
+  private metaRow(label: string, value: string): HTMLElement {
+    const row = makeEl("div", "al-moment-meta-row");
+    row.append(
+      makeEl("span", "al-moment-meta-label", label),
+      makeEl("span", "al-moment-meta-value", value),
+    );
+    return row;
+  }
+
+  private renderMeta(moment: MomentItem): HTMLElement | null {
+    const hasMeta = Boolean(moment.source || moment.position || moment.speaker || moment.tags?.length || moment.note);
+    if (!hasMeta) return null;
+    const wrap = makeEl("div", "al-moment-copy");
+    wrap.appendChild(makeEl("div", "al-moment-text", moment.text));
+
+    if (moment.source || moment.position || moment.speaker) {
+      const meta = makeEl("div", "al-moment-meta");
+      if (moment.source) meta.appendChild(this.metaRow(momentsText("sourceLabel"), moment.source));
+      if (moment.position) meta.appendChild(this.metaRow(momentsText("positionLabel"), moment.position));
+      if (moment.speaker) meta.appendChild(this.metaRow(momentsText("speakerLabel"), moment.speaker));
+      wrap.appendChild(meta);
+    }
+
+    if (moment.tags?.length) {
+      const row = makeEl("div", "al-moment-meta-row al-moment-tags-row");
+      row.appendChild(makeEl("span", "al-moment-meta-label", momentsText("tagsLabel")));
+      const tags = makeEl("div", "al-moment-tags");
+      moment.tags.forEach((tag) => tags.appendChild(makeEl("span", "al-moment-tag", tag)));
+      row.appendChild(tags);
+      wrap.appendChild(row);
+    }
+
+    if (moment.note) {
+      const note = makeEl("div", "al-moment-note");
+      note.append(
+        makeEl("span", "al-moment-meta-label", momentsText("noteLabel")),
+        makeEl("div", "al-moment-note-text", moment.note),
+      );
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
   private renderMoment(moment: MomentItem): HTMLElement {
     const card = makeEl("article", "al-moment-card");
     card.dataset.momentId = moment.id;
 
     const head = makeEl("div", "al-moment-head");
-    const text = makeEl("div", "al-moment-text", moment.text);
+    const copy = this.renderMeta(moment) ?? makeEl("div", "al-moment-copy");
+    if (!copy.hasChildNodes()) copy.appendChild(makeEl("div", "al-moment-text", moment.text));
     const actions = makeEl("button", "al-moment-actions");
     actions.type = "button";
     actions.setAttribute("aria-label", "Moment actions");
@@ -190,7 +234,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       event.stopPropagation();
       this.showMomentMenu(event, moment);
     });
-    head.append(text, actions);
+    head.append(copy, actions);
     card.appendChild(head);
 
     const media = makeEl("div", "al-moment-media");
