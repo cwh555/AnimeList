@@ -1206,6 +1206,285 @@
   .al-image-lightbox-nav { width:34px; height:42px; }
 }
 
+.animelist-moments-section {
+  position: relative;
+  box-sizing: border-box;
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-secondary) 72%, transparent);
+}
+
+.al-moments-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 32px;
+  margin-bottom: 0.65rem;
+}
+
+.al-moments-add,
+.al-moment-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.al-moments-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.al-moments-empty {
+  padding: 1.25rem 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.al-moment-card {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--background-modifier-border) 45%, transparent);
+}
+
+.al-moment-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+
+.al-moment-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.al-moment-actions {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.al-moment-image-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.1rem 0 0.35rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.al-moment-image {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 164px;
+  min-width: 120px;
+  max-width: min(520px, 78vw);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  scroll-snap-align: start;
+  cursor: zoom-in;
+}
+
+.al-moment-image img {
+  display: block;
+  width: auto;
+  max-width: min(520px, 78vw);
+  height: 100%;
+  object-fit: contain;
+  background: var(--background-secondary);
+}
+
+.al-moment-image-missing {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 1rem;
+  color: var(--text-muted);
+}
+
+.animelist-moment-editor-modal {
+  width: min(760px, calc(100vw - 36px));
+  max-width: min(760px, calc(100vw - 36px));
+}
+
+.animelist-moment-editor-modal .modal-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.al-moment-editor-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.al-moment-editor-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.al-moment-editor-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+}
+
+.al-moment-editor-image-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.al-moment-editor-add-images {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.al-moment-editor-file-input {
+  display: none;
+}
+
+.al-moment-editor-images {
+  display: flex;
+  gap: 0.5rem;
+  min-height: 116px;
+  margin-top: 0.45rem;
+  padding: 0.55rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  scrollbar-width: thin;
+}
+
+.al-moment-editor-images.is-dragging {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.al-moment-editor-image {
+  position: relative;
+  flex: 0 0 auto;
+  width: 150px;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--background-primary);
+}
+
+.al-moment-editor-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.al-moment-editor-image-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.al-moment-editor-image-missing,
+.al-moment-editor-images-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 160px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.al-moment-editor-paste-hint {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.al-moment-editor-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.al-moment-editor-url-row input {
+  min-width: 0;
+  width: 100%;
+}
+
+.al-moment-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.al-moment-delete-copy {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .animelist-moments-section {
+    padding: 0.6rem;
+    border-radius: 12px;
+  }
+
+  .al-moment-card {
+    padding: 0.65rem;
+  }
+
+  .al-moment-image {
+    height: 132px;
+    max-width: 82vw;
+  }
+
+  .al-moment-image img {
+    max-width: 82vw;
+  }
+
+  .al-moment-editor-url-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Explicit review UI for potentially destructive version-update cleanups. */
 .al-version-cleanup-modal { width:min(820px,calc(100vw - 32px)); }
 .al-version-cleanup-rules { margin:10px 0 14px; padding-left:22px; color:var(--text-muted); }
