@@ -21,6 +21,7 @@ function interactive(target: Element | null): boolean {
 export class MomentsRenderChild extends MarkdownRenderChild {
   private source: string;
   private lineHint: number | undefined;
+  private scrollerObservers: ResizeObserver[] = [];
 
   constructor(
     containerEl: HTMLElement,
@@ -42,6 +43,15 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       event.stopPropagation();
     });
     this.render();
+  }
+
+  onunload(): void {
+    this.clearScrollerObservers();
+  }
+
+  private clearScrollerObservers(): void {
+    this.scrollerObservers.forEach((observer) => observer.disconnect());
+    this.scrollerObservers = [];
   }
 
   private locator(): MomentsLocator {
@@ -123,6 +133,49 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     new ImageLightboxModal(this.host.app, this.imageService, this.context.sourcePath, moment.images, index).open();
   }
 
+  private bindScroller(
+    media: HTMLElement,
+    row: HTMLElement,
+    previous: HTMLButtonElement,
+    next: HTMLButtonElement,
+  ): void {
+    const sync = (): void => {
+      const maxScroll = Math.max(0, row.scrollWidth - row.clientWidth);
+      const scrollable = maxScroll > 2;
+      const atStart = !scrollable || row.scrollLeft <= 2;
+      const atEnd = !scrollable || row.scrollLeft >= maxScroll - 2;
+      media.classList.toggle("is-scrollable", scrollable);
+      media.classList.toggle("is-at-start", atStart);
+      media.classList.toggle("is-at-end", atEnd);
+      previous.hidden = !scrollable;
+      next.hidden = !scrollable;
+      previous.disabled = atStart;
+      next.disabled = atEnd;
+    };
+    const move = (direction: -1 | 1): void => {
+      row.scrollBy({
+        left: direction * Math.max(220, row.clientWidth * 0.72),
+        behavior: "smooth",
+      });
+    };
+    previous.addEventListener("click", (event) => {
+      event.stopPropagation();
+      move(-1);
+    });
+    next.addEventListener("click", (event) => {
+      event.stopPropagation();
+      move(1);
+    });
+    row.addEventListener("scroll", sync, { passive: true });
+    row.querySelectorAll("img").forEach((image) => image.addEventListener("load", sync, { once: true }));
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(sync);
+      observer.observe(row);
+      this.scrollerObservers.push(observer);
+    }
+    window.requestAnimationFrame(sync);
+  }
+
   private renderMoment(moment: MomentItem): HTMLElement {
     const card = makeEl("article", "al-moment-card");
     card.dataset.momentId = moment.id;
@@ -140,6 +193,8 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     head.append(text, actions);
     card.appendChild(head);
 
+    const media = makeEl("div", "al-moment-media");
+    const viewport = makeEl("div", "al-moment-image-viewport");
     const row = makeEl("div", "al-moment-image-row");
     row.setAttribute("role", "list");
     row.dataset.imageCount = String(moment.images.length);
@@ -160,6 +215,13 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         image.loading = "lazy";
         image.decoding = "async";
         image.draggable = false;
+        const updateRatio = (): void => {
+          if (!image.naturalWidth || !image.naturalHeight) return;
+          const ratio = Math.min(1.7, Math.max(0.58, image.naturalWidth / image.naturalHeight));
+          frame.style.setProperty("--al-moment-image-ratio", String(ratio));
+        };
+        image.addEventListener("load", updateRatio, { once: true });
+        if (image.complete) updateRatio();
         frame.appendChild(image);
       } else {
         const missing = makeEl("div", "al-moment-image-missing");
@@ -178,11 +240,30 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       });
       row.appendChild(frame);
     }
-    card.appendChild(row);
+    viewport.appendChild(row);
+
+    const previous = makeEl("button", "al-moment-scroll-prev");
+    previous.classList.add("al-moment-scroll-nav");
+    previous.type = "button";
+    previous.hidden = true;
+    previous.setAttribute("aria-label", "Previous images");
+    setAnimeListIcon(previous, "chevron-left");
+
+    const next = makeEl("button", "al-moment-scroll-next");
+    next.classList.add("al-moment-scroll-nav");
+    next.type = "button";
+    next.hidden = true;
+    next.setAttribute("aria-label", "Next images");
+    setAnimeListIcon(next, "chevron-right");
+
+    media.append(viewport, previous, next);
+    card.appendChild(media);
+    this.bindScroller(media, row, previous, next);
     return card;
   }
 
   private render(): void {
+    this.clearScrollerObservers();
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-moments-section");
 
