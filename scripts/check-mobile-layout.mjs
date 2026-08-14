@@ -89,13 +89,24 @@ function momentsFilmstripFixture(isMobile) {
     #fixture{width:${fixtureWidth}px;max-width:100%;}
   </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section">
     <div class="al-moments-toolbar"><div class="al-moments-identity"><span class="al-moments-icon"></span><span class="al-moments-title">Moments</span><span class="al-moments-count">5</span></div><button class="al-moments-add" type="button">+</button></div>
-    <div class="al-moments-list"><article id="card" class="al-moment-card">
-      <div id="copy" class="al-moment-head"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-actions" type="button">⋯</button></div>
-      <div id="media" class="al-moment-media is-scrollable"><div class="al-moment-image-viewport"><div id="gallery" class="al-moment-image-row" data-image-count="7">${image.repeat(7)}</div></div></div>
-    </article></div>
+    <div class="al-moments-list">
+      <article id="single-card" class="al-moment-card">
+        <div id="single-copy" class="al-moment-head"><div class="al-moment-copy"><div class="al-moment-text">雖然只是很短的一段時間。</div><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記</span><div class="al-moment-note-text">完整 metadata 測試。</div></div></div><button class="al-moment-actions" type="button">⋯</button></div>
+        <div id="single-media" class="al-moment-media"><div class="al-moment-image-viewport"><div id="single-gallery" class="al-moment-image-row" data-image-count="1"><button id="single-image" class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777;--al-moment-strip-ratio:1.7"><img alt="" src="${pixel}"></button></div></div></div>
+      </article>
+      <article id="card" class="al-moment-card">
+        <div id="copy" class="al-moment-head"><div class="al-moment-copy"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div></div><button class="al-moment-actions" type="button">⋯</button></div>
+        <div id="media" class="al-moment-media is-scrollable"><div class="al-moment-image-viewport"><div id="gallery" class="al-moment-image-row" data-image-count="7">${image.repeat(7)}</div></div></div>
+      </article>
+    </div>
   </section>
   <script>
     try {
+      const singleCard = document.querySelector('#single-card');
+      const singleCopy = document.querySelector('#single-copy');
+      const singleMedia = document.querySelector('#single-media');
+      const singleGallery = document.querySelector('#single-gallery');
+      const singleImage = document.querySelector('#single-image');
       const card = document.querySelector('#card');
       const copy = document.querySelector('#copy');
       const media = document.querySelector('#media');
@@ -109,22 +120,29 @@ function momentsFilmstripFixture(isMobile) {
       const uniqueRows = [...new Set(tops)];
       gallery.style.scrollBehavior = 'auto'; gallery.scrollLeft = 180;
       const shared = {
+        singleImageFitsViewport: singleImage.getBoundingClientRect().width <= singleGallery.getBoundingClientRect().width + 1,
+        singleImageNeedsNoScroll: singleGallery.scrollWidth <= singleGallery.clientWidth + 1 && getComputedStyle(singleGallery).overflowX === 'hidden',
+        metadataVisible: singleCopy.querySelectorAll('.al-moment-meta-row').length >= 4 && singleCopy.querySelector('.al-moment-tag')?.textContent === '回憶片段' && singleCopy.querySelector('.al-moment-note-text')?.textContent === '完整 metadata 測試。',
         singleHorizontalRow: uniqueRows.length === 1,
         horizontalOverflow: gallery.scrollWidth > gallery.clientWidth + 20,
         horizontalScrolling: gallery.scrollLeft > 0,
         nativeHorizontalScroller: getComputedStyle(gallery).overflowX === 'auto' && getComputedStyle(gallery).flexWrap === 'nowrap',
-        imagesUseContain: images.every((image) => getComputedStyle(image).objectFit === 'contain'),
+        imagesUseContain: [...images, ...singleGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
         noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
       };
+      const singleCopyRect = singleCopy.getBoundingClientRect();
+      const singleMediaRect = singleMedia.getBoundingClientRect();
       const details = ${isMobile} ? {
         ...shared,
         stackedCard: mediaRect.top >= copyRect.bottom - 2 && Math.abs(mediaRect.left - copyRect.left) <= 2 && Math.abs(mediaRect.right - copyRect.right) <= 2,
+        singleStackedCard: singleMediaRect.top >= singleCopyRect.bottom - 2 && Math.abs(singleMediaRect.left - singleCopyRect.left) <= 2 && Math.abs(singleMediaRect.right - singleCopyRect.right) <= 2,
         mediaBelowCopy: mediaRect.top >= copyRect.bottom - 2,
       } : {
         ...shared,
         splitCard: copyRect.width > 0 && mediaRect.width > 0 && copyRect.right <= mediaRect.left + 2 && Math.abs(copyRect.top - mediaRect.top) <= 2,
+        singleSplitCard: singleCopyRect.right <= singleMediaRect.left + 2 && Math.abs(singleCopyRect.top - singleMediaRect.top) <= 2,
         copyLeftOfFilmstrip: copyRect.right <= mediaRect.left + 2,
-        boundedCard: cardRect.width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
+        boundedCard: cardRect.width <= document.querySelector('#fixture').getBoundingClientRect().width + 1 && singleCard.getBoundingClientRect().width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
       };
       document.body.dataset.details = JSON.stringify(details);
       document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';

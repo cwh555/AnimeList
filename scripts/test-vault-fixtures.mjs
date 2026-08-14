@@ -83,8 +83,8 @@ const IMAGE_LAYOUT_SOURCE_IDS = [
 ];
 
 const MOMENTS_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/moments`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v3";
-const MOMENTS_PREVIOUS_MARKER = ".animelist-test-moments-v2";
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v4";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v3", ".animelist-test-moments-v2"];
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
 const MOMENTS_SCENE_SOURCES = [
@@ -161,6 +161,17 @@ function momentsBlock(items) {
     lines.push(`  - id: ${JSON.stringify(item.id)}`);
     lines.push("    text: |-");
     String(item.text).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    if (item.source) lines.push(`    source: ${JSON.stringify(item.source)}`);
+    if (item.position) lines.push(`    position: ${JSON.stringify(item.position)}`);
+    if (item.speaker) lines.push(`    speaker: ${JSON.stringify(item.speaker)}`);
+    if (Array.isArray(item.tags) && item.tags.length) {
+      lines.push("    tags:");
+      item.tags.forEach((tag) => lines.push(`      - ${JSON.stringify(tag)}`));
+    }
+    if (item.note) {
+      lines.push("    note: |-");
+      String(item.note).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    }
     lines.push("    images:");
     item.images.forEach((image) => lines.push(`      - ${JSON.stringify(image)}`));
   }
@@ -237,7 +248,6 @@ function momentsFixturePaths(vaultRoot) {
 
 async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
-  const previousMarker = path.join(vaultRoot, MOMENTS_PREVIOUS_MARKER);
   const known = momentsFixturePaths(vaultRoot);
   const assetPaths = await ensureMomentSceneAssets(vaultRoot, fetchImpl);
   if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
@@ -286,7 +296,12 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
       {
         id: "m_test_frieren_promise_04",
         text: "雖然只是很短的一段時間。",
-        images: [scene("frieren-ep01-04"), scene("frieren-ep01-05"), scene("frieren-ep01-06")],
+        source: "第 1 話",
+        position: "旅途的記憶",
+        speaker: "芙莉蓮",
+        tags: ["回憶片段", "辛美爾"],
+        note: "單張圖片的情況不該顯示橫向捲動；填寫中的 metadata 應該完整顯示。",
+        images: [scene("frieren-ep01-04")],
       },
       {
         id: "m_test_frieren_magic_05",
@@ -305,6 +320,9 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
       {
         id: "m_test_kaguya_01",
         text: "戀愛是戰爭！\n先喜歡上的人就輸了。",
+        source: "第 1 話",
+        tags: ["戀愛", "頭腦戰"],
+        note: "第一話就把作品的核心規則說得很清楚。",
         images: [scene("kaguya-s1-ep01-01"), scene("kaguya-s1-ep01-02")],
       },
       {
@@ -317,8 +335,8 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
     "> Test Vault scene source: Kaguya-sama season 1 episode 1 official STORY stills.",
   ].join("\n"));
 
-  fs.rmSync(previousMarker, { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v3 seeded. Ordinary test-vault runs preserve later edits.\n");
+  for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v4 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
@@ -932,8 +950,9 @@ Use these real media notes with **official episode stills downloaded into the Te
 Check the approved Moments behavior:
 
 - Each Moment is **text + 1..N related images**. Text preserves multiple lines.
-- On desktop, each Moment uses the approved **editorial split card**: quote/text on the left and a single-row horizontal image filmstrip on the right. Every image must remain fully visible without cropping. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text stacks above the same single-row filmstrip without horizontal page overflow.
-- When a filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
+- On desktop, each Moment uses the approved **editorial split card**: quote plus any filled optional metadata on the left and media on the right. Empty metadata fields must not render. The Frieren 「雖然只是很短的一段時間。」 case has one landscape still and must show that whole image without a horizontal scrollbar. Every image remains uncropped. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text/metadata stacks above the same single-row media area without horizontal page overflow.
+- Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
+- When a multi-image filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
 - Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
 - Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
 - Edit keeps the same stable \`id\`, supports replacing text and adding/removing images, and never duplicates an existing ID.

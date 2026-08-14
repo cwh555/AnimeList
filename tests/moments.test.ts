@@ -14,16 +14,24 @@ import {
 } from "../src/domain/moments";
 
 describe("moments Markdown model", () => {
-  it("round-trips multiline text and one-to-many image rows in human-readable YAML-like data", () => {
+  it("round-trips multiline text, optional metadata, and one-to-many image rows in human-readable YAML-like data", () => {
     const source = [
       "moments:",
       '  - id: "m_first123"',
       "    text: |-",
       "      人類的壽命太短了。",
       "      為什麼我當時沒有更了解他呢？",
+      '    source: "第 1 話"',
+      '    position: "旅途的記憶"',
+      '    speaker: "芙莉蓮"',
+      "    tags:",
+      '      - "回憶片段"',
+      '      - "辛美爾"',
+      "    note: |-",
+      "      單張圖片不該出現捲動列。",
+      "      Metadata 應保留多行文字。",
       "    images:",
       '      - "AnimeList/Images/frieren/001.jpg"',
-      '      - "AnimeList/Images/frieren/002.jpg"',
       '  - id: "m_second456"',
       "    text: |-",
       "      這幕真的很好笑。",
@@ -35,7 +43,12 @@ describe("moments Markdown model", () => {
       {
         id: "m_first123",
         text: "人類的壽命太短了。\n為什麼我當時沒有更了解他呢？",
-        images: ["AnimeList/Images/frieren/001.jpg", "AnimeList/Images/frieren/002.jpg"],
+        source: "第 1 話",
+        position: "旅途的記憶",
+        speaker: "芙莉蓮",
+        tags: ["回憶片段", "辛美爾"],
+        note: "單張圖片不該出現捲動列。\nMetadata 應保留多行文字。",
+        images: ["AnimeList/Images/frieren/001.jpg"],
       },
       { id: "m_second456", text: "這幕真的很好笑。", images: ["AnimeList/Images/frieren/003.png"] },
     ]);
@@ -54,12 +67,14 @@ describe("moments Markdown model", () => {
     const updated = replaceMoments(markdown, blocks[1], [{
       id: "m_unique123",
       text: "保存這一幕。",
+      source: "第 1 話",
+      tags: ["名場面"],
       images: ["AnimeList/Images/demo/scene.jpg"],
     }]);
     assert.match(updated, /custom: keep/);
     assert.match(updated, /Personal paragraph must stay\./);
     assert.match(updated, /## Quotes\n```animelist-moments\nmoments: \[\]\n```/);
-    assert.match(updated, /## Memes[\s\S]*m_unique123[\s\S]*scene\.jpg/);
+    assert.match(updated, /## Memes[\s\S]*m_unique123[\s\S]*source: "第 1 話"[\s\S]*scene\.jpg/);
     assert.deepEqual(allMomentIds(updated), ["m_unique123"]);
     assert.deepEqual(allMomentImagePaths(updated), ["AnimeList/Images/demo/scene.jpg"]);
   });

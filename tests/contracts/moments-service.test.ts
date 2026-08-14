@@ -74,6 +74,11 @@ describe("moments storage service", () => {
     const block = findMomentsBlocks(h.data.get(h.note.path) ?? "")[0];
     const added = await h.service.addMoment(h.note.path, block, {
       text: "第一句\n第二句",
+      source: "第 1 話",
+      position: "旅途的記憶",
+      speaker: "芙莉蓮",
+      tags: ["回憶片段", "名台詞"],
+      note: "這是一個帶 metadata 的 Moments 測試。",
       retainedImages: [],
       newAssets: [
         { name: "one.png", contentType: "image/png", data: new Uint8Array([1, 2, 3]).buffer },
@@ -82,17 +87,26 @@ describe("moments storage service", () => {
     });
     assert.ok(added.moment?.id.startsWith("m_"));
     assert.equal(added.moment?.images.length, 2);
+    assert.equal(added.moment?.source, "第 1 話");
+    assert.deepEqual(added.moment?.tags, ["回憶片段", "名台詞"]);
     assert.match(h.data.get(h.note.path) ?? "", /Keep this paragraph\./);
 
     const nextBlock = findMomentsBlocks(h.data.get(h.note.path) ?? "")[0];
     const id = added.moment?.id ?? "";
     const edited = await h.service.editMoment(h.note.path, nextBlock, id, {
       text: "更新後的文字",
+      source: "第 2 話",
+      position: "23:59",
+      speaker: "費倫",
+      tags: ["重編輯"],
+      note: "metadata 可編輯且要保留 stable id。",
       retainedImages: [added.moment?.images[0] ?? ""],
       newAssets: [{ name: "three.png", contentType: "image/png", data: new Uint8Array([7, 8, 9]).buffer }],
     });
     assert.equal(edited.moment?.id, id);
     assert.equal(edited.moment?.text, "更新後的文字");
+    assert.equal(edited.moment?.position, "23:59");
+    assert.deepEqual(edited.moment?.tags, ["重編輯"]);
     assert.equal(edited.moment?.images.length, 2);
     assert.equal(h.trashed.length, 1);
     assert.equal(parseMomentsSource(edited.source)[0].id, id);

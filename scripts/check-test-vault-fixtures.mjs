@@ -94,6 +94,7 @@ try {
   assert.match(checklist, /old default duplicate cover embed/i);
   assert.match(checklist, /## 8\. Moments sections/);
   assert.match(checklist, /seven-image Frieren Moment/i);
+  assert.match(checklist, /source \/ position-time \/ speaker-character \/ tags \/ note/i);
   assert.match(checklist, /official episode stills/i);
   assert.match(checklist, /not committed to the repository/i);
   assert.equal(first.imageSectionDemos.demoPaths.length, 3);
@@ -105,7 +106,8 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
   for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
@@ -123,10 +125,12 @@ try {
   assert.equal((read(frierenAnimePath).match(/```animelist-moments/g) ?? []).length, 2);
   assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 5);
   assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/moments\/frieren-ep01-/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_promise_04[\s\S]*source: "第 1 話"[\s\S]*position: "旅途的記憶"[\s\S]*speaker: "芙莉蓮"[\s\S]*tags:[\s\S]*回憶片段[\s\S]*辛美爾/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-moments/g) ?? []).length, 1);
   assert.equal((read(kaguyaAnimePath).match(/^  - id: "m_test_kaguya_/gm) ?? []).length, 2);
   assert.match(read(kaguyaAnimePath), /AnimeList\/Images\/test-vault\/moments\/kaguya-s1-ep01-/);
+  assert.match(read(kaguyaAnimePath), /m_test_kaguya_01[\s\S]*source: "第 1 話"[\s\S]*tags:[\s\S]*戀愛[\s\S]*頭腦戰/);
   assert.equal((read(kaguyaAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 10);
   assert.match(read(overlordPath), /```animelist-images\n```/);
   for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {
