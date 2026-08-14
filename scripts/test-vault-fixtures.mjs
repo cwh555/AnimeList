@@ -273,7 +273,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
       },
       {
         id: "m_test_frieren_short_03",
-        text: "好美。",
+        text: "在城裡不太看得清楚呢。",
         images: [scene("frieren-ep01-05")],
       },
     ]),
@@ -304,12 +304,12 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
     momentsBlock([
       {
         id: "m_test_kaguya_01",
-        text: "戀愛就是告白的一方輸了！",
+        text: "戀愛是戰爭！\n先喜歡上的人就輸了。",
         images: [scene("kaguya-s1-ep01-01"), scene("kaguya-s1-ep01-02")],
       },
       {
         id: "m_test_kaguya_02",
-        text: "真可愛呢……",
+        text: "好像有人在傳我們的謠言呢。",
         images: [scene("kaguya-s1-ep01-03")],
       },
     ]),
