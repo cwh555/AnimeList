@@ -11,15 +11,19 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 
 <table>
   <tr>
-    <td colspan="2" align="center">
+    <td width="50%" align="center">
       <img src="docs/images/library-card.webp" alt="AnimeList library in card view" width="100%"><br>
       <sub><b>Library</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
+      <sub><b>Score Dashboard</b></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
-      <sub><b>Score Dashboard</b></sub>
+      <img src="docs/images/image-session.png" alt="AnimeList library in card view" width="100%"><br>
+      <sub><b>Note</b></sub>
     </td>
     <td width="50%" align="center">
       <img src="docs/images/timeline.png" alt="AnimeList completion timeline"><br>
