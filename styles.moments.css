@@ -209,10 +209,8 @@
 }
 
 .al-moment-quote:not(.is-expanded) .al-moment-text {
-  display: -webkit-box;
+  max-height: 9.96em;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
 }
 
 .al-moment-quote.is-clampable:not(.is-expanded)::after {

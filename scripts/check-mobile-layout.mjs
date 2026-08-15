@@ -106,7 +106,7 @@ function momentsFilmstripFixture(isMobile) {
       </article>
       <article id="long-card" class="al-moment-card" data-image-count="3">
         ${index("03")}
-        <div id="long-copy" class="al-moment-head has-metadata"><div class="al-moment-copy"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button">展開</button></div><div class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div></div></div><button class="al-moment-actions" type="button">⋯</button></div>
+        <div id="long-copy" class="al-moment-head has-metadata"><div class="al-moment-copy"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div><div class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div></div></div><button class="al-moment-actions" type="button">⋯</button></div>
         <div class="al-moment-media is-filmstrip"><div class="al-moment-image-viewport"><div class="al-moment-image-row" data-image-count="3">${landscape.repeat(3)}</div></div></div>
       </article>
     </div>
@@ -140,11 +140,22 @@ function momentsFilmstripFixture(isMobile) {
       const singleMediaRect = singleMedia.getBoundingClientRect();
       const longQuote = document.querySelector('#long-quote');
       const longText = document.querySelector('#long-text');
+      const longToggle = document.querySelector('#long-toggle');
+      const syncLongOverflow = () => {
+        const overflow = longText.scrollHeight > longText.clientHeight + 2;
+        longQuote.classList.toggle('is-clampable', overflow);
+        longToggle.hidden = !overflow;
+      };
+      syncLongOverflow();
       const collapsedLongHeight = longText.getBoundingClientRect().height;
       const longContentOverflows = longText.scrollHeight > collapsedLongHeight + 2;
+      const longToggleVisibleWhenCollapsed = !longToggle.hidden && longToggle.textContent === '展開';
       longQuote.classList.add('is-expanded');
+      longToggle.textContent = '收合';
       const expandedLongHeight = longText.getBoundingClientRect().height;
+      const longToggleVisibleWhenExpanded = !longToggle.hidden && longToggle.textContent === '收合';
       longQuote.classList.remove('is-expanded');
+      longToggle.textContent = '展開';
       gallery.style.scrollBehavior = 'auto'; gallery.style.scrollSnapType = 'none'; gallery.scrollLeft = Math.min(180, gallery.scrollWidth - gallery.clientWidth);
       const shared = {
         singleImageFitsViewport: singleImage.getBoundingClientRect().width <= singleGallery.getBoundingClientRect().width + 1 && singleImage.getBoundingClientRect().height <= singleGallery.getBoundingClientRect().height + 1,
@@ -161,7 +172,7 @@ function momentsFilmstripFixture(isMobile) {
         nativeHorizontalScroller: getComputedStyle(gallery).overflowX === 'auto' && getComputedStyle(gallery).flexWrap === 'nowrap',
         imagesUseContain: [...images, ...singleGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
         longQuoteClamped: longContentOverflows && collapsedLongHeight < expandedLongHeight - 8,
-        longQuoteExpandable: expandedLongHeight > collapsedLongHeight + 8 && !document.querySelector('#long-toggle').hidden,
+        longQuoteExpandable: expandedLongHeight > collapsedLongHeight + 8 && longToggleVisibleWhenCollapsed && longToggleVisibleWhenExpanded,
         noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
       };
       const details = ${isMobile} ? {
