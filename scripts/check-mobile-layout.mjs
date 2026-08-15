@@ -152,6 +152,10 @@ function momentsFilmstripFixture(isMobile) {
       const singleNoteText = document.querySelector('#single-note-text');
       const singleNoteLabelRect = singleNoteLabel.getBoundingClientRect();
       const singleNoteTextRect = singleNoteText.getBoundingClientRect();
+      const tagsRow = metadata.querySelector('.al-moment-tags-row');
+      const tagsLabelRect = tagsRow.querySelector('.al-moment-meta-label').getBoundingClientRect();
+      const tagsRect = tagsRow.querySelector('.al-moment-tags').getBoundingClientRect();
+      const tagRects = [...tagsRow.querySelectorAll('.al-moment-tag')].map((tag) => tag.getBoundingClientRect());
       const longNoteText = document.querySelector('#long-note-text');
 
       const longQuote = document.querySelector('#long-quote');
@@ -209,6 +213,8 @@ function momentsFilmstripFixture(isMobile) {
         metadataValuesAligned: metadataValueLefts.length >= 3 && Math.max(...metadataValueLefts) - Math.min(...metadataValueLefts) <= 1,
         metadataValuesUsePrimaryText: metadataValues.every((value) => getComputedStyle(value).color === getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).color),
         noteUsesStackedLayout: singleNoteLabelRect.bottom <= singleNoteTextRect.top + 2 && Math.abs(singleNoteLabelRect.left - singleNoteTextRect.left) <= 1,
+        tagsUseStackedLayout: tagsLabelRect.bottom <= tagsRect.top + 2 && Math.abs(tagsLabelRect.left - tagsRect.left) <= 1,
+        tagsFlowHorizontally: tagRects.length >= 2 && Math.abs(tagRects[0].top - tagRects[1].top) <= 1 && getComputedStyle(tagsRow.querySelector('.al-moment-tags')).display === 'flex',
         shortNoteNotTruncated: singleNoteText.scrollHeight <= singleNoteText.clientHeight + 1 && getComputedStyle(singleNoteText).overflow !== 'hidden',
         twoImagesShareRow: twoRects.length === 2 && Math.abs(twoRects[0].top - twoRects[1].top) <= 1,
         longSingleHorizontalRow: longRows.length === 1,
