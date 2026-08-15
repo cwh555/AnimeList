@@ -78,6 +78,178 @@ function fixture(mode) {
   </body></html>`;
 }
 
+
+function momentsFilmstripFixture(isMobile) {
+  const pixel = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%235b5b5b'/%3E%3C/svg%3E";
+  const landscape = `<button class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777"><img alt="" src="${pixel}"></button>`;
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+  ${styles}
+  body { margin: 0; background: #181818; color: #ddd; --background-primary:#1e1e1e; --background-secondary:#252525; --background-modifier-border:#3c3c3c; --background-modifier-hover:#333; --interactive-accent:#8b5cf6; --text-normal:#ddd; --text-muted:#aaa; --text-faint:#777; --font-ui-medium:16px; --font-ui-small:13px; --font-ui-smaller:11px; }
+  #fixture { width: min(1120px, calc(100vw - 24px)); margin: 12px auto; }
+  </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section">
+    <div class="al-moments-toolbar"><div class="al-moments-identity"><span class="al-moments-icon"></span><span class="al-moments-title">Moments</span><span class="al-moments-count">3</span></div><button class="al-moments-add" type="button">+</button></div>
+    <div class="al-moments-list">
+      <article id="single-card" class="al-moment-card" data-image-count="1">
+        <div id="single-media" class="al-moment-media is-featured"><div class="al-moment-image-viewport"><div id="single-gallery" class="al-moment-image-row" data-image-count="1"><button id="single-image" class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777"><img alt="" src="${pixel}"></button></div></div></div>
+        <div id="single-content" class="al-moment-content has-metadata">
+          <div id="metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處：</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間：</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者：</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤：</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span><span class="al-moment-tag">辛美爾</span></div></div><div class="al-moment-note"><span id="single-note-label" class="al-moment-meta-label">註記：</span><div id="single-note-text" class="al-moment-note-text">完整 metadata 測試。</div></div></div>
+          <div id="single-quote-panel" class="al-moment-quote-panel"><div class="al-moment-quote"><div class="al-moment-text">雖然只是很短的一段時間。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div>
+        </div>
+        <button class="al-moment-actions" type="button">⋯</button>
+      </article>
+      <article id="two-card" class="al-moment-card" data-image-count="2">
+        <div id="two-media" class="al-moment-media is-filmstrip"><div class="al-moment-image-viewport"><div id="two-gallery" class="al-moment-image-row" data-image-count="2">${landscape.repeat(2)}</div></div></div>
+        <div id="two-content" class="al-moment-content without-metadata"><div id="two-quote-panel" class="al-moment-quote-panel"><div class="al-moment-quote"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div></div>
+        <button class="al-moment-actions" type="button">⋯</button>
+      </article>
+      <article id="long-card" class="al-moment-card" data-image-count="7">
+        <div id="long-media" class="al-moment-media is-filmstrip is-scrollable is-at-start"><div class="al-moment-image-viewport"><div id="long-gallery" class="al-moment-image-row" data-image-count="7">${landscape.repeat(7)}</div></div></div>
+        <div id="long-content" class="al-moment-content has-metadata"><div id="long-metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處：</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者：</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記：</span><div id="long-note-text" class="al-moment-note-text">這是一段刻意加長的註記，用來確認有足夠空間時內容會完整橫向顯示；當 metadata 欄位真的沒有足夠高度時，不會自己永久省略，而是跟右側文字共用同一個展開與收合狀態。展開之後這段註記必須完整顯示，收合時才回到緊湊版面。為了讓桌面與手機測試都確實進入 overflow 狀態，這裡再加入第二段說明：註記是一段連續的補充文字，不應像其他 metadata 一樣左右切成 label/value，也不應有獨立的省略號或第二個展開按鈕。</div></div></div><div id="long-quote-panel" class="al-moment-quote-panel"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。當時沒有特別放在心上的一句話、一場短暫的停留，甚至只是一起看過的普通風景，過了很久之後都可能變成最清楚的記憶。人也會在之後的旅途中慢慢理解曾經沒有理解的事情，因此再次回想同一段旅程時，感受到的重量也可能完全不同。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 在更寬的新版文字欄位中仍不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div></div></div>
+        <button class="al-moment-actions" type="button">⋯</button>
+      </article>
+    </div>
+  </section>
+  <script>
+    try {
+      const singleCard = document.querySelector('#single-card');
+      const singleMedia = document.querySelector('#single-media');
+      const singleGallery = document.querySelector('#single-gallery');
+      const singleImage = document.querySelector('#single-image');
+      const singleContent = document.querySelector('#single-content');
+      const metadata = document.querySelector('#metadata');
+      const singleQuotePanel = document.querySelector('#single-quote-panel');
+      const twoMedia = document.querySelector('#two-media');
+      const twoGallery = document.querySelector('#two-gallery');
+      const twoContent = document.querySelector('#two-content');
+      const twoItems = [...twoGallery.querySelectorAll('.al-moment-image')];
+      const longMedia = document.querySelector('#long-media');
+      const longGallery = document.querySelector('#long-gallery');
+      const longContent = document.querySelector('#long-content');
+      const longMetadata = document.querySelector('#long-metadata');
+      const longQuotePanel = document.querySelector('#long-quote-panel');
+      const longItems = [...longGallery.querySelectorAll('.al-moment-image')];
+      const longImages = [...longGallery.querySelectorAll('img')];
+
+      const singleMediaRect = singleMedia.getBoundingClientRect();
+      const singleContentRect = singleContent.getBoundingClientRect();
+      const metadataRect = metadata.getBoundingClientRect();
+      const singleQuoteRect = singleQuotePanel.getBoundingClientRect();
+      const twoMediaRect = twoMedia.getBoundingClientRect();
+      const twoContentRect = twoContent.getBoundingClientRect();
+      const twoGalleryRect = twoGallery.getBoundingClientRect();
+      const twoRects = twoItems.map((item) => item.getBoundingClientRect());
+      const longMediaRect = longMedia.getBoundingClientRect();
+      const longContentRect = longContent.getBoundingClientRect();
+      const longMetadataRect = longMetadata.getBoundingClientRect();
+      const longQuoteRect = longQuotePanel.getBoundingClientRect();
+      const longGalleryRect = longGallery.getBoundingClientRect();
+      const longRows = [...new Set(longItems.map((item) => Math.round(item.getBoundingClientRect().top)))];
+      const quoteFont = parseFloat(getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).fontSize);
+      const metadataFont = parseFloat(getComputedStyle(metadata.querySelector('.al-moment-meta-row')).fontSize);
+      const metadataLabels = [...metadata.querySelectorAll('.al-moment-meta-label')];
+      const metadataValues = [...metadata.querySelectorAll('.al-moment-meta-value')];
+      const singleNoteLabel = document.querySelector('#single-note-label');
+      const singleNoteText = document.querySelector('#single-note-text');
+      const singleNoteLabelRect = singleNoteLabel.getBoundingClientRect();
+      const singleNoteTextRect = singleNoteText.getBoundingClientRect();
+      const tagsRow = metadata.querySelector('.al-moment-tags-row');
+      const tagsLabelRect = tagsRow.querySelector('.al-moment-meta-label').getBoundingClientRect();
+      const tagsRect = tagsRow.querySelector('.al-moment-tags').getBoundingClientRect();
+      const tagRects = [...tagsRow.querySelectorAll('.al-moment-tag')].map((tag) => tag.getBoundingClientRect());
+      const longNoteText = document.querySelector('#long-note-text');
+
+      const longQuote = document.querySelector('#long-quote');
+      const longText = document.querySelector('#long-text');
+      const longToggle = document.querySelector('#long-toggle');
+      const syncLongOverflow = () => {
+        const overflow = longText.scrollHeight > longText.clientHeight + 2;
+        longQuote.classList.toggle('is-clampable', overflow);
+        longToggle.hidden = !overflow;
+      };
+      syncLongOverflow();
+      const syncLongMetadata = (expanded) => {
+        longMetadata.classList.remove('is-clamped');
+        longMetadata.style.removeProperty('max-height');
+        if (expanded) return;
+        const naturalHeight = longMetadata.scrollHeight;
+        const quoteHeight = longQuotePanel.getBoundingClientRect().height;
+        const needsSharedExpansion = naturalHeight > quoteHeight + 34;
+        if (needsSharedExpansion) {
+          longToggle.hidden = false;
+          longMetadata.classList.add('is-clamped');
+          longMetadata.style.maxHeight = Math.max(88, longQuotePanel.getBoundingClientRect().height) + 'px';
+        }
+      };
+      syncLongMetadata(false);
+      const collapsedLongHeight = longText.getBoundingClientRect().height;
+      const collapsedMetadataHeight = longMetadata.getBoundingClientRect().height;
+      const collapsedNoteVisibleHeight = longNoteText.getBoundingClientRect().height;
+      const longContentOverflows = longText.scrollHeight > collapsedLongHeight + 2;
+      const longMetadataOverflows = longMetadata.scrollHeight > collapsedMetadataHeight + 2;
+      const longToggleVisibleWhenCollapsed = !longToggle.hidden && longToggle.textContent === '展開';
+      longQuote.classList.add('is-expanded');
+      longToggle.textContent = '收合';
+      syncLongMetadata(true);
+      const expandedLongHeight = longText.getBoundingClientRect().height;
+      const expandedMetadataHeight = longMetadata.getBoundingClientRect().height;
+      const expandedNoteVisibleHeight = longNoteText.getBoundingClientRect().height;
+      const longToggleVisibleWhenExpanded = !longToggle.hidden && longToggle.textContent === '收合';
+      longQuote.classList.remove('is-expanded');
+      longToggle.textContent = '展開';
+      syncLongMetadata(false);
+
+      longGallery.style.scrollBehavior = 'auto'; longGallery.style.scrollSnapType = 'none';
+      longGallery.scrollLeft = Math.min(180, longGallery.scrollWidth - longGallery.clientWidth);
+      const twoVisibleWidth = twoRects.reduce((sum, rect) => sum + rect.width, 0);
+      const shared = {
+        mediaAboveSingleContent: singleMediaRect.bottom <= singleContentRect.top + 2 && Math.abs(singleMediaRect.left - singleContentRect.left) <= 2 && Math.abs(singleMediaRect.right - singleContentRect.right) <= 2,
+        mediaAboveTwoContent: twoMediaRect.bottom <= twoContentRect.top + 2,
+        mediaAboveLongContent: longMediaRect.bottom <= longContentRect.top + 2,
+        singleImageFitsViewport: singleImage.getBoundingClientRect().width <= singleGallery.getBoundingClientRect().width + 1 && singleImage.getBoundingClientRect().height <= singleGallery.getBoundingClientRect().height + 1,
+        singleImageNeedsNoScroll: singleGallery.scrollWidth <= singleGallery.clientWidth + 1 && getComputedStyle(singleGallery).overflowX === 'hidden',
+        featuredStageIsLandscape: singleGallery.getBoundingClientRect().width / singleGallery.getBoundingClientRect().height > 1.6,
+        metadataSmallerThanQuote: metadataFont < quoteFont * 0.82,
+        metadataVisible: metadata.querySelectorAll('.al-moment-meta-row').length >= 4 && metadata.querySelector('.al-moment-tag')?.textContent === '回憶片段' && metadata.querySelector('.al-moment-note-text')?.textContent === '完整 metadata 測試。',
+        metadataLabelsUseColon: metadataLabels.length >= 5 && metadataLabels.every((label) => label.textContent.trim().endsWith('：')),
+        metadataRowsUseNaturalInlineFlow: getComputedStyle(metadata.querySelector('.al-moment-meta-row')).display === 'block',
+        metadataValuesUsePrimaryText: metadataValues.every((value) => getComputedStyle(value).color === getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).color),
+        noteUsesInlineLayout: getComputedStyle(singleNoteText).display === 'inline',
+        tagsUseInlineLayout: getComputedStyle(tagsRow.querySelector('.al-moment-tags')).display === 'inline-flex',
+        tagsFlowHorizontally: tagRects.length >= 2 && Math.abs(tagRects[0].top - tagRects[1].top) <= 1 && getComputedStyle(tagsRow.querySelector('.al-moment-tags')).display === 'inline-flex',
+        shortNoteNotTruncated: singleNoteText.scrollHeight <= singleNoteText.clientHeight + 1 && getComputedStyle(singleNoteText).overflow !== 'hidden',
+        twoImagesShareRow: twoRects.length === 2 && Math.abs(twoRects[0].top - twoRects[1].top) <= 1,
+        longSingleHorizontalRow: longRows.length === 1,
+        longHorizontalOverflow: longGallery.scrollWidth > longGallery.clientWidth + 20,
+        longHorizontalScrolling: longGallery.scrollLeft > 0,
+        nativeHorizontalScroller: getComputedStyle(longGallery).overflowX === 'auto' && getComputedStyle(longGallery).flexWrap === 'nowrap',
+        imagesUseContain: [...longImages, ...singleGallery.querySelectorAll('img'), ...twoGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
+        longQuoteClamped: longContentOverflows && collapsedLongHeight < expandedLongHeight - 8,
+        longQuoteExpandable: expandedLongHeight > collapsedLongHeight + 8 && longToggleVisibleWhenCollapsed && longToggleVisibleWhenExpanded,
+        metadataNoteSharesExpansion: longMetadataOverflows
+        ? expandedMetadataHeight > collapsedMetadataHeight + 8 && expandedNoteVisibleHeight >= collapsedNoteVisibleHeight && longMetadata.scrollHeight <= expandedMetadataHeight + 2
+        : longNoteText.scrollHeight <= collapsedNoteVisibleHeight + 2 && getComputedStyle(longNoteText).overflow !== 'hidden',
+        noLegacyIndexRail: document.querySelector('.al-moment-index') === null,
+        noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
+      };
+      const details = ${isMobile} ? {
+        ...shared,
+        mobileQuoteBeforeMetadata: longQuoteRect.top <= longMetadataRect.top + 1 && longQuoteRect.bottom <= longMetadataRect.top + 2,
+        mobileContentSingleColumn: Math.abs(longQuoteRect.left - longContentRect.left) <= 2 && Math.abs(longMetadataRect.left - longContentRect.left) <= 2,
+        mobileTwoImageRowScrollsWhenNeeded: twoGallery.scrollWidth >= twoGallery.clientWidth && getComputedStyle(twoGallery).flexWrap === 'nowrap',
+      } : {
+        ...shared,
+        desktopMetadataLeftOfQuote: metadataRect.right <= singleQuoteRect.left + 2 && longMetadataRect.right <= longQuoteRect.left + 2,
+        desktopMetadataNarrowerThanQuote: metadataRect.width < singleQuoteRect.width * 0.55 && longMetadataRect.width < longQuoteRect.width * 0.55,
+        twoLandscapeFramesFitInitialViewport: twoRects.length === 2 && twoRects[0].left >= twoGalleryRect.left - 1 && twoRects[1].right <= twoGalleryRect.right + 1,
+        twoLandscapeFramesUseSpace: twoVisibleWidth >= twoGalleryRect.width * 0.82,
+        boundedCard: singleCard.getBoundingClientRect().width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
+      };
+      document.body.dataset.details = JSON.stringify(details);
+      document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
+    } catch (error) { document.body.dataset.details = String(error?.stack || error); document.body.dataset.result = 'fail'; }
+  </script></body></html>`;
+}
+
 async function imageSectionExpandFixture() {
   const anchorBundle = await build({
     stdin: {
@@ -166,6 +338,18 @@ try {
     profile: path.join(output, "image-section-expand-profile"),
     testName: "AnimeList image section expansion anchor",
     viewport: { width: 1200, height: 800, mobile: false },
+  });
+  await runChromiumDatasetTest({
+    html: momentsFilmstripFixture(false),
+    profile: path.join(output, "moments-filmstrip-desktop-profile"),
+    testName: "AnimeList moments desktop media-first cards",
+    viewport: { width: 1200, height: 900, mobile: false },
+  });
+  await runChromiumDatasetTest({
+    html: momentsFilmstripFixture(true),
+    profile: path.join(output, "moments-filmstrip-mobile-profile"),
+    testName: "AnimeList moments mobile media-first cards",
+    viewport: { width: 390, height: 844, mobile: true },
   });
 } finally {
   await rm(output, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });

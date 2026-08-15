@@ -3,6 +3,7 @@ import type { ImageSectionAssetInput, ImageSectionService } from "../data/image-
 import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
 import { imageSectionText } from "../image-section-text";
+import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
 interface QueuedImage {
@@ -45,9 +46,17 @@ export class AddImageSectionModal extends Modal {
 
   private readonly handlePaste = (event: ClipboardEvent): void => {
     const files = [...(event.clipboardData?.files ?? [])];
-    if (!files.length) return;
+    const html = event.clipboardData?.getData("text/html") ?? "";
+    if (!files.length && !/data:image\/(?:png|jpeg|webp|gif|avif);base64,/i.test(html)) return;
     event.preventDefault();
-    void this.addFiles(files);
+    void imageAssetsFromClipboard(event).then((assets) => {
+      const accepted = assets.filter((asset) => imageExtensionFor(asset.name, asset.contentType));
+      if (!accepted.length) return;
+      for (const asset of accepted) {
+        this.queue.push({ asset, previewUrl: previewUrl(asset), key: this.nextKey++ });
+      }
+      this.render();
+    });
   };
 
   private async addFiles(files: readonly File[]): Promise<void> {

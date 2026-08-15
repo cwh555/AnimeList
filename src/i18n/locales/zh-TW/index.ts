@@ -9,6 +9,7 @@ import { SEARCH_MESSAGES } from "./search";
 import { SERIAL_COVER_MESSAGES } from "./serial-cover";
 import { USER_TAG_MESSAGES } from "./user-tag";
 import { IMAGE_SECTION_MESSAGES } from "./image-section";
+import { MOMENTS_MESSAGES } from "./moments";
 
 export {
   CORE_MESSAGES,
@@ -22,6 +23,7 @@ export {
   SERIAL_COVER_MESSAGES,
   USER_TAG_MESSAGES,
   IMAGE_SECTION_MESSAGES,
+  MOMENTS_MESSAGES,
 };
 
 export const ZH_TW_CATALOGS = {
@@ -36,6 +38,7 @@ export const ZH_TW_CATALOGS = {
   "legacy-metadata": LEGACY_METADATA_MESSAGES,
   "user-tag": USER_TAG_MESSAGES,
   "image-section": IMAGE_SECTION_MESSAGES,
+  moments: MOMENTS_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

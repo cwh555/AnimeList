@@ -18,7 +18,10 @@ let fetchCalls = 0;
 
 const fakeFetch = async (url) => {
   fetchCalls += 1;
-  assert.match(String(url), /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//);
+  const value = String(url);
+  const isCover = /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//.test(value);
+  const isMomentScene = /^https:\/\/(?:frieren-anime\.jp\/wp-content\/uploads\/2023\/09\/01_\d{2}\.jpg|kaguya\.love\/1st\/assets\/img\/story\/01\/\d{2}\.jpg|www\.tbs\.co\.jp\/anime\/oregairu\/2nd\/story\/images\/story(?:04|07|10|12|13)\/story-img0\.jpg|blog-imgs-71\.fc2\.com\/x\/y\/s\/xystone\/oregairu-12-[14]\.jpg)$/.test(value);
+  assert.ok(isCover || isMomentScene, `unexpected Test Vault image URL: ${value}`);
   const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
   return {
     ok: true,
@@ -49,7 +52,7 @@ function allMarkdown(root) {
 try {
   // Simulate a Test Vault that carries the previous image-fixture marker but
   // is missing the image blocks. The next revision must seed them once.
-  fs.writeFileSync(path.join(vaultRoot, ".animelist-test-image-sections-v5"), "stale previous image fixture marker\n");
+  fs.writeFileSync(path.join(vaultRoot, ".animelist-test-image-sections-v6"), "stale previous image fixture marker\n");
 
   const legacyFixture = path.join(vaultRoot, "AnimeList/Test Fixtures/Anime/01-anime-planned.md");
   fs.mkdirSync(path.dirname(legacyFixture), { recursive: true });
@@ -67,7 +70,7 @@ try {
   assert.equal(first.repaired, 0);
   assert.equal(first.coversDownloaded, 18);
   assert.equal(first.legacyRemoved, 1);
-  assert.equal(fetchCalls, 18);
+  assert.equal(fetchCalls, 38);
   assert.equal(fs.existsSync(legacyFixture), false);
 
   const checklist = read(TEST_CHECKLIST_PATH);
@@ -85,26 +88,72 @@ try {
   assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
   assert.match(checklist, /Reusable image sections/);
-  assert.match(checklist, /real works and real downloaded cover images/i);
+  assert.match(checklist, /real works and official anime episode stills/i);
   assert.match(checklist, /Add modal uses the available width without horizontal scrolling/i);
   assert.match(checklist, /Updates & cleanup/i);
   assert.match(checklist, /old default duplicate cover embed/i);
+  assert.match(checklist, /## 8\. Moments sections/);
+  assert.match(checklist, /seven-image Frieren Moment/i);
+  assert.match(checklist, /source \/ position-time \/ speaker-character \/ tags \/ note/i);
+  assert.match(checklist, /official episode stills/i);
+  assert.match(checklist, /出處：第 1 話/);
+  assert.match(checklist, /not committed to the repository/i);
   assert.equal(first.imageSectionDemos.demoPaths.length, 3);
-  assert.equal(first.imageSectionDemos.assetPaths.length, 14);
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
+  assert.equal(first.imageSectionDemos.assetPaths.length, 20);
+  assert.equal(first.momentsDemos.demoPaths.length, 3);
+  assert.equal(first.momentsDemos.assetPaths.length, 20);
+  for (const asset of first.momentsDemos.assetPaths) {
+    const file = path.join(vaultRoot, asset);
+    assert.equal(fs.statSync(file).isFile(), true);
+    assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  }
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v8")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v7")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v6")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), false);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v7")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), false);
   for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
   for (const asset of first.imageSectionDemos.assetPaths) {
     const file = path.join(vaultRoot, asset);
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
+  assert.ok(first.imageSectionDemos.assetPaths.every((asset) => /^AnimeList\/Images\/test-vault\/anime-scenes\/(?:frieren-ep01|kaguya-s1-ep01|oregairu-zoku-ep(?:04|07|10|12|13))-/.test(asset)));
   const frierenAnimePath = "AnimeList/Anime/葬送的芙莉蓮.md";
   const kaguyaAnimePath = "AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~.md";
+  const oregairuAnimePath = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
   const overlordPath = "AnimeList/Novel/OVERLORD.md";
-  assert.equal((read(frierenAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 12);
+  assert.equal((read(frierenAnimePath).match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-\d{2}\.jpg$/gm) ?? []).length, 10);
   assert.match(read(frierenAnimePath), /animelist-test-image-sections:start/);
+  assert.match(read(frierenAnimePath), /animelist-test-moments:start/);
+  assert.equal((read(frierenAnimePath).match(/```animelist-moments/g) ?? []).length, 2);
+  assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 6);
+  assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_promise_04[\s\S]*source: "第 1 話"[\s\S]*position: "旅途的記憶"[\s\S]*speaker: "芙莉蓮"[\s\S]*tags:[\s\S]*回憶片段[\s\S]*辛美爾/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_long_06[\s\S]*長文字排版[\s\S]*展開／收合[\s\S]*Test Vault UI regression/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
-  assert.equal((read(kaguyaAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 10);
+  assert.equal((read(kaguyaAnimePath).match(/```animelist-moments/g) ?? []).length, 1);
+  assert.equal((read(kaguyaAnimePath).match(/^  - id: "m_test_kaguya_/gm) ?? []).length, 2);
+  assert.match(read(kaguyaAnimePath), /AnimeList\/Images\/test-vault\/anime-scenes\/kaguya-s1-ep01-/);
+  assert.match(read(kaguyaAnimePath), /m_test_kaguya_01[\s\S]*source: "第 1 話"[\s\S]*tags:[\s\S]*戀愛[\s\S]*頭腦戰/);
+  assert.equal((read(kaguyaAnimePath).match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/kaguya-s1-ep01-\d{2}\.jpg$/gm) ?? []).length, 3);
+  const oregairu = read(oregairuAnimePath);
+  assert.match(oregairu, /source_id: "102134"/);
+  const oregairuImageHeading = oregairu.indexOf("## 動畫截圖");
+  const oregairuMomentHeading = oregairu.indexOf("## 大老師語錄");
+  assert.ok(oregairuImageHeading >= 0 && oregairuMomentHeading > oregairuImageHeading);
+  const oregairuImageSection = oregairu.slice(oregairuImageHeading, oregairuMomentHeading);
+  assert.match(oregairu, /animelist-test-oregairu-images:start/);
+  assert.equal((oregairuImageSection.match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep(?:04|07|10|12|13)-official\.jpg$/gm) ?? []).length, 5);
+  assert.doesNotMatch(oregairuImageSection, /blog-imgs-71|ep12-(?:cafe|hachiman)/);
+  assert.match(oregairu, /## 大老師語錄[\s\S]*m_test_oregairu_zoku_ep12_hachiman/);
+  assert.match(oregairu, /想到未來又會不安到得憂鬱症[\s\S]*source: "果青續 \(12\)"[\s\S]*speaker: "比企谷八幡"/);
+  assert.equal((oregairu.match(/AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep(?:04|07|10|12|13)-[a-z]+\.jpg/g) ?? []).length, 8);
+  assert.doesNotMatch(oregairu, /fixture_version:/);
   assert.match(read(overlordPath), /```animelist-images\n```/);
   for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {
     assert.doesNotMatch(read(demoPath), /!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//);
@@ -170,7 +219,7 @@ try {
   fs.rmSync(path.join(vaultRoot, frierenMangaPath));
   fs.appendFileSync(path.join(vaultRoot, alyaPath), "\nUSER EDIT MUST SURVIVE\n");
   const imageDemoPath = kaguyaAnimePath;
-  fs.appendFileSync(path.join(vaultRoot, imageDemoPath), "\nIMAGE SECTION DEMO EDIT MUST SURVIVE\n");
+  fs.appendFileSync(path.join(vaultRoot, imageDemoPath), "\nIMAGE SECTION DEMO EDIT MUST SURVIVE\nMOMENTS DEMO EDIT MUST SURVIVE\n");
 
   fetchCalls = 0;
   const second = await prepareTestFixtures(vaultRoot, { reset: false, fetchImpl: fakeFetch });
@@ -186,6 +235,7 @@ try {
   assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.match(read(alyaPath), /USER EDIT MUST SURVIVE/);
   assert.match(read(imageDemoPath), /IMAGE SECTION DEMO EDIT MUST SURVIVE/);
+  assert.match(read(imageDemoPath), /MOMENTS DEMO EDIT MUST SURVIVE/);
   const frierenSourceMatches = allMarkdown(path.join(vaultRoot, "AnimeList", "Manga"))
     .filter((file) => /source_id: "305429"/.test(fs.readFileSync(file, "utf8")));
   assert.equal(frierenSourceMatches.length, 1);
@@ -215,6 +265,7 @@ try {
   assert.match(read(importedFrierenPath), /USER-COLLECTED NOTE MUST SURVIVE/);
   assert.doesNotMatch(read(alyaPath), /USER EDIT MUST SURVIVE/);
   assert.doesNotMatch(read(imageDemoPath), /IMAGE SECTION DEMO EDIT MUST SURVIVE/);
+  assert.doesNotMatch(read(imageDemoPath), /MOMENTS DEMO EDIT MUST SURVIVE/);
   assert.equal(reset.repaired, 17);
   assert.equal(reset.reused, 1);
   assert.equal(reset.reusedBySource, 1);

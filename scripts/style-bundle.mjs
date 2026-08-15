@@ -11,6 +11,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.progress.css",
   "styles.note-detail.css",
   "styles.image-sections.css",
+  "styles.moments.css",
   "styles.version-cleanup.css",
   "styles.masterpiece.css",
   "styles.score-dashboard.css",

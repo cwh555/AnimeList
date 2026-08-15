@@ -171,6 +171,22 @@ describe("image section storage service", () => {
     assert.match(h.data.get(h.note.path) ?? "", new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   });
 
+
+  it("does not trash a managed file while a moments section still references it", async () => {
+    const path = "AnimeList/Images/anime/demo-bangumi-42/shared.jpg";
+    const h = harness([
+      "# Demo",
+      "## Images", "```animelist-images", `- ${path}`, "```",
+      "## Moments", "```animelist-moments", "moments:",
+      '  - id: "m_shared123"', "    text: |-", "      same image", "    images:", `      - "${path}"`, "```", "",
+    ].join("\n"));
+    h.files.set(path, file(path));
+    const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
+    await h.service.remove(h.note.path, block, path);
+    assert.deepEqual(h.trashed, []);
+    assert.match(h.data.get(h.note.path) ?? "", /m_shared123/);
+  });
+
   it("batch-removes selected images and moves only safe managed files through Obsidian trash", async () => {
     const firstPath = "AnimeList/Images/anime/demo-bangumi-42/first.jpg";
     const secondPath = "AnimeList/Images/anime/demo-bangumi-42/second.jpg";

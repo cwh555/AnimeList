@@ -7,6 +7,7 @@ export const TEST_FEATURES = [
   "legacy-update",
   "markdown",
   "masterpiece",
+  "moments",
   "progress",
   "rating",
   "release",
@@ -29,6 +30,10 @@ export const TEST_TARGETS = [
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },
+
+  { path: "tests/moments.test.ts", kind: "test", suite: "unit", features: ["moments", "markdown"] },
+  { path: "tests/media-note-insert-menu.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
+  { path: "tests/contracts/moments-service.test.ts", kind: "test", suite: "contract", features: ["moments", "image-sections", "markdown"] },
 
   { path: "tests/masterpiece-labels.test.ts", kind: "test", suite: "unit", features: ["masterpiece"] },
   { path: "tests/masterpiece-decoration-cache.test.ts", kind: "test", suite: "unit", features: ["masterpiece", "library"] },

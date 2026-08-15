@@ -2,7 +2,6 @@ import { Notice, TFile, normalizePath, requestUrl, type App } from "obsidian";
 import type { CoverSources } from "../types";
 import type { AnimeListSettings } from "../domain/settings-types";
 import {
-  allImageSectionPaths,
   imageBaseName,
   imageContentHash,
   imageContentTypeForPath,
@@ -15,6 +14,7 @@ import {
   serializeImageSectionPaths,
   type ImageSectionLocator,
 } from "../domain/image-section";
+import { allManagedImageReferences } from "../domain/media-image-references";
 import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
 import { visualImageFingerprint } from "../image-raster";
 
@@ -36,6 +36,12 @@ export interface ImageSectionAssetInput {
 export interface ImageSectionAddResult {
   source: string;
   added: number;
+  duplicatesSkipped: number;
+}
+
+export interface StoredImageAssetsResult {
+  paths: string[];
+  addedPaths: string[];
   duplicatesSkipped: number;
 }
 
@@ -129,14 +135,14 @@ export class ImageSectionService {
     throw new Error("Image file is no longer available");
   }
 
-  async addAssets(
+  async storeAssets(
     sourcePath: string,
-    locator: ImageSectionLocator,
+    existingPaths: readonly string[],
     assets: readonly ImageSectionAssetInput[],
-  ): Promise<ImageSectionAddResult> {
-    const current = parseImageSectionSource(locator.source);
+  ): Promise<StoredImageAssetsResult> {
+    const current = [...new Set(existingPaths.map(normalizeImageSectionPath).filter(Boolean))];
     if (assets.length === 0) {
-      return { source: serializeImageSectionPaths(current), added: 0, duplicatesSkipped: 0 };
+      return { paths: current, addedPaths: [], duplicatesSkipped: 0 };
     }
     const note = this.noteFile(sourcePath);
     const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
@@ -192,23 +198,68 @@ export class ImageSectionService {
         });
         this.host.getImageThumbnailSources(file);
       }
-
-      const nextPaths = [...current, ...created.map((file) => file.path)];
-      if (created.length > 0) {
-        await this.host.app.vault.process(note, (markdown) => replaceImageSectionPaths(markdown, locator, nextPaths));
-      }
-      return {
-        source: serializeImageSectionPaths(nextPaths),
-        added: created.length,
-        duplicatesSkipped,
-      };
+      const addedPaths = created.map((file) => file.path);
+      return { paths: [...current, ...addedPaths], addedPaths, duplicatesSkipped };
     } catch (error) {
-      for (const file of created) {
-        try { await this.host.app.fileManager.trashFile(file); } catch { /* best-effort rollback */ }
-        this.fingerprintCache.delete(file.path);
-      }
+      await this.trashCreatedFiles(created);
       throw error;
     }
+  }
+
+  async rollbackStoredPaths(paths: readonly string[]): Promise<void> {
+    const files = paths
+      .map((path) => this.resolve(path, "").file)
+      .filter((file): file is TFile => file instanceof TFile);
+    await this.trashCreatedFiles(files);
+  }
+
+  async trashUnreferencedManagedPaths(
+    sourcePath: string,
+    markdownAfterUpdate: string,
+    pathValues: readonly unknown[],
+  ): Promise<void> {
+    const note = this.noteFile(sourcePath);
+    const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
+    const cover = normalizeImageSectionPath(normalizedCoverPath(frontmatter.cover));
+    const referencedAfterUpdate = new Set(allManagedImageReferences(markdownAfterUpdate));
+    const root = imageSectionRootFromCoverFolder(this.host.settings.coverFolder);
+    let trashError: unknown = null;
+    for (const pathValue of pathValues) {
+      const path = normalizeImageSectionPath(pathValue);
+      if (!path || /^https?:\/\//i.test(path) || referencedAfterUpdate.has(path) || cover === path) continue;
+      const resolved = this.resolve(path, sourcePath);
+      if (!resolved.file || !isManagedPath(resolved.file.path, root)) continue;
+      try {
+        await this.host.app.fileManager.trashFile(resolved.file);
+        this.fingerprintCache.delete(resolved.file.path);
+      } catch (error) {
+        trashError ??= error;
+      }
+    }
+    if (trashError) throw trashError;
+  }
+
+  async addAssets(
+    sourcePath: string,
+    locator: ImageSectionLocator,
+    assets: readonly ImageSectionAssetInput[],
+  ): Promise<ImageSectionAddResult> {
+    const current = parseImageSectionSource(locator.source);
+    const stored = await this.storeAssets(sourcePath, current, assets);
+    if (stored.addedPaths.length > 0) {
+      const note = this.noteFile(sourcePath);
+      try {
+        await this.host.app.vault.process(note, (markdown) => replaceImageSectionPaths(markdown, locator, stored.paths));
+      } catch (error) {
+        await this.rollbackStoredPaths(stored.addedPaths);
+        throw error;
+      }
+    }
+    return {
+      source: serializeImageSectionPaths(stored.paths),
+      added: stored.addedPaths.length,
+      duplicatesSkipped: stored.duplicatesSkipped,
+    };
   }
 
   async remove(
@@ -230,29 +281,11 @@ export class ImageSectionService {
     if (targets.size === 0) return serializeImageSectionPaths(current);
 
     const nextPaths = current.filter((entry) => !targets.has(entry));
-    const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
-    const cover = normalizeImageSectionPath(normalizedCoverPath(frontmatter.cover));
     const updated = await this.host.app.vault.process(
       note,
       (markdown) => replaceImageSectionPaths(markdown, locator, nextPaths),
     );
-
-    const root = imageSectionRootFromCoverFolder(this.host.settings.coverFolder);
-    const referencedAfterUpdate = new Set(allImageSectionPaths(updated));
-    let trashError: unknown = null;
-    for (const path of targets) {
-      if (/^https?:\/\//i.test(path) || referencedAfterUpdate.has(path) || cover === path) continue;
-      const resolved = this.resolve(path, sourcePath);
-      if (!resolved.file || !isManagedPath(resolved.file.path, root)) continue;
-      try {
-        // Respect the user's Obsidian trash preference: vault .trash or the OS trash.
-        await this.host.app.fileManager.trashFile(resolved.file);
-        this.fingerprintCache.delete(resolved.file.path);
-      } catch (error) {
-        trashError ??= error;
-      }
-    }
-    if (trashError) throw trashError;
+    await this.trashUnreferencedManagedPaths(sourcePath, updated, [...targets]);
     return serializeImageSectionPaths(nextPaths);
   }
 
@@ -293,9 +326,26 @@ export class ImageSectionService {
     }
   }
 
+  private async trashCreatedFiles(files: readonly TFile[]): Promise<void> {
+    for (const file of files) {
+      try { await this.host.app.fileManager.trashFile(file); } catch { /* best-effort rollback */ }
+      this.fingerprintCache.delete(file.path);
+    }
+  }
+
   private noteFile(sourcePath: string): TFile {
     const file = this.host.app.vault.getAbstractFileByPath(sourcePath);
     if (!(file instanceof TFile)) throw new Error("The media note is no longer available");
     return file;
   }
+}
+const IMAGE_SERVICES = new WeakMap<object, ImageSectionService>();
+
+export function imageSectionServiceForHost(host: ImageSectionHost): ImageSectionService {
+  const key = host as object;
+  const existing = IMAGE_SERVICES.get(key);
+  if (existing) return existing;
+  const service = new ImageSectionService(host);
+  IMAGE_SERVICES.set(key, service);
+  return service;
 }

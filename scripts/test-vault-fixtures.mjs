@@ -73,36 +73,429 @@ function writeFile(vaultRoot, relativePath, content) {
 
 const IMAGE_SECTION_DEMO_ROOT = "_AnimeList Image Section Demos";
 const IMAGE_SECTION_ASSET_ROOT = "AnimeList/Images/test-vault";
-const IMAGE_SECTION_FIXTURE_MARKER = ".animelist-test-image-sections-v6";
-const IMAGE_SECTION_PREVIOUS_MARKER = ".animelist-test-image-sections-v5";
+const IMAGE_SECTION_FIXTURE_MARKER = ".animelist-test-image-sections-v7";
+const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".animelist-test-image-sections-v5"];
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
-const IMAGE_LAYOUT_SOURCE_IDS = [
-  400602, 305429, 328609, 248175, 135218, 118165, 210505,
-  267222, 339092, 101929, 10380, 975, 266498, 302189,
+const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v8";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v7", ".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const OREGAIRU_MOMENTS_DEMO_PATH = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
+const OREGAIRU_QUOTE_MARKER = "想到未來又會不安到得憂鬱症";
+const OREGAIRU_IMAGE_FIXTURE_START = "<!-- animelist-test-oregairu-images:start -->";
+const OREGAIRU_IMAGE_FIXTURE_END = "<!-- animelist-test-oregairu-images:end -->";
+const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
+const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
+const ANIME_SCENE_SOURCES = [
+  {
+    key: "frieren-ep01-01",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_01.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-02",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_02.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-03",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_03.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-04",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_04.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-05",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_05.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-06",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_06.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-07",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_07.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-08",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_08.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-09",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_09.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "frieren-ep01-10",
+    remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_10.jpg",
+    referer: "https://frieren-anime.jp/story/1st/ep01/",
+  },
+  {
+    key: "kaguya-s1-ep01-01",
+    remote: "https://kaguya.love/1st/assets/img/story/01/01.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+  {
+    key: "kaguya-s1-ep01-02",
+    remote: "https://kaguya.love/1st/assets/img/story/01/02.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+  {
+    key: "kaguya-s1-ep01-03",
+    remote: "https://kaguya.love/1st/assets/img/story/01/03.jpg",
+    referer: "https://kaguya.love/1st/story/01.html",
+  },
+  {
+    key: "oregairu-zoku-ep04-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story04/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story04.html",
+  },
+  {
+    key: "oregairu-zoku-ep07-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story07/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story07.html",
+  },
+  {
+    key: "oregairu-zoku-ep10-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story10/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story10.html",
+  },
+  {
+    key: "oregairu-zoku-ep12-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story12/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story12.html",
+  },
+  {
+    key: "oregairu-zoku-ep13-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story13/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/",
+  },
+  {
+    key: "oregairu-zoku-ep12-cafe",
+    remote: "https://blog-imgs-71.fc2.com/x/y/s/xystone/oregairu-12-1.jpg",
+    referer: "https://xystone.blog.fc2.com/blog-entry-962.html",
+  },
+  {
+    key: "oregairu-zoku-ep12-hachiman",
+    remote: "https://blog-imgs-71.fc2.com/x/y/s/xystone/oregairu-12-4.jpg",
+    referer: "https://xystone.blog.fc2.com/blog-entry-962.html",
+  },
 ];
+
+function momentsBlock(items) {
+  const lines = ["```animelist-moments", "moments:"];
+  for (const item of items) {
+    lines.push(`  - id: ${JSON.stringify(item.id)}`);
+    lines.push("    text: |-");
+    String(item.text).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    if (item.source) lines.push(`    source: ${JSON.stringify(item.source)}`);
+    if (item.position) lines.push(`    position: ${JSON.stringify(item.position)}`);
+    if (item.speaker) lines.push(`    speaker: ${JSON.stringify(item.speaker)}`);
+    if (Array.isArray(item.tags) && item.tags.length) {
+      lines.push("    tags:");
+      item.tags.forEach((tag) => lines.push(`      - ${JSON.stringify(tag)}`));
+    }
+    if (item.note) {
+      lines.push("    note: |-");
+      String(item.note).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    }
+    lines.push("    images:");
+    item.images.forEach((image) => lines.push(`      - ${JSON.stringify(image)}`));
+  }
+  lines.push("```");
+  return lines.join("\n");
+}
+
+function stripMarkedMomentsFixture(content) {
+  const start = content.indexOf(MOMENTS_FIXTURE_START);
+  if (start < 0) return content;
+  const end = content.indexOf(MOMENTS_FIXTURE_END, start);
+  if (end < 0) return content;
+  const after = end + MOMENTS_FIXTURE_END.length;
+  return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
+}
+
+function stripMarkedOregairuImageFixture(content) {
+  const start = content.indexOf(OREGAIRU_IMAGE_FIXTURE_START);
+  if (start < 0) return content;
+  const end = content.indexOf(OREGAIRU_IMAGE_FIXTURE_END, start);
+  if (end < 0) return content;
+  const after = end + OREGAIRU_IMAGE_FIXTURE_END.length;
+  return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
+}
+
+function insertOregairuImageFixture(content, body) {
+  const fixtureBody = [OREGAIRU_IMAGE_FIXTURE_START, body.trim(), OREGAIRU_IMAGE_FIXTURE_END].join("\n");
+  const headingIndex = content.indexOf("## 大老師語錄");
+  const quoteIndex = content.indexOf(OREGAIRU_QUOTE_MARKER);
+  const momentFenceIndex = quoteIndex >= 0 ? content.lastIndexOf("```animelist-moments", quoteIndex) : -1;
+  const insertAt = headingIndex >= 0 ? headingIndex : momentFenceIndex >= 0 ? momentFenceIndex : content.length;
+  if (insertAt >= content.length) return `${content.trimEnd()}\n\n${fixtureBody}`;
+  return [content.slice(0, insertAt).trimEnd(), fixtureBody, content.slice(insertAt).trimStart()].filter(Boolean).join("\n\n");
+}
+
+function seedMomentsFixture(vaultRoot, fixture, body) {
+  const target = path.join(vaultRoot, fixtureRelativePath(fixture));
+  if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`Moments Test Vault note is missing: ${fixtureRelativePath(fixture)}`);
+  }
+  const content = stripMarkedMomentsFixture(fs.readFileSync(target, "utf8").trimEnd());
+  const fixtureBody = [MOMENTS_FIXTURE_START, body.trim(), MOMENTS_FIXTURE_END].join("\n");
+  fs.writeFileSync(target, `${content}\n\n${fixtureBody}\n`);
+  return target;
+}
+
+function oregairuMomentsBaseNote() {
+  return [
+    "---",
+    `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`,
+    'title: "我的青春恋爱物语果然有问题 续"',
+    'title_original: "やはり俺の青春ラブコメはまちがっている。続"',
+    'title_romaji: "Yahari Ore no Seishun LoveCome wa Machigatte Iru. Zoku"',
+    'media_type: "anime"',
+    'format: "tv"',
+    'status: "completed"',
+    "progress: 13",
+    "progress_total: 13",
+    'progress_unit: "episode"',
+    "favorite: false",
+    "year: 2015",
+    "genres:",
+    '  - "戀愛"',
+    '  - "校園"',
+    "studios:",
+    '  - "feel."',
+    'source_provider: "bangumi"',
+    'source_id: "102134"',
+    "source_urls:",
+    '  - "https://bgm.tv/subject/102134"',
+    "---",
+    "",
+    "# 我的青春恋爱物语果然有问题 续",
+    "",
+    "```animelist-detail",
+    "```",
+  ].join("\n");
+}
+
+function seedOregairuMomentsFixture(vaultRoot, imageBody, momentBody) {
+  const target = path.join(vaultRoot, OREGAIRU_MOMENTS_DEMO_PATH);
+  const existing = fs.statSync(target, { throwIfNoEntry: false })?.isFile()
+    ? fs.readFileSync(target, "utf8").trimEnd()
+    : oregairuMomentsBaseNote();
+
+  const hadControlledMoment = existing.includes(MOMENTS_FIXTURE_START) && existing.includes(MOMENTS_FIXTURE_END);
+  const preserveHandBuiltMoment = existing.includes(OREGAIRU_QUOTE_MARKER) && !hadControlledMoment;
+  let content = stripMarkedMomentsFixture(existing);
+  content = stripMarkedOregairuImageFixture(content);
+  content = insertOregairuImageFixture(content, imageBody);
+
+  if (!preserveHandBuiltMoment) {
+    const momentFixture = [MOMENTS_FIXTURE_START, momentBody.trim(), MOMENTS_FIXTURE_END].join("\n");
+    content = `${content.trimEnd()}\n\n${momentFixture}`;
+  }
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${content.trimEnd()}\n`);
+  return target;
+}
+
+function animeSceneRelativePath(scene) {
+  return `${ANIME_SCENE_ASSET_ROOT}/${scene.key}.jpg`;
+}
+
+async function ensureAnimeSceneAssets(vaultRoot, fetchImpl) {
+  const assetPaths = [];
+  for (const scene of ANIME_SCENE_SOURCES) {
+    const relative = animeSceneRelativePath(scene);
+    const target = path.join(vaultRoot, relative);
+    const existing = fs.statSync(target, { throwIfNoEntry: false });
+    if (existing?.isFile() && existing.size > 0) {
+      assetPaths.push(relative);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const response = await fetchImpl(scene.remote, {
+      headers: {
+        Accept: "image/avif,image/webp,image/png,image/jpeg,*/*",
+        "Accept-Language": "ja,en;q=0.8",
+        Referer: scene.referer,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/150 Safari/537.36",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Anime scene download failed (${response.status}) for ${scene.remote}`);
+    }
+    const contentType = response.headers?.get?.("content-type") ?? "";
+    if (contentType && !/^image\//i.test(contentType)) {
+      throw new Error(`Unexpected anime scene content type ${contentType} for ${scene.remote}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) throw new Error(`Empty anime scene response for ${scene.remote}`);
+    fs.writeFileSync(target, buffer);
+    assetPaths.push(relative);
+  }
+  return assetPaths;
+}
+
+function momentsFixturePaths(vaultRoot) {
+  const frieren = fixtureBySourceId(400602);
+  const kaguya = fixtureBySourceId(248175);
+  return {
+    demoPaths: [
+      path.join(vaultRoot, fixtureRelativePath(frieren)),
+      path.join(vaultRoot, fixtureRelativePath(kaguya)),
+      path.join(vaultRoot, OREGAIRU_MOMENTS_DEMO_PATH),
+    ],
+    assetPaths: ANIME_SCENE_SOURCES.map(animeSceneRelativePath),
+  };
+}
+
+async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
+  const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
+  const known = momentsFixturePaths(vaultRoot);
+  const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
+    return { ...known, assetPaths };
+  }
+
+  const byKey = new Map(ANIME_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
+  const scene = (key) => {
+    const value = byKey.get(key);
+    if (!value) throw new Error(`Missing prepared Moment scene ${key}`);
+    return value;
+  };
+  const frieren = fixtureBySourceId(400602);
+  const kaguya = fixtureBySourceId(248175);
+
+  seedMomentsFixture(vaultRoot, frieren, [
+    "## 第 1 話・冒險的終點",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_frieren_quote_01",
+        text: "人間的壽命明明這麼短……\n我當時為什麼沒想過要更了解他呢……",
+        images: [scene("frieren-ep01-07"), scene("frieren-ep01-08")],
+      },
+      {
+        id: "m_test_frieren_journey_02",
+        text: "那就下次吧。\n五十年後，我知道一個能看得更漂亮的地方，到時候帶你們去。",
+        images: [
+          scene("frieren-ep01-01"), scene("frieren-ep01-02"), scene("frieren-ep01-03"),
+          scene("frieren-ep01-04"), scene("frieren-ep01-05"), scene("frieren-ep01-06"),
+          scene("frieren-ep01-07"),
+        ],
+      },
+      {
+        id: "m_test_frieren_short_03",
+        text: "在城裡不太看得清楚呢。",
+        images: [scene("frieren-ep01-05")],
+      },
+    ]),
+    "",
+    "這段普通 Markdown 刻意放在兩個 Moments sections 中間。",
+    "",
+    "## 第 1 話・旅途的記憶",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_frieren_promise_04",
+        text: "雖然只是很短的一段時間。",
+        source: "第 1 話",
+        position: "旅途的記憶",
+        speaker: "芙莉蓮",
+        tags: ["回憶片段", "辛美爾"],
+        note: "單張圖片的情況不該顯示橫向捲動；填寫中的 metadata 應該完整顯示。",
+        images: [scene("frieren-ep01-04")],
+      },
+      {
+        id: "m_test_frieren_magic_05",
+        text: "我會繼續收集魔法。",
+        images: [scene("frieren-ep01-09"), scene("frieren-ep01-10")],
+      },
+      {
+        id: "m_test_frieren_long_06",
+        text: "有些旅程是在結束之後，才慢慢明白它留下了什麼。\n回頭看那些曾經並肩走過的路，會發現真正被記住的往往不是目的地，而是途中那些看似平凡的瞬間。\n時間繼續往前，我們也只能帶著這些記憶繼續走下去。",
+        source: "第 1 話",
+        tags: ["長文字排版", "旅途"],
+        note: "這段註記刻意寫得比較長，用來驗證 metadata 有空間時會完整橫向顯示；如果 metadata 高度真的不足，註記會跟右側文字共用同一個「展開／收合」控制。展開後必須完整顯示，不應永久停在省略狀態。這段文字是 Test Vault UI regression 文案，不是官方台詞；圖片仍使用官方 STORY 場面圖。",
+        images: [scene("frieren-ep01-02"), scene("frieren-ep01-06"), scene("frieren-ep01-10")],
+      },
+    ]),
+    "",
+    "> Test Vault scene source: TV anime Frieren episode 1 official STORY stills.",
+  ].join("\n"));
+
+  seedMomentsFixture(vaultRoot, kaguya, [
+    "## 第 1 話・戀愛頭腦戰",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_kaguya_01",
+        text: "戀愛是戰爭！\n先喜歡上的人就輸了。",
+        source: "第 1 話",
+        tags: ["戀愛", "頭腦戰"],
+        note: "第一話就把作品的核心規則說得很清楚。",
+        images: [scene("kaguya-s1-ep01-01"), scene("kaguya-s1-ep01-02")],
+      },
+      {
+        id: "m_test_kaguya_02",
+        text: "好像有人在傳我們的謠言呢。",
+        images: [scene("kaguya-s1-ep01-03")],
+      },
+    ]),
+    "",
+    "> Test Vault scene source: Kaguya-sama season 1 episode 1 official STORY stills.",
+  ].join("\n"));
+
+  const oregairuImageBody = [
+    "## 動畫截圖",
+    "",
+    imageBlock([
+      scene("oregairu-zoku-ep04-official"),
+      scene("oregairu-zoku-ep07-official"),
+      scene("oregairu-zoku-ep10-official"),
+      scene("oregairu-zoku-ep12-official"),
+      scene("oregairu-zoku-ep13-official"),
+    ]),
+  ].join("\n");
+  const oregairuMomentBody = [
+    "## 大老師語錄",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_oregairu_zoku_ep12_hachiman",
+        text: "想起過去會後悔的要死\n想到未來又會不安到得憂鬱症\n用消去法來說，現在堪稱幸福",
+        source: "果青續 (12)",
+        speaker: "比企谷八幡",
+        tags: ["大老師語錄", "第 12 話"],
+        images: [
+          scene("oregairu-zoku-ep12-official"),
+          scene("oregairu-zoku-ep12-cafe"),
+          scene("oregairu-zoku-ep12-hachiman"),
+        ],
+      },
+    ]),
+    "",
+    "> Test Vault scene source: Oregairu Zoku episode 12; the quote Moment uses one official TBS STORY still plus two episode-12 screenshot references. The Image Section above uses only official TBS second-season STORY stills.",
+  ].join("\n");
+  seedOregairuMomentsFixture(vaultRoot, oregairuImageBody, oregairuMomentBody);
+
+  for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v8 seeded. Ordinary test-vault runs preserve later edits.\n");
+  return { ...known, assetPaths };
+}
 
 function fixtureBySourceId(sourceId) {
   const fixture = FIXTURES.find((entry) => String(entry.sourceId) === String(sourceId));
   if (!fixture) throw new Error(`Missing Test Vault fixture for source ${sourceId}`);
   return fixture;
-}
-
-function galleryAssetRelativePath(sourceFixture) {
-  return `${IMAGE_SECTION_ASSET_ROOT}/${sourceFixture.mediaType}-${sourceFixture.sourceId}.jpg`;
-}
-
-function copyRealGalleryAsset(vaultRoot, sourceFixture) {
-  const sourceRelative = coverRelativePath(sourceFixture).split(path.sep).join("/");
-  const source = path.join(vaultRoot, sourceRelative);
-  if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile()) {
-    throw new Error(`Real image-section source cover is missing: ${sourceRelative}`);
-  }
-  const targetRelative = galleryAssetRelativePath(sourceFixture);
-  const target = path.join(vaultRoot, targetRelative);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(source, target);
-  return targetRelative;
 }
 
 function imageBlock(paths) {
@@ -167,21 +560,32 @@ function imageFixturePaths(vaultRoot) {
   return {
     demoPaths: [frierenAnime, kaguyaAnime, overlordNovel]
       .map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
-    assetPaths: IMAGE_LAYOUT_SOURCE_IDS.map((id) => galleryAssetRelativePath(fixtureBySourceId(id))),
+    assetPaths: ANIME_SCENE_SOURCES.map(animeSceneRelativePath),
   };
 }
 
-async function prepareImageSectionDemos(vaultRoot, reset) {
+async function prepareImageSectionDemos(vaultRoot, reset, fetchImpl) {
   const marker = path.join(vaultRoot, IMAGE_SECTION_FIXTURE_MARKER);
-  const previousMarker = path.join(vaultRoot, IMAGE_SECTION_PREVIOUS_MARKER);
+  const previousMarkers = IMAGE_SECTION_PREVIOUS_MARKERS.map((value) => path.join(vaultRoot, value));
   const known = imageFixturePaths(vaultRoot);
-  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) return known;
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
+    const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
+    return { ...known, assetPaths };
+  }
 
-  const migrateV2 = !reset && fs.statSync(previousMarker, { throwIfNoEntry: false })?.isFile();
+  const migrateLegacyUnmarked = !reset
+    && fs.statSync(previousMarkers.at(-1), { throwIfNoEntry: false })?.isFile();
   fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_DEMO_ROOT), { recursive: true, force: true });
   fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_ASSET_ROOT), { recursive: true, force: true });
 
-  const assetPaths = IMAGE_LAYOUT_SOURCE_IDS.map((id) => copyRealGalleryAsset(vaultRoot, fixtureBySourceId(id)));
+  const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
+  const scenesByKey = new Map(ANIME_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
+  const scenes = (prefix) => ANIME_SCENE_SOURCES
+    .filter((scene) => scene.key.startsWith(prefix))
+    .map((scene) => scenesByKey.get(scene.key))
+    .filter(Boolean);
+  const frierenScenes = scenes("frieren-ep01-");
+  const kaguyaScenes = scenes("kaguya-s1-ep01-");
   const frierenAnime = fixtureBySourceId(400602);
   const kaguyaAnime = fixtureBySourceId(248175);
   const overlordNovel = fixtureBySourceId(101929);
@@ -190,21 +594,21 @@ async function prepareImageSectionDemos(vaultRoot, reset) {
     seedRealImageSections(vaultRoot, frierenAnime, "frieren", [
       "## 圖片牆",
       "",
-      imageBlock(assetPaths.slice(0, 12)),
+      imageBlock(frierenScenes),
       "",
-      "> 版面測試使用 shared Test Vault 已下載的真實作品圖片，用來確認 masonry、預設捲動高度與展開功能。",
-    ].join("\n"), migrateV2),
+      "> 圖片牆測資改用《葬送的芙莉蓮》第 1 話官方 STORY 場面圖；不再混入其他作品封面。用來確認 masonry、預設捲動高度與展開功能。",
+    ].join("\n"), migrateLegacyUnmarked),
     seedRealImageSections(vaultRoot, kaguyaAnime, "kaguya", [
-      "## 動畫圖",
+      "## 第 1 話・動畫場面",
       "",
-      imageBlock(assetPaths.slice(0, 5)),
+      imageBlock(kaguyaScenes.slice(0, 2)),
       "",
       "這段文字刻意放在兩個 image sections 中間，確認正文與區塊互不干擾。",
       "",
-      "## 漫畫圖",
+      "## 第 1 話・另一組場面",
       "",
-      imageBlock(assetPaths.slice(5, 10)),
-    ].join("\n"), migrateV2),
+      imageBlock(kaguyaScenes.slice(2)),
+    ].join("\n"), migrateLegacyUnmarked),
     seedRealImageSections(vaultRoot, overlordNovel, "overlord", [
       "## 圖片收藏",
       "",
@@ -212,13 +616,14 @@ async function prepareImageSectionDemos(vaultRoot, reset) {
       "```",
       "",
       "> 真實作品的空 image section，用來驗證右鍵插入後的區塊與選檔、拖放、貼上、URL 新增。",
-    ].join("\n"), migrateV2),
+    ].join("\n"), migrateLegacyUnmarked),
   ];
 
   // Keep one intentional old-default note so Updates & cleanup can be verified manually.
   seedLegacyDefaultCoverEmbed(vaultRoot, overlordNovel);
 
-  fs.writeFileSync(marker, "Image-section real-work fixtures v6 seeded. OVERLORD intentionally retains one legacy duplicate cover for update-cleanup testing.\n");
+  for (const previous of previousMarkers) fs.rmSync(previous, { force: true });
+  fs.writeFileSync(marker, "Image-section official anime-scene fixtures v7 seeded. OVERLORD intentionally retains one legacy duplicate cover for update-cleanup testing.\n");
   return { demoPaths, assetPaths };
 }
 
@@ -654,9 +1059,9 @@ After **Check updates**:
 
 ## 7. Reusable image sections
 
-Use these **real works and real downloaded cover images** for manual verification:
+Use these **real works and official anime episode stills** for manual verification:
 
-- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — one populated section with **12 real downloaded work images** for masonry/scroll/expand review.
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — one populated section with **10 official episode-1 STORY stills** for masonry/scroll/expand review.
 - [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — two independent populated sections with ordinary Markdown text between them.
 - [[AnimeList/Novel/OVERLORD|OVERLORD]] — a real-work empty image section for Add and insertion testing.
 
@@ -680,6 +1085,30 @@ Check the approved image-section behavior:
 - 輝夜姬 keeps two independent \`animelist-images\` blocks with normal Markdown text between them.
 - The \`animelist-detail\` note header is a compact single-row control strip like the approved mockup; it must not render a second progress card/bar underneath.
 - Run \`npm run test-vault\` again and confirm edits to these seeded sections are preserved; only \`npm run test-vault:fixtures\` intentionally resets the controlled work fixtures.
+
+## 8. Moments sections
+
+Use these real media notes with **official episode stills downloaded into the Test Vault at fixture-preparation time**. Moments no longer reuse unrelated cover images:
+
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — episode 1 official STORY stills, split across **two independent \`animelist-moments\` sections** with five real-scene Moment cards total.
+- [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — season 1 episode 1 official STORY stills with short recognizable dialogue for cross-note verification.
+- Scene images are stored under \`AnimeList/Images/test-vault/moments/\`; they are downloaded from the official anime STORY pages and are not committed to the repository.
+
+Check the approved Moments behavior:
+
+- Each Moment is **text + 1..N related images**. Text preserves multiple lines. The seeded long-text Frieren case must clamp in the default card and expose **展開 / 收合** instead of making every card endlessly tall.
+- On desktop, each Moment uses the approved **editorial split card**: quote plus any filled optional metadata on the left and media on the right. Empty metadata fields must not render. The Frieren 「雖然只是很短的一段時間。」 case has one landscape still and must show that whole image without a horizontal scrollbar. Every image remains uncropped. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text/metadata stacks above the same single-row media area without horizontal page overflow.
+- Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. In reading view, each metadata label is immediately followed by a full-width colon and its value (for example **出處：第 1 話**) instead of reserving a fixed alignment column that forces avoidable wrapping. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
+- When a multi-image filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
+- Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
+- Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
+- Edit keeps the same stable \`id\`, supports replacing text and adding/removing images, and never duplicates an existing ID.
+- \`Copy text\` copies only the Moment text. \`Copy images\` copies the Moment image set; pasting into an AnimeList image picker should restore all images when the platform falls back to the AnimeList HTML clipboard format.
+- Deleting a Moment removes its YAML item. Managed images are moved through Obsidian trash only when no Image Section, other Moment, or current cover still references them.
+- Right-click a media note: **AnimeList › Add moments section** appears in the same native submenu as **Add image section**.
+- A note may contain multiple Moments sections named by ordinary Markdown headings.
+- Source mode remains human-readable YAML-like data under \`moments:\` with stable \`m_...\` IDs.
+- Run \`npm run test-vault\` again and confirm manual Moment edits are preserved; \`npm run test-vault:fixtures\` intentionally resets controlled fixtures.
 
 `;
 }
@@ -762,12 +1191,14 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
     else created += 1;
   }
 
-  const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset);
+  const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset, fetchImpl);
+  const momentsDemos = await prepareMomentsDemos(resolvedVault, reset, fetchImpl);
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return {
     fixtureRoot: path.join(resolvedVault, TEST_LIBRARY_ROOT),
     checklistPath,
     imageSectionDemos,
+    momentsDemos,
     files,
     created,
     reused,
