@@ -24,13 +24,13 @@ This runs the complete repository checks, verifies release consistency, installs
 
 `npm run test-vault` is intentionally non-destructive for media data. Existing current fixtures and downloaded covers are reused, so edits made during manual testing survive reopening the vault and duplicate media are not created. A missing cached cover is repaired without rewriting the note.
 
-To intentionally restore the 18 controlled baseline works:
+To intentionally restore the controlled baseline works and current feature fixtures:
 
 ```bash
 npm run test-vault:fixtures
 ```
 
-The shared Test Vault uses the same managed-library layout as normal collection (`test-vault/AnimeList/Anime`, `Manga`, `Novel`) and local covers under `test-vault/AnimeList/Covers/<type>`. Fixture notes retain real Bangumi source identity plus local/remote cover metadata, while user status/progress/dates remain controlled test scenarios. The entry page is `test-vault/_AnimeList Test Checklist.md`. Reset only rewrites the known fixture notes; unrelated manual test notes are preserved. All Test Vault files remain local and ignored by Git.
+The shared Test Vault uses the same managed-library layout as normal collection (`test-vault/AnimeList/Anime`, `Manga`, `Novel`) and local covers under `test-vault/AnimeList/Covers/<type>`. Fixture notes retain real source identity plus controlled user status/progress/dates and feature-specific test data. The entry page is `test-vault/_AnimeList Test Checklist.md`. Reset only rewrites the known fixture notes; unrelated manual test notes are preserved. All Test Vault files remain local and ignored by Git.
 
 To use another disposable vault:
 
@@ -54,30 +54,57 @@ Tests are cataloged by layer and functionality, so a branch can run the smallest
 npm run test:unit
 npm run test:integration
 npm run test:contract
+npm run test:legacy-update
 npm run test:legacy
 npm run test:feature -- timeline
 npm run test:feature -- serial-covers
 npm run test:list
 ```
 
-`tests/legacy-characterization.test.ts` contains characterization and source-structure checks that protect the current compatibility implementation and is catalogued in the `legacy` suite. New behavior tests belong in dedicated feature-named files or `tests/contracts`; do not add new product behavior only to the legacy suite.
+`tests/legacy-characterization.test.ts` contains characterization checks that protect remaining compatibility behavior and is catalogued in the `legacy` suite. Version-update and cleanup migrations belong in the `legacy-update` suite. New product behavior belongs in dedicated feature-named files or `tests/contracts`; do not add new behavior only to the legacy suite.
 
-Before opening a pull request, run:
+Browser-sensitive UI behavior has dedicated Chromium regressions:
+
+```bash
+npm run test:browser:date
+npm run test:browser:mobile
+npm run test:browser:tags
+npm run test:browser:tag-manager
+```
+
+Before opening or updating a pull request, run:
 
 ```bash
 npm run check
 npm run release:check
 ```
 
-`npm run check` includes both the compatibility typecheck and the strict typecheck for new domain, data, i18n, and shared UI modules.
+`npm run check` includes compatibility and strict typechecks, lint, architecture checks, automated tests, Community review preflight, a production build, and the reproducible stylesheet check.
 
 ## Architecture and compatibility boundaries
 
-Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before moving shared behavior. New persistence, normalization, provider, or settings rules belong in the responsible typed module, not in `src/main.ts` or `src/legacy.ts`. `src/types.ts` is a compatibility barrel; new modules should import directly from `src/domain`.
+Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before moving shared behavior. New persistence, normalization, provider, settings, note-media, or release-tracking rules belong in the responsible typed module, not in `src/main.ts` or `src/legacy.ts`. `src/types.ts` is a compatibility barrel; new modules should import directly from `src/domain`.
 
-User-visible text must be added to `src/ui-text.ts` or a feature `*-text.ts` catalog. Do not locate controls by translated label text; expose a semantic field role or typed integration hook instead.
+`src/main.ts` owns lifecycle, command/Markdown registration, and thin host wiring. `src/legacy.ts` is compatibility-only. New Image Section, Moments, release tracking, cleanup, and locale behavior must stay in their typed feature/domain/data/UI modules rather than being copied into either integration hotspot.
 
-Styles are maintained as `styles/base.css` plus feature source files. Use:
+## User-visible text and localization
+
+The runtime text catalog is `src/i18n/catalog.ts`. Locale bundles live under:
+
+```text
+src/i18n/locales/zh-TW/
+src/i18n/locales/en/
+src/i18n/locales/ja/
+src/i18n/locales/ko/
+```
+
+`src/ui-text.ts` and feature `*-text.ts` modules are namespace helpers/facades; they are not a second independent translation store. Add new user-visible product wording to the responsible locale namespace for all supported locales, preserving per-key fallback behavior where intentionally supported.
+
+The Settings page intentionally remains English. Do not locate controls by translated label text; expose a semantic field role, dataset marker, or typed integration hook instead.
+
+## Styles
+
+Styles are maintained as `styles/base.css` plus feature source files listed in `scripts/style-bundle.mjs`:
 
 ```bash
 npm run styles:check   # verify the committed release bundle
@@ -85,18 +112,24 @@ npm run styles:build   # intentionally regenerate styles.css
 npm run styles:dev     # watch a disposable development bundle
 ```
 
-Ordinary builds must leave the working tree clean.
+Ordinary builds must leave the working tree clean. `styles.css` is generated release output and must remain reproducible from tracked source styles.
 
-Do not commit the test vault, its media data, generated fixtures, or Obsidian workspace state.
+CSS must also respect the minimum Obsidian browser baseline. Prefer Grid/Flexbox and native overflow behavior over features that the Community scanner marks only partially supported. In particular, do not reintroduce CSS multi-column layout or `scrollbar-width` / `scrollbar-color`; the Community preflight checks the generated stylesheet for these properties.
 
 ## Code and UI language
 
 - Source code, comments, commit messages, and documentation should be written in English.
 - User-facing Chinese text should use Traditional Chinese unless it comes directly from an external metadata provider.
+- Add corresponding English, Japanese, and Korean locale strings for localized product UI.
 
 ## Data compatibility
 
 Media data must remain readable as ordinary Markdown and YAML frontmatter. Do not introduce a private database as the source of truth.
+
+When editing Markdown-backed feature blocks such as `animelist-images` and `animelist-moments`, preserve unrelated blocks, Markdown prose, and frontmatter. Image deletion must remain reference-aware so a shared managed image is not trashed while another cover, Image Section, or Moment still references it.
+
+Release-tracking fields are additive metadata and must never be repurposed as personal reading progress. Provider failure, ambiguity, or source regression must preserve trusted stored state rather than guessing.
+
 ## Obsidian API types
 
 Runtime imports from `obsidian` remain external and are supplied by Obsidian. The repository uses `types/obsidian.d.ts` only for compile-time declarations. Extend this file when new Obsidian APIs are used; do not add the full `obsidian` npm package unless the dependency cost is justified and installation is re-verified from an empty npm cache.
