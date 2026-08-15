@@ -106,7 +106,8 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v6")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), false);
@@ -129,7 +130,7 @@ try {
   assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 6);
   assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-/);
   assert.match(read(frierenAnimePath), /m_test_frieren_promise_04[\s\S]*source: "第 1 話"[\s\S]*position: "旅途的記憶"[\s\S]*speaker: "芙莉蓮"[\s\S]*tags:[\s\S]*回憶片段[\s\S]*辛美爾/);
-  assert.match(read(frierenAnimePath), /m_test_frieren_long_06[\s\S]*長文字排版[\s\S]*Test Vault[^\n]*長文字[^\n]*regression/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_long_06[\s\S]*長文字排版[\s\S]*展開／收合[\s\S]*Test Vault UI regression/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-moments/g) ?? []).length, 1);
   assert.equal((read(kaguyaAnimePath).match(/^  - id: "m_test_kaguya_/gm) ?? []).length, 2);

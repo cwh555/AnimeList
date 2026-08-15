@@ -7,10 +7,13 @@ Use the seeded real anime episode-scene fixtures in the shared Test Vault to ver
 - Each desktop Moment places media across the full card width first, then a lower content band.
 - The lower content band uses a compact metadata column on the left (about one quarter of the width) and the quote/content column on the right. Empty metadata is not rendered; a Moment without metadata gives the quote the full content width.
 - Metadata is visibly secondary: smaller type, compact rows/tags, and a subtle vertical divider separates it from the quote.
+- Standard metadata rows use a shared label column so every user-entered value starts on the same vertical line; labels use the accent color and values use normal foreground text.
+- `note` is intentionally different from the compact rows: **註記** sits on its own line and the note body flows horizontally underneath it.
+- A note is shown in full whenever it fits. If the metadata column would become materially taller than the collapsed quote, it shares the quote's **展開 / 收合** control; expanding the quote also reveals the complete note. There is no independent permanent ellipsis for notes.
 - Frieren `雖然只是很短的一段時間。`: the single 16:9 still is fully visible in the featured stage with no horizontal scrollbar. Letterboxing is acceptable; cropping is not.
 - Two landscape screenshots should fit side by side across a typical 15-inch desktop viewport before scrolling. Larger groups remain one horizontal row and scroll horizontally; images never wrap or crop.
 - Frieren seven-image Moment: all stills stay on one horizontal row and overflow horizontally.
-- Frieren long-text regression Moment: the quote is clamped in the normal card, shows **展開**, and only grows after explicit expansion; **收合** restores the compact card.
+- Frieren long-text regression Moment: the quote is clamped in the normal card, shows **展開**, and only grows after explicit expansion; its deliberately long note expands and collapses with the same control; **收合** restores the compact card.
 - Narrow/mobile views keep media first, then quote, then metadata; no page-level horizontal overflow is allowed.
 
 ## Optional metadata

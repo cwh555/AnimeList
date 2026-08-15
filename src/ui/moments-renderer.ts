@@ -186,40 +186,54 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     return row;
   }
 
-  private renderQuote(moment: MomentItem): HTMLElement {
+  private renderQuote(
+    moment: MomentItem,
+    onExpandedChange: (expanded: boolean) => void,
+  ): {
+    element: HTMLElement;
+    setExternalOverflow: (overflow: boolean) => void;
+  } {
     const quote = makeEl("div", "al-moment-quote");
     const text = makeEl("div", "al-moment-text", moment.text);
     const toggle = makeEl("button", "al-moment-text-toggle");
     toggle.type = "button";
     toggle.hidden = true;
 
-    const setExpanded = (expanded: boolean): void => {
+    let textOverflow = false;
+    let externalOverflow = false;
+
+    const refresh = (): void => {
+      const expanded = this.expandedTextIds.has(moment.id);
       quote.classList.toggle("is-expanded", expanded);
-      if (expanded) this.expandedTextIds.add(moment.id);
-      else this.expandedTextIds.delete(moment.id);
+      quote.classList.toggle("is-clampable", textOverflow);
+      toggle.hidden = !(expanded || textOverflow || externalOverflow);
       toggle.textContent = momentsText(expanded ? "collapseText" : "expandText");
       toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
     };
 
-    const syncOverflow = (): void => {
-      const expanded = this.expandedTextIds.has(moment.id);
-      setExpanded(expanded);
-      if (expanded) {
-        quote.addClass("is-clampable");
-        toggle.hidden = false;
-        return;
-      }
-      const overflow = text.scrollHeight > text.clientHeight + 2;
-      quote.classList.toggle("is-clampable", overflow);
-      toggle.hidden = !overflow;
+    const setExpanded = (expanded: boolean): void => {
+      if (expanded) this.expandedTextIds.add(moment.id);
+      else this.expandedTextIds.delete(moment.id);
+      refresh();
+      onExpandedChange(expanded);
+      if (!expanded) window.requestAnimationFrame(syncOverflow);
     };
 
-    setExpanded(this.expandedTextIds.has(moment.id));
+    const syncOverflow = (): void => {
+      if (this.expandedTextIds.has(moment.id)) {
+        refresh();
+        return;
+      }
+      textOverflow = text.scrollHeight > text.clientHeight + 2;
+      refresh();
+    };
+
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
-      setExpanded(!quote.classList.contains("is-expanded"));
+      setExpanded(!this.expandedTextIds.has(moment.id));
     });
     quote.append(text, toggle);
+    refresh();
 
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(syncOverflow);
@@ -227,7 +241,14 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       this.scrollerObservers.push(observer);
     }
     window.requestAnimationFrame(syncOverflow);
-    return quote;
+
+    return {
+      element: quote,
+      setExternalOverflow: (overflow: boolean): void => {
+        externalOverflow = overflow;
+        refresh();
+      },
+    };
   }
 
   private renderMeta(moment: MomentItem): HTMLElement | null {
@@ -347,10 +368,40 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     const content = makeEl("div", "al-moment-content");
     const metadata = this.renderMeta(moment);
     const quotePanel = makeEl("div", "al-moment-quote-panel");
-    quotePanel.appendChild(this.renderQuote(moment));
+    let syncMetadataForExpansion = (_expanded: boolean): void => {};
+    const quoteView = this.renderQuote(moment, (expanded) => syncMetadataForExpansion(expanded));
+    quotePanel.appendChild(quoteView.element);
     if (metadata) {
       content.addClass("has-metadata");
       content.append(metadata, quotePanel);
+
+      const syncMetadata = (expanded = this.expandedTextIds.has(moment.id)): void => {
+        metadata.classList.remove("is-clamped");
+        metadata.style.removeProperty("max-height");
+        card.classList.toggle("is-text-expanded", expanded);
+        if (expanded) return;
+
+        quoteView.setExternalOverflow(false);
+        const naturalHeight = metadata.scrollHeight;
+        const quoteHeight = quotePanel.getBoundingClientRect().height;
+        // Small metadata overages are allowed to grow naturally. Larger note blocks
+        // share the quote's Expand / Collapse control instead of introducing a second toggle.
+        const needsSharedExpansion = naturalHeight > quoteHeight + 34;
+        quoteView.setExternalOverflow(needsSharedExpansion);
+        if (!needsSharedExpansion) return;
+
+        const clampedHeight = Math.max(88, quotePanel.getBoundingClientRect().height);
+        metadata.classList.add("is-clamped");
+        metadata.style.maxHeight = `${clampedHeight}px`;
+      };
+
+      syncMetadataForExpansion = syncMetadata;
+      if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(() => syncMetadata());
+        observer.observe(quotePanel);
+        this.scrollerObservers.push(observer);
+      }
+      window.requestAnimationFrame(() => syncMetadata());
     } else {
       content.addClass("without-metadata");
       content.appendChild(quotePanel);

@@ -1338,6 +1338,7 @@
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(168px, 0.27fr) minmax(0, 0.73fr);
+  align-items: start;
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 66%, transparent);
   background:
     radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 44%),
@@ -1432,7 +1433,10 @@
 .al-moment-text-toggle[hidden] { display: none; }
 
 .al-moment-meta-section {
+  --al-moment-meta-label-width: 5.9rem;
+  position: relative;
   display: grid;
+  box-sizing: border-box;
   min-width: 0;
   align-content: start;
   gap: 0.48rem;
@@ -1443,8 +1447,18 @@
   background: color-mix(in srgb, var(--background-secondary) 24%, transparent);
 }
 
-.al-moment-meta,
-.al-moment-note {
+.al-moment-meta-section.is-clamped::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2.25rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background-secondary) 96%, var(--background-primary)));
+}
+
+.al-moment-meta {
   display: grid;
   gap: 0.3rem;
 }
@@ -1452,7 +1466,7 @@
 .al-moment-meta-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(3.8rem, auto) minmax(0, 1fr);
+  grid-template-columns: var(--al-moment-meta-label-width) minmax(0, 1fr);
   align-items: baseline;
   gap: 0.45rem;
   color: var(--text-muted);
@@ -1465,28 +1479,31 @@
   font-size: 0.92em;
   font-weight: 680;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .al-moment-meta-value,
 .al-moment-note-text {
   min-width: 0;
+  color: var(--text-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .al-moment-note {
-  grid-template-columns: minmax(3.8rem, auto) minmax(0, 1fr);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  gap: 0.22rem;
+  padding-top: 0.06rem;
   color: var(--text-muted);
   font-size: clamp(0.7rem, 0.08vw + 0.68rem, 0.77rem);
-  line-height: 1.38;
+  line-height: 1.42;
 }
 
 .al-moment-note-text {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  overflow: visible;
 }
 
 .al-moment-tags {

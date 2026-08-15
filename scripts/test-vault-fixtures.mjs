@@ -78,8 +78,8 @@ const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".a
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
 const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v5";
-const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v6";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
 const ANIME_SCENE_SOURCES = [
@@ -308,7 +308,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
         text: "有些旅程是在結束之後，才慢慢明白它留下了什麼。\n回頭看那些曾經並肩走過的路，會發現真正被記住的往往不是目的地，而是途中那些看似平凡的瞬間。\n時間繼續往前，我們也只能帶著這些記憶繼續走下去。",
         source: "第 1 話",
         tags: ["長文字排版", "旅途"],
-        note: "這段文字是 Test Vault 的長文字 UI regression 文案，不是官方台詞；圖片仍使用官方 STORY 場面圖。",
+        note: "這段註記刻意寫得比較長，用來驗證 metadata 有空間時會完整橫向顯示；如果 metadata 高度真的不足，註記會跟右側文字共用同一個「展開／收合」控制。展開後必須完整顯示，不應永久停在省略狀態。這段文字是 Test Vault UI regression 文案，不是官方台詞；圖片仍使用官方 STORY 場面圖。",
         images: [scene("frieren-ep01-02"), scene("frieren-ep01-06"), scene("frieren-ep01-10")],
       },
     ]),
@@ -339,7 +339,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   ].join("\n"));
 
   for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v5 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v6 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 

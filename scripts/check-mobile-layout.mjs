@@ -92,7 +92,7 @@ function momentsFilmstripFixture(isMobile) {
       <article id="single-card" class="al-moment-card" data-image-count="1">
         <div id="single-media" class="al-moment-media is-featured"><div class="al-moment-image-viewport"><div id="single-gallery" class="al-moment-image-row" data-image-count="1"><button id="single-image" class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777"><img alt="" src="${pixel}"></button></div></div></div>
         <div id="single-content" class="al-moment-content has-metadata">
-          <div id="metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span><span class="al-moment-tag">辛美爾</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記</span><div class="al-moment-note-text">完整 metadata 測試。</div></div></div>
+          <div id="metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span><span class="al-moment-tag">辛美爾</span></div></div><div class="al-moment-note"><span id="single-note-label" class="al-moment-meta-label">註記</span><div id="single-note-text" class="al-moment-note-text">完整 metadata 測試。</div></div></div>
           <div id="single-quote-panel" class="al-moment-quote-panel"><div class="al-moment-quote"><div class="al-moment-text">雖然只是很短的一段時間。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div>
         </div>
         <button class="al-moment-actions" type="button">⋯</button>
@@ -104,7 +104,7 @@ function momentsFilmstripFixture(isMobile) {
       </article>
       <article id="long-card" class="al-moment-card" data-image-count="7">
         <div id="long-media" class="al-moment-media is-filmstrip is-scrollable is-at-start"><div class="al-moment-image-viewport"><div id="long-gallery" class="al-moment-image-row" data-image-count="7">${landscape.repeat(7)}</div></div></div>
-        <div id="long-content" class="al-moment-content has-metadata"><div id="long-metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div></div><div id="long-quote-panel" class="al-moment-quote-panel"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。當時沒有特別放在心上的一句話、一場短暫的停留，甚至只是一起看過的普通風景，過了很久之後都可能變成最清楚的記憶。人也會在之後的旅途中慢慢理解曾經沒有理解的事情，因此再次回想同一段旅程時，感受到的重量也可能完全不同。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 在更寬的新版文字欄位中仍不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div></div></div>
+        <div id="long-content" class="al-moment-content has-metadata"><div id="long-metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記</span><div id="long-note-text" class="al-moment-note-text">這是一段刻意加長的註記，用來確認有足夠空間時內容會完整橫向顯示；當 metadata 欄位真的沒有足夠高度時，不會自己永久省略，而是跟右側文字共用同一個展開與收合狀態。展開之後這段註記必須完整顯示，收合時才回到緊湊版面。為了讓桌面與手機測試都確實進入 overflow 狀態，這裡再加入第二段說明：註記是一段連續的補充文字，不應像其他 metadata 一樣左右切成 label/value，也不應有獨立的省略號或第二個展開按鈕。</div></div></div><div id="long-quote-panel" class="al-moment-quote-panel"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。當時沒有特別放在心上的一句話、一場短暫的停留，甚至只是一起看過的普通風景，過了很久之後都可能變成最清楚的記憶。人也會在之後的旅途中慢慢理解曾經沒有理解的事情，因此再次回想同一段旅程時，感受到的重量也可能完全不同。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 在更寬的新版文字欄位中仍不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div></div></div>
         <button class="al-moment-actions" type="button">⋯</button>
       </article>
     </div>
@@ -146,6 +146,13 @@ function momentsFilmstripFixture(isMobile) {
       const longRows = [...new Set(longItems.map((item) => Math.round(item.getBoundingClientRect().top)))];
       const quoteFont = parseFloat(getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).fontSize);
       const metadataFont = parseFloat(getComputedStyle(metadata.querySelector('.al-moment-meta-row')).fontSize);
+      const metadataValues = [...metadata.querySelectorAll('.al-moment-meta-value')];
+      const metadataValueLefts = metadataValues.map((value) => value.getBoundingClientRect().left);
+      const singleNoteLabel = document.querySelector('#single-note-label');
+      const singleNoteText = document.querySelector('#single-note-text');
+      const singleNoteLabelRect = singleNoteLabel.getBoundingClientRect();
+      const singleNoteTextRect = singleNoteText.getBoundingClientRect();
+      const longNoteText = document.querySelector('#long-note-text');
 
       const longQuote = document.querySelector('#long-quote');
       const longText = document.querySelector('#long-text');
@@ -156,15 +163,36 @@ function momentsFilmstripFixture(isMobile) {
         longToggle.hidden = !overflow;
       };
       syncLongOverflow();
+      const syncLongMetadata = (expanded) => {
+        longMetadata.classList.remove('is-clamped');
+        longMetadata.style.removeProperty('max-height');
+        if (expanded) return;
+        const naturalHeight = longMetadata.scrollHeight;
+        const quoteHeight = longQuotePanel.getBoundingClientRect().height;
+        const needsSharedExpansion = naturalHeight > quoteHeight + 34;
+        if (needsSharedExpansion) {
+          longToggle.hidden = false;
+          longMetadata.classList.add('is-clamped');
+          longMetadata.style.maxHeight = Math.max(88, longQuotePanel.getBoundingClientRect().height) + 'px';
+        }
+      };
+      syncLongMetadata(false);
       const collapsedLongHeight = longText.getBoundingClientRect().height;
+      const collapsedMetadataHeight = longMetadata.getBoundingClientRect().height;
+      const collapsedNoteVisibleHeight = longNoteText.getBoundingClientRect().height;
       const longContentOverflows = longText.scrollHeight > collapsedLongHeight + 2;
+      const longMetadataOverflows = longMetadata.scrollHeight > collapsedMetadataHeight + 2;
       const longToggleVisibleWhenCollapsed = !longToggle.hidden && longToggle.textContent === '展開';
       longQuote.classList.add('is-expanded');
       longToggle.textContent = '收合';
+      syncLongMetadata(true);
       const expandedLongHeight = longText.getBoundingClientRect().height;
+      const expandedMetadataHeight = longMetadata.getBoundingClientRect().height;
+      const expandedNoteVisibleHeight = longNoteText.getBoundingClientRect().height;
       const longToggleVisibleWhenExpanded = !longToggle.hidden && longToggle.textContent === '收合';
       longQuote.classList.remove('is-expanded');
       longToggle.textContent = '展開';
+      syncLongMetadata(false);
 
       longGallery.style.scrollBehavior = 'auto'; longGallery.style.scrollSnapType = 'none';
       longGallery.scrollLeft = Math.min(180, longGallery.scrollWidth - longGallery.clientWidth);
@@ -178,6 +206,10 @@ function momentsFilmstripFixture(isMobile) {
         featuredStageIsLandscape: singleGallery.getBoundingClientRect().width / singleGallery.getBoundingClientRect().height > 1.6,
         metadataSmallerThanQuote: metadataFont < quoteFont * 0.82,
         metadataVisible: metadata.querySelectorAll('.al-moment-meta-row').length >= 4 && metadata.querySelector('.al-moment-tag')?.textContent === '回憶片段' && metadata.querySelector('.al-moment-note-text')?.textContent === '完整 metadata 測試。',
+        metadataValuesAligned: metadataValueLefts.length >= 3 && Math.max(...metadataValueLefts) - Math.min(...metadataValueLefts) <= 1,
+        metadataValuesUsePrimaryText: metadataValues.every((value) => getComputedStyle(value).color === getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).color),
+        noteUsesStackedLayout: singleNoteLabelRect.bottom <= singleNoteTextRect.top + 2 && Math.abs(singleNoteLabelRect.left - singleNoteTextRect.left) <= 1,
+        shortNoteNotTruncated: singleNoteText.scrollHeight <= singleNoteText.clientHeight + 1 && getComputedStyle(singleNoteText).overflow !== 'hidden',
         twoImagesShareRow: twoRects.length === 2 && Math.abs(twoRects[0].top - twoRects[1].top) <= 1,
         longSingleHorizontalRow: longRows.length === 1,
         longHorizontalOverflow: longGallery.scrollWidth > longGallery.clientWidth + 20,
@@ -186,6 +218,9 @@ function momentsFilmstripFixture(isMobile) {
         imagesUseContain: [...longImages, ...singleGallery.querySelectorAll('img'), ...twoGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
         longQuoteClamped: longContentOverflows && collapsedLongHeight < expandedLongHeight - 8,
         longQuoteExpandable: expandedLongHeight > collapsedLongHeight + 8 && longToggleVisibleWhenCollapsed && longToggleVisibleWhenExpanded,
+        metadataNoteSharesExpansion: longMetadataOverflows
+        ? expandedMetadataHeight > collapsedMetadataHeight + 8 && expandedNoteVisibleHeight >= collapsedNoteVisibleHeight && longMetadata.scrollHeight <= expandedMetadataHeight + 2
+        : longNoteText.scrollHeight <= collapsedNoteVisibleHeight + 2 && getComputedStyle(longNoteText).overflow !== 'hidden',
         noLegacyIndexRail: document.querySelector('.al-moment-index') === null,
         noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
       };
