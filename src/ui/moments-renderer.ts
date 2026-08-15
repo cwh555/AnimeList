@@ -180,7 +180,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   private metaRow(label: string, value: string): HTMLElement {
     const row = makeEl("div", "al-moment-meta-row");
     row.append(
-      makeEl("span", "al-moment-meta-label", label),
+      makeEl("span", "al-moment-meta-label", `${label}：`),
       makeEl("span", "al-moment-meta-value", value),
     );
     return row;
@@ -266,7 +266,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
 
     if (moment.tags?.length) {
       const row = makeEl("div", "al-moment-meta-row al-moment-tags-row");
-      row.appendChild(makeEl("span", "al-moment-meta-label", momentsText("tagsLabel")));
+      row.appendChild(makeEl("span", "al-moment-meta-label", `${momentsText("tagsLabel")}：`));
       const tags = makeEl("div", "al-moment-tags");
       moment.tags.forEach((tag) => tags.appendChild(makeEl("span", "al-moment-tag", tag)));
       row.appendChild(tags);
@@ -276,7 +276,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     if (moment.note) {
       const note = makeEl("div", "al-moment-note");
       note.append(
-        makeEl("span", "al-moment-meta-label", momentsText("noteLabel")),
+        makeEl("span", "al-moment-meta-label", `${momentsText("noteLabel")}：`),
         makeEl("div", "al-moment-note-text", moment.note),
       );
       section.appendChild(note);
