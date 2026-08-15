@@ -400,8 +400,6 @@
   scroll-snap-type: x proximity;
   scroll-padding-inline: 0.14rem;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border)) transparent;
 }
 
 .al-moment-image-row::-webkit-scrollbar { height: 6px; }
@@ -469,7 +467,6 @@
   padding: 0;
   overflow: hidden;
   scroll-snap-type: none;
-  scrollbar-width: none;
 }
 
 .al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
@@ -659,7 +656,6 @@
   border: 1px dashed var(--background-modifier-border);
   border-radius: 10px;
   background: var(--background-secondary);
-  scrollbar-width: thin;
 }
 
 .al-moment-editor-images.is-dragging {

@@ -940,12 +940,17 @@
   padding:2px;
   scrollbar-gutter:auto;
 }
-.al-image-masonry { columns:4 178px; column-gap:8px; }
+.al-image-masonry {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(178px,1fr));
+  align-items:start;
+  gap:8px;
+}
 .al-image-item {
   position:relative;
-  break-inside:avoid;
+  min-width:0;
   overflow:hidden;
-  margin:0 0 8px;
+  margin:0;
   border:1px solid color-mix(in srgb,var(--background-modifier-border) 82%,transparent);
   border-radius:9px;
   background:var(--background-secondary);
@@ -1119,12 +1124,11 @@
   .animelist-image-add-modal { width:calc(100vw - 20px); max-width:calc(100vw - 20px); }
   .animelist-image-section { padding:8px; }
   .al-image-gallery-viewport { max-height:clamp(360px,58vh,500px); }
-  .al-image-masonry { columns:2 138px; column-gap:7px; }
-  .al-image-item { margin-bottom:7px; }
+  .al-image-masonry { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
   .al-image-url-row { align-items:stretch; flex-direction:column; }
   .al-image-url-row button { align-self:flex-end; }
 }
-@media (max-width:360px) { .al-image-masonry { columns:1; } }
+@media (max-width:360px) { .al-image-masonry { grid-template-columns:minmax(0,1fr); } }
 
 .al-image-item:not(.is-selecting) { cursor:zoom-in; }
 .al-image-item:not(.is-selecting):focus-visible {
@@ -1608,8 +1612,6 @@
   scroll-snap-type: x proximity;
   scroll-padding-inline: 0.14rem;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border)) transparent;
 }
 
 .al-moment-image-row::-webkit-scrollbar { height: 6px; }
@@ -1677,7 +1679,6 @@
   padding: 0;
   overflow: hidden;
   scroll-snap-type: none;
-  scrollbar-width: none;
 }
 
 .al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
@@ -1867,7 +1868,6 @@
   border: 1px dashed var(--background-modifier-border);
   border-radius: 10px;
   background: var(--background-secondary);
-  scrollbar-width: thin;
 }
 
 .al-moment-editor-images.is-dragging {
