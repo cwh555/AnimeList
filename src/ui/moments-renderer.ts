@@ -22,6 +22,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   private source: string;
   private lineHint: number | undefined;
   private scrollerObservers: ResizeObserver[] = [];
+  private readonly expandedTextIds = new Set<string>();
 
   constructor(
     containerEl: HTMLElement,
@@ -185,18 +186,61 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     return row;
   }
 
+  private renderQuote(moment: MomentItem): HTMLElement {
+    const quote = makeEl("div", "al-moment-quote");
+    const text = makeEl("div", "al-moment-text", moment.text);
+    const toggle = makeEl("button", "al-moment-text-toggle");
+    toggle.type = "button";
+    toggle.hidden = true;
+
+    const setExpanded = (expanded: boolean): void => {
+      quote.classList.toggle("is-expanded", expanded);
+      if (expanded) this.expandedTextIds.add(moment.id);
+      else this.expandedTextIds.delete(moment.id);
+      toggle.textContent = momentsText(expanded ? "collapseText" : "expandText");
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    };
+
+    const syncOverflow = (): void => {
+      const expanded = this.expandedTextIds.has(moment.id);
+      setExpanded(expanded);
+      if (expanded) {
+        quote.addClass("is-clampable");
+        toggle.hidden = false;
+        return;
+      }
+      const overflow = text.scrollHeight > text.clientHeight + 2;
+      quote.classList.toggle("is-clampable", overflow);
+      toggle.hidden = !overflow;
+    };
+
+    setExpanded(this.expandedTextIds.has(moment.id));
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setExpanded(!quote.classList.contains("is-expanded"));
+    });
+    quote.append(text, toggle);
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(syncOverflow);
+      observer.observe(text);
+      this.scrollerObservers.push(observer);
+    }
+    window.requestAnimationFrame(syncOverflow);
+    return quote;
+  }
+
   private renderMeta(moment: MomentItem): HTMLElement | null {
     const hasMeta = Boolean(moment.source || moment.position || moment.speaker || moment.tags?.length || moment.note);
     if (!hasMeta) return null;
-    const wrap = makeEl("div", "al-moment-copy");
-    wrap.appendChild(makeEl("div", "al-moment-text", moment.text));
 
+    const section = makeEl("div", "al-moment-meta-section");
     if (moment.source || moment.position || moment.speaker) {
       const meta = makeEl("div", "al-moment-meta");
       if (moment.source) meta.appendChild(this.metaRow(momentsText("sourceLabel"), moment.source));
       if (moment.position) meta.appendChild(this.metaRow(momentsText("positionLabel"), moment.position));
       if (moment.speaker) meta.appendChild(this.metaRow(momentsText("speakerLabel"), moment.speaker));
-      wrap.appendChild(meta);
+      section.appendChild(meta);
     }
 
     if (moment.tags?.length) {
@@ -205,7 +249,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       const tags = makeEl("div", "al-moment-tags");
       moment.tags.forEach((tag) => tags.appendChild(makeEl("span", "al-moment-tag", tag)));
       row.appendChild(tags);
-      wrap.appendChild(row);
+      section.appendChild(row);
     }
 
     if (moment.note) {
@@ -214,18 +258,29 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         makeEl("span", "al-moment-meta-label", momentsText("noteLabel")),
         makeEl("div", "al-moment-note-text", moment.note),
       );
-      wrap.appendChild(note);
+      section.appendChild(note);
     }
-    return wrap;
+    return section;
   }
 
-  private renderMoment(moment: MomentItem): HTMLElement {
+  private renderMoment(moment: MomentItem, index: number): HTMLElement {
     const card = makeEl("article", "al-moment-card");
     card.dataset.momentId = moment.id;
+    card.dataset.imageCount = String(moment.images.length);
+
+    const indexRail = makeEl("div", "al-moment-index");
+    indexRail.setAttribute("aria-hidden", "true");
+    indexRail.appendChild(makeEl("span", "al-moment-index-badge", String(index + 1).padStart(2, "0")));
 
     const head = makeEl("div", "al-moment-head");
-    const copy = this.renderMeta(moment) ?? makeEl("div", "al-moment-copy");
-    if (!copy.hasChildNodes()) copy.appendChild(makeEl("div", "al-moment-text", moment.text));
+    const copy = makeEl("div", "al-moment-copy");
+    copy.appendChild(this.renderQuote(moment));
+    const metadata = this.renderMeta(moment);
+    if (metadata) {
+      copy.appendChild(metadata);
+      head.addClass("has-metadata");
+    }
+
     const actions = makeEl("button", "al-moment-actions");
     actions.type = "button";
     actions.setAttribute("aria-label", "Moment actions");
@@ -235,9 +290,10 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       this.showMomentMenu(event, moment);
     });
     head.append(copy, actions);
-    card.appendChild(head);
 
     const media = makeEl("div", "al-moment-media");
+    media.classList.toggle("is-featured", moment.images.length === 1);
+    media.classList.toggle("is-filmstrip", moment.images.length > 1);
     const viewport = makeEl("div", "al-moment-image-viewport");
     const row = makeEl("div", "al-moment-image-row");
     row.setAttribute("role", "list");
@@ -253,7 +309,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
         if (resolved.thumbnailSources?.srcset) {
           image.srcset = resolved.thumbnailSources.srcset;
-          image.sizes = "360px";
+          image.sizes = moment.images.length === 1 ? "720px" : "360px";
         }
         image.alt = "";
         image.loading = "lazy";
@@ -261,7 +317,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         image.draggable = false;
         const updateRatio = (): void => {
           if (!image.naturalWidth || !image.naturalHeight) return;
-          const ratio = Math.min(1.7, Math.max(0.58, image.naturalWidth / image.naturalHeight));
+          const ratio = Math.min(2.2, Math.max(0.55, image.naturalWidth / image.naturalHeight));
           frame.style.setProperty("--al-moment-image-ratio", String(ratio));
         };
         image.addEventListener("load", updateRatio, { once: true });
@@ -301,7 +357,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     setAnimeListIcon(next, "chevron-right");
 
     media.append(viewport, previous, next);
-    card.appendChild(media);
+    card.append(indexRail, head, media);
     this.bindScroller(media, row, previous, next);
     return card;
   }
@@ -333,7 +389,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       return;
     }
     const list = makeEl("div", "al-moments-list");
-    moments.forEach((moment) => list.appendChild(this.renderMoment(moment)));
+    moments.forEach((moment, index) => list.appendChild(this.renderMoment(moment, index)));
     this.containerEl.appendChild(list);
   }
 }

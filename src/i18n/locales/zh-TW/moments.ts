@@ -28,6 +28,8 @@ export const MOMENTS_MESSAGES = {
   create: "新增片段",
   copiedText: "文字已複製",
   copiedImages: "圖片已複製",
+  expandText: "展開",
+  collapseText: "收合",
   copyFailed: "無法複製：{error}",
   saveFailed: "無法儲存片段：{error}",
   deleteFailed: "無法刪除片段：{error}",

@@ -28,6 +28,8 @@ export const EN_MOMENTS_MESSAGES = {
   create: "Add moment",
   copiedText: "Text copied",
   copiedImages: "Images copied",
+  expandText: "Expand",
+  collapseText: "Collapse",
   copyFailed: "Could not copy: {error}",
   saveFailed: "Could not save moment: {error}",
   deleteFailed: "Could not delete moment: {error}",

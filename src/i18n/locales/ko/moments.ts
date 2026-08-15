@@ -28,6 +28,8 @@ export const KO_MOMENTS_MESSAGES = {
   create: "모먼트 추가",
   copiedText: "텍스트를 복사했습니다",
   copiedImages: "이미지를 복사했습니다",
+  expandText: "펼치기",
+  collapseText: "접기",
   copyFailed: "복사할 수 없습니다: {error}",
   saveFailed: "모먼트를 저장할 수 없습니다: {error}",
   deleteFailed: "모먼트를 삭제할 수 없습니다: {error}",

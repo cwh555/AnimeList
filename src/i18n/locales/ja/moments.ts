@@ -28,6 +28,8 @@ export const JA_MOMENTS_MESSAGES = {
   create: "モーメントを追加",
   copiedText: "テキストをコピーしました",
   copiedImages: "画像をコピーしました",
+  expandText: "展開",
+  collapseText: "折りたたむ",
   copyFailed: "コピーできませんでした: {error}",
   saveFailed: "モーメントを保存できませんでした: {error}",
   deleteFailed: "モーメントを削除できませんでした: {error}",
