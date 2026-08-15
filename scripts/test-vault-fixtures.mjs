@@ -73,21 +73,16 @@ function writeFile(vaultRoot, relativePath, content) {
 
 const IMAGE_SECTION_DEMO_ROOT = "_AnimeList Image Section Demos";
 const IMAGE_SECTION_ASSET_ROOT = "AnimeList/Images/test-vault";
-const IMAGE_SECTION_FIXTURE_MARKER = ".animelist-test-image-sections-v6";
-const IMAGE_SECTION_PREVIOUS_MARKER = ".animelist-test-image-sections-v5";
+const IMAGE_SECTION_FIXTURE_MARKER = ".animelist-test-image-sections-v7";
+const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".animelist-test-image-sections-v5"];
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
-const IMAGE_LAYOUT_SOURCE_IDS = [
-  400602, 305429, 328609, 248175, 135218, 118165, 210505,
-  267222, 339092, 101929, 10380, 975, 266498, 302189,
-];
-
-const MOMENTS_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/moments`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v4";
-const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v5";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
-const MOMENTS_SCENE_SOURCES = [
+const ANIME_SCENE_SOURCES = [
   {
     key: "frieren-ep01-01",
     remote: "https://frieren-anime.jp/wp-content/uploads/2023/09/01_01.jpg",
@@ -199,14 +194,14 @@ function seedMomentsFixture(vaultRoot, fixture, body) {
   return target;
 }
 
-function momentSceneRelativePath(scene) {
-  return `${MOMENTS_SCENE_ASSET_ROOT}/${scene.key}.jpg`;
+function animeSceneRelativePath(scene) {
+  return `${ANIME_SCENE_ASSET_ROOT}/${scene.key}.jpg`;
 }
 
-async function ensureMomentSceneAssets(vaultRoot, fetchImpl) {
+async function ensureAnimeSceneAssets(vaultRoot, fetchImpl) {
   const assetPaths = [];
-  for (const scene of MOMENTS_SCENE_SOURCES) {
-    const relative = momentSceneRelativePath(scene);
+  for (const scene of ANIME_SCENE_SOURCES) {
+    const relative = animeSceneRelativePath(scene);
     const target = path.join(vaultRoot, relative);
     const existing = fs.statSync(target, { throwIfNoEntry: false });
     if (existing?.isFile() && existing.size > 0) {
@@ -223,14 +218,14 @@ async function ensureMomentSceneAssets(vaultRoot, fetchImpl) {
       },
     });
     if (!response.ok) {
-      throw new Error(`Moment scene download failed (${response.status}) for ${scene.remote}`);
+      throw new Error(`Anime scene download failed (${response.status}) for ${scene.remote}`);
     }
     const contentType = response.headers?.get?.("content-type") ?? "";
     if (contentType && !/^image\//i.test(contentType)) {
-      throw new Error(`Unexpected Moment scene content type ${contentType} for ${scene.remote}`);
+      throw new Error(`Unexpected anime scene content type ${contentType} for ${scene.remote}`);
     }
     const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length) throw new Error(`Empty Moment scene response for ${scene.remote}`);
+    if (!buffer.length) throw new Error(`Empty anime scene response for ${scene.remote}`);
     fs.writeFileSync(target, buffer);
     assetPaths.push(relative);
   }
@@ -242,19 +237,19 @@ function momentsFixturePaths(vaultRoot) {
   const kaguya = fixtureBySourceId(248175);
   return {
     demoPaths: [frieren, kaguya].map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
-    assetPaths: MOMENTS_SCENE_SOURCES.map(momentSceneRelativePath),
+    assetPaths: ANIME_SCENE_SOURCES.map(animeSceneRelativePath),
   };
 }
 
 async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   const marker = path.join(vaultRoot, MOMENTS_FIXTURE_MARKER);
   const known = momentsFixturePaths(vaultRoot);
-  const assetPaths = await ensureMomentSceneAssets(vaultRoot, fetchImpl);
+  const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
   if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
     return { ...known, assetPaths };
   }
 
-  const byKey = new Map(MOMENTS_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
+  const byKey = new Map(ANIME_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
   const scene = (key) => {
     const value = byKey.get(key);
     if (!value) throw new Error(`Missing prepared Moment scene ${key}`);
@@ -308,6 +303,14 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
         text: "我會繼續收集魔法。",
         images: [scene("frieren-ep01-09"), scene("frieren-ep01-10")],
       },
+      {
+        id: "m_test_frieren_long_06",
+        text: "有些旅程是在結束之後，才慢慢明白它留下了什麼。\n回頭看那些曾經並肩走過的路，會發現真正被記住的往往不是目的地，而是途中那些看似平凡的瞬間。\n時間繼續往前，我們也只能帶著這些記憶繼續走下去。",
+        source: "第 1 話",
+        tags: ["長文字排版", "旅途"],
+        note: "這段文字是 Test Vault 的長文字 UI regression 文案，不是官方台詞；圖片仍使用官方 STORY 場面圖。",
+        images: [scene("frieren-ep01-02"), scene("frieren-ep01-06"), scene("frieren-ep01-10")],
+      },
     ]),
     "",
     "> Test Vault scene source: TV anime Frieren episode 1 official STORY stills.",
@@ -336,7 +339,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   ].join("\n"));
 
   for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v4 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v5 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
@@ -344,23 +347,6 @@ function fixtureBySourceId(sourceId) {
   const fixture = FIXTURES.find((entry) => String(entry.sourceId) === String(sourceId));
   if (!fixture) throw new Error(`Missing Test Vault fixture for source ${sourceId}`);
   return fixture;
-}
-
-function galleryAssetRelativePath(sourceFixture) {
-  return `${IMAGE_SECTION_ASSET_ROOT}/${sourceFixture.mediaType}-${sourceFixture.sourceId}.jpg`;
-}
-
-function copyRealGalleryAsset(vaultRoot, sourceFixture) {
-  const sourceRelative = coverRelativePath(sourceFixture).split(path.sep).join("/");
-  const source = path.join(vaultRoot, sourceRelative);
-  if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile()) {
-    throw new Error(`Real image-section source cover is missing: ${sourceRelative}`);
-  }
-  const targetRelative = galleryAssetRelativePath(sourceFixture);
-  const target = path.join(vaultRoot, targetRelative);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(source, target);
-  return targetRelative;
 }
 
 function imageBlock(paths) {
@@ -425,21 +411,32 @@ function imageFixturePaths(vaultRoot) {
   return {
     demoPaths: [frierenAnime, kaguyaAnime, overlordNovel]
       .map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
-    assetPaths: IMAGE_LAYOUT_SOURCE_IDS.map((id) => galleryAssetRelativePath(fixtureBySourceId(id))),
+    assetPaths: ANIME_SCENE_SOURCES.map(animeSceneRelativePath),
   };
 }
 
-async function prepareImageSectionDemos(vaultRoot, reset) {
+async function prepareImageSectionDemos(vaultRoot, reset, fetchImpl) {
   const marker = path.join(vaultRoot, IMAGE_SECTION_FIXTURE_MARKER);
-  const previousMarker = path.join(vaultRoot, IMAGE_SECTION_PREVIOUS_MARKER);
+  const previousMarkers = IMAGE_SECTION_PREVIOUS_MARKERS.map((value) => path.join(vaultRoot, value));
   const known = imageFixturePaths(vaultRoot);
-  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) return known;
+  if (!reset && fs.statSync(marker, { throwIfNoEntry: false })?.isFile()) {
+    const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
+    return { ...known, assetPaths };
+  }
 
-  const migrateV2 = !reset && fs.statSync(previousMarker, { throwIfNoEntry: false })?.isFile();
+  const migrateLegacyUnmarked = !reset
+    && fs.statSync(previousMarkers.at(-1), { throwIfNoEntry: false })?.isFile();
   fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_DEMO_ROOT), { recursive: true, force: true });
   fs.rmSync(path.join(vaultRoot, IMAGE_SECTION_ASSET_ROOT), { recursive: true, force: true });
 
-  const assetPaths = IMAGE_LAYOUT_SOURCE_IDS.map((id) => copyRealGalleryAsset(vaultRoot, fixtureBySourceId(id)));
+  const assetPaths = await ensureAnimeSceneAssets(vaultRoot, fetchImpl);
+  const scenesByKey = new Map(ANIME_SCENE_SOURCES.map((scene, index) => [scene.key, assetPaths[index]]));
+  const scenes = (prefix) => ANIME_SCENE_SOURCES
+    .filter((scene) => scene.key.startsWith(prefix))
+    .map((scene) => scenesByKey.get(scene.key))
+    .filter(Boolean);
+  const frierenScenes = scenes("frieren-ep01-");
+  const kaguyaScenes = scenes("kaguya-s1-ep01-");
   const frierenAnime = fixtureBySourceId(400602);
   const kaguyaAnime = fixtureBySourceId(248175);
   const overlordNovel = fixtureBySourceId(101929);
@@ -448,21 +445,21 @@ async function prepareImageSectionDemos(vaultRoot, reset) {
     seedRealImageSections(vaultRoot, frierenAnime, "frieren", [
       "## 圖片牆",
       "",
-      imageBlock(assetPaths.slice(0, 12)),
+      imageBlock(frierenScenes),
       "",
-      "> 版面測試使用 shared Test Vault 已下載的真實作品圖片，用來確認 masonry、預設捲動高度與展開功能。",
-    ].join("\n"), migrateV2),
+      "> 圖片牆測資改用《葬送的芙莉蓮》第 1 話官方 STORY 場面圖；不再混入其他作品封面。用來確認 masonry、預設捲動高度與展開功能。",
+    ].join("\n"), migrateLegacyUnmarked),
     seedRealImageSections(vaultRoot, kaguyaAnime, "kaguya", [
-      "## 動畫圖",
+      "## 第 1 話・動畫場面",
       "",
-      imageBlock(assetPaths.slice(0, 5)),
+      imageBlock(kaguyaScenes.slice(0, 2)),
       "",
       "這段文字刻意放在兩個 image sections 中間，確認正文與區塊互不干擾。",
       "",
-      "## 漫畫圖",
+      "## 第 1 話・另一組場面",
       "",
-      imageBlock(assetPaths.slice(5, 10)),
-    ].join("\n"), migrateV2),
+      imageBlock(kaguyaScenes.slice(2)),
+    ].join("\n"), migrateLegacyUnmarked),
     seedRealImageSections(vaultRoot, overlordNovel, "overlord", [
       "## 圖片收藏",
       "",
@@ -470,13 +467,14 @@ async function prepareImageSectionDemos(vaultRoot, reset) {
       "```",
       "",
       "> 真實作品的空 image section，用來驗證右鍵插入後的區塊與選檔、拖放、貼上、URL 新增。",
-    ].join("\n"), migrateV2),
+    ].join("\n"), migrateLegacyUnmarked),
   ];
 
   // Keep one intentional old-default note so Updates & cleanup can be verified manually.
   seedLegacyDefaultCoverEmbed(vaultRoot, overlordNovel);
 
-  fs.writeFileSync(marker, "Image-section real-work fixtures v6 seeded. OVERLORD intentionally retains one legacy duplicate cover for update-cleanup testing.\n");
+  for (const previous of previousMarkers) fs.rmSync(previous, { force: true });
+  fs.writeFileSync(marker, "Image-section official anime-scene fixtures v7 seeded. OVERLORD intentionally retains one legacy duplicate cover for update-cleanup testing.\n");
   return { demoPaths, assetPaths };
 }
 
@@ -912,9 +910,9 @@ After **Check updates**:
 
 ## 7. Reusable image sections
 
-Use these **real works and real downloaded cover images** for manual verification:
+Use these **real works and official anime episode stills** for manual verification:
 
-- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — one populated section with **12 real downloaded work images** for masonry/scroll/expand review.
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — one populated section with **10 official episode-1 STORY stills** for masonry/scroll/expand review.
 - [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — two independent populated sections with ordinary Markdown text between them.
 - [[AnimeList/Novel/OVERLORD|OVERLORD]] — a real-work empty image section for Add and insertion testing.
 
@@ -949,7 +947,7 @@ Use these real media notes with **official episode stills downloaded into the Te
 
 Check the approved Moments behavior:
 
-- Each Moment is **text + 1..N related images**. Text preserves multiple lines.
+- Each Moment is **text + 1..N related images**. Text preserves multiple lines. The seeded long-text Frieren case must clamp in the default card and expose **展開 / 收合** instead of making every card endlessly tall.
 - On desktop, each Moment uses the approved **editorial split card**: quote plus any filled optional metadata on the left and media on the right. Empty metadata fields must not render. The Frieren 「雖然只是很短的一段時間。」 case has one landscape still and must show that whole image without a horizontal scrollbar. Every image remains uncropped. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text/metadata stacks above the same single-row media area without horizontal page overflow.
 - Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
 - When a multi-image filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
@@ -1044,7 +1042,7 @@ export async function prepareTestFixtures(vaultRoot, options = {}) {
     else created += 1;
   }
 
-  const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset);
+  const imageSectionDemos = await prepareImageSectionDemos(resolvedVault, reset, fetchImpl);
   const momentsDemos = await prepareMomentsDemos(resolvedVault, reset, fetchImpl);
   const checklistPath = writeFile(resolvedVault, TEST_CHECKLIST_PATH, checklistContent());
   return {

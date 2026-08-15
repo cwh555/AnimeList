@@ -52,7 +52,7 @@ function allMarkdown(root) {
 try {
   // Simulate a Test Vault that carries the previous image-fixture marker but
   // is missing the image blocks. The next revision must seed them once.
-  fs.writeFileSync(path.join(vaultRoot, ".animelist-test-image-sections-v5"), "stale previous image fixture marker\n");
+  fs.writeFileSync(path.join(vaultRoot, ".animelist-test-image-sections-v6"), "stale previous image fixture marker\n");
 
   const legacyFixture = path.join(vaultRoot, "AnimeList/Test Fixtures/Anime/01-anime-planned.md");
   fs.mkdirSync(path.dirname(legacyFixture), { recursive: true });
@@ -88,7 +88,7 @@ try {
   assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
   assert.match(checklist, /Reusable image sections/);
-  assert.match(checklist, /real works and real downloaded cover images/i);
+  assert.match(checklist, /real works and official anime episode stills/i);
   assert.match(checklist, /Add modal uses the available width without horizontal scrolling/i);
   assert.match(checklist, /Updates & cleanup/i);
   assert.match(checklist, /old default duplicate cover embed/i);
@@ -98,7 +98,7 @@ try {
   assert.match(checklist, /official episode stills/i);
   assert.match(checklist, /not committed to the repository/i);
   assert.equal(first.imageSectionDemos.demoPaths.length, 3);
-  assert.equal(first.imageSectionDemos.assetPaths.length, 14);
+  assert.equal(first.imageSectionDemos.assetPaths.length, 13);
   assert.equal(first.momentsDemos.demoPaths.length, 2);
   assert.equal(first.momentsDemos.assetPaths.length, 13);
   for (const asset of first.momentsDemos.assetPaths) {
@@ -106,32 +106,36 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v3")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v2")), false);
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v7")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-image-sections-v6")), false);
   for (const demo of first.imageSectionDemos.demoPaths) assert.equal(fs.statSync(demo).isFile(), true);
   for (const asset of first.imageSectionDemos.assetPaths) {
     const file = path.join(vaultRoot, asset);
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
+  assert.ok(first.imageSectionDemos.assetPaths.every((asset) => /^AnimeList\/Images\/test-vault\/anime-scenes\/(?:frieren-ep01|kaguya-s1-ep01)-/.test(asset)));
   const frierenAnimePath = "AnimeList/Anime/葬送的芙莉蓮.md";
   const kaguyaAnimePath = "AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~.md";
   const overlordPath = "AnimeList/Novel/OVERLORD.md";
-  assert.equal((read(frierenAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 12);
+  assert.equal((read(frierenAnimePath).match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-\d{2}\.jpg$/gm) ?? []).length, 10);
   assert.match(read(frierenAnimePath), /animelist-test-image-sections:start/);
   assert.match(read(frierenAnimePath), /animelist-test-moments:start/);
   assert.equal((read(frierenAnimePath).match(/```animelist-moments/g) ?? []).length, 2);
-  assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 5);
-  assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/moments\/frieren-ep01-/);
+  assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 6);
+  assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-/);
   assert.match(read(frierenAnimePath), /m_test_frieren_promise_04[\s\S]*source: "第 1 話"[\s\S]*position: "旅途的記憶"[\s\S]*speaker: "芙莉蓮"[\s\S]*tags:[\s\S]*回憶片段[\s\S]*辛美爾/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_long_06[\s\S]*長文字排版[\s\S]*Test Vault[^\n]*長文字[^\n]*regression/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-moments/g) ?? []).length, 1);
   assert.equal((read(kaguyaAnimePath).match(/^  - id: "m_test_kaguya_/gm) ?? []).length, 2);
-  assert.match(read(kaguyaAnimePath), /AnimeList\/Images\/test-vault\/moments\/kaguya-s1-ep01-/);
+  assert.match(read(kaguyaAnimePath), /AnimeList\/Images\/test-vault\/anime-scenes\/kaguya-s1-ep01-/);
   assert.match(read(kaguyaAnimePath), /m_test_kaguya_01[\s\S]*source: "第 1 話"[\s\S]*tags:[\s\S]*戀愛[\s\S]*頭腦戰/);
-  assert.equal((read(kaguyaAnimePath).match(/- AnimeList\/Images\/test-vault\/(?:anime|manga|novel)-\d+\.jpg/g) ?? []).length, 10);
+  assert.equal((read(kaguyaAnimePath).match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/kaguya-s1-ep01-\d{2}\.jpg$/gm) ?? []).length, 3);
   assert.match(read(overlordPath), /```animelist-images\n```/);
   for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {
     assert.doesNotMatch(read(demoPath), /!\[\[AnimeList\/Covers\/(?:anime|manga|novel)\//);
