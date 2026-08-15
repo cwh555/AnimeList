@@ -80,64 +80,73 @@ function fixture(mode) {
 
 
 function momentsFilmstripFixture(isMobile) {
-  const fixtureWidth = isMobile ? 360 : 980;
-  const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+  const pixel = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%235b5b5b'/%3E%3C/svg%3E";
   const landscape = `<button class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777"><img alt="" src="${pixel}"></button>`;
-  const index = (value) => `<div class="al-moment-index"><span class="al-moment-index-badge">${value}</span></div>`;
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-    :root { --background-primary:#111; --background-secondary:#222; --background-modifier-border:#444; --background-modifier-hover:#2a2a2a; --interactive-accent:#7777dd; --text-normal:#eee; --text-muted:#aaa; --text-faint:#777; --font-ui-smaller:12px; --font-ui-small:13px; --font-ui-medium:16px; }
-    html,body{margin:0;width:100%;min-height:100%;} body{font-family:sans-serif;padding:16px;box-sizing:border-box;} ${styles}
-    #fixture{width:${fixtureWidth}px;max-width:100%;}
+  ${styles}
+  body { margin: 0; background: #181818; color: #ddd; --background-primary:#1e1e1e; --background-secondary:#252525; --background-modifier-border:#3c3c3c; --background-modifier-hover:#333; --interactive-accent:#8b5cf6; --text-normal:#ddd; --text-muted:#aaa; --text-faint:#777; --font-ui-medium:16px; --font-ui-small:13px; --font-ui-smaller:11px; }
+  #fixture { width: min(1120px, calc(100vw - 24px)); margin: 12px auto; }
   </style></head><body data-result="pending"><section id="fixture" class="animelist-moments-section">
     <div class="al-moments-toolbar"><div class="al-moments-identity"><span class="al-moments-icon"></span><span class="al-moments-title">Moments</span><span class="al-moments-count">3</span></div><button class="al-moments-add" type="button">+</button></div>
     <div class="al-moments-list">
       <article id="single-card" class="al-moment-card" data-image-count="1">
-        ${index("01")}
-        <div id="single-copy" class="al-moment-head has-metadata"><div class="al-moment-copy">
-          <div class="al-moment-quote"><div class="al-moment-text">雖然只是很短的一段時間。</div><button class="al-moment-text-toggle" hidden>展開</button></div>
-          <div id="metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span><span class="al-moment-tag">辛美爾</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記</span><div class="al-moment-note-text">完整 metadata 測試。</div></div></div>
-        </div><button class="al-moment-actions" type="button">⋯</button></div>
         <div id="single-media" class="al-moment-media is-featured"><div class="al-moment-image-viewport"><div id="single-gallery" class="al-moment-image-row" data-image-count="1"><button id="single-image" class="al-moment-image" type="button" style="--al-moment-image-ratio:1.777"><img alt="" src="${pixel}"></button></div></div></div>
+        <div id="single-content" class="al-moment-content has-metadata">
+          <div id="metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">位置／時間</span><span class="al-moment-meta-value">旅途的記憶</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div><div class="al-moment-meta-row al-moment-tags-row"><span class="al-moment-meta-label">標籤</span><div class="al-moment-tags"><span class="al-moment-tag">回憶片段</span><span class="al-moment-tag">辛美爾</span></div></div><div class="al-moment-note"><span class="al-moment-meta-label">註記</span><div class="al-moment-note-text">完整 metadata 測試。</div></div></div>
+          <div id="single-quote-panel" class="al-moment-quote-panel"><div class="al-moment-quote"><div class="al-moment-text">雖然只是很短的一段時間。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div>
+        </div>
+        <button class="al-moment-actions" type="button">⋯</button>
       </article>
-      <article id="card" class="al-moment-card" data-image-count="7">
-        ${index("02")}
-        <div id="copy" class="al-moment-head"><div class="al-moment-copy"><div class="al-moment-quote"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div><button class="al-moment-actions" type="button">⋯</button></div>
-        <div id="media" class="al-moment-media is-filmstrip is-scrollable is-at-start"><div class="al-moment-image-viewport"><div id="gallery" class="al-moment-image-row" data-image-count="7">${landscape.repeat(7)}</div></div></div>
+      <article id="two-card" class="al-moment-card" data-image-count="2">
+        <div id="two-media" class="al-moment-media is-filmstrip"><div class="al-moment-image-viewport"><div id="two-gallery" class="al-moment-image-row" data-image-count="2">${landscape.repeat(2)}</div></div></div>
+        <div id="two-content" class="al-moment-content without-metadata"><div id="two-quote-panel" class="al-moment-quote-panel"><div class="al-moment-quote"><div class="al-moment-text">旅途的意義，不在於目的地，而在於與你並肩看過的風景。</div><button class="al-moment-text-toggle" hidden>展開</button></div></div></div>
+        <button class="al-moment-actions" type="button">⋯</button>
       </article>
-      <article id="long-card" class="al-moment-card" data-image-count="3">
-        ${index("03")}
-        <div id="long-copy" class="al-moment-head has-metadata"><div class="al-moment-copy"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div><div class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div></div></div><button class="al-moment-actions" type="button">⋯</button></div>
-        <div class="al-moment-media is-filmstrip"><div class="al-moment-image-viewport"><div class="al-moment-image-row" data-image-count="3">${landscape.repeat(3)}</div></div></div>
+      <article id="long-card" class="al-moment-card" data-image-count="7">
+        <div id="long-media" class="al-moment-media is-filmstrip is-scrollable is-at-start"><div class="al-moment-image-viewport"><div id="long-gallery" class="al-moment-image-row" data-image-count="7">${landscape.repeat(7)}</div></div></div>
+        <div id="long-content" class="al-moment-content has-metadata"><div id="long-metadata" class="al-moment-meta-section"><div class="al-moment-meta"><div class="al-moment-meta-row"><span class="al-moment-meta-label">出處</span><span class="al-moment-meta-value">第 1 話</span></div><div class="al-moment-meta-row"><span class="al-moment-meta-label">角色／說話者</span><span class="al-moment-meta-value">芙莉蓮</span></div></div></div><div id="long-quote-panel" class="al-moment-quote-panel"><div id="long-quote" class="al-moment-quote is-clampable"><div id="long-text" class="al-moment-text">人總是在不經意的時候被時間推著前行，在告別與相遇之間，才慢慢學會珍惜那些曾經並肩走過的日子。很多當下看似平凡的事情，往往要過了很久才知道它們有多重要。即使未來仍然有許多未知，只要記得那些一路上遇見的人、看過的風景，以及曾經想好好珍惜的心情，就還能繼續往前走。當時沒有特別放在心上的一句話、一場短暫的停留，甚至只是一起看過的普通風景，過了很久之後都可能變成最清楚的記憶。人也會在之後的旅途中慢慢理解曾經沒有理解的事情，因此再次回想同一段旅程時，感受到的重量也可能完全不同。這是一段特別加長的 Test Vault 文字，用來驗證長 quote 在更寬的新版文字欄位中仍不會把整張卡片無限制撐高，而是先以收合狀態呈現，需要時再由使用者展開閱讀完整內容。</div><button id="long-toggle" class="al-moment-text-toggle" type="button" hidden>展開</button></div></div></div>
+        <button class="al-moment-actions" type="button">⋯</button>
       </article>
     </div>
   </section>
   <script>
     try {
       const singleCard = document.querySelector('#single-card');
-      const singleCopy = document.querySelector('#single-copy');
       const singleMedia = document.querySelector('#single-media');
       const singleGallery = document.querySelector('#single-gallery');
       const singleImage = document.querySelector('#single-image');
+      const singleContent = document.querySelector('#single-content');
       const metadata = document.querySelector('#metadata');
-      const card = document.querySelector('#card');
-      const copy = document.querySelector('#copy');
-      const media = document.querySelector('#media');
-      const gallery = document.querySelector('#gallery');
-      const firstItem = gallery.querySelector('.al-moment-image');
-      const items = [...gallery.querySelectorAll('.al-moment-image')];
-      const images = [...gallery.querySelectorAll('img')];
-      const cardRect = card.getBoundingClientRect();
-      const copyRect = copy.getBoundingClientRect();
-      const mediaRect = media.getBoundingClientRect();
-      const firstItemRect = firstItem.getBoundingClientRect();
-      const galleryRect = gallery.getBoundingClientRect();
-      const tops = items.map((item) => Math.round(item.getBoundingClientRect().top));
-      const uniqueRows = [...new Set(tops)];
-      const quoteFont = parseFloat(getComputedStyle(singleCopy.querySelector('.al-moment-text')).fontSize);
-      const metadataFont = parseFloat(getComputedStyle(metadata.querySelector('.al-moment-meta-row')).fontSize);
-      const metadataRect = metadata.getBoundingClientRect();
-      const singleCopyRect = singleCopy.getBoundingClientRect();
+      const singleQuotePanel = document.querySelector('#single-quote-panel');
+      const twoMedia = document.querySelector('#two-media');
+      const twoGallery = document.querySelector('#two-gallery');
+      const twoContent = document.querySelector('#two-content');
+      const twoItems = [...twoGallery.querySelectorAll('.al-moment-image')];
+      const longMedia = document.querySelector('#long-media');
+      const longGallery = document.querySelector('#long-gallery');
+      const longContent = document.querySelector('#long-content');
+      const longMetadata = document.querySelector('#long-metadata');
+      const longQuotePanel = document.querySelector('#long-quote-panel');
+      const longItems = [...longGallery.querySelectorAll('.al-moment-image')];
+      const longImages = [...longGallery.querySelectorAll('img')];
+
       const singleMediaRect = singleMedia.getBoundingClientRect();
+      const singleContentRect = singleContent.getBoundingClientRect();
+      const metadataRect = metadata.getBoundingClientRect();
+      const singleQuoteRect = singleQuotePanel.getBoundingClientRect();
+      const twoMediaRect = twoMedia.getBoundingClientRect();
+      const twoContentRect = twoContent.getBoundingClientRect();
+      const twoGalleryRect = twoGallery.getBoundingClientRect();
+      const twoRects = twoItems.map((item) => item.getBoundingClientRect());
+      const longMediaRect = longMedia.getBoundingClientRect();
+      const longContentRect = longContent.getBoundingClientRect();
+      const longMetadataRect = longMetadata.getBoundingClientRect();
+      const longQuoteRect = longQuotePanel.getBoundingClientRect();
+      const longGalleryRect = longGallery.getBoundingClientRect();
+      const longRows = [...new Set(longItems.map((item) => Math.round(item.getBoundingClientRect().top)))];
+      const quoteFont = parseFloat(getComputedStyle(singleQuotePanel.querySelector('.al-moment-text')).fontSize);
+      const metadataFont = parseFloat(getComputedStyle(metadata.querySelector('.al-moment-meta-row')).fontSize);
+
       const longQuote = document.querySelector('#long-quote');
       const longText = document.querySelector('#long-text');
       const longToggle = document.querySelector('#long-toggle');
@@ -156,37 +165,42 @@ function momentsFilmstripFixture(isMobile) {
       const longToggleVisibleWhenExpanded = !longToggle.hidden && longToggle.textContent === '收合';
       longQuote.classList.remove('is-expanded');
       longToggle.textContent = '展開';
-      gallery.style.scrollBehavior = 'auto'; gallery.style.scrollSnapType = 'none'; gallery.scrollLeft = Math.min(180, gallery.scrollWidth - gallery.clientWidth);
+
+      longGallery.style.scrollBehavior = 'auto'; longGallery.style.scrollSnapType = 'none';
+      longGallery.scrollLeft = Math.min(180, longGallery.scrollWidth - longGallery.clientWidth);
+      const twoVisibleWidth = twoRects.reduce((sum, rect) => sum + rect.width, 0);
       const shared = {
+        mediaAboveSingleContent: singleMediaRect.bottom <= singleContentRect.top + 2 && Math.abs(singleMediaRect.left - singleContentRect.left) <= 2 && Math.abs(singleMediaRect.right - singleContentRect.right) <= 2,
+        mediaAboveTwoContent: twoMediaRect.bottom <= twoContentRect.top + 2,
+        mediaAboveLongContent: longMediaRect.bottom <= longContentRect.top + 2,
         singleImageFitsViewport: singleImage.getBoundingClientRect().width <= singleGallery.getBoundingClientRect().width + 1 && singleImage.getBoundingClientRect().height <= singleGallery.getBoundingClientRect().height + 1,
         singleImageNeedsNoScroll: singleGallery.scrollWidth <= singleGallery.clientWidth + 1 && getComputedStyle(singleGallery).overflowX === 'hidden',
         featuredStageIsLandscape: singleGallery.getBoundingClientRect().width / singleGallery.getBoundingClientRect().height > 1.6,
         metadataSmallerThanQuote: metadataFont < quoteFont * 0.82,
-        metadataSeparatedByRule: parseFloat(getComputedStyle(metadata).borderTopWidth) >= 1,
-        metadataUnderHalf: metadataRect.height <= singleCopyRect.height * 0.5 + 1,
-        metadataVisible: singleCopy.querySelectorAll('.al-moment-meta-row').length >= 4 && singleCopy.querySelector('.al-moment-tag')?.textContent === '回憶片段' && singleCopy.querySelector('.al-moment-note-text')?.textContent === '完整 metadata 測試。',
-        singleHorizontalRow: uniqueRows.length === 1,
-        firstLandscapeFullyVisible: firstItemRect.left >= galleryRect.left - 1 && firstItemRect.right <= galleryRect.right + 1,
-        horizontalOverflow: gallery.scrollWidth > gallery.clientWidth + 20,
-        horizontalScrolling: gallery.scrollLeft > 0,
-        nativeHorizontalScroller: getComputedStyle(gallery).overflowX === 'auto' && getComputedStyle(gallery).flexWrap === 'nowrap',
-        imagesUseContain: [...images, ...singleGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
+        metadataVisible: metadata.querySelectorAll('.al-moment-meta-row').length >= 4 && metadata.querySelector('.al-moment-tag')?.textContent === '回憶片段' && metadata.querySelector('.al-moment-note-text')?.textContent === '完整 metadata 測試。',
+        twoImagesShareRow: twoRects.length === 2 && Math.abs(twoRects[0].top - twoRects[1].top) <= 1,
+        longSingleHorizontalRow: longRows.length === 1,
+        longHorizontalOverflow: longGallery.scrollWidth > longGallery.clientWidth + 20,
+        longHorizontalScrolling: longGallery.scrollLeft > 0,
+        nativeHorizontalScroller: getComputedStyle(longGallery).overflowX === 'auto' && getComputedStyle(longGallery).flexWrap === 'nowrap',
+        imagesUseContain: [...longImages, ...singleGallery.querySelectorAll('img'), ...twoGallery.querySelectorAll('img')].every((image) => getComputedStyle(image).objectFit === 'contain'),
         longQuoteClamped: longContentOverflows && collapsedLongHeight < expandedLongHeight - 8,
         longQuoteExpandable: expandedLongHeight > collapsedLongHeight + 8 && longToggleVisibleWhenCollapsed && longToggleVisibleWhenExpanded,
+        noLegacyIndexRail: document.querySelector('.al-moment-index') === null,
         noPageOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
       };
       const details = ${isMobile} ? {
         ...shared,
-        stackedCard: mediaRect.top >= copyRect.bottom - 2 && Math.abs(mediaRect.left - copyRect.left) <= 2 && Math.abs(mediaRect.right - copyRect.right) <= 2,
-        singleStackedCard: singleMediaRect.top >= singleCopyRect.bottom - 2 && Math.abs(singleMediaRect.left - singleCopyRect.left) <= 2 && Math.abs(singleMediaRect.right - singleCopyRect.right) <= 2,
-        mediaBelowCopy: mediaRect.top >= copyRect.bottom - 2,
+        mobileQuoteBeforeMetadata: longQuoteRect.top <= longMetadataRect.top + 1 && longQuoteRect.bottom <= longMetadataRect.top + 2,
+        mobileContentSingleColumn: Math.abs(longQuoteRect.left - longContentRect.left) <= 2 && Math.abs(longMetadataRect.left - longContentRect.left) <= 2,
+        mobileTwoImageRowScrollsWhenNeeded: twoGallery.scrollWidth >= twoGallery.clientWidth && getComputedStyle(twoGallery).flexWrap === 'nowrap',
       } : {
         ...shared,
-        splitCard: copyRect.width > 0 && mediaRect.width > 0 && copyRect.right <= mediaRect.left + 2 && Math.abs(copyRect.top - mediaRect.top) <= 2,
-        singleSplitCard: singleCopyRect.right <= singleMediaRect.left + 2 && Math.abs(singleCopyRect.top - singleMediaRect.top) <= 2,
-        copyLeftOfFilmstrip: copyRect.right <= mediaRect.left + 2,
-        indexRailVisible: document.querySelector('#single-card .al-moment-index').getBoundingClientRect().width >= 40,
-        boundedCard: cardRect.width <= document.querySelector('#fixture').getBoundingClientRect().width + 1 && singleCard.getBoundingClientRect().width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
+        desktopMetadataLeftOfQuote: metadataRect.right <= singleQuoteRect.left + 2 && longMetadataRect.right <= longQuoteRect.left + 2,
+        desktopMetadataNarrowerThanQuote: metadataRect.width < singleQuoteRect.width * 0.55 && longMetadataRect.width < longQuoteRect.width * 0.55,
+        twoLandscapeFramesFitInitialViewport: twoRects.length === 2 && twoRects[0].left >= twoGalleryRect.left - 1 && twoRects[1].right <= twoGalleryRect.right + 1,
+        twoLandscapeFramesUseSpace: twoVisibleWidth >= twoGalleryRect.width * 0.82,
+        boundedCard: singleCard.getBoundingClientRect().width <= document.querySelector('#fixture').getBoundingClientRect().width + 1,
       };
       document.body.dataset.details = JSON.stringify(details);
       document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';
@@ -286,13 +300,13 @@ try {
   await runChromiumDatasetTest({
     html: momentsFilmstripFixture(false),
     profile: path.join(output, "moments-filmstrip-desktop-profile"),
-    testName: "AnimeList moments desktop split-card filmstrip",
+    testName: "AnimeList moments desktop media-first cards",
     viewport: { width: 1200, height: 900, mobile: false },
   });
   await runChromiumDatasetTest({
     html: momentsFilmstripFixture(true),
     profile: path.join(output, "moments-filmstrip-mobile-profile"),
-    testName: "AnimeList moments mobile stacked filmstrip",
+    testName: "AnimeList moments mobile media-first cards",
     viewport: { width: 390, height: 844, mobile: true },
   });
 } finally {

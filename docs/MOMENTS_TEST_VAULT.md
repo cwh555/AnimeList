@@ -2,20 +2,22 @@
 
 Use the seeded real anime episode-scene fixtures in the shared Test Vault to verify Moments before merging the feature branch.
 
-## Editorial card layout
+## Media-first card layout
 
-- Each desktop Moment uses the approved three-part presentation: compact number rail, quote/metadata panel, and media panel.
-- Metadata is visually secondary to the quote: smaller type, a divider above it, compact labels/tags, and it must never occupy more than half of the left panel. Empty metadata is not rendered.
-- Frieren `雖然只是很短的一段時間。`: the single 16:9 landscape still is a featured media stage, fully visible at first glance with no horizontal scrollbar. Dark/gray letterboxing is acceptable for other aspect ratios; cropping is not.
-- Frieren seven-image Moment: all stills stay on one horizontal row and scroll horizontally; images never wrap or crop. At the initial position, at least one complete landscape frame must fit inside the media viewport.
-- Frieren long-text regression Moment: the quote is clamped in the normal card, shows **展開**, and only grows after the user explicitly expands it; **收合** restores the compact card.
-- Desktop keeps quote/metadata on the left and media on the right. Narrow/mobile views stack quote/metadata above the same media area without page-level horizontal overflow.
+- Each desktop Moment places media across the full card width first, then a lower content band.
+- The lower content band uses a compact metadata column on the left (about one quarter of the width) and the quote/content column on the right. Empty metadata is not rendered; a Moment without metadata gives the quote the full content width.
+- Metadata is visibly secondary: smaller type, compact rows/tags, and a subtle vertical divider separates it from the quote.
+- Frieren `雖然只是很短的一段時間。`: the single 16:9 still is fully visible in the featured stage with no horizontal scrollbar. Letterboxing is acceptable; cropping is not.
+- Two landscape screenshots should fit side by side across a typical 15-inch desktop viewport before scrolling. Larger groups remain one horizontal row and scroll horizontally; images never wrap or crop.
+- Frieren seven-image Moment: all stills stay on one horizontal row and overflow horizontally.
+- Frieren long-text regression Moment: the quote is clamped in the normal card, shows **展開**, and only grows after explicit expansion; **收合** restores the compact card.
+- Narrow/mobile views keep media first, then quote, then metadata; no page-level horizontal overflow is allowed.
 
 ## Optional metadata
 
 Edit a Moment and exercise `source`, `position`, `speaker`, `tags`, and `note`.
 
-- Populated fields appear beneath the quote divider.
+- Populated fields appear only in the metadata column.
 - Empty fields disappear from both reading view and serialized YAML.
 - Legacy Moments containing only `id`, `text`, and `images` remain valid and do not render empty metadata placeholders.
 - Kaguya's partial metadata fixture should show only the fields that are actually populated.

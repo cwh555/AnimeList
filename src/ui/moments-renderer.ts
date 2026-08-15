@@ -263,23 +263,10 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     return section;
   }
 
-  private renderMoment(moment: MomentItem, index: number): HTMLElement {
+  private renderMoment(moment: MomentItem): HTMLElement {
     const card = makeEl("article", "al-moment-card");
     card.dataset.momentId = moment.id;
     card.dataset.imageCount = String(moment.images.length);
-
-    const indexRail = makeEl("div", "al-moment-index");
-    indexRail.setAttribute("aria-hidden", "true");
-    indexRail.appendChild(makeEl("span", "al-moment-index-badge", String(index + 1).padStart(2, "0")));
-
-    const head = makeEl("div", "al-moment-head");
-    const copy = makeEl("div", "al-moment-copy");
-    copy.appendChild(this.renderQuote(moment));
-    const metadata = this.renderMeta(moment);
-    if (metadata) {
-      copy.appendChild(metadata);
-      head.addClass("has-metadata");
-    }
 
     const actions = makeEl("button", "al-moment-actions");
     actions.type = "button";
@@ -289,7 +276,6 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       event.stopPropagation();
       this.showMomentMenu(event, moment);
     });
-    head.append(copy, actions);
 
     const media = makeEl("div", "al-moment-media");
     media.classList.toggle("is-featured", moment.images.length === 1);
@@ -357,7 +343,20 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     setAnimeListIcon(next, "chevron-right");
 
     media.append(viewport, previous, next);
-    card.append(indexRail, head, media);
+
+    const content = makeEl("div", "al-moment-content");
+    const metadata = this.renderMeta(moment);
+    const quotePanel = makeEl("div", "al-moment-quote-panel");
+    quotePanel.appendChild(this.renderQuote(moment));
+    if (metadata) {
+      content.addClass("has-metadata");
+      content.append(metadata, quotePanel);
+    } else {
+      content.addClass("without-metadata");
+      content.appendChild(quotePanel);
+    }
+
+    card.append(media, content, actions);
     this.bindScroller(media, row, previous, next);
     return card;
   }
@@ -389,7 +388,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       return;
     }
     const list = makeEl("div", "al-moments-list");
-    moments.forEach((moment, index) => list.appendChild(this.renderMoment(moment, index)));
+    moments.forEach((moment) => list.appendChild(this.renderMoment(moment)));
     this.containerEl.appendChild(list);
   }
 }
