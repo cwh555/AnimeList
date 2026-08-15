@@ -20,7 +20,7 @@ const fakeFetch = async (url) => {
   fetchCalls += 1;
   const value = String(url);
   const isCover = /^https:\/\/lain\.bgm\.tv\/pic\/cover\/l\//.test(value);
-  const isMomentScene = /^https:\/\/(?:frieren-anime\.jp\/wp-content\/uploads\/2023\/09\/01_\d{2}\.jpg|kaguya\.love\/1st\/assets\/img\/story\/01\/\d{2}\.jpg|www\.tbs\.co\.jp\/anime\/oregairu\/2nd\/story\/images\/story12\/story-img0\.jpg|blog-imgs-71\.fc2\.com\/x\/y\/s\/xystone\/oregairu-12-[14]\.jpg)$/.test(value);
+  const isMomentScene = /^https:\/\/(?:frieren-anime\.jp\/wp-content\/uploads\/2023\/09\/01_\d{2}\.jpg|kaguya\.love\/1st\/assets\/img\/story\/01\/\d{2}\.jpg|www\.tbs\.co\.jp\/anime\/oregairu\/2nd\/story\/images\/story(?:04|07|10|12|13)\/story-img0\.jpg|blog-imgs-71\.fc2\.com\/x\/y\/s\/xystone\/oregairu-12-[14]\.jpg)$/.test(value);
   assert.ok(isCover || isMomentScene, `unexpected Test Vault image URL: ${value}`);
   const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00, 0xff, 0xd9]);
   return {
@@ -70,7 +70,7 @@ try {
   assert.equal(first.repaired, 0);
   assert.equal(first.coversDownloaded, 18);
   assert.equal(first.legacyRemoved, 1);
-  assert.equal(fetchCalls, 34);
+  assert.equal(fetchCalls, 38);
   assert.equal(fs.existsSync(legacyFixture), false);
 
   const checklist = read(TEST_CHECKLIST_PATH);
@@ -96,17 +96,19 @@ try {
   assert.match(checklist, /seven-image Frieren Moment/i);
   assert.match(checklist, /source \/ position-time \/ speaker-character \/ tags \/ note/i);
   assert.match(checklist, /official episode stills/i);
+  assert.match(checklist, /出處：第 1 話/);
   assert.match(checklist, /not committed to the repository/i);
   assert.equal(first.imageSectionDemos.demoPaths.length, 3);
-  assert.equal(first.imageSectionDemos.assetPaths.length, 16);
+  assert.equal(first.imageSectionDemos.assetPaths.length, 20);
   assert.equal(first.momentsDemos.demoPaths.length, 3);
-  assert.equal(first.momentsDemos.assetPaths.length, 16);
+  assert.equal(first.momentsDemos.assetPaths.length, 20);
   for (const asset of first.momentsDemos.assetPaths) {
     const file = path.join(vaultRoot, asset);
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v7")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v8")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v7")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v6")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v4")), false);
@@ -120,7 +122,7 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.ok(first.imageSectionDemos.assetPaths.every((asset) => /^AnimeList\/Images\/test-vault\/anime-scenes\/(?:frieren-ep01|kaguya-s1-ep01|oregairu-zoku-ep12)-/.test(asset)));
+  assert.ok(first.imageSectionDemos.assetPaths.every((asset) => /^AnimeList\/Images\/test-vault\/anime-scenes\/(?:frieren-ep01|kaguya-s1-ep01|oregairu-zoku-ep(?:04|07|10|12|13))-/.test(asset)));
   const frierenAnimePath = "AnimeList/Anime/葬送的芙莉蓮.md";
   const kaguyaAnimePath = "AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~.md";
   const oregairuAnimePath = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
@@ -141,10 +143,16 @@ try {
   assert.equal((read(kaguyaAnimePath).match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/kaguya-s1-ep01-\d{2}\.jpg$/gm) ?? []).length, 3);
   const oregairu = read(oregairuAnimePath);
   assert.match(oregairu, /source_id: "102134"/);
-  assert.match(oregairu, /## 動畫截圖[\s\S]*```animelist-images[\s\S]*oregairu-zoku-ep12-official/);
+  const oregairuImageHeading = oregairu.indexOf("## 動畫截圖");
+  const oregairuMomentHeading = oregairu.indexOf("## 大老師語錄");
+  assert.ok(oregairuImageHeading >= 0 && oregairuMomentHeading > oregairuImageHeading);
+  const oregairuImageSection = oregairu.slice(oregairuImageHeading, oregairuMomentHeading);
+  assert.match(oregairu, /animelist-test-oregairu-images:start/);
+  assert.equal((oregairuImageSection.match(/^- AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep(?:04|07|10|12|13)-official\.jpg$/gm) ?? []).length, 5);
+  assert.doesNotMatch(oregairuImageSection, /blog-imgs-71|ep12-(?:cafe|hachiman)/);
   assert.match(oregairu, /## 大老師語錄[\s\S]*m_test_oregairu_zoku_ep12_hachiman/);
   assert.match(oregairu, /想到未來又會不安到得憂鬱症[\s\S]*source: "果青續 \(12\)"[\s\S]*speaker: "比企谷八幡"/);
-  assert.equal((oregairu.match(/AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep12-[a-z]+\.jpg/g) ?? []).length, 6);
+  assert.equal((oregairu.match(/AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep(?:04|07|10|12|13)-[a-z]+\.jpg/g) ?? []).length, 8);
   assert.doesNotMatch(oregairu, /fixture_version:/);
   assert.match(read(overlordPath), /```animelist-images\n```/);
   for (const demoPath of [frierenAnimePath, kaguyaAnimePath]) {

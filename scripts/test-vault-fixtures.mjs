@@ -78,9 +78,12 @@ const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".a
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
 const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v7";
-const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v8";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v7", ".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
 const OREGAIRU_MOMENTS_DEMO_PATH = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
+const OREGAIRU_QUOTE_MARKER = "想到未來又會不安到得憂鬱症";
+const OREGAIRU_IMAGE_FIXTURE_START = "<!-- animelist-test-oregairu-images:start -->";
+const OREGAIRU_IMAGE_FIXTURE_END = "<!-- animelist-test-oregairu-images:end -->";
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
 const ANIME_SCENE_SOURCES = [
@@ -150,9 +153,29 @@ const ANIME_SCENE_SOURCES = [
     referer: "https://kaguya.love/1st/story/01.html",
   },
   {
+    key: "oregairu-zoku-ep04-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story04/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story04.html",
+  },
+  {
+    key: "oregairu-zoku-ep07-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story07/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story07.html",
+  },
+  {
+    key: "oregairu-zoku-ep10-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story10/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story10.html",
+  },
+  {
     key: "oregairu-zoku-ep12-official",
     remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story12/story-img0.jpg",
     referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story12.html",
+  },
+  {
+    key: "oregairu-zoku-ep13-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story13/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/",
   },
   {
     key: "oregairu-zoku-ep12-cafe",
@@ -199,6 +222,25 @@ function stripMarkedMomentsFixture(content) {
   return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
 }
 
+function stripMarkedOregairuImageFixture(content) {
+  const start = content.indexOf(OREGAIRU_IMAGE_FIXTURE_START);
+  if (start < 0) return content;
+  const end = content.indexOf(OREGAIRU_IMAGE_FIXTURE_END, start);
+  if (end < 0) return content;
+  const after = end + OREGAIRU_IMAGE_FIXTURE_END.length;
+  return `${content.slice(0, start).trimEnd()}${content.slice(after)}`.trimEnd();
+}
+
+function insertOregairuImageFixture(content, body) {
+  const fixtureBody = [OREGAIRU_IMAGE_FIXTURE_START, body.trim(), OREGAIRU_IMAGE_FIXTURE_END].join("\n");
+  const headingIndex = content.indexOf("## 大老師語錄");
+  const quoteIndex = content.indexOf(OREGAIRU_QUOTE_MARKER);
+  const momentFenceIndex = quoteIndex >= 0 ? content.lastIndexOf("```animelist-moments", quoteIndex) : -1;
+  const insertAt = headingIndex >= 0 ? headingIndex : momentFenceIndex >= 0 ? momentFenceIndex : content.length;
+  if (insertAt >= content.length) return `${content.trimEnd()}\n\n${fixtureBody}`;
+  return [content.slice(0, insertAt).trimEnd(), fixtureBody, content.slice(insertAt).trimStart()].filter(Boolean).join("\n\n");
+}
+
 function seedMomentsFixture(vaultRoot, fixture, body) {
   const target = path.join(vaultRoot, fixtureRelativePath(fixture));
   if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) {
@@ -243,20 +285,24 @@ function oregairuMomentsBaseNote() {
   ].join("\n");
 }
 
-function seedOregairuMomentsFixture(vaultRoot, body) {
+function seedOregairuMomentsFixture(vaultRoot, imageBody, momentBody) {
   const target = path.join(vaultRoot, OREGAIRU_MOMENTS_DEMO_PATH);
   const existing = fs.statSync(target, { throwIfNoEntry: false })?.isFile()
     ? fs.readFileSync(target, "utf8").trimEnd()
     : oregairuMomentsBaseNote();
 
-  // Preserve the hand-built Test Vault example when the same quote already exists.
-  // Clean/future Test Vaults receive the controlled equivalent below.
-  if (existing.includes("想到未來又會不安到得憂鬱症")) return target;
+  const hadControlledMoment = existing.includes(MOMENTS_FIXTURE_START) && existing.includes(MOMENTS_FIXTURE_END);
+  const preserveHandBuiltMoment = existing.includes(OREGAIRU_QUOTE_MARKER) && !hadControlledMoment;
+  let content = stripMarkedMomentsFixture(existing);
+  content = stripMarkedOregairuImageFixture(content);
+  content = insertOregairuImageFixture(content, imageBody);
 
-  const content = stripMarkedMomentsFixture(existing);
-  const fixtureBody = [MOMENTS_FIXTURE_START, body.trim(), MOMENTS_FIXTURE_END].join("\n");
+  if (!preserveHandBuiltMoment) {
+    const momentFixture = [MOMENTS_FIXTURE_START, momentBody.trim(), MOMENTS_FIXTURE_END].join("\n");
+    content = `${content.trimEnd()}\n\n${momentFixture}`;
+  }
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${content}\n\n${fixtureBody}\n`);
+  fs.writeFileSync(target, `${content.trimEnd()}\n`);
   return target;
 }
 
@@ -408,15 +454,18 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
     "> Test Vault scene source: Kaguya-sama season 1 episode 1 official STORY stills.",
   ].join("\n"));
 
-  seedOregairuMomentsFixture(vaultRoot, [
+  const oregairuImageBody = [
     "## 動畫截圖",
     "",
     imageBlock([
+      scene("oregairu-zoku-ep04-official"),
+      scene("oregairu-zoku-ep07-official"),
+      scene("oregairu-zoku-ep10-official"),
       scene("oregairu-zoku-ep12-official"),
-      scene("oregairu-zoku-ep12-cafe"),
-      scene("oregairu-zoku-ep12-hachiman"),
+      scene("oregairu-zoku-ep13-official"),
     ]),
-    "",
+  ].join("\n");
+  const oregairuMomentBody = [
     "## 大老師語錄",
     "",
     momentsBlock([
@@ -434,11 +483,12 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
       },
     ]),
     "",
-    "> Test Vault scene source: Oregairu Zoku episode 12; one official TBS STORY still plus episode-12 screenshot references used only as local Test Vault media.",
-  ].join("\n"));
+    "> Test Vault scene source: Oregairu Zoku episode 12; the quote Moment uses one official TBS STORY still plus two episode-12 screenshot references. The Image Section above uses only official TBS second-season STORY stills.",
+  ].join("\n");
+  seedOregairuMomentsFixture(vaultRoot, oregairuImageBody, oregairuMomentBody);
 
   for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v7 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v8 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
@@ -1048,7 +1098,7 @@ Check the approved Moments behavior:
 
 - Each Moment is **text + 1..N related images**. Text preserves multiple lines. The seeded long-text Frieren case must clamp in the default card and expose **展開 / 收合** instead of making every card endlessly tall.
 - On desktop, each Moment uses the approved **editorial split card**: quote plus any filled optional metadata on the left and media on the right. Empty metadata fields must not render. The Frieren 「雖然只是很短的一段時間。」 case has one landscape still and must show that whole image without a horizontal scrollbar. Every image remains uncropped. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text/metadata stacks above the same single-row media area without horizontal page overflow.
-- Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
+- Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. In reading view, each metadata label is immediately followed by a full-width colon and its value (for example **出處：第 1 話**) instead of reserving a fixed alignment column that forces avoidable wrapping. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
 - When a multi-image filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
 - Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
 - Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
