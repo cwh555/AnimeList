@@ -78,8 +78,9 @@ const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".a
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
 const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v6";
-const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v7";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const OREGAIRU_MOMENTS_DEMO_PATH = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
 const MOMENTS_FIXTURE_START = "<!-- animelist-test-moments:start -->";
 const MOMENTS_FIXTURE_END = "<!-- animelist-test-moments:end -->";
 const ANIME_SCENE_SOURCES = [
@@ -148,6 +149,21 @@ const ANIME_SCENE_SOURCES = [
     remote: "https://kaguya.love/1st/assets/img/story/01/03.jpg",
     referer: "https://kaguya.love/1st/story/01.html",
   },
+  {
+    key: "oregairu-zoku-ep12-official",
+    remote: "https://www.tbs.co.jp/anime/oregairu/2nd/story/images/story12/story-img0.jpg",
+    referer: "https://www.tbs.co.jp/anime/oregairu/2nd/story/story12.html",
+  },
+  {
+    key: "oregairu-zoku-ep12-cafe",
+    remote: "https://blog-imgs-71.fc2.com/x/y/s/xystone/oregairu-12-1.jpg",
+    referer: "https://xystone.blog.fc2.com/blog-entry-962.html",
+  },
+  {
+    key: "oregairu-zoku-ep12-hachiman",
+    remote: "https://blog-imgs-71.fc2.com/x/y/s/xystone/oregairu-12-4.jpg",
+    referer: "https://xystone.blog.fc2.com/blog-entry-962.html",
+  },
 ];
 
 function momentsBlock(items) {
@@ -194,6 +210,56 @@ function seedMomentsFixture(vaultRoot, fixture, body) {
   return target;
 }
 
+function oregairuMomentsBaseNote() {
+  return [
+    "---",
+    `schema_version: ${CURRENT_MEDIA_SCHEMA_VERSION}`,
+    'title: "我的青春恋爱物语果然有问题 续"',
+    'title_original: "やはり俺の青春ラブコメはまちがっている。続"',
+    'title_romaji: "Yahari Ore no Seishun LoveCome wa Machigatte Iru. Zoku"',
+    'media_type: "anime"',
+    'format: "tv"',
+    'status: "completed"',
+    "progress: 13",
+    "progress_total: 13",
+    'progress_unit: "episode"',
+    "favorite: false",
+    "year: 2015",
+    "genres:",
+    '  - "戀愛"',
+    '  - "校園"',
+    "studios:",
+    '  - "feel."',
+    'source_provider: "bangumi"',
+    'source_id: "102134"',
+    "source_urls:",
+    '  - "https://bgm.tv/subject/102134"',
+    "---",
+    "",
+    "# 我的青春恋爱物语果然有问题 续",
+    "",
+    "```animelist-detail",
+    "```",
+  ].join("\n");
+}
+
+function seedOregairuMomentsFixture(vaultRoot, body) {
+  const target = path.join(vaultRoot, OREGAIRU_MOMENTS_DEMO_PATH);
+  const existing = fs.statSync(target, { throwIfNoEntry: false })?.isFile()
+    ? fs.readFileSync(target, "utf8").trimEnd()
+    : oregairuMomentsBaseNote();
+
+  // Preserve the hand-built Test Vault example when the same quote already exists.
+  // Clean/future Test Vaults receive the controlled equivalent below.
+  if (existing.includes("想到未來又會不安到得憂鬱症")) return target;
+
+  const content = stripMarkedMomentsFixture(existing);
+  const fixtureBody = [MOMENTS_FIXTURE_START, body.trim(), MOMENTS_FIXTURE_END].join("\n");
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${content}\n\n${fixtureBody}\n`);
+  return target;
+}
+
 function animeSceneRelativePath(scene) {
   return `${ANIME_SCENE_ASSET_ROOT}/${scene.key}.jpg`;
 }
@@ -236,7 +302,11 @@ function momentsFixturePaths(vaultRoot) {
   const frieren = fixtureBySourceId(400602);
   const kaguya = fixtureBySourceId(248175);
   return {
-    demoPaths: [frieren, kaguya].map((fixture) => path.join(vaultRoot, fixtureRelativePath(fixture))),
+    demoPaths: [
+      path.join(vaultRoot, fixtureRelativePath(frieren)),
+      path.join(vaultRoot, fixtureRelativePath(kaguya)),
+      path.join(vaultRoot, OREGAIRU_MOMENTS_DEMO_PATH),
+    ],
     assetPaths: ANIME_SCENE_SOURCES.map(animeSceneRelativePath),
   };
 }
@@ -338,8 +408,37 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
     "> Test Vault scene source: Kaguya-sama season 1 episode 1 official STORY stills.",
   ].join("\n"));
 
+  seedOregairuMomentsFixture(vaultRoot, [
+    "## 動畫截圖",
+    "",
+    imageBlock([
+      scene("oregairu-zoku-ep12-official"),
+      scene("oregairu-zoku-ep12-cafe"),
+      scene("oregairu-zoku-ep12-hachiman"),
+    ]),
+    "",
+    "## 大老師語錄",
+    "",
+    momentsBlock([
+      {
+        id: "m_test_oregairu_zoku_ep12_hachiman",
+        text: "想起過去會後悔的要死\n想到未來又會不安到得憂鬱症\n用消去法來說，現在堪稱幸福",
+        source: "果青續 (12)",
+        speaker: "比企谷八幡",
+        tags: ["大老師語錄", "第 12 話"],
+        images: [
+          scene("oregairu-zoku-ep12-official"),
+          scene("oregairu-zoku-ep12-cafe"),
+          scene("oregairu-zoku-ep12-hachiman"),
+        ],
+      },
+    ]),
+    "",
+    "> Test Vault scene source: Oregairu Zoku episode 12; one official TBS STORY still plus episode-12 screenshot references used only as local Test Vault media.",
+  ].join("\n"));
+
   for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v6 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v7 seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
