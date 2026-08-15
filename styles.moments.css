@@ -402,13 +402,6 @@
   overscroll-behavior-inline: contain;
 }
 
-.al-moment-image-row::-webkit-scrollbar { height: 6px; }
-.al-moment-image-row::-webkit-scrollbar-track { background: transparent; }
-.al-moment-image-row::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 46%, var(--background-modifier-border));
-}
-
 .al-moment-image {
   display: inline-flex;
   flex: 0 0 auto;
@@ -468,8 +461,6 @@
   overflow: hidden;
   scroll-snap-type: none;
 }
-
-.al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
 
 .al-moment-image-row[data-image-count="1"] .al-moment-image {
   box-sizing: border-box;

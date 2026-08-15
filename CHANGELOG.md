@@ -16,7 +16,7 @@
 - Reorganized Settings into five top-level pages: General, Search & metadata, Features, Maintenance, and Updates & cleanup. Same-page settings are grouped into clear sections while persisted setting values remain unchanged.
 - New built-in media notes no longer add a second standalone body cover below `animelist-detail`; the frontmatter cover remains authoritative and optional note-media sections are independent.
 - Image Section reading layout now uses baseline CSS Grid instead of CSS multi-column layout, avoiding an Obsidian 1.4.5 Community compatibility warning while preserving a responsive multi-column grid and uncropped images.
-- Moments keeps horizontal image overflow and WebKit/native scrollbar behavior without relying on `scrollbar-width` or `scrollbar-color`, removing the corresponding Community compatibility warning.
+- Scrollable AnimeList surfaces use browser-native scrollbars with no custom scrollbar CSS, removing the corresponding Community compatibility warning.
 
 ### Improved
 

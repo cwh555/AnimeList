@@ -50,13 +50,13 @@ requireMatch(settings, /getSettingDefinitions\(\):\s*SettingDefinition\[\]/, "de
 rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
 rejectMatch(
   styles,
-  /(?:^|[;{}])\s*(?:columns|column-count|column-width|column-fill|column-span|column-rule(?:-[a-z-]+)?)\s*:/m,
-  "CSS multi-column properties remain; use baseline Grid/Flexbox for the minimum Obsidian browser target",
+  /(?:^|[;{}])\s*(?:columns|column-count|column-width|column-fill|column-span|column-gap|column-rule(?:-[a-z-]+)?|break-inside)\s*:/m,
+  "CSS multi-column or fragmentation properties remain; use baseline Grid/Flexbox for the minimum Obsidian browser target",
 );
 rejectMatch(
   styles,
-  /scrollbar-(?:width|color)\s*:/,
-  "non-baseline scrollbar width/color properties remain; use native/WebKit overflow styling instead",
+  /(?:scrollbar-(?:width|color)\s*:|::?-webkit-scrollbar(?:-[a-z-]+)?)/,
+  "partially supported custom scrollbar CSS remains; use native overflow scrollbars instead",
 );
 requireMatch(releaseWorkflow, /actions\/attest@v4/, "release artifact attestation is missing");
 requireMatch(releaseWorkflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/, "all release assets must be attested");
