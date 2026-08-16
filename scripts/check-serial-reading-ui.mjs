@@ -53,8 +53,8 @@ assert.match(coverStyles, /\.al-serial-cover-migration-progress/);
 assert.doesNotMatch(coverStyles, /\.al-serial-cover-results/);
 
 assert.match(progressStyles, /\.al-progress\.is-state-progress \.al-progress-fill/);
-assert.match(progressStyles, /\.al-detail-progress/);
-assert.match(progressStyles, /\.al-detail-actions\.has-detail-progress/);
+assert.doesNotMatch(progressStyles, /\.al-detail-progress/);
+assert.doesNotMatch(progressStyles, /\.al-detail-actions\.has-detail-progress/);
 assert.doesNotMatch(progressStyles, /:has\(/);
 
 assert.match(progressEditorSource, /READING_EDITOR_STATE_KEY/);

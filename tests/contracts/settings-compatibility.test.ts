@@ -17,6 +17,7 @@ async function loadSettings(raw: unknown): Promise<AnimeListPlugin["settings"]> 
 describe("settings compatibility", () => {
   it("loads every core persisted field and normalizes legacy UI state", async () => {
     const settings = await loadSettings({
+      interfaceLanguage: "ja-JP",
       storageMode: "flat",
       libraryRoot: "Library",
       flatMediaFolder: "Media",
@@ -38,6 +39,7 @@ describe("settings compatibility", () => {
       },
     });
 
+    assert.equal(settings.interfaceLanguage, "ja");
     assert.equal(settings.storageMode, "flat");
     assert.equal(settings.flatMediaFolder, "Media");
     assert.deepEqual(settings.additionalScanFolders, ["Archive", "Other"]);
@@ -55,6 +57,24 @@ describe("settings compatibility", () => {
     });
   });
 
+  it("loads release tracking as an explicit opt-in feature", async () => {
+    const disabled = await loadSettings({});
+    assert.deepEqual(disabled.releaseTracking, {
+      enabled: false,
+      automatic: false,
+      lastAutomaticCheckAt: "",
+    });
+
+    const enabled = await loadSettings({
+      releaseTracking: { enabled: true, automatic: true, lastAutomaticCheckAt: "2026-08-08T00:00:00.000Z" },
+    });
+    assert.deepEqual(enabled.releaseTracking, {
+      enabled: true,
+      automatic: true,
+      lastAutomaticCheckAt: "2026-08-08T00:00:00.000Z",
+    });
+  });
+
   it("falls back deterministically when stored settings are missing or malformed", async () => {
     const settings = await loadSettings({
       storageMode: "unknown",
@@ -64,6 +84,7 @@ describe("settings compatibility", () => {
       uiState: { type: "podcast", status: "all", view: "table" },
     });
 
+    assert.equal(settings.interfaceLanguage, "zh-TW");
     assert.equal(settings.storageMode, DEFAULT_SETTINGS.storageMode);
     assert.deepEqual(settings.additionalScanFolders, []);
     assert.deepEqual(settings.tagCatalog, []);

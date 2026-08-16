@@ -1,6 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { normalizePath } from "obsidian";
 import type { CoverSources } from "./types";
+import { decodeRasterImage, encodeRasterImage } from "./image-raster";
 
 export const COVER_THUMBNAIL_WIDTHS = [24, 320, 640] as const;
 export const COVER_CACHE_POLICY = {
@@ -28,13 +29,6 @@ export interface CoverCacheFileRecord {
 export interface CoverCacheCleanupPolicy {
   maxBytes: number;
   targetBytes: number;
-}
-
-interface DecodedCover {
-  source: CanvasImageSource;
-  width: number;
-  height: number;
-  close(): void;
 }
 
 function unsignedHex(value: number): string {
@@ -121,56 +115,6 @@ async function waitForIdle(): Promise<void> {
   });
 }
 
-async function decodeCover(data: ArrayBuffer): Promise<DecodedCover> {
-  const blob = new Blob([data]);
-  if (typeof createImageBitmap === "function") {
-    const bitmap = await createImageBitmap(blob);
-    return {
-      source: bitmap,
-      width: bitmap.width,
-      height: bitmap.height,
-      close: () => bitmap.close(),
-    };
-  }
-
-  const objectUrl = URL.createObjectURL(blob);
-  const image = createEl("img");
-  image.src = objectUrl;
-  try {
-    await image.decode();
-    return {
-      source: image,
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-      close: () => URL.revokeObjectURL(objectUrl),
-    };
-  } catch (error) {
-    URL.revokeObjectURL(objectUrl);
-    throw error;
-  }
-}
-
-async function renderWebp(decoded: DecodedCover, width: number): Promise<ArrayBuffer> {
-  if (decoded.width <= 0 || decoded.height <= 0) throw new Error("Cover image has invalid dimensions");
-  const height = Math.max(1, Math.round(width * decoded.height / decoded.width));
-  const canvas = createEl("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { alpha: true });
-  if (!context) throw new Error("Canvas 2D context is unavailable");
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(decoded.source, 0, 0, width, height);
-  const quality = width === COVER_THUMBNAIL_WIDTHS[0] ? PLACEHOLDER_QUALITY : WEBP_QUALITY;
-  const output = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (result) resolve(result);
-      else reject(new Error("WebP thumbnail encoding failed"));
-    }, "image/webp", quality);
-  });
-  return output.arrayBuffer();
-}
-
 export class CoverThumbnailCache {
   readonly root: string;
   private readonly app: App;
@@ -184,9 +128,9 @@ export class CoverThumbnailCache {
   private disposed = false;
   private processedSinceDrain = false;
 
-  constructor(app: App, pluginId: string, onDrain?: () => void) {
+  constructor(app: App, pluginId: string, onDrain?: () => void, cacheFolder = "covers") {
     this.app = app;
-    this.root = normalizePath(`${app.vault.configDir}/plugins/${pluginId}/cache/covers`);
+    this.root = normalizePath(`${app.vault.configDir}/plugins/${pluginId}/cache/${cacheFolder}`);
     this.onDrain = onDrain;
   }
 
@@ -419,13 +363,14 @@ export class CoverThumbnailCache {
     const paths = coverCachePaths(this.root, file.path, file.stat.mtime);
     const created: string[] = [];
     const sourceData = await this.app.vault.adapter.readBinary(file.path);
-    const decoded = await decodeCover(sourceData);
+    const decoded = await decodeRasterImage(sourceData);
     try {
       const variants: Array<[number, string]> = [[640, paths.large], [320, paths.small], [24, paths.placeholder]];
       for (const [width, path] of variants) {
         if (idle) await waitForIdle();
-        const output = await renderWebp(decoded, width);
-        await this.app.vault.adapter.writeBinary(path, output);
+        const quality = width === COVER_THUMBNAIL_WIDTHS[0] ? PLACEHOLDER_QUALITY : WEBP_QUALITY;
+        const output = await encodeRasterImage(decoded, width, "image/webp", quality);
+        await this.app.vault.adapter.writeBinary(path, await output.arrayBuffer());
         this.files.add(path);
         created.push(path);
       }

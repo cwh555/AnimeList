@@ -39,12 +39,47 @@ test("feature manifests validate dependencies and declaration order", () => {
   ]), /must appear earlier/);
 });
 
+test("feature registry assigns settings sections to stable pages and preserves overrides", () => {
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  registry.load([
+    defineFeature({
+      id: "release-tracking",
+      contributions: [{
+        kind: "settings",
+        sections: () => ({ heading: "Release tracking", definitions: [] }),
+      }],
+    }),
+    defineFeature({
+      id: "legacy-metadata-cleanup-settings",
+      contributions: [{
+        kind: "settings",
+        sections: () => ({ heading: "Legacy metadata", definitions: [] }),
+      }],
+    }),
+    defineFeature({
+      id: "custom-feature",
+      contributions: [{
+        kind: "settings",
+        sections: () => ({ page: "search-metadata", heading: "Custom", definitions: [] }),
+      }],
+    }),
+  ]);
+
+  assert.deepEqual(
+    registry.settingsSections(host).map((section) => [section.heading, section.page]),
+    [
+      ["Release tracking", "features"],
+      ["Legacy metadata", "updates-cleanup"],
+      ["Custom", "search-metadata"],
+    ],
+  );
+});
+
 test("feature registry cannot be loaded twice", () => {
   const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
   registry.load([]);
   assert.throws(() => registry.load([]), /already loaded/);
 });
-
 
 test("feature lifecycle cannot activate twice", async () => {
   const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();

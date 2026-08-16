@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.4.0 - 2026-08-16
+
+### Added
+
+- Added interface localization for Traditional Chinese, English, Japanese, and Korean, plus **Follow Obsidian**. Settings remain English, while recognized provider tag/category labels are localized for display without rewriting stored values.
+- Added opt-in latest-release tracking for manga chapters and already-published novel volumes. Manga tracking combines verified MangaDex evidence with supported official public chapter sources discovered from the exact preserved AniList identity; novel tracking uses NDL/JPRO publication data.
+- Added reusable `animelist-images` note sections with file picker, drag/drop, clipboard paste, URL import, lightbox navigation, clipboard copy, Set as cover, multi-select deletion, exact/canonical-raster duplicate protection, and local thumbnail caching.
+- Added reusable `animelist-moments` note sections for saving text plus one or more images, with optional source, position, speaker, tags, and note metadata.
+- Added a native AnimeList editor submenu for inserting Image Sections and Moments at the current note position without replacing surrounding Markdown.
+- Added an **Updates & cleanup** Settings page with review-first duplicate generated-note-cover cleanup alongside explicit legacy metadata upgrade tools.
+
+### Changed
+
+- Reorganized Settings into five top-level pages: General, Search & metadata, Features, Maintenance, and Updates & cleanup. Same-page settings are grouped into clear sections while persisted setting values remain unchanged.
+- New built-in media notes no longer add a second standalone body cover below `animelist-detail`; the frontmatter cover remains authoritative and optional note-media sections are independent.
+- Image Section reading layout now uses baseline CSS Grid instead of CSS multi-column layout, avoiding an Obsidian 1.4.5 Community compatibility warning while preserving a responsive multi-column grid and uncropped images.
+- Scrollable AnimeList surfaces use browser-native scrollbars with no custom scrollbar CSS, removing the corresponding Community compatibility warning.
+
+### Improved
+
+- Release tracking never treats one manga source as universally newest: valid MangaDex and supported official-source evidence are compared, and the highest valid main chapter is retained.
+- Manga supplementary decimal chapters remain distinct from the latest main serialized chapter when the integer base chapter exists; personal reading progress may still contain a decimal value and is never rewritten by release tracking.
+- Novel release tracking groups verified main publication lines conservatively and excludes recognized adaptations, spin-offs, short stories, special editions, guides, fanbooks, anthologies, and other side publications from replacing the main latest volume.
+- Ambiguous, unmatched, provider-error, and true source-regression states preserve trusted release data and surface review/attention instead of guessing or erasing state.
+- Image deletion is reference-aware across series/entry covers, Image Sections, and Moments so a managed image is not trashed while another supported reference still uses it.
+- Image Sections and Moments reuse the same managed image import, thumbnail, clipboard, lightbox, and safe-deletion infrastructure instead of maintaining separate storage paths.
+
+### Compatibility and migration
+
+- The media schema remains version 6. Existing 1.3.1 notes remain readable and there is no automatic startup media migration for 1.4.0.
+- `animelist-images` and `animelist-moments` are ordinary fenced Markdown blocks; multiple independent blocks may appear in one note and unrelated Markdown/frontmatter is preserved when one block is edited.
+- Release tracking fields are additive and never repurpose `progress`, `progress_unit`, `volume_log`, personal status, rating, or note-body content.
+- Interface-language changes do not rewrite media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, note bodies, or templates.
+- Older notes with classification metadata gaps can still use explicit **Upgrade legacy metadata**. Older generated notes with an exact redundant standalone cover may use **Remove duplicate note covers** after reviewing the candidate list. Both operations require explicit confirmation and preserve unrelated content.
+
 ## 1.3.0 - 2026-08-07
 
 ### Added

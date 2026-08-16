@@ -2,12 +2,12 @@ import { mediaSeasonQuarter, type MediaSeason } from "../domain/media-classifica
 import type { MediaType } from "../domain/media-types";
 import { uiText } from "../ui-text";
 
-const SEASON_LABELS: Readonly<Record<MediaSeason, string>> = {
-  winter: "冬季",
-  spring: "春季",
-  summer: "夏季",
-  fall: "秋季",
-};
+const SEASON_TEXT_KEYS = {
+  winter: "season.winter",
+  spring: "season.spring",
+  summer: "season.summer",
+  fall: "season.fall",
+} as const satisfies Record<MediaSeason, Parameters<typeof uiText>[0]>;
 
 function seasonValue(value: unknown): MediaSeason | null {
   return value === "winter" || value === "spring" || value === "summer" || value === "fall"
@@ -27,7 +27,7 @@ export function mediaQuarterLabel(seasonInput: unknown, seasonYearInput: unknown
   if (!season) return "";
   const quarter = mediaSeasonQuarter(season);
   const period = [year === null ? "" : String(year), quarter].filter(Boolean).join(" ");
-  const seasonLabel = season ? SEASON_LABELS[season] : "";
+  const seasonLabel = season ? uiText(SEASON_TEXT_KEYS[season]) : "";
   return [period, seasonLabel ? `(${seasonLabel})` : ""].filter(Boolean).join(" ");
 }
 

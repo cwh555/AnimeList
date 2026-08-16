@@ -24,6 +24,16 @@ export function getActiveLocale(): LocaleCode {
   return activeLocale;
 }
 
+export function withActiveLocale<T>(locale: LocaleCode, callback: () => T): T {
+  const previous = activeLocale;
+  setActiveLocale(locale);
+  try {
+    return callback();
+  } finally {
+    activeLocale = previous;
+  }
+}
+
 export function registerLocaleMessages<T extends TextMessages>(
   namespace: string,
   locale: LocaleCode,
@@ -31,8 +41,7 @@ export function registerLocaleMessages<T extends TextMessages>(
 ): void {
   const state = CATALOGS.get(namespace);
   if (!state) throw new Error(`Unknown text catalog namespace: ${namespace}`);
-  const fallback = state.messagesByLocale.get(state.defaultLocale) ?? {};
-  const existing = state.messagesByLocale.get(locale) ?? fallback;
+  const existing = state.messagesByLocale.get(locale) ?? {};
   state.messagesByLocale.set(locale, { ...existing, ...messages });
 }
 

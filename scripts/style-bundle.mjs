@@ -9,6 +9,10 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.timeline.css",
   "styles.serial-reading.css",
   "styles.progress.css",
+  "styles.note-detail.css",
+  "styles.image-sections.css",
+  "styles.moments.css",
+  "styles.version-cleanup.css",
   "styles.masterpiece.css",
   "styles.score-dashboard.css",
   "styles.serial-cover.css",
@@ -17,6 +21,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles.library-filters.css",
   "styles.user-tags.css",
   "styles.mobile.css",
+  "styles.release-tracking.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {

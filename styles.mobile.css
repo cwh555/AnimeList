@@ -24,8 +24,6 @@
 
   .al-type-tabs,
   .al-status-bar { width:100%; max-width:none; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
-  .al-type-tabs::-webkit-scrollbar,
-  .al-status-bar::-webkit-scrollbar { display:none; }
   .al-type-tabs { margin:12px 0 10px; }
   .al-type-tab { flex:0 0 auto; min-height:42px; padding-inline:12px; scroll-snap-align:start; }
   .al-status-bar { gap:6px; margin-bottom:16px; padding-bottom:2px; }
@@ -90,7 +88,6 @@
   .al-score-dashboard-summary { max-width:none; font-size:.68rem; text-align:left; }
   .al-score-dashboard-controls { position:static; display:grid; grid-template-columns:1fr; gap:8px; padding:10px 0; }
   .al-score-dashboard-tabs { width:100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .al-score-dashboard-tabs::-webkit-scrollbar { display:none; }
   .al-score-dashboard-tab { flex:0 0 auto; min-height:42px; }
   .al-score-dashboard-action-group { width:100%; }
   .al-score-tool-button { min-height:44px; flex:1 1 0; justify-content:center; }
@@ -167,8 +164,6 @@
   .al-timeline-copy { min-width:0; }
   .al-timeline-type-filters,
   .al-timeline-controls { width:100%; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .al-timeline-type-filters::-webkit-scrollbar,
-  .al-timeline-controls::-webkit-scrollbar { display:none; }
   .al-timeline-type-filter { min-height:40px; flex:0 0 auto; padding-inline:12px; }
   .al-timeline-control-group { flex:0 0 auto; justify-content:flex-start; }
   .al-timeline-controls button { width:42px; height:42px; flex:0 0 42px; }

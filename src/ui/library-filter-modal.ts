@@ -1,6 +1,7 @@
 import { App, Modal } from "obsidian";
 import type { LibraryFilterOptions, LibraryFilters, LibraryQuarterOption } from "../domain/library-filters";
 import { normalizeLibraryFilters, toggleLibraryFilterValue, toggleLibraryQuarter } from "../domain/library-filters";
+import { localizeProviderTag } from "../i18n/provider-tag-localization";
 import { uiText } from "../ui-text";
 import { mediaQuarterLabel } from "./media-quarter-label";
 import { makeEl, setAnimeListIcon } from "./ui-helpers";
@@ -8,7 +9,10 @@ import { makeEl, setAnimeListIcon } from "./ui-helpers";
 export type ApplyLibraryFilters = (filters: LibraryFilters) => void;
 
 function filterText(value: string, query: string): boolean {
-  return !query || value.toLocaleLowerCase().includes(query);
+  if (!query) return true;
+  const normalizedQuery = query.toLocaleLowerCase();
+  return value.toLocaleLowerCase().includes(normalizedQuery)
+    || localizeProviderTag(value).toLocaleLowerCase().includes(normalizedQuery);
 }
 
 export class LibraryFilterModal extends Modal {
@@ -114,7 +118,7 @@ export class LibraryFilterModal extends Modal {
     }
     const chips = makeEl("div", "al-filter-chips");
     for (const option of visible) {
-      chips.appendChild(this.createChip(option, selected.includes(option), () => {
+      chips.appendChild(this.createChip(localizeProviderTag(option), selected.includes(option), () => {
         toggle(option);
         this.renderGroups();
       }));

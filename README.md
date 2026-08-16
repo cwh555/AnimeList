@@ -1,25 +1,29 @@
 # AnimeList
 
-AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a native library, metadata search, local covers, progress tracking, ratings, templates, a Score Dashboard, and a completion timeline.
+AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a native library, metadata search, local covers, progress tracking, ratings, templates, release tracking, reusable note media sections, a Score Dashboard, and a completion timeline.
 
 Your Markdown notes remain the source of truth. Removing the plugin does not remove your records, notes, or images.
 
 > [!CAUTION]
-> **Existing libraries and legacy metadata**
+> **Existing libraries and update cleanup**
 >
-> Stable 1.2.1 notes remain readable and AnimeList does not automatically rewrite the library on startup. To backfill the new company/quarter metadata for existing notes, or if the vault has ever used preview/development builds that wrote `user_tags`, `classification_*`, mixed tag/studio values, or malformed company data, make sure the vault is backed up or synced and run **Settings → Legacy metadata cleanup → Scan and upgrade** once. The cleanup rewrites only recognized AnimeList metadata fields into the current schema and preserves unrelated frontmatter and Markdown body content.
+> Existing 1.3.1 libraries remain readable without an automatic startup migration. Older notes may still be missing classification metadata introduced in 1.3, and older generated note bodies may contain a redundant standalone cover below `animelist-detail`. Back up or sync the vault before using **Settings → Updates & cleanup**. The available cleanup tools are explicit, review-first operations and preserve unrelated frontmatter and Markdown body content.
 
 <table>
   <tr>
-    <td colspan="2" align="center">
+    <td width="50%" align="center">
       <img src="docs/images/library-card.webp" alt="AnimeList library in card view" width="100%"><br>
       <sub><b>Library</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
+      <sub><b>Score Dashboard</b></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
-      <sub><b>Score Dashboard</b></sub>
+      <img src="docs/images/image-session.png" alt="AnimeList note with reusable image and Moment sections" width="100%"><br>
+      <sub><b>Note media</b></sub>
     </td>
     <td width="50%" align="center">
       <img src="docs/images/timeline.png" alt="AnimeList completion timeline"><br>
@@ -29,16 +33,15 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new in 1.3.0**
+> **What's new in 1.4.0**
 >
-> - Added richer media metadata for format, animation studio or author, anime quarter, AniList classification tags, and source material while keeping Markdown as the source of truth.
-> - Added a Library filter dialog for animation company, quarter, and reusable work tags. Company and tag selections can be combined; all filter groups apply together.
-> - Added an English **Tag manager** in Settings with search, add, rename, global delete, usage counts, and per-work removal without deleting the reusable tag itself.
-> - Improved animation-studio reliability with structured AniList data and Bangumi animation-production relations, including canonical company identity so formatting variants do not create duplicate filters.
-> - Made large libraries faster with a cached media index, scoped refreshes, progressive card rendering, demand-loaded thumbnails, and lazy Score Dashboard cover work.
-> - Added a mobile-first phone layout for the Library, Score Dashboard, media editors, serial entries, and Timeline while preserving tablet and desktop layouts.
-> - Added consistent keyboard navigation across manga and novel serial-entry rows, including Enter/Tab progression and previous-field Backspace navigation.
-> - Reorganized external metadata providers behind typed clients so search and Load More share the same Bangumi, AniList, and Open Library behavior.
+> - Added interface localization for Traditional Chinese, English, Japanese, and Korean, with an option to follow Obsidian's interface language. Settings remain English.
+> - Added opt-in release tracking for manga chapters and already-published novel volumes. Manga can combine MangaDex with supported official public chapter sources discovered from preserved AniList identity; novels use NDL/JPRO publication data. Tracking never overwrites reading progress.
+> - Added reusable **Image Sections** inside media notes with file, drag-and-drop, clipboard, and URL import; lightbox navigation; copy; Set as cover; multi-select deletion; duplicate protection; and local thumbnail caching.
+> - Added reusable **Moments** for saving a quote or scene as text plus one or more images, with optional source, position, speaker, tags, and notes.
+> - Reorganized Settings into General, Search & metadata, Features, Maintenance, and Updates & cleanup pages with clearer same-page groups.
+> - Added review-first cleanup for redundant generated note covers and kept legacy metadata cleanup explicit rather than rewriting libraries on startup.
+> - Removed CSS multi-column and non-baseline scrollbar properties from note media layouts so Community compatibility checks do not rely on browser features only partially supported by older Obsidian releases.
 
 ## Features
 
@@ -46,10 +49,13 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 - Metadata search through Bangumi, AniList, and Open Library, with structured classification metadata for supported works.
 - Card, list, and poster views with search, sorting, and combined company, quarter, and tag filters.
 - Media-specific progress tracking and dated serial entries with optional per-entry covers.
+- Optional manga/novel latest-release tracking that is separate from personal reading progress.
+- Reusable Image Sections and Moments stored directly in ordinary Markdown notes.
 - A Score Dashboard for direct and batch rating changes.
 - Favorite mode or reusable Masterpiece categories.
 - A pannable and zoomable completion timeline.
-- Local series and serial-entry covers with remote-image fallback.
+- Local series, serial-entry, Image Section, and Moment images with safe reference-aware cleanup.
+- Traditional Chinese, English, Japanese, and Korean interface support.
 - Desktop and mobile support without a Dataview dependency.
 
 ## Installation
@@ -72,18 +78,22 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 2. Select **收錄**, choose anime, manga, or novel, and search for a title.
 3. Review the imported metadata and save the note.
 4. Update its status, progress, dates, rating, or special label from the library.
+5. For manga or novels, enable **Latest release tracking** under Settings → Features if you want source-backed latest chapter/volume information.
+6. Inside a media note, use the editor context menu **AnimeList** submenu to insert an Image Section or Moments section where you want it.
 
-The main Library and media workflow uses Traditional Chinese. The 1.3 Tag manager and legacy-cleanup Settings tools use English. Provider metadata may remain in its original language.
+AnimeList can display its main interface in Traditional Chinese, English, Japanese, or Korean. The Settings page itself stays in English. Choose a language there or follow Obsidian's interface language. Recognized provider-supplied tag/category labels are displayed in the selected interface language, while media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, and existing templates are not rewritten.
 
 ## Documentation
 
-See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, metadata and filters, reusable tags, legacy cleanup, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
+See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, metadata and filters, reusable tags, release tracking, Image Sections, Moments, cleanup tools, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
 
-## Metadata and privacy
+## Metadata, network access, and privacy
 
-- Search terms are sent only to enabled metadata providers.
-- Personal ratings, progress, dates, labels, and note content stay in the vault.
-- Covers are stored locally when available, with remote-image fallback.
+- Search and enrichment queries are sent only to enabled metadata providers.
+- Release tracking, when enabled, contacts its configured public metadata/catalog sources and supported official public chapter pages; it does not send personal ratings, progress, dates, or note-body text.
+- Personal ratings, progress, dates, labels, Moments text, and note content stay in the vault.
+- Covers and note-media images are stored locally when available, with remote-image fallback only where the relevant feature supports it.
+- AnimeList does not include telemetry or a private remote library database.
 
 ## Development
 

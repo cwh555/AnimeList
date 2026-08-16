@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../../app-metadata";
 import type { ExternalMediaResult, MediaType } from "../../domain/media-types";
+import type { AniListMangaExternalLink } from "../../domain/manga-release-sources";
 import { asArray, stringValue } from "../../domain/value-normalization";
 import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
 import { normalizeAniListMedia } from "../provider-normalizers";
@@ -39,6 +40,22 @@ export const ANILIST_MEDIA_METADATA_QUERY = `
       ${ANILIST_MEDIA_FIELDS}
     }
   }`;
+
+
+export const ANILIST_MANGA_RELEASE_SOURCES_QUERY = `
+  query ($id: Int!) {
+    Media(id: $id, type: MANGA) {
+      id synonyms
+      title { romaji english native }
+      externalLinks { site url type language }
+    }
+  }`;
+
+export interface AniListMangaReleaseSources {
+  id: number;
+  titles: string[];
+  externalLinks: AniListMangaExternalLink[];
+}
 
 export interface AniListClientOptions {
   requestTimeoutMs?: number;
@@ -92,6 +109,32 @@ function graphQlError(payload: Record<string, unknown>): Error | null {
   const status = Number(first.status);
   if (Number.isInteger(status) && status > 0) error.status = status;
   return error;
+}
+
+
+function mangaReleaseSources(value: unknown): AniListMangaReleaseSources | null {
+  const media = record(value);
+  const id = Number(media.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const title = record(media.title);
+  const titles = [...new Set([
+    stringValue(title.native),
+    stringValue(title.romaji),
+    stringValue(title.english),
+    ...asArray(media.synonyms).map((entry) => stringValue(entry)),
+  ].filter(Boolean))];
+  const externalLinks = asArray(media.externalLinks).flatMap((value) => {
+    const link = record(value);
+    const url = stringValue(link.url);
+    if (!url) return [];
+    return [{
+      site: stringValue(link.site),
+      url,
+      type: stringValue(link.type),
+      language: stringValue(link.language),
+    } satisfies AniListMangaExternalLink];
+  });
+  return { id, titles, externalLinks };
 }
 
 function mediaTypeVariable(mediaType: MediaType): "ANIME" | "MANGA" {
@@ -287,6 +330,13 @@ export class AniListClient implements MetadataProviderClient {
       page: normalizedPage,
     });
     return this.normalizePage(mediaType, record(record(payload.data).Page));
+  }
+
+  async fetchMangaReleaseSources(id: string | number | undefined): Promise<AniListMangaReleaseSources | null> {
+    const numericId = Number(id);
+    if (!Number.isInteger(numericId) || numericId <= 0) return null;
+    const payload = await this.graphQl(ANILIST_MANGA_RELEASE_SOURCES_QUERY, { id: numericId });
+    return mangaReleaseSources(record(record(payload.data).Media));
   }
 
   async fetchMediaById(mediaType: MediaType, id: string | number): Promise<ExternalMediaResult | null> {

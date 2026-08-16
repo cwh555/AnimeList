@@ -1,6 +1,8 @@
 import type { Plugin, SettingDefinition, TFile } from "obsidian";
+import type { SettingsPageId } from "../settings-layout";
 import type {
   AnimeListSettings,
+  CoverSources,
   ExternalMediaResult,
   ExternalMediaSearchPage,
   MediaItem,
@@ -18,6 +20,7 @@ import type {
 import type { SearchRenderContext } from "../ui/search-contracts";
 
 export interface FeatureSettingsSection {
+  page?: SettingsPageId;
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
@@ -25,11 +28,14 @@ export interface FeatureSettingsSection {
 
 export interface AnimeListFeatureHost extends Pick<
   Plugin,
-  "app" | "register" | "registerDomEvent" | "registerView" | "addCommand" | "registerEvent"
+  "app" | "register" | "registerDomEvent" | "registerView" | "addCommand" | "registerEvent" | "registerMarkdownCodeBlockProcessor"
 > {
   settings: AnimeListSettings;
   saveSettings(): Promise<void>;
   refreshViews(): void;
+  ensureFolder(path: string): Promise<void>;
+  uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string>;
+  getImageThumbnailSources(file: TFile): CoverSources | undefined;
   getScanFolders(): string[];
   collectMediaItems(source?: string): MediaItem[];
   resolveMediaCoverPath(value: unknown, sourcePath: string): string;

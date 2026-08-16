@@ -2,7 +2,9 @@ import { Modal, Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../types";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
-import { compatibleGenres } from "../data/media-frontmatter-compat";
+import { normalizeGenre } from "../domain/media-metadata";
+import { providerTagDisplayLabels } from "../i18n/provider-tag-localization";
+import { compatibleGenres, compatibleSourceGenres } from "../data/media-frontmatter-compat";
 import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
@@ -205,6 +207,11 @@ export class AddMediaModal extends Modal {
     const templateOptions: Array<[string, string]> = templates.length
       ? templates.map((template): [string, string] => [template.path, template.name])
       : [["", uiText("add.noTemplate")]];
+    const apiTagValues = [
+      ...enrichedResult.genres,
+      ...enrichedResult.rawGenres,
+      ...persistedMediaTags(enrichedResult.classification),
+    ];
     const fields = createMediaEditorFields({
       parent: form,
       mediaType: enrichedResult.mediaType,
@@ -223,6 +230,7 @@ export class AddMediaModal extends Modal {
       },
       templateOptions,
       tagOptions: libraryTagOptions(this.plugin, persistedMediaTags(enrichedResult.classification)),
+      tagDisplayLabels: providerTagDisplayLabels(apiTagValues),
     });
     this.contentEl.appendChild(form);
 
@@ -370,6 +378,12 @@ export class EditMediaModal extends Modal {
 
     const form = createDiv();
     form.className = "al-media-form al-edit-media-form";
+    const sourceGenres = compatibleSourceGenres(frontmatter);
+    const apiTagValues = [
+      ...normalizeUserTags(frontmatter.media_tags),
+      ...sourceGenres,
+      ...sourceGenres.map((value) => normalizeGenre(value)).filter(Boolean),
+    ];
     const fields = createMediaEditorFields({
       parent: form,
       mediaType,
@@ -390,6 +404,7 @@ export class EditMediaModal extends Modal {
         ? frontmatter.progress_unit
         : undefined,
       tagOptions: libraryTagOptions(this.plugin, frontmatter.media_tags),
+      tagDisplayLabels: providerTagDisplayLabels(apiTagValues),
     });
     this.contentEl.appendChild(form);
 

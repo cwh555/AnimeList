@@ -1,0 +1,24 @@
+/* Explicit review UI for potentially destructive version-update cleanups. */
+.al-version-cleanup-modal { width:min(820px,calc(100vw - 32px)); }
+.al-version-cleanup-rules { margin:10px 0 14px; padding-left:22px; color:var(--text-muted); }
+.al-version-cleanup-rules li { margin:5px 0; line-height:1.45; }
+.al-version-cleanup-status { margin:12px 0 8px; font-weight:650; }
+.al-version-cleanup-list {
+  display:flex;
+  max-height:min(46vh,420px);
+  flex-direction:column;
+  gap:8px;
+  overflow-y:auto;
+  padding:2px;
+}
+.al-version-cleanup-item {
+  padding:10px 12px;
+  border:1px solid var(--background-modifier-border);
+  border-radius:10px;
+  background:var(--background-secondary);
+}
+.al-version-cleanup-item strong { display:block; margin-bottom:3px; }
+.al-version-cleanup-item code { display:block; margin-top:7px; overflow-wrap:anywhere; white-space:normal; }
+.al-version-cleanup-item p { margin:7px 0 0; color:var(--text-muted); }
+.al-version-cleanup-item.is-failed { border-color:color-mix(in srgb,var(--text-error) 55%,var(--background-modifier-border)); }
+@media (max-width:620px) { .al-version-cleanup-modal { width:calc(100vw - 20px); } }

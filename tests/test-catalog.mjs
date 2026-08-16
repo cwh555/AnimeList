@@ -1,13 +1,17 @@
-export const TEST_SUITES = ["unit", "integration", "contract", "legacy"];
+export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", "legacy"];
 
 export const TEST_FEATURES = [
   "covers",
+  "image-sections",
   "library",
+  "legacy-update",
   "markdown",
   "masterpiece",
+  "moments",
   "progress",
   "rating",
   "release",
+  "release-tracking",
   "score-dashboard",
   "search",
   "serial-covers",
@@ -22,6 +26,14 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
+  { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
+  { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },
+
+  { path: "tests/moments.test.ts", kind: "test", suite: "unit", features: ["moments", "markdown"] },
+  { path: "tests/media-note-insert-menu.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
+  { path: "tests/contracts/moments-service.test.ts", kind: "test", suite: "contract", features: ["moments", "image-sections", "markdown"] },
 
   { path: "tests/masterpiece-labels.test.ts", kind: "test", suite: "unit", features: ["masterpiece"] },
   { path: "tests/masterpiece-decoration-cache.test.ts", kind: "test", suite: "unit", features: ["masterpiece", "library"] },
@@ -29,7 +41,11 @@ export const TEST_TARGETS = [
   { path: "tests/media-status.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/progress-display.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/progress-units.test.ts", kind: "test", suite: "unit", features: ["progress"] },
+  { path: "tests/release-tracking.test.ts", kind: "test", suite: "unit", features: ["release-tracking"] },
   { path: "tests/rating.test.ts", kind: "test", suite: "unit", features: ["rating", "progress"] },
+  { path: "tests/release-tracking-state-service.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "markdown"] },
+  { path: "tests/release-tracking-enrollment.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "markdown"] },
+  { path: "tests/release-tracking-settings.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "settings"] },
   { path: "tests/schema-migration.test.ts", kind: "test", suite: "integration", features: ["progress", "markdown"] },
   { path: "tests/segmented-date-input.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/serial-entry-scroll.test.ts", kind: "test", suite: "unit", features: ["progress"] },
@@ -70,10 +86,12 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/user-tag-library-service.test.ts", kind: "test", suite: "contract", features: ["tags", "settings", "markdown"] },
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },
   { path: "tests/contracts/metadata-provider-clients.test.ts", kind: "test", suite: "contract", features: ["search"] },
+  { path: "tests/contracts/release-tracking-provider-clients.test.ts", kind: "test", suite: "contract", features: ["release-tracking"] },
   { path: "tests/contracts/media-classification-service.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
   { path: "tests/contracts/media-classification-fields.test.ts", kind: "test", suite: "contract", features: ["search", "markdown"] },
   { path: "tests/contracts/media-quarter-metadata.test.ts", kind: "test", suite: "contract", features: ["search", "markdown", "settings"] },
-  { path: "tests/contracts/legacy-metadata-cleanup.test.ts", kind: "test", suite: "contract", features: ["settings", "markdown", "search"] },
+  { path: "tests/contracts/legacy-metadata-cleanup.test.ts", kind: "test", suite: "legacy-update", features: ["legacy-update", "settings", "markdown", "search"] },
+  { path: "tests/legacy-update/version-cleanup.test.ts", kind: "test", suite: "legacy-update", features: ["legacy-update", "settings", "markdown", "covers"] },
   { path: "tests/contracts/existing-library-initialization.test.ts", kind: "test", suite: "contract", features: ["library", "markdown", "settings"] },
   { path: "tests/contracts/feature-installer.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
   { path: "tests/contracts/media-repository.test.ts", kind: "test", suite: "contract", features: ["library", "markdown"] },

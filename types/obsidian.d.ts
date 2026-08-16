@@ -135,11 +135,47 @@ declare module "obsidian" {
     createFolder(path: string): Promise<TFolder>;
     cachedRead(file: TFile): Promise<string>;
     read(file: TFile): Promise<string>;
+    readBinary(file: TFile): Promise<ArrayBuffer>;
     modify(file: TFile, data: string): Promise<void>;
+    process(file: TFile, fn: (data: string) => string): Promise<string>;
     delete(file: TAbstractFile, force?: boolean): Promise<void>;
     trash(file: TAbstractFile, system: boolean): Promise<void>;
     getResourcePath(file: TFile): string;
     on(name: string, callback: (...args: unknown[]) => void): EventRef;
+  }
+
+  export interface EditorPosition {
+    line: number;
+    ch: number;
+  }
+
+  export abstract class Editor {
+    abstract getLine(line: number): string;
+    abstract getCursor(side?: "from" | "to" | "head" | "anchor"): EditorPosition;
+    abstract replaceRange(replacement: string, from: EditorPosition, to?: EditorPosition, origin?: string): void;
+    abstract setCursor(pos: EditorPosition | number, ch?: number): void;
+  }
+
+  export interface MarkdownFileInfo {
+    app: App;
+    file: TFile | null;
+    editor?: Editor;
+  }
+
+  export class MenuItem {
+    setTitle(title: string | DocumentFragment): this;
+    setIcon(icon: string | null): this;
+    setWarning(isWarning: boolean): this;
+    setIsLabel(isLabel: boolean): this;
+    setSection(section: string): this;
+    onClick(callback: (event: MouseEvent | KeyboardEvent) => unknown): this;
+  }
+
+  export class Menu extends Component {
+    addItem(callback: (item: MenuItem) => unknown): this;
+    showAtPosition(position: { x: number; y: number }, doc?: Document): this;
+    showAtMouseEvent(event: MouseEvent): this;
+    hide(): this;
   }
 
   export interface Workspace {
@@ -147,6 +183,7 @@ declare module "obsidian" {
     getLeaf(newLeaf?: string | boolean): WorkspaceLeaf;
     revealLeaf(leaf: WorkspaceLeaf): void;
     openLinkText(linktext: string, sourcePath: string, newLeaf?: boolean): Promise<void>;
+    on(name: "editor-menu", callback: (menu: Menu, editor: Editor, info: MarkdownFileInfo) => unknown): EventRef;
   }
 
   export interface MetadataCache {
@@ -167,9 +204,16 @@ declare module "obsidian" {
     fileManager: FileManager;
   }
 
+  export interface MarkdownSectionInformation {
+    text: string;
+    lineStart: number;
+    lineEnd: number;
+  }
+
   export interface MarkdownPostProcessorContext {
     sourcePath: string;
     addChild(child: MarkdownRenderChild): void;
+    getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null;
   }
 
   export interface Command {

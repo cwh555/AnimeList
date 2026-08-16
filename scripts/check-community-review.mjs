@@ -48,6 +48,16 @@ rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
 rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
 requireMatch(settings, /getSettingDefinitions\(\):\s*SettingDefinition\[\]/, "declarative settings definitions are missing");
 rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
+rejectMatch(
+  styles,
+  /(?:^|[;{}])\s*(?:columns|column-count|column-width|column-fill|column-span|column-gap|column-rule(?:-[a-z-]+)?|break-inside)\s*:/m,
+  "CSS multi-column or fragmentation properties remain; use baseline Grid/Flexbox for the minimum Obsidian browser target",
+);
+rejectMatch(
+  styles,
+  /(?:scrollbar-(?:width|color)\s*:|::?-webkit-scrollbar(?:-[a-z-]+)?)/,
+  "partially supported custom scrollbar CSS remains; use native overflow scrollbars instead",
+);
 requireMatch(releaseWorkflow, /actions\/attest@v4/, "release artifact attestation is missing");
 requireMatch(releaseWorkflow, /subject-path:[\s\S]*main\.js[\s\S]*manifest\.json[\s\S]*styles\.css/, "all release assets must be attested");
 

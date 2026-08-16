@@ -24,8 +24,14 @@ function summaryVariables(summary: SerialCoverMigrationSummary): Record<string, 
 
 export function formatSerialCoverMigrationReport(summary: SerialCoverMigrationSummary): string {
   const lines = [serialCoverText("settings.summary", summaryVariables(summary))];
+  const statusKeys = {
+    loaded: "migration.status.loaded",
+    "not-found": "migration.status.notFound",
+    failed: "migration.status.failed",
+    skipped: "migration.status.skipped",
+  } as const;
   for (const detail of summary.details) {
-    lines.push(`${detail.status.toUpperCase()} · ${detail.title} · ${detail.label} · ${detail.message}`);
+    lines.push(`${serialCoverText(statusKeys[detail.status])} · ${detail.title} · ${detail.label} · ${detail.message}`);
   }
   return lines.join("\n");
 }

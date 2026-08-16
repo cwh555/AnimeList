@@ -66,7 +66,11 @@ const html = `<!doctype html>
         genres: ["戀愛", "日常"],
         favorite: false,
       },
-      tagOptions: ["校園", "收藏"],
+      tagOptions: ["School", "Coming of Age", "收藏"],
+      tagDisplayLabels: new Map([
+        ["School", "学園"],
+        ["Coming of Age", "成長"],
+      ]),
     });
 
     const details = {};
@@ -78,20 +82,28 @@ const html = `<!doctype html>
 
     fields.genres.querySelector(".al-tag-add-button").click();
     const school = [...fields.genres.querySelectorAll(".al-tag-suggestion")]
-      .find((button) => button.textContent === "校園");
+      .find((button) => button.textContent === "学園");
     school.click();
-    details.suggestionAppends = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "日常", "校園"]);
+    details.localizedSuggestionStoresCanonical = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "日常", "School"]);
 
     const input = fields.genres.querySelector(".al-tag-picker input");
+    input.value = "成長";
+    input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    const comingOfAge = [...fields.genres.querySelectorAll(".al-tag-suggestion")]
+      .find((button) => button.textContent === "成長");
+    details.localizedSearchFindsCanonical = Boolean(comingOfAge);
+    comingOfAge.click();
+    details.localizedSearchStoresCanonical = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "日常", "School", "Coming of Age"]);
+
     input.value = "重看";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    details.enterAppends = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "日常", "校園", "重看"]);
+    details.enterAppends = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "日常", "School", "Coming of Age", "重看"]);
 
     const dailyChip = [...fields.genres.querySelectorAll(".al-tag-chip-selected")]
       .find((chip) => chip.querySelector(".al-tag-chip-label")?.textContent === "日常");
     dailyChip.querySelector(".al-tag-chip-remove").click();
-    details.xOnlyRemovesOne = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "校園", "重看"]);
+    details.xOnlyRemovesOne = JSON.stringify(fields.genres.values()) === JSON.stringify(["戀愛", "School", "Coming of Age", "重看"]);
 
     document.body.dataset.details = JSON.stringify(details);
     document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";

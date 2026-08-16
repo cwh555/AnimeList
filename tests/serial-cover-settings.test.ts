@@ -3,7 +3,7 @@ import test from "node:test";
 import type { ButtonComponent, Setting, TextComponent } from "obsidian";
 import { SerialCoverMigrationModal } from "../src/serial-cover-migration-modal";
 import { configureSerialCoverProvider } from "../src/serial-cover-provider";
-import { createSerialCoverSettingsSection } from "../src/serial-cover-settings";
+import { createSerialCoverSettingsSections } from "../src/serial-cover-settings";
 import type { SerialCoverPlugin } from "../src/serial-cover-service";
 
 function settingsPlugin(): {
@@ -23,8 +23,11 @@ function settingsPlugin(): {
 
 test("serial cover settings use typed controls and preserve their actions", async () => {
   const { plugin, savedCount } = settingsPlugin();
-  const section = createSerialCoverSettingsSection(plugin);
-  assert.equal(section.definitions.length, 2);
+  const sections = createSerialCoverSettingsSections(plugin);
+  assert.deepEqual(sections.map((section) => section.page), ["features", "maintenance"]);
+  assert.equal(sections.every((section) => Boolean(section.heading)), true);
+  assert.equal(sections[0]?.definitions.length, 1);
+  assert.equal(sections[1]?.definitions.length, 1);
 
   let placeholder = "";
   let inputValue = "";
@@ -50,7 +53,7 @@ test("serial cover settings use typed controls and preserve their actions", asyn
     },
   } as unknown as Setting;
 
-  const apiKeyDefinition = section.definitions[0];
+  const apiKeyDefinition = sections[0]?.definitions[0];
   if (!apiKeyDefinition?.render) throw new Error("API key setting is not renderable");
   apiKeyDefinition.render(textSetting);
   assert.ok(placeholder);
@@ -76,7 +79,7 @@ test("serial cover settings use typed controls and preserve their actions", asyn
     },
   } as unknown as Setting;
 
-  const migrationDefinition = section.definitions[1];
+  const migrationDefinition = sections[1]?.definitions[0];
   if (!migrationDefinition?.render) throw new Error("Migration setting is not renderable");
   migrationDefinition.render(buttonSetting);
   if (onClick === null) throw new Error("Migration click handler was not registered");

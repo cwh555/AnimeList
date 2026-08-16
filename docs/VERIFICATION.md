@@ -1,47 +1,66 @@
 # Verification
 
-This repository was verified from clean extracted copies on 2026-07-19.
+AnimeList release candidates are verified from the exact Git commit that will be reviewed. This document describes the required verification contract instead of preserving stale timing or test-count snapshots from an older release.
 
-## Environment
+## Required environment
 
-- Node.js: 22.16.0
-- npm: 10.9.2
-- Operating system: Linux x64
-- npm cache: empty for every clean-install run
+- A clean checkout of the candidate commit.
+- The Node.js version used by repository CI or another version supported by `package.json`.
+- npm with the committed lockfile.
+- Chromium available for the browser regression scripts when they are run outside GitHub Actions.
+- A disposable Obsidian Test Vault for the final interactive checks.
 
-## Results
+## Local release-candidate checks
 
-Two clean installs were recorded against the configured npm registry:
-
-```text
-Run 1: npm ci completed in 2.44 seconds
-Run 2: npm ci completed in 32.81 seconds during a slower registry response
-Final run after the test-runner fix: npm ci completed in 2.35 seconds
-```
-
-The final automated checks completed as follows:
-
-```text
-npm run check:          2.89 seconds
-unit tests:             7 passed, 0 failed
-npm run release:check:  0.31 seconds
-node --check main.js:   passed
-```
-
-The repository installs four packages on the current platform: TypeScript, tslib, esbuild, and the platform-specific esbuild binary. The lockfile contains no private registry hostname and no `resolved` registry URL fields.
-
-The test runner explicitly stops the esbuild service after the Node.js test process exits. This prevents `npm test` from printing successful results and then remaining alive indefinitely.
-
-## Commands
+Run from the repository root:
 
 ```bash
-rm -rf node_modules
 npm ci
+npm test
 npm run check
 npm run release:check
-node --check main.js
 ```
 
-The exact download time depends on the configured npm registry and network. A clean install should finish or report a network error; it should not remain alive after the unit-test summary.
+`npm run check` is the complete repository gate: TypeScript, strict TypeScript, lint, architecture checks, automated tests, Community preflight, reproducible styles, and the production build. `npm run release:check` verifies the currently committed release metadata and release artifacts; version metadata is intentionally changed only in the dedicated final version-bump step.
 
-The verification environment cannot launch the official Obsidian desktop or mobile application. Complete the manual checklist in `docs/MANUAL_TEST_CHECKLIST.md` before publishing.
+For browser-sensitive changes, also run the relevant Chromium regressions:
+
+```bash
+npm run test:browser:date
+npm run test:browser:mobile
+npm run test:browser:tags
+npm run test:browser:tag-manager
+```
+
+## GitHub Actions
+
+The final PR head must pass `.github/workflows/ci.yml` on the exact SHA being reviewed. The workflow independently runs:
+
+```text
+npm ci
+TZ=UTC npm run check
+TZ=Asia/Taipei npm test
+segmented-date Chromium regression
+responsive mobile Chromium regression
+tag-chip Chromium regression
+Tag Manager Chromium regression
+npm run release:check
+```
+
+A successful older SHA is not sufficient after the branch changes. If a validation-only commit is used to obtain a clean final CI run, the final reported workflow must correspond to that new head SHA.
+
+## Community compatibility
+
+The Community preflight must stay free of suppressions and browser-feature workarounds that exceed the minimum supported Obsidian baseline. Release CSS should avoid unsupported or partially supported features when an equivalent baseline layout exists. The current preflight explicitly protects against reintroducing CSS multi-column layout and `scrollbar-width` / `scrollbar-color` into the generated release stylesheet.
+
+## Test Vault
+
+After automated checks pass, run:
+
+```bash
+npm run test-vault
+```
+
+This installs only `main.js`, `manifest.json`, and `styles.css` into the disposable vault, prepares the controlled fixtures, and opens the manual checklist. The production Test Vault is the final place to verify real Obsidian lifecycle, Markdown rendering, note-media behavior, release tracking, Settings, and desktop/mobile layout.
+
+The automated checks do not replace interactive Test Vault verification. A release candidate should not be merged or published until the manual checklist relevant to the changed features is explicitly approved.

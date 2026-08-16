@@ -1,14 +1,19 @@
 import type { LegacyMetadataCleanupDetail, LegacyMetadataCleanupResult } from "./domain/legacy-metadata-types";
+import { legacyMetadataText } from "./legacy-metadata-text";
 
 function enrichmentSuffix(detail: LegacyMetadataCleanupDetail): string {
-  if (detail.enrichment === "unavailable") return "AniList: no reliable match";
-  if (detail.enrichment === "failed") return `AniList failed${detail.error ? `: ${detail.error}` : ""}`;
+  if (detail.enrichment === "unavailable") return legacyMetadataText("report.noMatch");
+  if (detail.enrichment === "failed") {
+    return legacyMetadataText("report.failed", { detail: detail.error ? `: ${detail.error}` : "" });
+  }
   return "";
 }
 
 export function legacyMetadataDetailLine(detail: LegacyMetadataCleanupDetail): string {
   const parts = [`${detail.title} (${detail.path})`];
-  if (detail.changes.length) parts.push(`changed: ${detail.changes.join(", ")}`);
+  if (detail.changes.length) {
+    parts.push(legacyMetadataText("report.changed", { fields: detail.changes.join(", ") }));
+  }
   const enrichment = enrichmentSuffix(detail);
   if (enrichment) parts.push(enrichment);
   return parts.join(" — ");

@@ -55,6 +55,8 @@ export class MediaRepository {
     const mediaType = mediaTypeOf(frontmatter.media_type);
     if (!mediaType) return null;
 
+    const coverPath = normalizedCoverPath(frontmatter.cover);
+    const remoteCoverPath = normalizedCoverPath(frontmatter.cover_remote);
     const coverFile = this.resolveCoverFile(frontmatter.cover, file.path);
     const studios = compatibleStudios(frontmatter);
     const authors = stringArray(frontmatter.authors);
@@ -66,7 +68,6 @@ export class MediaRepository {
     const modified = Number(file.stat?.mtime || 0);
     const modifiedLabel = modified ? formatFileModifiedTime(modified) : "";
     const progressUnit = defaultProgressUnit(mediaType, frontmatter.progress_unit);
-
     return {
       title: stringValue(frontmatter.title, file.basename),
       originalTitle: stringValue(
@@ -100,9 +101,11 @@ export class MediaRepository {
       sourceUrls: stringArray(frontmatter.source_urls),
       cover: coverFile
         ? this.app.vault.getResourcePath(coverFile)
-        : /^https?:\/\//i.test(normalizedCoverPath(frontmatter.cover))
-          ? normalizedCoverPath(frontmatter.cover)
-          : "",
+        : /^https?:\/\//i.test(coverPath)
+          ? coverPath
+          : /^https?:\/\//i.test(remoteCoverPath)
+            ? remoteCoverPath
+            : "",
       coverSources: coverFile ? this.coverSourcesFor?.(coverFile) : undefined,
       filePath: file.path,
       updated: modified,

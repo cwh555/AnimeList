@@ -1,6 +1,6 @@
 {
   "name": "animelist",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "An Obsidian plugin for managing anime, manga, and novel lists in Markdown.",
   "main": "main.js",
   "type": "module",
@@ -13,7 +13,7 @@
     "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm run architecture:check && npm test && npm run community:check && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
-    "test-vault:fixtures": "node scripts/test-vault-fixtures.mjs",
+    "test-vault:fixtures": "node scripts/release-tracking-test-fixtures.mjs --reset",
     "release:check": "node scripts/check-release.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
     "community:check": "node scripts/check-community-review.mjs",
@@ -22,6 +22,7 @@
     "test:unit": "node scripts/run-tests.mjs --suite unit",
     "test:integration": "node scripts/run-tests.mjs --suite integration",
     "test:contract": "node scripts/run-tests.mjs --suite contract",
+    "test:legacy-update": "node scripts/run-tests.mjs --suite legacy-update",
     "test:legacy": "node scripts/run-tests.mjs --suite legacy",
     "test:feature": "node scripts/run-tests.mjs --feature",
     "test:list": "node scripts/run-tests.mjs --list",
@@ -31,6 +32,7 @@
     "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json",
     "architecture:check": "node scripts/check-architecture.mjs",
     "test:browser:mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-mobile-layout.mjs",
+    "test:browser:score-mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-dashboard-mobile-interactions.mjs",
     "test:browser:tags": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-tag-chip-interactions.mjs",
     "test:browser:tag-manager": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-user-tag-manager.mjs"
   },

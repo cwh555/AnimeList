@@ -1,7 +1,14 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
 import type { SettingDefinition } from "obsidian";
 import { DEFAULT_SEARCH_LANGUAGES } from "./multilingual-search";
+import { withActiveLocale } from "./i18n/catalog";
 import { searchFeatureText } from "./search-feature-text";
+import {
+  SETTINGS_PAGES,
+  normalizeSettingsPage,
+  settingsPageForKey,
+  type SettingsPageId,
+} from "./settings-layout";
 import {
   MAX_TIMELINE_MAX_STACK_DEPTH,
   MIN_TIMELINE_MAX_STACK_DEPTH,
@@ -9,6 +16,7 @@ import {
 } from "./timeline-scale";
 import type {
   AnimeListSettings,
+  LanguagePreference,
   SearchLanguage,
   SearchLanguageSettings,
   StorageMode,
@@ -27,10 +35,12 @@ export interface AnimeListSettingsHost {
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+  setInterfaceLanguage?(preference: LanguagePreference): Promise<void>;
   getFeatureSettingsSections?(): SettingsSection[];
 }
 
 export interface SettingsSection {
+  page?: SettingsPageId;
   heading?: string;
   description?: string;
   definitions: SettingDefinition[];
@@ -43,17 +53,25 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
-
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
+  private activePage: SettingsPageId = "general";
 
   constructor(app: App, plugin: AnimeListSettingsHost) {
     super(app, plugin as never);
     this.plugin = plugin;
   }
 
+  getInterfaceLanguageDefinition(): SettingDefinition {
+    return withActiveLocale("en", () => ({
+      name: uiText("settings.language.name"),
+      desc: uiText("settings.language.desc"),
+      render: (setting) => this.renderInterfaceLanguage(setting),
+    }));
+  }
+
   getSettingDefinitions(): SettingDefinition[] {
-    return [
+    return withActiveLocale("en", () => [
       {
         name: uiText("settings.storageLayout.name"),
         desc: uiText("settings.storageLayout.desc"),
@@ -116,11 +134,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
         desc: uiText("settings.copyTemplates.desc"),
         render: (setting) => this.renderCopyTemplates(setting),
       },
-    ];
+    ]);
   }
 
   getSearchLanguageDefinitions(): SettingDefinition[] {
-    return [
+    return withActiveLocale("en", () => [
       {
         name: searchFeatureText("settings.languages.chinese.name"),
         desc: searchFeatureText("settings.languages.chinese.desc"),
@@ -136,34 +154,59 @@ export class AnimeListSettingTab extends PluginSettingTab {
         desc: searchFeatureText("settings.languages.original.desc"),
         render: (setting) => this.renderSearchLanguage(setting, "original"),
       },
-    ];
+    ]);
   }
 
   getSettingSections(): SettingsSection[] {
-    const base = this.getSettingDefinitions();
-    const sections: SettingsSection[] = [
-      { definitions: base.slice(0, 6) },
-      {
-        heading: uiText("settings.timeline.heading"),
-        description: uiText("settings.timeline.desc"),
-        definitions: base.slice(6, 7),
-      },
-      {
-        heading: searchFeatureText("settings.languages.heading"),
-        definitions: this.getSearchLanguageDefinitions(),
-      },
-      {
-        heading: uiText("settings.providers.heading"),
-        definitions: base.slice(7, 10),
-      },
-      {
-        heading: uiText("settings.setup.heading"),
-        definitions: base.slice(10),
-      },
+    return withActiveLocale("en", () => {
+      const base = this.getSettingDefinitions();
+      const sections: SettingsSection[] = [
+        {
+          page: "general",
+          definitions: [this.getInterfaceLanguageDefinition(), ...base.slice(0, 6)],
+        },
+        {
+          page: "general",
+          heading: uiText("settings.timeline.heading"),
+          description: uiText("settings.timeline.desc"),
+          definitions: base.slice(6, 7),
+        },
+        {
+          page: "search-metadata",
+          heading: searchFeatureText("settings.languages.heading"),
+          definitions: this.getSearchLanguageDefinitions(),
+        },
+        {
+          page: "search-metadata",
+          heading: uiText("settings.providers.heading"),
+          definitions: base.slice(7, 10),
+        },
+        {
+          page: "maintenance",
+          heading: uiText("settings.setup.heading"),
+          definitions: base.slice(10),
+        },
+      ];
+      const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
+        ...section,
+        page: section.page ?? "features" as const,
+      }));
+      sections.splice(1, 0, ...featureSections);
+      return sections;
+    });
+  }
+
+  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
+    const sections = this.getSettingSections().filter((section) => section.page === page);
+    if (page !== "general") return sections;
+    const core = sections.find((section) => !section.heading);
+    if (!core) return sections;
+    return [
+      { page: "general", heading: "Interface", definitions: core.definitions.slice(0, 1) },
+      { page: "general", heading: "Library & storage", definitions: core.definitions.slice(1, 5) },
+      { page: "general", heading: "File locations", definitions: core.definitions.slice(5) },
+      ...sections.filter((section) => section !== core),
     ];
-    const featureSections = this.plugin.getFeatureSettingsSections?.() ?? [];
-    sections.splice(1, 0, ...featureSections);
-    return sections;
   }
 
   display(): void {
@@ -173,33 +216,147 @@ export class AnimeListSettingTab extends PluginSettingTab {
     this.renderImperativeSettings();
   }
 
-  private renderImperativeSettings(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("p", {
-      text: uiText("settings.intro"),
-    });
+  private renderPageTabs(containerEl: HTMLElement): void {
+    const tabList = containerEl.createDiv({ cls: "animelist-settings-tabs" });
+    tabList.setAttribute("role", "tablist");
+    tabList.setAttribute("aria-label", "Settings pages");
 
-    for (const section of this.getSettingSections()) {
-      if (section.heading) {
-        const heading = new Setting(containerEl).setName(section.heading).setHeading();
-        if (section.description) heading.setDesc(section.description);
-      }
-      for (const definition of section.definitions) {
-        if (definition.visible && !definition.visible()) continue;
-        const setting = new Setting(containerEl).setName(definition.name);
-        if (definition.desc) setting.setDesc(definition.desc);
-        definition.render?.(setting);
-      }
+    for (const page of SETTINGS_PAGES) {
+      const active = page.id === this.activePage;
+      const button = tabList.createEl("button", { text: page.label });
+      button.type = "button";
+      button.id = `animelist-settings-tab-${page.id}`;
+      button.dataset.settingsPage = page.id;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(active));
+      button.setAttribute("aria-controls", `animelist-settings-panel-${page.id}`);
+      button.tabIndex = active ? 0 : -1;
+      button.toggleClass("mod-cta", active);
+      button.addEventListener("click", () => {
+        if (page.id !== this.activePage) this.openSettingsPage(page.id);
+      });
+      button.addEventListener("keydown", (event) => {
+        const next = settingsPageForKey(page.id, event.key);
+        if (!next) return;
+        event.preventDefault();
+        this.openSettingsPage(next, true);
+      });
+      tabList.append(" ");
     }
   }
 
-  private refreshSettingsTab(): void {
-    if (typeof this.update === "function") {
-      this.update();
-      return;
-    }
+  private openSettingsPage(page: SettingsPageId, focusTab = false): void {
+    this.activePage = normalizeSettingsPage(page);
     this.renderImperativeSettings();
+    if (!focusTab) return;
+    this.containerEl
+      .querySelector<HTMLButtonElement>(`button[data-settings-page="${this.activePage}"]`)
+      ?.focus();
+  }
+
+  private renderImperativeSettings(): void {
+    withActiveLocale("en", () => {
+      const { containerEl } = this;
+      containerEl.empty();
+      this.activePage = normalizeSettingsPage(this.activePage);
+      this.renderPageTabs(containerEl);
+
+      const panel = containerEl.createDiv({ cls: "animelist-settings-page" });
+      panel.id = `animelist-settings-panel-${this.activePage}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", `animelist-settings-tab-${this.activePage}`);
+      const intro = panel.createEl("p", {
+        text: uiText("settings.intro"),
+      });
+      intro.setCssStyles({
+        margin: "var(--size-4-3) 0 var(--size-4-5)",
+        color: "var(--text-muted)",
+      });
+
+      for (const section of this.getSettingsPageSections(this.activePage)) {
+        const sectionEl = panel.createEl("section", { cls: "animelist-settings-section" });
+        sectionEl.setCssStyles({
+          margin: "0 0 var(--size-4-6)",
+          overflow: "hidden",
+          border: "1px solid var(--background-modifier-border)",
+          borderRadius: "var(--radius-l)",
+          background: "var(--background-secondary)",
+        });
+        if (section.heading) {
+          const headerEl = sectionEl.createDiv({ cls: "animelist-settings-section-header" });
+          headerEl.setCssStyles({
+            background: "var(--background-secondary-alt)",
+            borderBottom: "1px solid var(--background-modifier-border)",
+          });
+          const heading = new Setting(headerEl).setName(section.heading).setHeading();
+          heading.settingEl.setCssStyles({
+            margin: "0",
+            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
+            border: "0",
+            borderRadius: "0",
+            background: "transparent",
+            boxShadow: "none",
+          });
+          if (section.description) {
+            heading.setDesc(section.description);
+            heading.descEl.setCssStyles({
+              marginTop: "var(--size-4-1)",
+              color: "var(--text-muted)",
+            });
+          }
+        }
+
+        const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });
+        let renderedDefinitions = 0;
+        for (const definition of section.definitions) {
+          if (definition.visible && !definition.visible()) continue;
+          const setting = new Setting(bodyEl).setName(definition.name);
+          setting.settingEl.setCssStyles({
+            margin: "0",
+            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
+            border: "0",
+            borderTop: renderedDefinitions > 0
+              ? "1px solid var(--background-modifier-border)"
+              : "0",
+            borderRadius: "0",
+            background: "transparent",
+            boxShadow: "none",
+          });
+          setting.nameEl.setCssStyles({ fontWeight: "var(--font-medium)" });
+          if (definition.desc) setting.setDesc(definition.desc);
+          definition.render?.(setting);
+          renderedDefinitions += 1;
+        }
+        if (renderedDefinitions === 0) sectionEl.remove();
+      }
+    });
+  }
+
+  private refreshSettingsTab(): void {
+    this.renderImperativeSettings();
+  }
+
+  private renderInterfaceLanguage(setting: Setting): void {
+    setting.addDropdown((dropdown) => {
+      dropdown
+        .addOption("system", uiText("settings.language.system"))
+        .addOption("zh-TW", uiText("settings.language.zhTW"))
+        .addOption("en", uiText("settings.language.en"))
+        .addOption("ja", uiText("settings.language.ja"))
+        .addOption("ko", uiText("settings.language.ko"))
+        .setValue(this.plugin.settings.interfaceLanguage)
+        .onChange(async (value) => {
+          const preference = value as LanguagePreference;
+          if (this.plugin.setInterfaceLanguage) {
+            await this.plugin.setInterfaceLanguage(preference);
+          } else {
+            this.plugin.settings.interfaceLanguage = preference;
+            await this.plugin.saveSettings();
+            this.plugin.refreshViews();
+          }
+          this.refreshSettingsTab();
+        });
+    });
   }
 
   private renderStorageLayout(setting: Setting): void {

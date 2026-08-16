@@ -318,6 +318,39 @@ describe("metadata provider clients", () => {
   });
 
 
+  it("fetches official manga streaming links by a preserved AniList identity", async () => {
+    let body: any;
+    setRequestUrlMock((options) => {
+      body = JSON.parse(options.body ?? "{}");
+      return {
+        json: {
+          data: {
+            Media: {
+              id: 87395,
+              title: { romaji: "Grand Blue", english: "Grand Blue Dreaming", native: "ぐらんぶる" },
+              synonyms: ["碧藍之海"],
+              externalLinks: [
+                { site: "Comic Days", url: "https://comic-days.com/episode/old", type: "STREAMING", language: "Japanese" },
+                { site: "Official Site", url: "https://afternoon.kodansha.co.jp/c/grandblue.html", type: "INFO", language: "Japanese" },
+              ],
+            },
+          },
+        },
+        text: "",
+      };
+    });
+    try {
+      const result = await new AniListClient().fetchMangaReleaseSources("87395");
+      assert.equal(body.variables.id, 87395);
+      assert.match(body.query, /externalLinks \{ site url type language \}/);
+      assert.deepEqual(result?.titles, ["ぐらんぶる", "Grand Blue", "Grand Blue Dreaming", "碧藍之海"]);
+      assert.equal(result?.externalLinks[0]?.site, "Comic Days");
+      assert.equal(result?.externalLinks[1]?.type, "INFO");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("batches multilingual AniList query variants into one GraphQL request", async () => {
     let calls = 0;
     let body: any;
