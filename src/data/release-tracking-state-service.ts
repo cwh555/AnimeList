@@ -157,9 +157,15 @@ export class ReleaseTrackingStateService {
     return true;
   }
 
+  hasExplicitStatus(path: string): boolean {
+    const file = this.file(path);
+    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    return Object.hasOwn(frontmatter, "release_tracking_status");
+  }
+
   async enable(path: string, mediaType: MediaType): Promise<boolean> {
     const current = this.read(path, mediaType);
-    if (current.status !== "disabled") return false;
+    if (current.status !== "disabled" && this.hasExplicitStatus(path)) return false;
     await this.update(path, (frontmatter) => {
       frontmatter.release_tracking_status = "unconfigured";
       delete frontmatter.release_tracking_error;
