@@ -16,8 +16,8 @@ await build({
   absWorkingDir: root,
   stdin: {
     contents: `
-      export { renderSerialCoverCandidateRow } from "./src/serial-cover-picker";
-      export { SerialCoverDirectApply, directlyApplySerialCover } from "./src/serial-cover-direct-apply";
+      export { renderSerialCoverCandidateRow } from "./src/ui/serial-covers/picker";
+      export { SerialCoverDirectApply, directlyApplySerialCover } from "./src/app/serial-covers/direct-apply";
     `,
     resolveDir: root,
     loader: "ts",

@@ -1,6 +1,6 @@
 import { createSerialEntryDateControls } from "../../src/ui/serial-entry-date-controls";
 import { createSerialEntryKeyboardNavigation } from "../../src/ui/serial-entry-keyboard-navigation";
-import { scheduleStableSerialEntryFocus } from "../../src/serial-entry-scroll-stability";
+import { scheduleStableSerialEntryFocus } from "../../src/ui/serial-covers/scroll-stability";
 
 declare global {
   interface HTMLElement {
