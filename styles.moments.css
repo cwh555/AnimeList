@@ -400,15 +400,6 @@
   scroll-snap-type: x proximity;
   scroll-padding-inline: 0.14rem;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border)) transparent;
-}
-
-.al-moment-image-row::-webkit-scrollbar { height: 6px; }
-.al-moment-image-row::-webkit-scrollbar-track { background: transparent; }
-.al-moment-image-row::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 46%, var(--background-modifier-border));
 }
 
 .al-moment-image {
@@ -469,10 +460,7 @@
   padding: 0;
   overflow: hidden;
   scroll-snap-type: none;
-  scrollbar-width: none;
 }
-
-.al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
 
 .al-moment-image-row[data-image-count="1"] .al-moment-image {
   box-sizing: border-box;
@@ -659,7 +647,6 @@
   border: 1px dashed var(--background-modifier-border);
   border-radius: 10px;
   background: var(--background-secondary);
-  scrollbar-width: thin;
 }
 
 .al-moment-editor-images.is-dragging {

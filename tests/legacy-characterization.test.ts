@@ -705,16 +705,23 @@ describe("version documentation", () => {
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
     assert.match(sessions, /\*\*Release state:\*\* Published through `1\.1\.2`\./);
+    assert.match(changelog, /## 1\.4\.0 - 2026-08-15/);
     assert.match(changelog, /## 1\.3\.0 - 2026-08-07/);
     assert.match(changelog, /## 1\.2\.1 - 2026-07-27/);
     assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
     assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
     assert.match(readme, /> \[!NOTE\]/);
-    assert.match(readme, /> \*\*What's new in 1\.3\.0\*\*/);
+    assert.match(readme, /> \*\*What's new in 1\.4\.0\*\*/);
     assert.match(readme, /\[User Guide\]\(docs\/USER_GUIDE\.md\)/);
+    assert.match(userGuide, /## Latest release tracking/);
+    assert.match(userGuide, /## Image Sections/);
+    assert.match(userGuide, /## Moments/);
     assert.match(userGuide, /## Score Dashboard/);
     assert.match(userGuide, /## Markdown data and templates/);
     assert.doesNotMatch(roadmap, /Add a score dashboard/);
+    assert.doesNotMatch(roadmap, /Support multiple interface languages/);
+    assert.doesNotMatch(roadmap, /Add an image section/);
+    assert.doesNotMatch(roadmap, /Add a meme section/);
     assert.doesNotMatch(readme, /## Library data/);
   });
 

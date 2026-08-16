@@ -12,10 +12,7 @@
 
 > New features and capabilities that expand what the plugin can do.
 
-- Support multiple interface languages
 - Export library data as plain text or JSON
-- Add an image section to notes for storing related images
-- Add a meme section to notes with captions, search, and clipboard copy support
 
 ---
 

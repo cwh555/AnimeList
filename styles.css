@@ -940,12 +940,17 @@
   padding:2px;
   scrollbar-gutter:auto;
 }
-.al-image-masonry { columns:4 178px; column-gap:8px; }
+.al-image-masonry {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  align-items:start;
+  gap:8px;
+}
 .al-image-item {
   position:relative;
-  break-inside:avoid;
+  min-width:0;
   overflow:hidden;
-  margin:0 0 8px;
+  margin:0;
   border:1px solid color-mix(in srgb,var(--background-modifier-border) 82%,transparent);
   border-radius:9px;
   background:var(--background-secondary);
@@ -1115,16 +1120,16 @@
 .al-image-delete-copy { color:var(--text-muted); line-height:1.55; }
 
 @media (hover:none) { .al-image-menu-trigger { opacity:.86; } }
+@media (min-width:621px) and (max-width:740px) { .al-image-masonry { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (max-width:620px) {
   .animelist-image-add-modal { width:calc(100vw - 20px); max-width:calc(100vw - 20px); }
   .animelist-image-section { padding:8px; }
   .al-image-gallery-viewport { max-height:clamp(360px,58vh,500px); }
-  .al-image-masonry { columns:2 138px; column-gap:7px; }
-  .al-image-item { margin-bottom:7px; }
+  .al-image-masonry { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
   .al-image-url-row { align-items:stretch; flex-direction:column; }
   .al-image-url-row button { align-self:flex-end; }
 }
-@media (max-width:360px) { .al-image-masonry { columns:1; } }
+@media (max-width:360px) { .al-image-masonry { grid-template-columns:minmax(0,1fr); } }
 
 .al-image-item:not(.is-selecting) { cursor:zoom-in; }
 .al-image-item:not(.is-selecting):focus-visible {
@@ -1608,15 +1613,6 @@
   scroll-snap-type: x proximity;
   scroll-padding-inline: 0.14rem;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border)) transparent;
-}
-
-.al-moment-image-row::-webkit-scrollbar { height: 6px; }
-.al-moment-image-row::-webkit-scrollbar-track { background: transparent; }
-.al-moment-image-row::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 46%, var(--background-modifier-border));
 }
 
 .al-moment-image {
@@ -1677,10 +1673,7 @@
   padding: 0;
   overflow: hidden;
   scroll-snap-type: none;
-  scrollbar-width: none;
 }
-
-.al-moment-image-row[data-image-count="1"]::-webkit-scrollbar { display: none; }
 
 .al-moment-image-row[data-image-count="1"] .al-moment-image {
   box-sizing: border-box;
@@ -1867,7 +1860,6 @@
   border: 1px dashed var(--background-modifier-border);
   border-radius: 10px;
   background: var(--background-secondary);
-  scrollbar-width: thin;
 }
 
 .al-moment-editor-images.is-dragging {
@@ -3009,8 +3001,6 @@
 
   .al-type-tabs,
   .al-status-bar { width:100%; max-width:none; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
-  .al-type-tabs::-webkit-scrollbar,
-  .al-status-bar::-webkit-scrollbar { display:none; }
   .al-type-tabs { margin:12px 0 10px; }
   .al-type-tab { flex:0 0 auto; min-height:42px; padding-inline:12px; scroll-snap-align:start; }
   .al-status-bar { gap:6px; margin-bottom:16px; padding-bottom:2px; }
@@ -3075,7 +3065,6 @@
   .al-score-dashboard-summary { max-width:none; font-size:.68rem; text-align:left; }
   .al-score-dashboard-controls { position:static; display:grid; grid-template-columns:1fr; gap:8px; padding:10px 0; }
   .al-score-dashboard-tabs { width:100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .al-score-dashboard-tabs::-webkit-scrollbar { display:none; }
   .al-score-dashboard-tab { flex:0 0 auto; min-height:42px; }
   .al-score-dashboard-action-group { width:100%; }
   .al-score-tool-button { min-height:44px; flex:1 1 0; justify-content:center; }
@@ -3152,8 +3141,6 @@
   .al-timeline-copy { min-width:0; }
   .al-timeline-type-filters,
   .al-timeline-controls { width:100%; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .al-timeline-type-filters::-webkit-scrollbar,
-  .al-timeline-controls::-webkit-scrollbar { display:none; }
   .al-timeline-type-filter { min-height:40px; flex:0 0 auto; padding-inline:12px; }
   .al-timeline-control-group { flex:0 0 auto; justify-content:flex-start; }
   .al-timeline-controls button { width:42px; height:42px; flex:0 0 42px; }

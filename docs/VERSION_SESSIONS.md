@@ -62,7 +62,7 @@ This document preserves the product-level decisions introduced by each major dev
 
 ## 1.3.0 — Classification, reusable tags, filtering, and mobile performance
 
-**Release state:** Preview / release candidate.
+**Release state:** Published through `1.3.1`.
 
 ### Main outcomes
 
@@ -81,7 +81,35 @@ This document preserves the product-level decisions introduced by each major dev
 - `genres` remains the canonical editable/reusable work-tag field.
 - `media_tags` stores filtered provider classification tags separately from user-edited tags.
 - Anime classification may add `studios`, `season`, `season_year`, `source_material`, and `anilist_id`.
-- Stable 1.2.1 notes remain readable without startup rewriting; explicit cleanup can backfill missing metadata and consolidate supported `user_tags` / `classification_*` fields while preserving unrelated frontmatter and body content.
+- Older notes remain readable without startup rewriting; explicit cleanup can backfill missing metadata and consolidate supported `user_tags` / `classification_*` fields while preserving unrelated frontmatter and body content.
+
+## 1.4.0 — Localized UI, release awareness, and reusable note media
+
+**Release state:** Preview / release candidate.
+
+### Main outcomes
+
+- Added a localized AnimeList interface for Traditional Chinese, English, Japanese, and Korean, plus Follow Obsidian. Settings remain English, and provider taxonomy localization is display-only.
+- Added opt-in latest-release tracking for manga chapters and already-published novel volumes without changing personal reading progress.
+- Manga tracking combines verified MangaDex evidence with supported official public chapter pages discovered from the exact preserved AniList identity; the highest valid main-chapter evidence wins rather than assuming one source is always newest.
+- Novel tracking uses NDL/JPRO publication records with main-line matching that excludes recognized adaptations, side stories, specials, guides, and other parallel publications.
+- Added reusable `animelist-images` sections anywhere in a note with local image management, clipboard/file/drag-drop/URL import, duplicate protection, thumbnails, lightbox navigation, copy, Set as cover, and reference-aware deletion.
+- Added reusable `animelist-moments` sections for quote/scene memories composed of text plus one or more images and optional source, position, speaker, tags, and note fields.
+- Added the native AnimeList editor submenu for inserting Image Sections and Moments without replacing surrounding Markdown.
+- Reorganized Settings into General, Search & metadata, Features, Maintenance, and Updates & cleanup pages with clear section grouping.
+- Added review-first duplicate generated-note-cover cleanup alongside the existing explicit legacy metadata cleanup.
+- Kept note-media layouts compatible with the declared Obsidian browser baseline by avoiding CSS multi-column and non-baseline scrollbar properties.
+
+### Data model
+
+- Keeps `schema_version: 6`; no startup media-schema migration is introduced.
+- `animelist-images` and `animelist-moments` are ordinary fenced Markdown blocks and do not require a new frontmatter schema version.
+- Moments use stable IDs; optional Moment metadata is omitted when empty.
+- Release tracking adds `release_tracking_*`, `latest_chapter` / `latest_volume`, `latest_release_date`, and source/check metadata only when the feature is configured or refreshed.
+- Release tracking never repurposes or overwrites `progress`, `progress_unit`, `volume_log`, personal status, rating, or note body text.
+- Interface-language changes do not rewrite titles, raw provider metadata, custom tags, Markdown/frontmatter, note bodies, or templates.
+- Managed image deletion remains reference-aware across covers, Image Sections, and Moments.
+- Version cleanup actions are explicit, review-first, and revalidate each candidate before mutation.
 
 ## Future session template
 
