@@ -44,6 +44,7 @@ export const TEST_TARGETS = [
   { path: "tests/release-tracking.test.ts", kind: "test", suite: "unit", features: ["release-tracking"] },
   { path: "tests/rating.test.ts", kind: "test", suite: "unit", features: ["rating", "progress"] },
   { path: "tests/release-tracking-state-service.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "markdown"] },
+  { path: "tests/release-tracking-enrollment.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "markdown"] },
   { path: "tests/release-tracking-settings.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "settings"] },
   { path: "tests/schema-migration.test.ts", kind: "test", suite: "integration", features: ["progress", "markdown"] },
   { path: "tests/segmented-date-input.test.ts", kind: "test", suite: "unit", features: ["progress"] },
