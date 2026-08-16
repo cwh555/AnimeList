@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { collectVersionMetadataFailures, loadVersionMetadata } from "./version-metadata.mjs";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -13,9 +14,8 @@ function walk(directory) {
   });
 }
 
-const manifest = JSON.parse(read("manifest.json"));
-const packageJson = JSON.parse(read("package.json"));
-const versions = JSON.parse(read("versions.json"));
+const versionMetadata = loadVersionMetadata(root);
+const { manifest } = versionMetadata;
 const sourceFiles = walk(path.join(root, "src"))
   .filter((file) => file.endsWith(".ts"))
   .map((file) => fs.readFileSync(file, "utf8"))
@@ -34,8 +34,7 @@ function rejectMatch(value, pattern, message) {
   if (pattern.test(value)) failures.push(message);
 }
 
-if (manifest.version !== packageJson.version) failures.push("manifest.json and package.json versions must match");
-if (versions[manifest.version] !== manifest.minAppVersion) failures.push(`versions.json must map ${manifest.version} to manifest minAppVersion`);
+failures.push(...collectVersionMetadataFailures(versionMetadata));
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");
 rejectMatch(sourceFiles, /document\.create(?:Element|DocumentFragment|TextNode)\s*\(/, "native DOM creation remains; use Obsidian createEl helpers");

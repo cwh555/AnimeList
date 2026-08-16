@@ -33,7 +33,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new in 1.4.0**
+> **What's new**
 >
 > - Added interface localization for Traditional Chinese, English, Japanese, and Korean, with an option to follow Obsidian's interface language. Settings remain English.
 > - Added opt-in release tracking for manga chapters and already-published novel volumes. Manga can combine MangaDex with supported official public chapter sources discovered from preserved AniList identity; novels use NDL/JPRO publication data. Tracking never overwrites reading progress.

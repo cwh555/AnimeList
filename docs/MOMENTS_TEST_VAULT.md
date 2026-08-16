@@ -1,6 +1,6 @@
 # Moments Test Vault checklist
 
-Use this supplemental Test Vault checklist for AnimeList 1.4.0 release-candidate regression testing. The seeded real anime episode-scene fixtures exercise Moments together with Image Sections; the general release gate remains `docs/MANUAL_TEST_CHECKLIST.md`.
+Use this supplemental Test Vault checklist for AnimeList release-candidate regression testing. The seeded real anime episode-scene fixtures exercise Moments together with Image Sections; the general release gate remains `docs/MANUAL_TEST_CHECKLIST.md`.
 
 ## Media-first card layout
 
