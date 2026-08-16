@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm } from "../../src/domain/media-types";
-import { createDefaultSettings } from "../../src/settings-model";
+import { createDefaultSettings } from "../../src/app/settings-model";
 import { MediaNoteService } from "../../src/data/media-note-service";
 import type { MediaRepository } from "../../src/data/media-repository";
 import type { LibraryStorage } from "../../src/data/library-storage";

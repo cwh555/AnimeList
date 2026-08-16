@@ -6,7 +6,7 @@ import {
   renameUserTagInCatalog,
 } from "../domain/user-tag-catalog";
 import { normalizeUserTag } from "../domain/user-tags";
-import { userTagText } from "../user-tag-text";
+import { userTagText } from "../features/user-tags/text";
 import { makeEl, setAnimeListIcon } from "./ui-helpers";
 
 export interface UserTagManagerCallbacks {

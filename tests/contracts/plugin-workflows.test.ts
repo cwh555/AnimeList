@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App, TFile } from "obsidian";
 import AnimeListPlugin from "../../src/main";
-import { createDefaultSettings } from "../../src/settings-model";
+import { createDefaultSettings } from "../../src/app/settings-model";
 import type { MediaItem } from "../../src/types";
 import { TimelineModal } from "../../src/ui/timeline-modal";
 

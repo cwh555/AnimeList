@@ -5,19 +5,19 @@ import {
   normalizeScoreDashboardScale,
   scoreDashboardPosterMetrics,
   scoreDashboardScores,
-} from "../src/score-dashboard-model";
+} from "../src/domain/score-dashboard/model";
 import {
   planScoreDashboardMove,
   planScoreDashboardShift,
   scoreDashboardPlanNeedsClampConfirmation,
-} from "../src/score-dashboard-move";
-import { applyScoreDashboardFrontmatter } from "../src/score-dashboard-score-service";
-import { visibleScoreDashboardPaths } from "../src/score-dashboard-ui";
+} from "../src/domain/score-dashboard/move";
+import { applyScoreDashboardFrontmatter } from "../src/data/score-dashboard/score-service";
+import { visibleScoreDashboardPaths } from "../src/ui/score-dashboard/renderer";
 import {
   preserveScoreDashboardAnchorScrollTop,
   scoreDashboardScaleFromWheel,
   scoreDashboardWheelIntent,
-} from "../src/score-dashboard-gesture";
+} from "../src/domain/score-dashboard/gesture";
 import type { MediaItem, MediaType } from "../src/types";
 
 function item(title: string, score: number | null, mediaType: MediaType = "anime"): MediaItem {

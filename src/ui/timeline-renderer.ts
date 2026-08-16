@@ -1,8 +1,9 @@
 import type { LibraryMediaFilter } from "./library-contracts";
 import type { TimelineMediaEntry } from "../types";
-import { compareVolumeLabels, expandTimelineEntries, normalizeVolumeLabel } from "../novel-progress";
-import { MAX_TIMELINE_DAY_SPACING, MAX_TIMELINE_VIEW_SCALE, MIN_TIMELINE_DAY_SPACING, MIN_TIMELINE_VIEW_SCALE, calculateDefaultTimelineView, preserveTimelineAxisScreenY } from "../timeline-scale";
-import { centerLatestTimelineAxis } from "../timeline-corrections";
+import { compareVolumeLabels, normalizeVolumeLabel } from "../domain/progress/novel-progress";
+import { expandTimelineEntries } from "./timeline-entry-expansion";
+import { MAX_TIMELINE_DAY_SPACING, MAX_TIMELINE_VIEW_SCALE, MIN_TIMELINE_DAY_SPACING, MIN_TIMELINE_VIEW_SCALE, calculateDefaultTimelineView, preserveTimelineAxisScreenY } from "../domain/timeline/scale";
+import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 

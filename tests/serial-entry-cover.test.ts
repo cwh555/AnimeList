@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { USER_AGENT } from "../src/app-metadata";
 import test from "node:test";
 import {
   confidentSerialCover,
@@ -8,20 +9,20 @@ import {
   selectOriginalTitle,
   serialCoverQueries,
   serialCoverQuery,
-} from "../src/serial-entry-cover";
+} from "../src/domain/serial-covers/ranking";
 import {
   groupMissingSerialCoverRecords,
   missingSerialCoverEntryCount,
-} from "../src/serial-cover-migration";
+} from "../src/domain/serial-covers/migration";
 import { setRequestUrlMock } from "./mocks/obsidian";
-import { directlyApplySerialCover, SerialCoverDirectApply } from "../src/serial-cover-direct-apply";
+import { directlyApplySerialCover, SerialCoverDirectApply } from "../src/app/serial-covers/direct-apply";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
   searchManualSerialCovers,
   searchSerialCovers,
-} from "../src/serial-cover-provider";
+} from "../src/data/serial-covers/provider";
 
 function bangumiSubject(options: {
   id: number;
@@ -101,6 +102,7 @@ test("Bangumi lookup retries 429 and preserves one exact query", async () => {
   assert.equal(result[0]?.sourceId, "5");
   for (const request of requests) {
     assert.equal(request.url, "https://api.bgm.tv/v0/search/subjects?limit=50&offset=0");
+    assert.equal((request.headers as Record<string, string> | undefined)?.["User-Agent"], USER_AGENT);
     const body = JSON.parse(String(request.body)) as { keyword: string };
     assert.equal(body.keyword, "寄宿学校のジュリエット 5");
   }

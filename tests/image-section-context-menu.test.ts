@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Menu, type Editor } from "obsidian";
-import { addImageSectionContextMenu } from "../src/image-section-feature";
+import { addImageSectionContextMenu } from "../src/features/image-sections/feature";
 
 function editorHarness(): { editor: Editor; inserted: string[] } {
   const inserted: string[] = [];

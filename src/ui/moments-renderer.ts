@@ -3,7 +3,7 @@ import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { ImageSectionService } from "../data/image-section-service";
 import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
-import { momentsText } from "../moments-text";
+import { momentsText } from "../features/moments/text";
 import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
 import { ImageLightboxModal } from "./image-lightbox";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";

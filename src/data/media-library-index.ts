@@ -2,7 +2,7 @@ import type { App, TFile } from "obsidian";
 import type { MediaItem } from "../domain/media-types";
 import { pathBelongsToLibraryRoot } from "./library-change-scope";
 import type { MediaRepository } from "./media-repository";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 function rootsKey(roots: readonly string[]): string {
   return [...roots].sort().join("\u0000");

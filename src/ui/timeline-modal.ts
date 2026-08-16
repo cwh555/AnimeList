@@ -1,6 +1,6 @@
 import { Modal } from "obsidian";
 import type { MediaItem } from "../types";
-import { normalizeTimelineMaxStackDepth } from "../timeline-scale";
+import { normalizeTimelineMaxStackDepth } from "../domain/timeline/scale";
 import type { AnimeListUiHost } from "./plugin-host";
 import { TimelineUI } from "./timeline-renderer";
 

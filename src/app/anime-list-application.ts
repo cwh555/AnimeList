@@ -1,5 +1,5 @@
 import { TFile, normalizePath, type App } from "obsidian";
-import { CoverThumbnailCache } from "../cover-cache";
+import { CoverThumbnailCache } from "../data/cover-cache";
 import { ExternalMediaSearchService } from "../data/external-media-service";
 import { createMetadataProviderClients, type HttpMetadataProviderClients } from "../data/metadata-provider-clients";
 import { isLibraryRelevantPath, pathBelongsToLibraryRoot } from "../data/library-change-scope";
@@ -12,7 +12,7 @@ import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "../data/vault-scope";
 
 export interface AnimeListApplicationCallbacks {
   openMediaFile(path: string): Promise<void>;

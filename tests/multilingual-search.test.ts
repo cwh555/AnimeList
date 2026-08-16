@@ -3,12 +3,12 @@ import { describe, it } from "node:test";
 import {
   collectChineseDiscoveryQueries,
   traditionalToSimplifiedQuery,
-} from "../src/chinese-search-variants";
+} from "../src/domain/search/chinese-variants";
 import {
   collectMultilingualSearchQueries,
   normalizeSearchLanguageSettings,
   searchMultilingualProviders,
-} from "../src/multilingual-search";
+} from "../src/app/search/multilingual-search";
 import type { ExternalMediaResult } from "../src/types";
 
 function result(overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResult {

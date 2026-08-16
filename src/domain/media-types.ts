@@ -1,7 +1,8 @@
-import type { MediaStatus } from "../media-status";
+import type { MediaStatus } from "./media-status";
+import type { MediaType } from "./media-primitives";
 import type { MediaClassification } from "./media-classification";
 
-export type MediaType = "anime" | "manga" | "novel";
+export type { MediaType } from "./media-primitives";
 export type ReleaseStatus = "releasing" | "finished" | "hiatus" | "cancelled" | "unknown";
 export type ProgressValue = number | string;
 

@@ -4,7 +4,7 @@ import { TFile } from "obsidian";
 import { ImageSectionService } from "../../src/data/image-section-service";
 import { MomentsService } from "../../src/data/moments-service";
 import { findMomentsBlocks, parseMomentsSource } from "../../src/domain/moments";
-import { createDefaultSettings } from "../../src/settings-model";
+import { createDefaultSettings } from "../../src/app/settings-model";
 
 function file(path: string): TFile {
   const value = new TFile();

@@ -9,8 +9,8 @@ import {
   applyDuplicateDefaultCoverCleanup,
   planDuplicateDefaultCoverCleanup,
 } from "../../src/data/version-cleanup-service";
-import { createVersionCleanupSettingsSection } from "../../src/version-cleanup-settings";
-import { createLegacyMetadataSettingsSection } from "../../src/legacy-metadata-settings";
+import { createVersionCleanupSettingsSection } from "../../src/features/version-cleanup/settings";
+import { createLegacyMetadataSettingsSection } from "../../src/features/legacy-metadata-cleanup/settings";
 
 function legacyNote(extraFrontmatter: Record<string, unknown> = {}): { markdown: string; frontmatter: Record<string, unknown> } {
   const frontmatter = {

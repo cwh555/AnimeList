@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { TFile } from "obsidian";
 import { ImageSectionService } from "../../src/data/image-section-service";
 import { findImageSectionBlocks } from "../../src/domain/image-section";
-import { createDefaultSettings } from "../../src/settings-model";
+import { createDefaultSettings } from "../../src/app/settings-model";
 
 function file(path: string): TFile {
   const value = new TFile();

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import AnimeListPlugin from "../../src/main";
-import { normalizeSpecialLabelMode } from "../../src/masterpiece-labels";
-import { normalizeSearchLanguageSettings } from "../../src/multilingual-search";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { normalizeSpecialLabelMode } from "../../src/domain/masterpiece-labels";
+import { normalizeSearchLanguageSettings } from "../../src/app/search/multilingual-search";
+import { DEFAULT_SETTINGS } from "../../src/ui/settings";
 
 async function loadSettings(raw: unknown): Promise<AnimeListPlugin["settings"]> {
   const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
@@ -126,7 +126,7 @@ it("preserves unknown feature settings through the shared settings store", async
       saved.push(value);
     },
   };
-  const { AnimeListSettingsStore } = await import("../../src/settings-store");
+  const { AnimeListSettingsStore } = await import("../../src/app/settings-store");
   const store = new AnimeListSettingsStore(storage);
   const settings = await store.load();
   await store.save(settings);

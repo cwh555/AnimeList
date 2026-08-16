@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { legacyTest } from "../../src/legacy";
-import { normalizeVolumeLog } from "../../src/novel-progress";
+import { normalizeVolumeLog } from "../../src/domain/progress/novel-progress";
 
 const { buildMediaMarkdown } = legacyTest;
 

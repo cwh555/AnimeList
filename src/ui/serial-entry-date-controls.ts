@@ -1,7 +1,7 @@
 import {
   createSegmentedDateInput,
   type SegmentedDateInputElement,
-} from "../segmented-date-input";
+} from "./segmented-date-input";
 
 export interface SerialEntryDateControlOptions {
   readonly labelInput: HTMLInputElement;

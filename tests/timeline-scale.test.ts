@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import AnimeListPlugin from "../src/main";
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { DEFAULT_SETTINGS } from "../src/ui/settings";
 import { legacyTest } from "../src/legacy";
 import type { MediaItem } from "../src/types";
 import { uiText } from "../src/ui-text";
@@ -15,7 +15,7 @@ import {
   centerTimelinePoint,
   normalizeTimelineMaxStackDepth,
   preserveTimelineAxisScreenY,
-} from "../src/timeline-scale";
+} from "../src/domain/timeline/scale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINIMUM_CARD_DISTANCE = 136;

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   scoreDashboardDragScrollDelta,
   scoreDashboardDragScrollVelocity,
-} from "../src/score-dashboard-drag-scroll";
+} from "../src/domain/score-dashboard/drag-scroll";
 
 const options = { edgeSize: 100, minSpeed: 2, maxSpeed: 22 };
 

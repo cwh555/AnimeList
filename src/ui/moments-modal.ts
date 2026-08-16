@@ -4,7 +4,7 @@ import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
 import type { MomentEditorInput } from "../data/moments-service";
 import type { MomentItem } from "../domain/moments";
-import { momentsText } from "../moments-text";
+import { momentsText } from "../features/moments/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 

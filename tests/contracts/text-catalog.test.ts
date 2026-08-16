@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { masterpieceFeatureText } from "../../src/masterpiece-feature-text";
-import { legacyMetadataText } from "../../src/legacy-metadata-text";
-import { userTagText } from "../../src/user-tag-text";
+import { masterpieceFeatureText } from "../../src/features/masterpiece/text";
+import { legacyMetadataText } from "../../src/features/legacy-metadata-cleanup/text";
+import { userTagText } from "../../src/features/user-tags/text";
 import { BUNDLED_LOCALE_CATALOGS, registerBundledLocales } from "../../src/i18n/locales";
 import { normalizeSupportedLocale, resolveInterfaceLocale } from "../../src/i18n/locale";
 import {
   PROGRESS_UNIT_FEATURE_TEXT,
   progressUnitFeatureText,
-} from "../../src/progress-unit-feature-text";
-import { RATING_FEATURE_TEXT, ratingFeatureText } from "../../src/rating-feature-text";
-import { scoreDashboardText } from "../../src/score-dashboard-text";
-import { searchFeatureText } from "../../src/search-feature-text";
-import { SERIAL_COVER_TEXT, serialCoverText } from "../../src/serial-cover-text";
+} from "../../src/features/progress/text";
+import { RATING_FEATURE_TEXT, ratingFeatureText } from "../../src/features/rating/text";
+import { scoreDashboardText } from "../../src/features/score-dashboard/text";
+import { searchFeatureText } from "../../src/features/search/text";
+import { SERIAL_COVER_TEXT, serialCoverText } from "../../src/features/serial-covers/text";
 import {
   registerLocaleMessages,
   resetLocaleForTests,

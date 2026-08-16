@@ -1,3 +1,4 @@
+import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { existsSync, readFileSync } from "node:fs";
@@ -5,27 +6,26 @@ import path from "node:path";
 import { App, TFile, TFolder } from "obsidian";
 import AnimeListPlugin from "../src/main";
 import { PLUGIN_VERSION } from "../src/app-metadata";
-import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/builtin-templates";
-import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/settings";
+import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/app/builtin-templates";
+import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
 import { legacyTest } from "../src/legacy";
-import { SEGMENTED_DATE_PARTS } from "../src/segmented-date-input";
+import { SEGMENTED_DATE_PARTS } from "../src/ui/segmented-date-input";
 import { libraryCoverSizes, libraryEagerCoverCount } from "../src/ui/library-renderer";
 import { TIMELINE_MEDIA_FILTERS, timelineStemGeometry } from "../src/ui/timeline-renderer";
-import { getScopedMarkdownFiles } from "../src/vault-scope";
+import { getScopedMarkdownFiles } from "../src/data/vault-scope";
 import {
   compareVolumeLabels,
-  expandTimelineEntries,
   normalizeVolumeLabel,
   normalizeVolumeLog,
   progressRatio,
   serializeVolumeLog,
-} from "../src/novel-progress";
+} from "../src/domain/progress/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
-import { rankSearchResults, searchQueryVariants } from "../src/search";
+import { rankSearchResults, searchQueryVariants } from "../src/domain/search/ranking";
 import {
   MIN_TIMELINE_VIEW_SCALE,
   calculateDefaultTimelineView,
-} from "../src/timeline-scale";
+} from "../src/domain/timeline/scale";
 
 const PathExists = existsSync;
 
@@ -443,7 +443,7 @@ describe("serial progress and novel volume records", () => {
 
 describe("serial-entry cover UI", () => {
   it("places the thumbnail panel on the row right side", () => {
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.serial-cover.css"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles/serial-cover.css"), "utf8");
     assert.match(stylesheet, /\.animelist-modal \.al-volume-row \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
     assert.match(stylesheet, /\.al-serial-cover-panel/);
   });

@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { expandTimelineEntries } from "../src/novel-progress";
+import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import type { MediaItem } from "../src/types";
-import {
-  centerLatestTimelineAxis,
-  timelineEntryCopy,
-} from "../src/timeline-corrections";
-import { calculateDefaultTimelineDaySpacing } from "../src/timeline-scale";
+import { centerLatestTimelineAxis } from "../src/domain/timeline/corrections";
+import { timelineEntryCopy } from "../src/ui/timeline-entry-expansion";
+import { calculateDefaultTimelineDaySpacing } from "../src/domain/timeline/scale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINIMUM_CARD_DISTANCE = 136;

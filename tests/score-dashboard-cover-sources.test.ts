@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CoverSources, MediaItem } from "../src/types";
-import { prepareScoreDashboardCoverSources } from "../src/score-dashboard-cover-sources";
-import { CoverThumbnailCache } from "../src/cover-cache";
+import { prepareScoreDashboardCoverSources } from "../src/ui/score-dashboard/cover-sources";
+import { CoverThumbnailCache } from "../src/data/cover-cache";
 import { TFile, type App } from "obsidian";
 
 function mediaItem(coverSources?: CoverSources): MediaItem {

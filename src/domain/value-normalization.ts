@@ -1,4 +1,4 @@
-import type { MediaType } from "./media-types";
+import type { MediaType } from "./media-primitives";
 
 export function asArray<T>(value: T | T[] | null | undefined): T[] {
   if (value == null) return [];

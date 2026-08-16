@@ -16,7 +16,7 @@ import {
 } from "../domain/image-section";
 import { allManagedImageReferences } from "../domain/media-image-references";
 import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
-import { visualImageFingerprint } from "../image-raster";
+import { visualImageFingerprint } from "./image-raster";
 
 export interface ImageSectionHost {
   app: App;

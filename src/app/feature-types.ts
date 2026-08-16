@@ -1,5 +1,5 @@
 import type { Plugin, SettingDefinition, TFile } from "obsidian";
-import type { SettingsPageId } from "../settings-layout";
+import type { SettingsPageId } from "./settings-layout";
 import type {
   AnimeListSettings,
   CoverSources,
