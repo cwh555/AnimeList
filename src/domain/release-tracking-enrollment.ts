@@ -23,3 +23,15 @@ export function isReleaseTrackingEnabled(
   if (item.status !== "completed") return true;
   return hasExistingReleaseTracking(snapshot, explicitStatus);
 }
+
+export function releaseTrackingItemsForRefresh(
+  items: readonly MediaItem[],
+  snapshotForItem: (item: MediaItem) => ReleaseTrackingSnapshot,
+  hasExplicitStatus: (item: MediaItem) => boolean,
+): MediaItem[] {
+  return items.filter((item) => isReleaseTrackingEnabled(
+    item,
+    snapshotForItem(item),
+    hasExplicitStatus(item),
+  ));
+}
