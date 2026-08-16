@@ -2,6 +2,7 @@ import { Modal, setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { ReleaseTrackingService, ReleaseRefreshItemResult, ReleaseRefreshProgress, ReleaseRefreshSummary } from "../data/release-tracking-service";
 import type { MediaItem } from "../domain/media-types";
+import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
 import type { ReleaseTrackingSnapshot, ReleaseTrackingStatus } from "../domain/release-tracking";
 import { releaseTrackingText } from "../release-tracking-text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
@@ -31,10 +32,6 @@ function icon(name: string, className = ""): HTMLElement {
   const node = el("span", className);
   setIcon(node, name);
   return node;
-}
-
-function isTrackable(item: MediaItem): boolean {
-  return item.mediaType === "manga" || item.mediaType === "novel";
 }
 
 function needsAttention(status: ReleaseTrackingStatus): boolean {
@@ -112,10 +109,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
     private readonly actions: ReleaseTrackingDashboardActions,
   ) {
     super(app);
-    this.items = items.filter((item) => {
-      if (!isTrackable(item)) return false;
-      return this.service.state.read(item.filePath, item.mediaType).status !== "disabled";
-    });
+    this.items = items.filter(isReleaseTrackingMedia);
   }
 
   onOpen(): void {
@@ -136,11 +130,17 @@ export class ReleaseTrackingDashboardModal extends Modal {
     };
   }
 
+  private isTracked(item: MediaItem, snapshot = this.service.state.read(item.filePath, item.mediaType)): boolean {
+    return isReleaseTrackingEnabled(item, snapshot, this.service.state.hasExplicitStatus(item.filePath));
+  }
+
   private render(): void {
     const entries = this.items.map((item) => this.entry(item));
-    const attention = entries.filter((entry) => needsAttention(entry.result?.status ?? entry.snapshot.status));
-    const normal = entries.filter((entry) => !attention.includes(entry));
-    const verified = entries.filter((entry) => (entry.result?.status ?? entry.snapshot.status) === "verified").length;
+    const tracked = entries.filter((entry) => this.isTracked(entry.item, entry.snapshot));
+    const excluded = entries.filter((entry) => !tracked.includes(entry));
+    const attention = tracked.filter((entry) => needsAttention(entry.result?.status ?? entry.snapshot.status));
+    const normal = tracked.filter((entry) => !attention.includes(entry));
+    const verified = tracked.filter((entry) => (entry.result?.status ?? entry.snapshot.status) === "verified").length;
     const updated = [...this.results.values()].filter((result) => result.kind === "updated").length;
 
     this.modalEl.classList.toggle("is-busy", this.allBusy || this.refreshing.size > 0);
@@ -155,7 +155,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
     );
     const refreshAll = el("button", "mod-cta al-release-dashboard-refresh-all");
     refreshAll.type = "button";
-    refreshAll.disabled = this.allBusy || this.refreshing.size > 0 || this.items.length === 0;
+    refreshAll.disabled = this.allBusy || this.refreshing.size > 0 || tracked.length === 0;
     refreshAll.append(icon("refresh-cw"), el("span", "", releaseTrackingText("dashboard.refreshAll")));
     refreshAll.addEventListener("click", () => { void this.refreshEverything(); });
     header.append(mark, copy, refreshAll);
@@ -163,7 +163,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
 
     const overview = el("div", "al-release-dashboard-overview");
     overview.append(
-      this.metric("library", String(entries.length), releaseTrackingText("dashboard.metricTracked")),
+      this.metric("library", String(tracked.length), releaseTrackingText("dashboard.metricTracked")),
       this.metric("shield-check", String(verified), releaseTrackingText("dashboard.metricVerified")),
       this.metric("arrow-up", String(updated), releaseTrackingText("dashboard.metricUpdated"), updated > 0 ? "is-positive" : ""),
       this.metric("triangle-alert", String(attention.length), releaseTrackingText("dashboard.metricAttention"), attention.length > 0 ? "is-attention" : ""),
@@ -180,6 +180,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
     const body = el("div", "al-release-dashboard-content");
     if (normal.length) body.appendChild(this.section(releaseTrackingText("dashboard.trackedHeading"), normal, "tracked"));
     if (attention.length) body.appendChild(this.section(releaseTrackingText("dashboard.attentionHeading"), attention, "attention"));
+    if (excluded.length) body.appendChild(this.section(releaseTrackingText("dashboard.excludedHeading"), excluded, "excluded"));
     if (!entries.length) body.appendChild(el("div", "al-release-dashboard-empty", releaseTrackingText("dashboard.empty")));
     this.contentEl.appendChild(body);
 
@@ -194,6 +195,10 @@ export class ReleaseTrackingDashboardModal extends Modal {
     this.contentEl.appendChild(footer);
   }
 
+  private trackedCount(): number {
+    return this.items.filter((item) => this.isTracked(item)).length;
+  }
+
   private metric(iconName: string, value: string, label: string, state = ""): HTMLElement {
     const metric = el("div", `al-release-dashboard-metric${state ? ` ${state}` : ""}`);
     metric.append(icon(iconName), el("strong", "", value), el("span", "", label));
@@ -203,7 +208,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
   private overallProgress(): HTMLElement {
     const progress = this.progress;
     const completed = progress?.completed ?? 0;
-    const total = progress?.total ?? this.items.length;
+    const total = progress?.total ?? this.trackedCount();
     const box = el("div", "al-release-dashboard-progress");
     const header = el("div", "al-release-dashboard-progress-head");
     const current = progress?.item.title || releaseTrackingText("modal.runningPreparing");
@@ -222,7 +227,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
   private updateOverallProgress(): void {
     const progress = this.progress;
     const completed = progress?.completed ?? 0;
-    const total = progress?.total ?? this.items.length;
+    const total = progress?.total ?? this.trackedCount();
     const current = progress?.item.title || releaseTrackingText("modal.runningPreparing");
     const currentNode = this.contentEl.querySelector<HTMLElement>(".al-release-dashboard-progress-current");
     const countNode = this.contentEl.querySelector<HTMLElement>(".al-release-dashboard-progress-count");
@@ -232,21 +237,21 @@ export class ReleaseTrackingDashboardModal extends Modal {
     if (fill) fill.style.width = total > 0 ? `${Math.min(100, Math.max(0, completed / total * 100))}%` : "0%";
   }
 
-  private section(title: string, entries: DashboardEntry[], kind: "tracked" | "attention"): HTMLElement {
+  private section(title: string, entries: DashboardEntry[], kind: "tracked" | "attention" | "excluded"): HTMLElement {
     const section = el("section", `al-release-dashboard-section is-${kind}`);
     const head = el("div", "al-release-dashboard-section-head");
     head.append(
-      icon(kind === "attention" ? "triangle-alert" : "list"),
+      icon(kind === "attention" ? "triangle-alert" : kind === "excluded" ? "list-plus" : "list"),
       el("h3", "", title),
       el("span", "", String(entries.length)),
     );
     const list = el("div", "al-release-dashboard-list");
-    for (const entry of entries) list.appendChild(this.row(entry));
+    for (const entry of entries) list.appendChild(this.row(entry, kind !== "excluded"));
     section.append(head, list);
     return section;
   }
 
-  private row(entry: DashboardEntry): HTMLElement {
+  private row(entry: DashboardEntry, tracked = true): HTMLElement {
     const { item, snapshot, result } = entry;
     const status = result?.status ?? snapshot.status;
     const latest = result?.status === "verified" ? result.after : snapshot.latest;
@@ -269,9 +274,16 @@ export class ReleaseTrackingDashboardModal extends Modal {
     );
 
     const state = el("div", "al-release-dashboard-state");
-    state.append(el("span", `al-release-dashboard-status is-${status}${result ? ` is-${result.kind}` : ""}`, statusText(status, result)));
-    if (result?.message) state.appendChild(el("small", "", result.message));
-    else if (snapshot.error && needsAttention(status)) state.appendChild(el("small", "", snapshot.error));
+    if (tracked) {
+      state.append(el("span", `al-release-dashboard-status is-${status}${result ? ` is-${result.kind}` : ""}`, statusText(status, result)));
+      if (result?.message) state.appendChild(el("small", "", result.message));
+      else if (snapshot.error && needsAttention(status)) state.appendChild(el("small", "", snapshot.error));
+    } else {
+      state.append(el("span", "al-release-dashboard-status is-disabled", releaseTrackingText("dashboard.notTracked")));
+      if (item.status === "completed" && !this.service.state.hasExplicitStatus(item.filePath) && snapshot.status !== "disabled") {
+        state.appendChild(el("small", "", releaseTrackingText("dashboard.completedDefaultOff")));
+      }
+    }
     if (snapshot.checkedAt) {
       const date = new Date(snapshot.checkedAt);
       state.appendChild(el("small", "al-release-dashboard-checked", releaseTrackingText("dashboard.checked", {
@@ -280,7 +292,13 @@ export class ReleaseTrackingDashboardModal extends Modal {
     }
 
     const actions = el("div", "al-release-dashboard-row-actions");
-    if (canChooseSource(status)) {
+    if (!tracked) {
+      const add = el("button", "al-secondary-button al-release-dashboard-enable", releaseTrackingText("dashboard.addTracking"));
+      add.type = "button";
+      add.disabled = busy || this.allBusy;
+      add.addEventListener("click", () => { void this.enableTracking(item); });
+      actions.appendChild(add);
+    } else if (canChooseSource(status)) {
       const choose = el("button", "al-secondary-button al-release-dashboard-choose", releaseTrackingText("modal.review"));
       choose.type = "button";
       choose.disabled = busy || this.allBusy;
@@ -293,14 +311,16 @@ export class ReleaseTrackingDashboardModal extends Modal {
       });
       actions.appendChild(choose);
     }
-    const refresh = el("button", "clickable-icon al-release-dashboard-refresh-one");
-    refresh.type = "button";
-    refresh.setAttribute("aria-label", releaseTrackingText("dashboard.refreshOne", { title: item.title }));
-    refresh.title = releaseTrackingText("dashboard.refreshOne", { title: item.title });
-    refresh.disabled = busy || this.allBusy;
-    refresh.appendChild(icon("refresh-cw"));
-    refresh.addEventListener("click", () => { void this.refreshOne(item); });
-    actions.appendChild(refresh);
+    if (tracked) {
+      const refresh = el("button", "clickable-icon al-release-dashboard-refresh-one");
+      refresh.type = "button";
+      refresh.setAttribute("aria-label", releaseTrackingText("dashboard.refreshOne", { title: item.title }));
+      refresh.title = releaseTrackingText("dashboard.refreshOne", { title: item.title });
+      refresh.disabled = busy || this.allBusy;
+      refresh.appendChild(icon("refresh-cw"));
+      refresh.addEventListener("click", () => { void this.refreshOne(item); });
+      actions.appendChild(refresh);
+    }
 
     row.append(cover(item), identity, progress, latestCell, source, state, actions);
     if (busy) {
@@ -315,6 +335,23 @@ export class ReleaseTrackingDashboardModal extends Modal {
     const cell = el("div", "al-release-dashboard-cell");
     cell.append(el("span", "", label), el("strong", valueClass, value));
     return cell;
+  }
+
+  private async enableTracking(item: MediaItem): Promise<void> {
+    if (this.allBusy || this.refreshing.has(item.filePath)) return;
+    this.failure = "";
+    this.refreshing.add(item.filePath);
+    this.render();
+    try {
+      await this.service.state.enable(item.filePath, item.mediaType);
+      this.results.delete(item.filePath);
+      this.actions.onChanged();
+    } catch (error) {
+      this.failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.refreshing.delete(item.filePath);
+      this.render();
+    }
   }
 
   private async refreshOne(item: MediaItem): Promise<void> {
