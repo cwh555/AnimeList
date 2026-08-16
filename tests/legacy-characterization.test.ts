@@ -5,7 +5,6 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { App, TFile, TFolder } from "obsidian";
 import AnimeListPlugin from "../src/main";
-import { PLUGIN_VERSION } from "../src/app-metadata";
 import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/app/builtin-templates";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
 import { legacyTest } from "../src/legacy";
@@ -711,7 +710,7 @@ describe("version documentation", () => {
     assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
     assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
     assert.match(readme, /> \[!NOTE\]/);
-    assert.match(readme, /> \*\*What's new in 1\.4\.0\*\*/);
+    assert.match(readme, /> \*\*What's new\*\*/);
     assert.match(readme, /\[User Guide\]\(docs\/USER_GUIDE\.md\)/);
     assert.match(userGuide, /## Latest release tracking/);
     assert.match(userGuide, /## Image Sections/);
@@ -723,22 +722,6 @@ describe("version documentation", () => {
     assert.doesNotMatch(roadmap, /Add an image section/);
     assert.doesNotMatch(roadmap, /Add a meme section/);
     assert.doesNotMatch(readme, /## Library data/);
-  });
-
-  it("keeps every runtime and release version synchronized", () => {
-    const manifest = JSON.parse(readFileSync(path.join(process.cwd(), "manifest.json"), "utf8")) as { version: string };
-    const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
-    const packageLock = JSON.parse(readFileSync(path.join(process.cwd(), "package-lock.json"), "utf8")) as {
-      version: string;
-      packages: Record<string, { version?: string }>;
-    };
-    const versions = JSON.parse(readFileSync(path.join(process.cwd(), "versions.json"), "utf8")) as Record<string, string>;
-    assert.equal(manifest.version, "1.4.0");
-    assert.equal(packageJson.version, manifest.version);
-    assert.equal(packageLock.version, manifest.version);
-    assert.equal(packageLock.packages[""]?.version, manifest.version);
-    assert.equal(versions[manifest.version], "1.5.0");
-    assert.equal(PLUGIN_VERSION, manifest.version);
   });
 });
 

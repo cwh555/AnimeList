@@ -101,6 +101,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release", "timeline"] },
   { path: "tests/contracts/text-catalog.test.ts", kind: "test", suite: "contract", features: ["text", "settings"] },
   { path: "tests/contracts/test-catalog.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
+  { path: "tests/contracts/version-metadata.test.ts", kind: "test", suite: "contract", features: ["release", "test-infrastructure"] },
   { path: "scripts/check-architecture.mjs", kind: "script", suite: "contract", features: ["test-infrastructure"] },
 
   { path: "tests/legacy-characterization.test.ts", kind: "test", suite: "legacy", features: ["library", "markdown", "progress", "release", "search", "settings", "text", "timeline", "serial-covers"] },
