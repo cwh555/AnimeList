@@ -2,6 +2,7 @@ import { Modal, setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { ReleaseTrackingService } from "../data/release-tracking-service";
 import type { MediaItem } from "../domain/media-types";
+import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
 import { releaseTrackingText } from "../release-tracking-text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
@@ -47,6 +48,7 @@ export interface ReleaseTrackingManagerModalOptions {
 export class ReleaseTrackingManagerModal extends Modal {
   private readonly items: MediaItem[];
   private readonly checked = new Map<string, boolean>();
+  private readonly initialChecked = new Map<string, boolean>();
 
   constructor(
     app: App,
@@ -55,9 +57,11 @@ export class ReleaseTrackingManagerModal extends Modal {
     private readonly options: ReleaseTrackingManagerModalOptions,
   ) {
     super(app);
-    this.items = items.filter((item) => item.mediaType === "manga" || item.mediaType === "novel");
+    this.items = items.filter(isReleaseTrackingMedia);
     for (const item of this.items) {
-      this.checked.set(item.filePath, this.service.state.read(item.filePath, item.mediaType).status !== "disabled");
+      const enabled = isReleaseTrackingEnabled(item, this.service.state.read(item.filePath, item.mediaType), this.service.state.hasExplicitStatus(item.filePath));
+      this.checked.set(item.filePath, enabled);
+      this.initialChecked.set(item.filePath, enabled);
     }
   }
 
@@ -138,6 +142,7 @@ export class ReleaseTrackingManagerModal extends Modal {
       void (async () => {
         for (const item of this.items) {
           const enabled = this.checked.get(item.filePath) ?? true;
+          if (enabled === this.initialChecked.get(item.filePath)) continue;
           if (enabled) await this.service.state.enable(item.filePath, item.mediaType);
           else await this.service.state.disable(item.filePath, item.mediaType);
         }
