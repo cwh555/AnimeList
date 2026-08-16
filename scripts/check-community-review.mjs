@@ -21,8 +21,8 @@ const sourceFiles = walk(path.join(root, "src"))
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
 const main = read("src/main.ts");
-const settings = read("src/settings.ts");
-const scopedVault = read("src/vault-scope.ts");
+const settings = read("src/ui/settings.ts");
+const scopedVault = read("src/data/vault-scope.ts");
 const shim = read("types/obsidian.d.ts");
 const styles = read("styles.css");
 const releaseWorkflow = read(".github/workflows/release.yml");

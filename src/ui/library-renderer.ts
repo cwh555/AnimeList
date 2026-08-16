@@ -1,8 +1,8 @@
 import type { MediaItem } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
 import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
-import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../media-status";
-import { normalizeProgressValue, normalizeReleaseStatus, normalizeVolumeLog, progressDisplayValue, progressRatio } from "../novel-progress";
+import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../domain/media-status";
+import { normalizeProgressValue, normalizeReleaseStatus, normalizeVolumeLog, progressDisplayValue, progressRatio } from "../domain/progress/novel-progress";
 import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
 import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryViewMode } from "./library-contracts";
 import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";

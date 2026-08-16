@@ -1,6 +1,6 @@
 import { persistedMediaTags, resolveMediaSeasonMetadata } from "../domain/media-classification";
 import { writeCompatibleGenres } from "./media-frontmatter-compat";
-import { normalizeMediaStatus } from "../media-status";
+import { normalizeMediaStatus } from "../domain/media-status";
 import { normalizeGenres } from "../domain/media-metadata";
 import type {
   ExternalMediaResult,
@@ -15,7 +15,7 @@ import {
   stringValue,
   todayString,
 } from "../domain/value-normalization";
-import { normalizeReleaseStatus } from "../novel-progress";
+import { normalizeReleaseStatus } from "../domain/progress/novel-progress";
 import {
   defaultProgressUnit,
   isReadingProgressUnit,
@@ -23,8 +23,8 @@ import {
   normalizeSerialProgress,
   serializeSerialLog,
   type ReadingProgressUnit,
-} from "../progress-units";
-import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
+} from "../domain/progress-units";
+import { CURRENT_MEDIA_SCHEMA_VERSION } from "../app/schema-migration";
 import { completedRequirementMessage, uiText } from "../ui-text";
 
 export interface TemplateContext {

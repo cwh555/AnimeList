@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { calculateDefaultTimelineDaySpacing } from "../src/timeline-scale";
+import { calculateDefaultTimelineDaySpacing } from "../src/domain/timeline/scale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINIMUM_CARD_DISTANCE = 136;

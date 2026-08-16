@@ -7,7 +7,7 @@ import {
   coverCacheKey,
   coverCachePaths,
   planCoverCacheCleanup,
-} from "../src/cover-cache";
+} from "../src/data/cover-cache";
 
 const record = (filePath: string, size: number, mtime: number) => ({ path: filePath, size, mtime });
 

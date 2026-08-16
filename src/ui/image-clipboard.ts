@@ -1,6 +1,6 @@
 import type { ImageSectionService, ImageSectionAssetInput } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
-import { decodeRasterImage, encodeRasterImage } from "../image-raster";
+import { decodeRasterImage, encodeRasterImage } from "../data/image-raster";
 
 async function toPngBlob(data: ArrayBuffer, contentType: string): Promise<Blob> {
   if (contentType.split(";")[0].trim().toLocaleLowerCase() === "image/png") {

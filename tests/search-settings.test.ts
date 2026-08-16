@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App } from "obsidian";
-import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/settings";
-import { SETTINGS_PAGES, settingsPageForKey } from "../src/settings-layout";
+import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
+import { SETTINGS_PAGES, settingsPageForKey } from "../src/app/settings-layout";
 import { registerLocaleMessages, resetLocaleForTests, setActiveLocale } from "../src/i18n/catalog";
 import { EN_CORE_MESSAGES } from "../src/i18n/locales/en/core";
 import { EN_SEARCH_MESSAGES } from "../src/i18n/locales/en/search";

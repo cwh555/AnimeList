@@ -2,7 +2,7 @@ import type {
   ExternalMediaResult,
   ExternalMediaSourceRef,
 } from "../domain/media-types";
-import { normalizeSearchComparable } from "../search";
+import { normalizeSearchComparable } from "../domain/search/ranking";
 import { AniListClient } from "./providers/anilist-client";
 
 function sourceRefs(result: ExternalMediaResult): ExternalMediaSourceRef[] {

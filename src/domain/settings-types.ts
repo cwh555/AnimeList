@@ -1,5 +1,5 @@
-import type { MediaStatusFilter } from "../media-status";
-import type { SpecialLabelMode } from "../masterpiece-labels";
+import type { MediaStatusFilter } from "./media-status";
+import type { SpecialLabelMode } from "./masterpiece-labels";
 import type { MediaType } from "./media-types";
 import type { LibraryFilters } from "./library-filters";
 import type { LanguagePreference } from "../i18n/locale";

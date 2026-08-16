@@ -6,9 +6,8 @@ import {
   cleanupLegacyMediaFrontmatter,
   cleanupLegacyMetadataNotes,
 } from "../../src/data/legacy-metadata-cleanup";
-import { createLegacyMetadataSettingsSection } from "../../src/legacy-metadata-settings";
-import { legacyMetadataText } from "../../src/legacy-metadata-text";
-import { legacyMetadataDetailReport } from "../../src/legacy-metadata-report";
+import { createLegacyMetadataSettingsSection } from "../../src/features/legacy-metadata-cleanup/settings";
+import { legacyMetadataText } from "../../src/features/legacy-metadata-cleanup/text";
 import type { AnimeListFeatureHost } from "../../src/app/feature-types";
 
 const pollutedStudio = "CloverWorks、「ホリミヤ」製作委員会（Aniplex、マイシアターD.D.、毎日放送、スクウェア・エニックス、鐘通インベストメント、グローバル・ソリューションズ、ムービック、未来工場）岩上敦宏、石井紹良、丸山博雄、橋本真司、松井宏記、高麗大助、國枝信吾、近藤尚己";
@@ -172,7 +171,6 @@ describe("legacy metadata cleanup", () => {
       ],
       enrichment: "enriched",
     });
-    assert.match(legacyMetadataDetailReport(result), /堀與宮村 .*changed: genres, studios, user_tags, media_tags, season, season_year/);
 
     let secondPassApiCalls = 0;
     const secondPass = await cleanupLegacyMetadataNotes(app, [""], {
@@ -337,7 +335,6 @@ describe("legacy metadata cleanup", () => {
       changes: [],
       enrichment: "unavailable",
     }]);
-    assert.match(legacyMetadataDetailReport(result), /Unknown work .*AniList: no reliable match/);
   });
 
   it("uses English Settings copy and opens the progress workflow", () => {

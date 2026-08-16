@@ -8,7 +8,7 @@ import {
   normalizeMediaStatus,
   normalizeStatusFilter,
   shouldMigrateMediaStatus,
-} from "../src/media-status";
+} from "../src/domain/media-status";
 
 describe("media status domain", () => {
   it("keeps one canonical storage vocabulary", () => {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import ts from "typescript";
 
 const root = process.cwd();
 const failures = [];
@@ -61,6 +62,112 @@ require(/featureManifest\(\)/, "plugin entry must expose the feature manifest th
 const legacyLines = legacy.trim().split(/\r?\n/).length;
 if (legacyLines > 25) failures.push(`src/legacy.ts must remain a thin compatibility barrel (found ${legacyLines} lines)`);
 reject(/\bclass\b|\bfunction\b/, "src/legacy.ts must not contain active implementations", legacy);
+
+
+const ROOT_SOURCE_ALLOWLIST = new Set([
+  "app-metadata.ts",
+  "legacy.ts",
+  "main.ts",
+  "plugin-entry.ts",
+  "types.ts",
+  "ui-text.ts",
+]);
+const sourceRootEntries = fs.readdirSync(path.join(root, "src"), { withFileTypes: true });
+for (const entry of sourceRootEntries) {
+  if (entry.isFile() && entry.name.endsWith(".ts") && !ROOT_SOURCE_ALLOWLIST.has(entry.name)) {
+    failures.push(`src root must contain only entry/compat surfaces (found ${entry.name})`);
+  }
+}
+
+for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+  if (entry.isFile() && /^styles\..+\.css$/u.test(entry.name)) {
+    failures.push(`feature stylesheet sources must live under styles/ (found ${entry.name})`);
+  }
+}
+
+const sourceByPath = new Map(sources.map((source) => [source.path, source]));
+
+function resolveSourceImport(importerPath, specifier) {
+  if (!specifier.startsWith(".")) return null;
+  const importerDirectory = path.posix.dirname(importerPath);
+  const normalized = path.posix.normalize(path.posix.join(importerDirectory, specifier));
+  const candidates = [normalized, `${normalized}.ts`, `${normalized}/index.ts`];
+  return candidates.find((candidate) => sourceByPath.has(candidate)) ?? null;
+}
+
+function sourceDependencies(source) {
+  const parsed = ts.createSourceFile(
+    source.path,
+    source.content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const dependencies = new Set();
+  let definesFeature = false;
+  const visit = (node) => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const target = resolveSourceImport(source.path, node.moduleSpecifier.text);
+      if (target) dependencies.add(target);
+    }
+    if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword
+        && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
+        const target = resolveSourceImport(source.path, node.arguments[0].text);
+        if (target) dependencies.add(target);
+      }
+      if (ts.isIdentifier(node.expression) && node.expression.text === "defineFeature") definesFeature = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  return { dependencies, definesFeature };
+}
+
+const dependencyGraph = new Map();
+for (const source of sources) {
+  const { dependencies, definesFeature } = sourceDependencies(source);
+  dependencyGraph.set(source.path, dependencies);
+  if (definesFeature && source.path !== "src/app/feature-types.ts" && !source.path.startsWith("src/features/")) {
+    failures.push(`feature definitions must live under src/features/ (found ${source.path})`);
+  }
+  if (source.path.startsWith("src/domain/")) {
+    for (const dependency of dependencies) {
+      if (dependency.startsWith("src/app/")
+        || dependency.startsWith("src/data/")
+        || dependency.startsWith("src/ui/")
+        || dependency.startsWith("src/features/")) {
+        failures.push(`domain modules must not depend on higher layers (${source.path} -> ${dependency})`);
+      }
+    }
+  }
+}
+
+const visitState = new Map();
+const visitStack = [];
+const reportedCycles = new Set();
+function visitDependency(file) {
+  const state = visitState.get(file) ?? 0;
+  if (state === 2) return;
+  if (state === 1) {
+    const start = visitStack.indexOf(file);
+    const cycle = [...visitStack.slice(start), file];
+    const members = cycle.slice(0, -1);
+    const canonical = [...members].sort().join("|");
+    if (!reportedCycles.has(canonical)) {
+      reportedCycles.add(canonical);
+      failures.push(`source dependency cycle: ${cycle.join(" -> ")}`);
+    }
+    return;
+  }
+  visitState.set(file, 1);
+  visitStack.push(file);
+  for (const dependency of dependencyGraph.get(file) ?? []) visitDependency(dependency);
+  visitStack.pop();
+  visitState.set(file, 2);
+}
+for (const file of dependencyGraph.keys()) visitDependency(file);
 
 if (failures.length) {
   console.error("Architecture boundary check failed:");

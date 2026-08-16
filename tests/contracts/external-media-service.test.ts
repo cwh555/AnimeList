@@ -8,7 +8,7 @@ import type {
   MetadataProviderPage,
 } from "../../src/data/external-media-provider";
 import { ExternalMediaSearchService } from "../../src/data/external-media-service";
-import { searchFeatureText } from "../../src/search-feature-text";
+import { searchFeatureText } from "../../src/features/search/text";
 
 function result(
   provider: string,

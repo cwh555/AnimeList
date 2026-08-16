@@ -9,8 +9,8 @@ import type {
 } from "../domain/legacy-metadata-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { compatibleGenres, compatibleSeasonMetadata, compatibleSourceGenres, compatibleStudios, legacyClassificationKeys, legacySelectedClassificationTags, migrateLegacyClassificationHeaders } from "./media-frontmatter-compat";
-import { CURRENT_MEDIA_SCHEMA_VERSION } from "../schema-migration";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { CURRENT_MEDIA_SCHEMA_VERSION } from "../app/schema-migration";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 export interface LegacyMetadataCleanupChange {
   changed: boolean;

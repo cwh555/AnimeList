@@ -9,14 +9,14 @@ import {
   stringArray,
   stringValue,
 } from "../domain/value-normalization";
-import { normalizeMediaStatus } from "../media-status";
+import { normalizeMediaStatus } from "../domain/media-status";
 import {
   normalizeProgressValue,
   normalizeReleaseStatus,
-} from "../novel-progress";
-import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../progress-units";
+} from "../domain/progress/novel-progress";
+import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../domain/progress-units";
 import { uiText } from "../ui-text";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 export type CoverSourcesResolver = (file: TFile) => CoverSources | undefined;
 

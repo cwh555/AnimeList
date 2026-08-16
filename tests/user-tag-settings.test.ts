@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AnimeListFeatureRegistry } from "../src/app/feature-registry";
-import { userTagSettingsFeature } from "../src/user-tag-settings";
-import { createDefaultSettings } from "../src/settings-model";
-import { createUserTagSettingsSection } from "../src/user-tag-settings";
-import { userTagText } from "../src/user-tag-text";
+import { userTagSettingsFeature } from "../src/features/user-tags/settings";
+import { createDefaultSettings } from "../src/app/settings-model";
+import { createUserTagSettingsSection } from "../src/features/user-tags/settings";
+import { userTagText } from "../src/features/user-tags/text";
 
 describe("user tag settings feature", () => {
   it("does not scan the Library during plugin activation", async () => {

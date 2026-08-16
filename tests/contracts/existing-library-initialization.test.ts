@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { TFile, TFolder, type App } from "obsidian";
 import { AnimeListApplicationServices } from "../../src/app/anime-list-application";
-import { createDefaultSettings } from "../../src/settings-model";
+import { createDefaultSettings } from "../../src/app/settings-model";
 
 function folder(path: string, children: Array<TFile | TFolder> = []): TFolder {
   const value = new TFolder();

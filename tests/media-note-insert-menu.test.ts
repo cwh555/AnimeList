@@ -3,7 +3,7 @@ import test from "node:test";
 import { Menu, type Editor } from "obsidian";
 import { imageSectionInsertionPlan } from "../src/domain/image-section";
 import { momentsInsertionPlan } from "../src/domain/moments";
-import { renderAnimeListInsertMenu } from "../src/media-note-insert-menu";
+import { renderAnimeListInsertMenu } from "../src/ui/media-note-insert-menu";
 
 function editorHarness(): { editor: Editor; inserted: string[] } {
   const inserted: string[] = [];

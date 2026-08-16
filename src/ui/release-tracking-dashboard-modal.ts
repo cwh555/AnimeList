@@ -4,7 +4,7 @@ import type { ReleaseTrackingService, ReleaseRefreshItemResult, ReleaseRefreshPr
 import type { MediaItem } from "../domain/media-types";
 import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
 import type { ReleaseTrackingSnapshot, ReleaseTrackingStatus } from "../domain/release-tracking";
-import { releaseTrackingText } from "../release-tracking-text";
+import { releaseTrackingText } from "../features/release-tracking/text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 export interface ReleaseTrackingDashboardActions {

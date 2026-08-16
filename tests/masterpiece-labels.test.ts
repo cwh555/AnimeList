@@ -12,7 +12,7 @@ import {
   renameMasterpieceLabel,
   stateAfterFavoriteChange,
   stateAfterMasterpieceSelection,
-} from "../src/masterpiece-labels";
+} from "../src/domain/masterpiece-labels";
 
 
 describe("masterpiece label domain", () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { hasRecordedProgress, progressPresentation } from "../src/progress-display";
+import { hasRecordedProgress, progressPresentation } from "../src/domain/progress/display";
 
 describe("progress presentation", () => {
   it("keeps anime progress numeric", () => {

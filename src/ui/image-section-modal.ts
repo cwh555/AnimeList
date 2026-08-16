@@ -2,7 +2,7 @@ import { Modal, Notice } from "obsidian";
 import type { ImageSectionAssetInput, ImageSectionService } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
-import { imageSectionText } from "../image-section-text";
+import { imageSectionText } from "../features/image-sections/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 

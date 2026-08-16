@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatSerialCoverMigrationReport } from "../src/serial-cover-migration-modal";
+import { formatSerialCoverMigrationReport } from "../src/ui/serial-covers/migration-modal";
 
 test("serial cover migration report summarizes counts and preserves detail order", () => {
   const output = formatSerialCoverMigrationReport({

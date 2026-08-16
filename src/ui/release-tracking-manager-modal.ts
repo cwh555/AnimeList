@@ -3,7 +3,7 @@ import type { App } from "obsidian";
 import type { ReleaseTrackingService } from "../data/release-tracking-service";
 import type { MediaItem } from "../domain/media-types";
 import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
-import { releaseTrackingText } from "../release-tracking-text";
+import { releaseTrackingText } from "../features/release-tracking/text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {

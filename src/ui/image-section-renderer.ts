@@ -7,7 +7,7 @@ import {
   parseImageSectionSource,
   type ImageSectionLocator,
 } from "../domain/image-section";
-import { imageSectionText } from "../image-section-text";
+import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal } from "./image-lightbox";

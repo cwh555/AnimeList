@@ -1,20 +1,20 @@
 import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types";
 import { registerBundledLocales } from "./i18n/locales";
-import { additionalProgressUnitsFeature } from "./additional-progress-units-ui";
+import { additionalProgressUnitsFeature } from "./features/progress/additional-progress-units";
 import AnimeListPlugin from "./main";
-import { masterpieceFeature } from "./masterpiece-ui";
-import { imageSectionFeature } from "./image-section-feature";
-import { momentsFeature } from "./moments-feature";
-import { progressUiFeature } from "./progress-ui";
-import { ratingFeature } from "./rating-ui";
-import { releaseTrackingFeature } from "./release-tracking-feature";
-import { scoreDashboardFeature } from "./score-dashboard-feature";
-import { searchEnhancementsFeature } from "./search-enhancements";
-import { searchPaginationFeature } from "./search-pagination";
-import { serialEntryCoversFeature } from "./serial-cover-feature";
-import { serialCoverSettingsFeature } from "./serial-cover-settings";
-import { userTagSettingsFeature } from "./user-tag-settings";
-import { versionCleanupSettingsFeature } from "./version-cleanup-settings";
+import { masterpieceFeature } from "./features/masterpiece/feature";
+import { imageSectionFeature } from "./features/image-sections/feature";
+import { momentsFeature } from "./features/moments/feature";
+import { progressUiFeature } from "./features/progress/feature";
+import { ratingFeature } from "./features/rating/feature";
+import { releaseTrackingFeature } from "./features/release-tracking/feature";
+import { scoreDashboardFeature } from "./features/score-dashboard/feature";
+import { searchEnhancementsFeature } from "./features/search/enhancements";
+import { searchPaginationFeature } from "./features/search/pagination";
+import { serialEntryCoversFeature } from "./features/serial-covers/feature";
+import { serialCoverSettingsFeature } from "./features/serial-covers/settings";
+import { userTagSettingsFeature } from "./features/user-tags/settings";
+import { versionCleanupSettingsFeature } from "./features/version-cleanup/settings";
 
 registerBundledLocales();
 

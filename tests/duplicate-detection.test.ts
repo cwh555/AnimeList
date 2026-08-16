@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findConfidentDuplicate, type StoredMediaIdentity } from "../src/duplicate-detection";
+import { findConfidentDuplicate, type StoredMediaIdentity } from "../src/domain/duplicate-detection";
 import type { ExternalMediaResult } from "../src/types";
 
 const storedSecondSeason: StoredMediaIdentity = {

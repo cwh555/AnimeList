@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { MasterpieceDecorationCache } from "../src/masterpiece-decoration-cache";
+import { MasterpieceDecorationCache } from "../src/app/masterpiece-decoration-cache";
 import type { MediaItem } from "../src/types";
 
 function item(path: string, title = path): MediaItem {

@@ -1,6 +1,6 @@
 import { Menu, Modal, Notice } from "obsidian";
 import type { ImageSectionService } from "../data/image-section-service";
-import { imageSectionText } from "../image-section-text";
+import { imageSectionText } from "../features/image-sections/text";
 import { copyImageToClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   createReliableLibraryOpener,
   type LibraryNavigationAdapter,
-} from "../src/library-navigation";
+} from "../src/app/library-navigation";
 
 interface TestLeaf {
   view?: { showSection(section: "library"): Promise<void> };

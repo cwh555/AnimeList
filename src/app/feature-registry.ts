@@ -1,4 +1,4 @@
-import { settingsPageForFeature } from "../settings-layout";
+import { settingsPageForFeature } from "./settings-layout";
 import type { MediaItem } from "../types";
 import type { LibraryRenderAdapters, LibraryRenderContext } from "../ui/library-contracts";
 import type { MediaFormContext, MediaFormSubmitContext } from "../ui/media-form-contracts";

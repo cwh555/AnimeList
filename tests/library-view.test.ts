@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { WorkspaceLeaf } from "obsidian";
-import { createDefaultSettings } from "../src/settings-model";
+import { createDefaultSettings } from "../src/app/settings-model";
 import type { LibraryRenderAdapters } from "../src/ui/library-contracts";
 import { AnimeListView, type AnimeListViewHost } from "../src/ui/library-view";
 

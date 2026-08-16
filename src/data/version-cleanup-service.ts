@@ -5,7 +5,7 @@ import {
   removeLegacyDefaultCoverLine,
   type LegacyCoverCleanupCandidate,
 } from "../domain/version-cleanup";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 export interface VersionCleanupPlanItem extends LegacyCoverCleanupCandidate {
   path: string;

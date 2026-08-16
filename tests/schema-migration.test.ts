@@ -5,7 +5,7 @@ import {
   CURRENT_MEDIA_SCHEMA_VERSION,
   migrateMediaStatusFrontmatter,
   migrateMediaStatusNotes,
-} from "../src/schema-migration";
+} from "../src/app/schema-migration";
 
 function markdownFile(path: string): TFile {
   const file = new TFile();

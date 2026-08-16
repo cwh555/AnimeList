@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ButtonComponent, Setting, TextComponent } from "obsidian";
-import { SerialCoverMigrationModal } from "../src/serial-cover-migration-modal";
-import { configureSerialCoverProvider } from "../src/serial-cover-provider";
-import { createSerialCoverSettingsSections } from "../src/serial-cover-settings";
-import type { SerialCoverPlugin } from "../src/serial-cover-service";
+import { SerialCoverMigrationModal } from "../src/ui/serial-covers/migration-modal";
+import { configureSerialCoverProvider } from "../src/data/serial-covers/provider";
+import { createSerialCoverSettingsSections } from "../src/features/serial-covers/settings";
+import type { SerialCoverPlugin } from "../src/app/serial-covers/serial-cover-service";
 
 function settingsPlugin(): {
   plugin: SerialCoverPlugin;

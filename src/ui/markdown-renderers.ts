@@ -1,7 +1,7 @@
 import { MarkdownRenderChild, Menu, TAbstractFile, TFile } from "obsidian";
 import type { MediaItem, MediaType } from "../types";
-import { normalizeMediaStatus } from "../media-status";
-import { normalizeProgressValue, normalizeReleaseStatus, progressDisplayValue } from "../novel-progress";
+import { normalizeMediaStatus } from "../domain/media-status";
+import { normalizeProgressValue, normalizeReleaseStatus, progressDisplayValue } from "../domain/progress/novel-progress";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { LibraryViewMode } from "./library-contracts";
 import type { AnimeListUiHost } from "./plugin-host";
