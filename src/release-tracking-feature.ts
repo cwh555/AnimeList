@@ -10,6 +10,7 @@ import {
   type ReleaseTrackingSnapshot,
 } from "./domain/release-tracking";
 import type { MediaItem, MediaType } from "./domain/media-types";
+import { releaseTrackingItemsForRefresh } from "./domain/release-tracking-enrollment";
 import { releaseTrackingText } from "./release-tracking-text";
 import { ReleaseTrackingMatchModal } from "./ui/release-tracking-modal";
 import { ReleaseTrackingDashboardModal } from "./ui/release-tracking-dashboard-modal";
@@ -113,8 +114,13 @@ async function performReleaseCheck(
   const active = {} as ActiveReleaseCheck;
   active.listeners = listeners;
   const service = serviceFor(host);
+  const trackedItems = releaseTrackingItemsForRefresh(
+    host.collectMediaItems(),
+    (item) => service.state.read(item.filePath, item.mediaType),
+    (item) => service.state.hasExplicitStatus(item.filePath),
+  );
   active.promise = Promise.resolve()
-    .then(() => service.refreshAll(host.collectMediaItems(), (progress) => {
+    .then(() => service.refreshAll(trackedItems, (progress) => {
       active.latest = progress;
       active.listeners.forEach((listener) => listener(progress));
     }))
