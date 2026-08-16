@@ -705,7 +705,7 @@ describe("version documentation", () => {
     assert.match(sessions, /## 1\.0\.x — Public foundation/);
     assert.match(sessions, /## 1\.1\.0 — Serial reading and novel-volume timeline/);
     assert.match(sessions, /\*\*Release state:\*\* Published through `1\.1\.2`\./);
-    assert.match(changelog, /## 1\.4\.0 - 2026-08-15/);
+    assert.match(changelog, /## 1\.4\.0 - 2026-08-16/);
     assert.match(changelog, /## 1\.3\.0 - 2026-08-07/);
     assert.match(changelog, /## 1\.2\.1 - 2026-07-27/);
     assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
@@ -733,7 +733,7 @@ describe("version documentation", () => {
       packages: Record<string, { version?: string }>;
     };
     const versions = JSON.parse(readFileSync(path.join(process.cwd(), "versions.json"), "utf8")) as Record<string, string>;
-    assert.equal(manifest.version, "1.3.1");
+    assert.equal(manifest.version, "1.4.0");
     assert.equal(packageJson.version, manifest.version);
     assert.equal(packageLock.version, manifest.version);
     assert.equal(packageLock.packages[""]?.version, manifest.version);

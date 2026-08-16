@@ -85,7 +85,7 @@ This document preserves the product-level decisions introduced by each major dev
 
 ## 1.4.0 — Localized UI, release awareness, and reusable note media
 
-**Release state:** Preview / release candidate.
+**Release state:** Published.
 
 ### Main outcomes
 
