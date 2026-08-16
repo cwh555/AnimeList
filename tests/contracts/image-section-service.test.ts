@@ -223,4 +223,61 @@ describe("image section storage service", () => {
     await h.service.remove(h.note.path, block, path);
     assert.deepEqual(h.trashed, []);
   });
+  it("persists per-section column metadata without changing image order or unrelated Markdown", async () => {
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images custom=keep", "- a.jpg", "- b.jpg", "```",
+      "Keep this paragraph.",
+      "## Two", "```animelist-images", "- c.jpg", "```", "",
+    ].join("\n"));
+    const first = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
+    const update = await h.service.setColumns(h.note.path, first, 6);
+    assert.equal(update.source, "- a.jpg\n- b.jpg");
+    assert.match(h.data.get(h.note.path) ?? "", /```animelist-images custom=keep columns=6\n- a\.jpg\n- b\.jpg/);
+    assert.match(h.data.get(h.note.path) ?? "", /Keep this paragraph\./);
+    assert.match(h.data.get(h.note.path) ?? "", /## Two\n```animelist-images\n- c\.jpg/);
+  });
+
+  it("reorders an image inside one section without trashing or rewriting other content", async () => {
+    const h = harness([
+      "# Demo", "```animelist-images columns=3",
+      "- a.jpg", "- b.jpg", "- c.jpg", "```",
+      "Keep this paragraph.", "",
+    ].join("\n"));
+    const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
+    const result = await h.service.moveAsset(h.note.path, block, block, "c.jpg", "a.jpg", "before");
+    assert.equal(result.sourceSection.source, "- c.jpg\n- a.jpg\n- b.jpg");
+    assert.equal(result.targetSection.source, result.sourceSection.source);
+    assert.match(h.data.get(h.note.path) ?? "", /```animelist-images columns=3\n- c\.jpg\n- a\.jpg\n- b\.jpg\n```/);
+    assert.match(h.data.get(h.note.path) ?? "", /Keep this paragraph\./);
+    assert.deepEqual(h.trashed, []);
+  });
+
+  it("moves an image between sections in one atomic note update without trashing the asset", async () => {
+    const path = "AnimeList/Images/anime/demo-bangumi-42/move.jpg";
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images columns=2", `- ${path}`, "- stay.jpg", "```",
+      "Keep this paragraph.",
+      "## Two", "```animelist-images columns=5", "- target-a.jpg", "- target-b.jpg", "```", "",
+    ].join("\n"));
+    h.files.set(path, file(path));
+    const [source, target] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
+    const result = await h.service.moveAsset(h.note.path, source, target, path, "target-b.jpg", "before");
+    const updated = h.data.get(h.note.path) ?? "";
+    assert.match(updated, /```animelist-images columns=2\n- stay\.jpg\n```/);
+    assert.ok(updated.includes([
+      "```animelist-images columns=5",
+      "- target-a.jpg",
+      `- ${path}`,
+      "- target-b.jpg",
+      "```",
+    ].join("\n")));
+    assert.match(updated, /Keep this paragraph\./);
+    assert.equal(result.sourceSection.source, "- stay.jpg");
+    assert.match(result.targetSection.source, /move\.jpg/);
+    assert.deepEqual(h.trashed, []);
+    assert.equal(h.files.has(path), true);
+  });
+
 });

@@ -8,12 +8,20 @@ import {
   imageExtensionFor,
   imageSectionFolderForNote,
   imageSectionRootFromCoverFolder,
+  locateImageSectionBlock,
   normalizeImageSectionPath,
   parseImageSectionSource,
   replaceImageSectionPaths,
   serializeImageSectionPaths,
   type ImageSectionLocator,
 } from "../domain/image-section";
+import { setImageSectionColumns } from "../domain/image-section-layout";
+import {
+  moveImageSectionPath,
+  type ImageSectionDropPlacement,
+  type ImageSectionMoveUpdate,
+  type ImageSectionStateUpdate,
+} from "../domain/image-section-order";
 import { allManagedImageReferences } from "../domain/media-image-references";
 import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
 import { visualImageFingerprint } from "./image-raster";
@@ -51,6 +59,11 @@ export interface ResolvedImageSectionAsset {
   thumbnailSources?: CoverSources;
   file: TFile | null;
   remote: boolean;
+}
+
+function findSectionState(markdown: string, locator: ImageSectionLocator): ImageSectionStateUpdate {
+  const block = locateImageSectionBlock(markdown, locator);
+  return { source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd };
 }
 
 function isManagedPath(path: string, root: string): boolean {
@@ -260,6 +273,45 @@ export class ImageSectionService {
       added: stored.addedPaths.length,
       duplicatesSkipped: stored.duplicatesSkipped,
     };
+  }
+
+  async setColumns(
+    sourcePath: string,
+    locator: ImageSectionLocator,
+    columns: number,
+  ): Promise<ImageSectionStateUpdate> {
+    const note = this.noteFile(sourcePath);
+    const updated = await this.host.app.vault.process(
+      note,
+      (markdown) => setImageSectionColumns(markdown, locator, columns),
+    );
+    const block = findSectionState(updated, locator);
+    return block;
+  }
+
+  async moveAsset(
+    sourcePath: string,
+    sourceLocator: ImageSectionLocator,
+    targetLocator: ImageSectionLocator,
+    pathValue: unknown,
+    targetPathValue: unknown,
+    placement: ImageSectionDropPlacement,
+  ): Promise<ImageSectionMoveUpdate> {
+    const note = this.noteFile(sourcePath);
+    let result: ImageSectionMoveUpdate | null = null;
+    await this.host.app.vault.process(note, (markdown) => {
+      result = moveImageSectionPath(
+        markdown,
+        sourceLocator,
+        targetLocator,
+        pathValue,
+        targetPathValue,
+        placement,
+      );
+      return result.markdown;
+    });
+    if (!result) throw new Error("Could not update image section order");
+    return result;
   }
 
   async remove(

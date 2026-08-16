@@ -27,6 +27,7 @@ export const TEST_FEATURES = [
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },

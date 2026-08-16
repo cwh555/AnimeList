@@ -104,7 +104,7 @@ function sameSectionSource(left: string, right: string): boolean {
     === serializeImageSectionPaths(parseImageSectionSource(right));
 }
 
-function locateImageSection(markdown: string, locator: ImageSectionLocator): ImageSectionBlock {
+export function locateImageSectionBlock(markdown: string, locator: ImageSectionLocator): ImageSectionBlock {
   const blocks = findImageSectionBlocks(markdown);
   const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
   if (hint !== null) {
@@ -129,7 +129,7 @@ export function replaceImageSectionPaths(
   const text = stringValue(markdown);
   const newline = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = text.split(/\r?\n/);
-  const block = locateImageSection(text, locator);
+  const block = locateImageSectionBlock(text, locator);
   const source = serializeImageSectionPaths(nextPaths);
   const replacement = [lines[block.lineStart], ...(source ? source.split("\n") : []), lines[block.lineEnd]];
   lines.splice(block.lineStart, block.lineEnd - block.lineStart + 1, ...replacement);
