@@ -14,6 +14,11 @@ import {
   serializeScoreDashboardDraggedPaths,
   toggleScoreDashboardPathSelection,
 } from "../src/score-dashboard-selection";
+import {
+  SCORE_DASHBOARD_TOUCH_DRAG_THRESHOLD_PX,
+  scoreDashboardTouchIntent,
+  shouldExitScoreDashboardTouchBatchMode,
+} from "../src/score-dashboard-touch";
 
 describe("score dashboard incremental selection", () => {
   it("updates the existing selection set without rebuilding dashboard data", () => {
@@ -137,5 +142,27 @@ describe("score dashboard refresh scope", () => {
     assert.equal(shouldRefreshScoreDashboardMetadata(
       "Notes/unrelated.md", roots, covers, guard, 1000,
     ), false);
+  });
+});
+
+describe("score dashboard mobile touch gestures", () => {
+  it("keeps small movement pending until the drag threshold is crossed", () => {
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 23, y: 24 }), "pending");
+    assert.equal(SCORE_DASHBOARD_TOUCH_DRAG_THRESHOLD_PX > 0, true);
+  });
+
+  it("reserves horizontal movement for the native mobile score rail", () => {
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 60, y: 24 }), "horizontal-scroll");
+  });
+
+  it("treats vertical movement as direct score dragging", () => {
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 24, y: 60 }), "drag");
+  });
+
+  it("exits touch batch mode whenever the selection becomes empty", () => {
+    assert.equal(shouldExitScoreDashboardTouchBatchMode(true, true, 0), true);
+    assert.equal(shouldExitScoreDashboardTouchBatchMode(true, true, 1), false);
+    assert.equal(shouldExitScoreDashboardTouchBatchMode(false, true, 0), false);
+    assert.equal(shouldExitScoreDashboardTouchBatchMode(true, false, 0), false);
   });
 });

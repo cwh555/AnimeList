@@ -9,6 +9,10 @@ import {
 } from "./score-dashboard-selection";
 import { planScoreDashboardMove, type ScoreDashboardScoreChange } from "./score-dashboard-move";
 import { scoreDashboardText as text } from "./score-dashboard-text";
+import {
+  installScoreDashboardTouchInteractions,
+  shouldExitScoreDashboardTouchBatchMode,
+} from "./score-dashboard-touch";
 import { renderScoreDashboard, type ScoreDashboardUiAdapters, type ScoreDashboardUiState } from "./score-dashboard-ui";
 import type { MediaItem } from "./types";
 
@@ -33,11 +37,17 @@ export function renderScoreDashboardWithBatchDrag(
 ): void {
   controllers.get(container)?.abort();
   let currentState = { ...initialState };
+  let touchInputSeen = false;
 
   const render = (scrollTop: number, restoreBatchMode = false): void => {
     controllers.get(container)?.abort();
+    let scheduleTouchBatchInvariant = (): void => {};
     renderScoreDashboard(container, items, currentState, {
       ...adapters,
+      applyChanges: async (changes) => {
+        await adapters.applyChanges(changes);
+        container.ownerDocument.defaultView?.setTimeout(scheduleTouchBatchInvariant, 0);
+      },
       onStateChange: (nextState) => {
         currentState = { ...nextState };
         adapters.onStateChange(nextState);
@@ -60,6 +70,20 @@ export function renderScoreDashboardWithBatchDrag(
     const selectedPosters = (): HTMLButtonElement[] => Array.from(
       container.querySelectorAll<HTMLButtonElement>(".al-score-poster.is-selected"),
     );
+    let batchInvariantQueued = false;
+    scheduleTouchBatchInvariant = (): void => {
+      if (!touchInputSeen || batchInvariantQueued) return;
+      batchInvariantQueued = true;
+      queueMicrotask(() => {
+        batchInvariantQueued = false;
+        if (!shouldExitScoreDashboardTouchBatchMode(
+          touchInputSeen,
+          shell.classList.contains("is-batch-mode"),
+          selectedPosters().length,
+        )) return;
+        batchButton.click();
+      });
+    };
     const syncDraggablePosters = (): void => {
       const batchMode = shell.classList.contains("is-batch-mode");
       container.querySelectorAll<HTMLButtonElement>(".al-score-poster").forEach((poster) => {
@@ -76,8 +100,38 @@ export function renderScoreDashboardWithBatchDrag(
       autoScroller = null;
       dragPreview?.remove();
       dragPreview = null;
+      container.querySelectorAll<HTMLElement>(".al-score-poster.is-dragging")
+        .forEach((poster) => poster.classList.remove("is-dragging"));
       selectedPosters().forEach((poster) => poster.classList.remove("is-batch-dragging"));
       clearDropTargets();
+    };
+
+    const applyPathDrop = (paths: readonly string[], lane: HTMLElement, restoreBatchMode: boolean): void => {
+      finishDrag();
+      if (operationPending) return;
+      const sources = paths.flatMap((path) => {
+        const item = items.find((candidate) => candidate.filePath === path);
+        return item ? [{ filePath: item.filePath, score: item.score }] : [];
+      });
+      const plan = planScoreDashboardMove(sources, targetScore(lane));
+      if (!plan.changes.length) {
+        adapters.showNotice(text.moveNoChange);
+        return;
+      }
+
+      operationPending = true;
+      const preservedScrollTop = container.scrollTop;
+      void adapters.applyChanges(plan.changes)
+        .then(() => {
+          applyLocalChanges(items, plan.changes);
+          adapters.showNotice(text.moveSuccess(plan.changes.length));
+          render(preservedScrollTop, restoreBatchMode);
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          adapters.showNotice(text.moveFailed(message));
+        })
+        .finally(() => { operationPending = false; });
     };
 
     container.addEventListener("click", (event) => {
@@ -89,7 +143,10 @@ export function renderScoreDashboardWithBatchDrag(
       }
     }, { ...options, capture: true });
 
-    container.addEventListener("click", () => queueMicrotask(syncDraggablePosters), options);
+    container.addEventListener("click", () => {
+      queueMicrotask(syncDraggablePosters);
+      scheduleTouchBatchInvariant();
+    }, options);
 
     container.addEventListener("dragstart", (event) => {
       if (!shell.classList.contains("is-batch-mode")) return;
@@ -146,32 +203,21 @@ export function renderScoreDashboardWithBatchDrag(
 
       event.preventDefault();
       event.stopPropagation();
-      finishDrag();
-      if (operationPending) return;
-      const sources = paths.flatMap((path) => {
-        const item = items.find((candidate) => candidate.filePath === path);
-        return item ? [{ filePath: item.filePath, score: item.score }] : [];
-      });
-      const plan = planScoreDashboardMove(sources, targetScore(lane));
-      if (!plan.changes.length) {
-        adapters.showNotice(text.moveNoChange);
-        return;
-      }
-
-      operationPending = true;
-      const preservedScrollTop = container.scrollTop;
-      void adapters.applyChanges(plan.changes)
-        .then(() => {
-          applyLocalChanges(items, plan.changes);
-          adapters.showNotice(text.moveSuccess(plan.changes.length));
-          render(preservedScrollTop, true);
-        })
-        .catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
-          adapters.showNotice(text.moveFailed(message));
-        })
-        .finally(() => { operationPending = false; });
+      applyPathDrop(paths, lane, true);
     }, { ...options, capture: true });
+
+    installScoreDashboardTouchInteractions(container, shell, batchButton, controller.signal, {
+      selectedPosters,
+      onTouchInput: () => { touchInputSeen = true; },
+      finishDrag,
+      onDragStart: (clientY) => {
+        autoScroller = new ScoreDashboardDragAutoScroller(container);
+        autoScroller.start();
+        autoScroller.update(clientY);
+      },
+      onDragMove: (clientY) => autoScroller?.update(clientY),
+      onDrop: (paths, lane) => applyPathDrop(paths, lane, false),
+    });
 
     container.addEventListener("dragend", finishDrag, { ...options, capture: true });
     container.ownerDocument.defaultView?.addEventListener("blur", finishDrag, options);
