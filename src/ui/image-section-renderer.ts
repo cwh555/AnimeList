@@ -7,6 +7,14 @@ import {
   parseImageSectionSource,
   type ImageSectionLocator,
 } from "../domain/image-section";
+import {
+  DEFAULT_IMAGE_SECTION_COLUMNS,
+  effectiveImageSectionColumns,
+  imageSectionColumnBuckets,
+  normalizeImageSectionColumns,
+  parseImageSectionColumns,
+} from "../domain/image-section-layout";
+import type { ImageSectionDropPlacement, ImageSectionStateUpdate } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
@@ -23,15 +31,39 @@ function isInteractiveTarget(target: Element | null): boolean {
   return Boolean(target?.closest("button, a, input, textarea, select, [role='button']"));
 }
 
+const IMAGE_SECTION_DRAG_TYPE = "application/x-animelist-image-section";
+
+let activeImageDrag: { source: ImageSectionRenderChild; path: string } | null = null;
+
+function isInternalImageDrag(dataTransfer: DataTransfer | null): boolean {
+  return activeImageDrag !== null
+    && Boolean(dataTransfer && [...dataTransfer.types].includes(IMAGE_SECTION_DRAG_TYPE));
+}
+
+function clearImageDropIndicators(): void {
+  for (const item of document.querySelectorAll<HTMLElement>(
+    ".al-image-item.is-drop-before, .al-image-item.is-drop-after",
+  )) {
+    item.removeClass("is-drop-before", "is-drop-after");
+  }
+  for (const section of document.querySelectorAll<HTMLElement>(".animelist-image-section.is-image-drag-target")) {
+    section.removeClass("is-image-drag-target");
+  }
+}
+
 export class ImageSectionRenderChild extends MarkdownRenderChild {
   private source: string;
   private interactionsBound = false;
   private lineHint: number | undefined;
+  private lineHintAuthoritative = false;
   private expanded = false;
   private galleryCollapsible = false;
   private selectionMode = false;
   private readonly selectedPaths = new Set<string>();
   private selectionDeleteButton: HTMLButtonElement | null = null;
+  private preferredColumns = DEFAULT_IMAGE_SECTION_COLUMNS;
+  private galleryResizeObserver: ResizeObserver | null = null;
+  private galleryRelayout: (() => void) | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -45,18 +77,37 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   onload(): void {
-    this.lineHint = this.context.getSectionInfo(this.containerEl)?.lineStart;
+    const section = this.context.getSectionInfo(this.containerEl);
+    this.lineHint = section?.lineStart;
+    this.preferredColumns = parseImageSectionColumns(section?.text);
     this.render();
     this.registerDomEvent(document, "click", () => this.closeMenus());
+  }
+
+  onunload(): void {
+    this.galleryResizeObserver?.disconnect();
+    this.galleryResizeObserver = null;
+    this.galleryRelayout = null;
+    if (activeImageDrag?.source === this) activeImageDrag = null;
+    clearImageDropIndicators();
   }
 
   private locator(): ImageSectionLocator {
     const section = this.context.getSectionInfo(this.containerEl);
     return {
       source: this.source,
-      lineStart: section?.lineStart ?? this.lineHint,
-      lineEnd: section?.lineEnd,
+      lineStart: this.lineHintAuthoritative ? this.lineHint : section?.lineStart ?? this.lineHint,
     };
+  }
+
+  private applySectionState(update: ImageSectionStateUpdate): void {
+    this.source = update.source;
+    this.lineHint = update.lineStart;
+    this.lineHintAuthoritative = true;
+    window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
+    this.selectionMode = false;
+    this.selectedPaths.clear();
+    this.render();
   }
 
   private setSource(source: string): void {
@@ -222,8 +273,89 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.render();
   }
 
+  private dropPlacement(item: HTMLElement, clientY: number): ImageSectionDropPlacement {
+    const rect = item.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2 ? "before" : "after";
+  }
+
+  private markDropTarget(item: HTMLElement, placement: ImageSectionDropPlacement): void {
+    clearImageDropIndicators();
+    this.containerEl.addClass("is-image-drag-target");
+    item.addClass(placement === "before" ? "is-drop-before" : "is-drop-after");
+  }
+
+  private async handleInternalImageDrop(
+    targetPath: string | null,
+    placement: ImageSectionDropPlacement,
+  ): Promise<void> {
+    const drag = activeImageDrag;
+    clearImageDropIndicators();
+    if (!drag) return;
+    if (drag.source.context.sourcePath !== this.context.sourcePath) {
+      new Notice(imageSectionText("crossNoteMoveUnsupported"));
+      return;
+    }
+    try {
+      const update = await this.service.moveAsset(
+        this.context.sourcePath,
+        drag.source.locator(),
+        this.locator(),
+        drag.path,
+        targetPath ?? "",
+        placement,
+      );
+      drag.source.containerEl.removeClass("is-image-drag-source");
+      activeImageDrag = null;
+      if (drag.source === this) {
+        this.applySectionState(update.sourceSection);
+      } else {
+        drag.source.applySectionState(update.sourceSection);
+        this.applySectionState(update.targetSection);
+      }
+    } catch (error) {
+      new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
+    }
+  }
+
+  private bindImageDrag(item: HTMLElement, path: string): void {
+    item.draggable = true;
+    item.addEventListener("dragstart", (event) => {
+      if (this.selectionMode || !event.dataTransfer) {
+        event.preventDefault();
+        return;
+      }
+      activeImageDrag = { source: this, path };
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(IMAGE_SECTION_DRAG_TYPE, path);
+      item.addClass("is-image-dragging");
+      this.containerEl.addClass("is-image-drag-source");
+      this.closeMenus();
+    });
+    item.addEventListener("dragover", (event) => {
+      if (!isInternalImageDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      this.markDropTarget(item, this.dropPlacement(item, event.clientY));
+    });
+    item.addEventListener("drop", (event) => {
+      if (!isInternalImageDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const placement = this.dropPlacement(item, event.clientY);
+      void this.handleInternalImageDrop(path, placement);
+    });
+    item.addEventListener("dragend", () => {
+      item.removeClass("is-image-dragging");
+      this.containerEl.removeClass("is-image-drag-source");
+      if (activeImageDrag?.source === this && activeImageDrag.path === path) activeImageDrag = null;
+      clearImageDropIndicators();
+    });
+  }
+
   private createImage(path: string): HTMLElement {
     const item = makeEl("div", `al-image-item${this.selectionMode ? " is-selecting" : ""}`);
+    item.dataset.imagePath = path;
     const resolved = this.service.resolve(path, this.context.sourcePath);
     if (resolved.resourcePath) {
       const image = makeEl("img");
@@ -298,6 +430,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         this.showImageContextMenu(event, path);
       });
       item.appendChild(this.createMenu(path));
+      this.bindImageDrag(item, path);
     }
     return item;
   }
@@ -305,7 +438,23 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private renderGallery(paths: readonly string[]): void {
     const viewport = makeEl("div", `al-image-gallery-viewport${this.expanded ? " is-expanded" : ""}`);
     const gallery = makeEl("div", "al-image-masonry");
-    for (const path of paths) gallery.appendChild(this.createImage(path));
+    const items = paths.map((path) => this.createImage(path));
+    const relayout = (): void => {
+      const width = gallery.clientWidth || viewport.clientWidth || this.containerEl.clientWidth;
+      const columns = effectiveImageSectionColumns(this.preferredColumns, width);
+      gallery.style.setProperty("--al-image-columns", String(columns));
+      const columnElements = imageSectionColumnBuckets(items, columns).map((bucket) => {
+        const column = makeEl("div", "al-image-masonry-column");
+        column.append(...bucket);
+        return column;
+      });
+      gallery.replaceChildren(...columnElements);
+    };
+    this.galleryRelayout = relayout;
+    relayout();
+    this.galleryResizeObserver?.disconnect();
+    this.galleryResizeObserver = new ResizeObserver(relayout);
+    this.galleryResizeObserver.observe(gallery);
     viewport.appendChild(gallery);
 
     const toggle = makeEl("button", "al-image-expand-button");
@@ -353,7 +502,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       event.stopPropagation();
     });
     this.containerEl.addEventListener("mousedown", (event) => {
-      if (!isInteractiveTarget(eventTargetElement(event))) return;
+      const target = eventTargetElement(event);
+      if (!isInteractiveTarget(target)) return;
+      if (target?.closest(".al-image-item[draggable='true'], input[type='range']")) {
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
     });
@@ -362,12 +516,28 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       this.containerEl.focus({ preventScroll: true });
     });
     this.containerEl.addEventListener("dragover", (event) => {
+      if (isInternalImageDrag(event.dataTransfer)) {
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+        this.containerEl.addClass("is-image-drag-target");
+        return;
+      }
       if (![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === "file")) return;
       event.preventDefault();
       this.containerEl.addClass("is-dragging");
     });
-    this.containerEl.addEventListener("dragleave", () => this.containerEl.removeClass("is-dragging"));
+    this.containerEl.addEventListener("dragleave", (event) => {
+      if (!this.containerEl.contains(event.relatedTarget as Node | null)) {
+        this.containerEl.removeClass("is-dragging", "is-image-drag-target");
+      }
+    });
     this.containerEl.addEventListener("drop", (event) => {
+      if (isInternalImageDrag(event.dataTransfer)) {
+        event.preventDefault();
+        this.containerEl.removeClass("is-image-drag-target");
+        void this.handleInternalImageDrop(null, "append");
+        return;
+      }
       const files = [...(event.dataTransfer?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
@@ -431,11 +601,54 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         });
         toolbar.appendChild(remove);
       }
+
+      const control = makeEl("label", "al-image-column-control");
+      const labelText = makeEl("span", "al-image-column-label", imageSectionText("columnsLabel"));
+      const range = makeEl("input");
+      range.type = "range";
+      range.min = "1";
+      range.max = "6";
+      range.step = "1";
+      range.value = String(this.preferredColumns);
+      range.setAttribute("aria-label", imageSectionText("columnsLabel"));
+      const value = makeEl("output", "al-image-column-value", String(this.preferredColumns));
+      let persistedColumns = this.preferredColumns;
+      range.addEventListener("input", () => {
+        this.preferredColumns = normalizeImageSectionColumns(range.value);
+        value.value = String(this.preferredColumns);
+        value.textContent = String(this.preferredColumns);
+        this.galleryRelayout?.();
+      });
+      range.addEventListener("change", () => {
+        const nextColumns = normalizeImageSectionColumns(range.value);
+        void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
+          .then((update) => {
+            this.source = update.source;
+            this.lineHint = update.lineStart;
+            this.lineHintAuthoritative = true;
+            window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
+            this.preferredColumns = nextColumns;
+            persistedColumns = nextColumns;
+          })
+          .catch((error) => {
+            this.preferredColumns = persistedColumns;
+            range.value = String(persistedColumns);
+            value.value = String(persistedColumns);
+            value.textContent = String(persistedColumns);
+            this.galleryRelayout?.();
+            new Notice(imageSectionText("layoutFailed", { error: errorMessage(error) }));
+          });
+      });
+      control.append(labelText, range, value);
+      toolbar.appendChild(control);
     }
     this.containerEl.appendChild(toolbar);
   }
 
   render(): void {
+    this.galleryResizeObserver?.disconnect();
+    this.galleryResizeObserver = null;
+    this.galleryRelayout = null;
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-image-section");
     this.containerEl.toggleClass("is-selecting", this.selectionMode);

@@ -1075,7 +1075,10 @@ Check the approved image-section behavior:
 - OVERLORD's empty section accepts **Choose files / drag & drop / paste / URL**.
 - OVERLORD intentionally starts with one **old default duplicate cover embed** below \`animelist-detail\`. In Settings → **Updates & cleanup** → **Remove duplicate note covers**, Review cleanup must list OVERLORD before confirmation.
 - Confirming that cleanup must remove only the duplicate standalone cover line; OVERLORD's frontmatter, image section, and other body text must remain unchanged.
-- Real images render as a clean Pinterest/masonry wall without captions or editing controls.
+- Real images render as a clean Pinterest/masonry wall without fixed row-height gaps: a shorter image lets the next image in that column move upward immediately.
+- The **Image columns** slider defaults to 4 on desktop. Change it to 2 and 5, reopen the note, and confirm the chosen value persists while narrow layouts still cap the effective column count for readability.
+- Drag an image within one section and confirm its Markdown list order changes and survives reopening the note.
+- In 輝夜姬, drag an image from the first populated image section into the second. Confirm it disappears from the source, appears at the intended target position, the Markdown paragraph between the two sections remains byte-for-byte untouched, and no image file is moved to trash.
 - Click an image to open the original in the lightbox; left/right arrows navigate within that image section and Esc closes the modal.
 - Copy the current image with **Cmd/Ctrl+C** in the lightbox, or use **Copy image** from an image right-click menu; paste it into another image section and confirm it behaves like a normal image paste.
 - Add the exact same file again under a different filename, then copy/paste an existing image back into the same section. Both must be skipped as duplicates instead of creating a second entry.
