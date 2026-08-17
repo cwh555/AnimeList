@@ -15,11 +15,13 @@ These are primary destinations, not toolbar actions. Switching them reuses the s
 
 The primary navigation must remain visually distinct from page-local filters: icon + label, flat/underlined active treatment, and a persistent horizontal navigation row. On narrow/mobile layouts it may scroll horizontally but must not be hidden behind a hamburger menu.
 
-The right side of the shared header is reserved for actions:
+The shared workspace header shows the **AnimeList** product name only; do not restore the old Markdown-description subtitle. Primary actions live on the same row as primary navigation: **Collect** and optional **More** align to the workspace tabs rather than floating in a separate header row.
 
 - **Collect** is the primary action.
 - **More** contains enabled low-frequency tools such as Release Updates.
 - Images, Timeline, and Score Dashboard must not be reintroduced as header action buttons.
+
+Workspace pages must also own a definite content height. Timeline in particular renders its existing flex viewport inside the shared page; the page must not collapse that viewport to zero height. Image-gallery buttons must explicitly preserve intrinsic image/card height so Obsidian's normal button sizing cannot crop gallery content into thin strips.
 
 ## Page-local navigation
 
