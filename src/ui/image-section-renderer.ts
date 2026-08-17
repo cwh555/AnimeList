@@ -21,7 +21,7 @@ import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal } from "./image-lightbox";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
-import { captureViewportAnchor } from "./viewport-anchor";
+import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
 
 function eventTargetElement(event: Event): Element | null {
   const target = event.target as { closest?: (selector: string) => Element | null } | null;
@@ -72,7 +72,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private galleryRelayout: (() => void) | null = null;
   private galleryPaths: string[] = [];
   private readonly imageElements = new Map<string, HTMLElement>();
-  private suppressImageClickUntil = 0;
 
   constructor(
     containerEl: HTMLElement,
@@ -399,7 +398,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       dragElement: item,
       ghostClass: "al-image-drag-ghost",
       onStart: () => {
-        this.suppressImageClickUntil = performance.now() + 500;
         this.containerEl.addClass("is-image-drag-source");
         this.closeMenus();
       },
@@ -476,11 +474,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       item.setAttribute("aria-label", imageSectionText("openImage"));
       item.addEventListener("click", (event) => {
         if (eventTargetElement(event)?.closest(".al-image-item-actions, .al-image-drag-handle")) return;
-        if (performance.now() < this.suppressImageClickUntil) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
         event.preventDefault();
         event.stopPropagation();
         if (event.shiftKey) {
@@ -696,6 +689,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       });
       range.addEventListener("change", () => {
         const nextColumns = normalizeImageSectionColumns(range.value);
+        // Persisting the fence metadata rewrites the note. Obsidian may replace
+        // this Markdown render child as a result; keep the surrounding scroller
+        // at the exact user-visible offset through that refresh.
+        const scrollPosition = captureScrollPosition(this.containerEl);
+        range.blur();
+        scrollPosition.stabilize(12);
         void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
           .then((update) => {
             this.source = update.source;
@@ -704,6 +703,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
             window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
             this.preferredColumns = nextColumns;
             persistedColumns = nextColumns;
+            scrollPosition.restore();
+            scrollPosition.stabilize(12);
           })
           .catch((error) => {
             this.preferredColumns = persistedColumns;
@@ -711,6 +712,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
             value.value = String(persistedColumns);
             value.textContent = String(persistedColumns);
             this.galleryRelayout?.();
+            scrollPosition.restore();
             new Notice(imageSectionText("layoutFailed", { error: errorMessage(error) }));
           });
       });

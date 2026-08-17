@@ -26,6 +26,34 @@ function distanceSquared(left: PointerDragPoint, right: PointerDragPoint): numbe
   return dx * dx + dy * dy;
 }
 
+
+function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, radius = 32): void {
+  const view = window;
+  const deadline = performance.now() + timeoutMs;
+  const radiusSquared = radius * radius;
+  let timeout = 0;
+
+  const cleanup = (): void => {
+    view.removeEventListener("click", block, true);
+    if (timeout) view.clearTimeout(timeout);
+  };
+  const block = (event: MouseEvent): void => {
+    if (performance.now() > deadline) {
+      cleanup();
+      return;
+    }
+    const clickPoint = { clientX: event.clientX, clientY: event.clientY, pointerType: "click" };
+    if (distanceSquared(pointValue, clickPoint) > radiusSquared) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    cleanup();
+  };
+
+  view.addEventListener("click", block, true);
+  timeout = view.setTimeout(cleanup, timeoutMs);
+}
+
 function createGhost(element: HTMLElement, className: string): HTMLElement {
   const rect = element.getBoundingClientRect();
   const ghost = element.cloneNode(true) as HTMLElement;
@@ -100,6 +128,10 @@ export function armPointerDrag(options: PointerDragOptions): void {
     if (started) {
       upEvent.preventDefault();
       upEvent.stopPropagation();
+      // Browsers may emit a click after pointerup even when the drag changed
+      // the underlying Markdown and replaced the render child. Suppress that
+      // one click at the drop point independently of renderer lifetime.
+      suppressSyntheticClick(current);
       onDrop(current);
     }
     cleanup();

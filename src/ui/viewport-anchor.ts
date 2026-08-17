@@ -20,6 +20,21 @@ function findScrollContainer(element: HTMLElement): HTMLElement | null {
   return scrolling ? scrolling as HTMLElement : null;
 }
 
+function stabilizer(view: Window | null, restore: () => void): ViewportAnchor {
+  return {
+    restore,
+    stabilize(frames = 10): void {
+      let remaining = Math.max(1, frames);
+      const frame = (): void => {
+        restore();
+        remaining -= 1;
+        if (remaining > 0) view?.requestAnimationFrame(frame);
+      };
+      view?.requestAnimationFrame(frame);
+    },
+  };
+}
+
 export function captureViewportAnchor(element: HTMLElement): ViewportAnchor {
   const view = element.ownerDocument.defaultView;
   const scroller = findScrollContainer(element);
@@ -33,15 +48,28 @@ export function captureViewportAnchor(element: HTMLElement): ViewportAnchor {
     else view?.scrollBy(0, delta);
   };
 
-  const stabilize = (frames = 10): void => {
-    let remaining = Math.max(1, frames);
-    const frame = (): void => {
-      restore();
-      remaining -= 1;
-      if (remaining > 0) view?.requestAnimationFrame(frame);
-    };
-    view?.requestAnimationFrame(frame);
+  return stabilizer(view, restore);
+}
+
+/**
+ * Preserve the current scroll offset even if the child used to find the scroll
+ * container is replaced by a Markdown re-render. This is intentionally
+ * different from captureViewportAnchor(), which follows one connected child.
+ */
+export function captureScrollPosition(element: HTMLElement): ViewportAnchor {
+  const view = element.ownerDocument.defaultView;
+  const scroller = findScrollContainer(element);
+  const scrollTop = scroller?.scrollTop ?? view?.scrollY ?? 0;
+  const scrollLeft = scroller?.scrollLeft ?? view?.scrollX ?? 0;
+
+  const restore = (): void => {
+    if (scroller?.isConnected) {
+      if (Math.abs(scroller.scrollTop - scrollTop) >= 0.5) scroller.scrollTop = scrollTop;
+      if (Math.abs(scroller.scrollLeft - scrollLeft) >= 0.5) scroller.scrollLeft = scrollLeft;
+      return;
+    }
+    view?.scrollTo(scrollLeft, scrollTop);
   };
 
-  return { restore, stabilize };
+  return stabilizer(view, restore);
 }
