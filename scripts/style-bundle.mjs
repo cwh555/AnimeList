@@ -7,6 +7,8 @@ export const GENERATED_STYLE_END = "/* END GENERATED FEATURE STYLES */";
 export const STYLE_SOURCES = Object.freeze([
   "styles/base.css",
   "styles/settings.css",
+  "styles/workspace.css",
+  "styles/image-gallery.css",
   "styles/timeline.css",
   "styles/serial-reading.css",
   "styles/progress.css",

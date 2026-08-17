@@ -1,0 +1,102 @@
+/* Top-level AnimeList workspace shell. Main navigation is intentionally flat/underlined
+ * so it cannot be confused with page-local pill filters. */
+.al-workspace-shell {
+  --al-accent: var(--interactive-accent, #7867e6);
+  --al-accent-soft: color-mix(in srgb, var(--al-accent) 14%, transparent);
+  --al-border: color-mix(in srgb, var(--background-modifier-border, #34343c) 82%, transparent);
+  width:min(1500px,100%);
+  margin-inline:auto;
+  padding-bottom:52px;
+  color:var(--text-normal);
+}
+.al-workspace-shell * { box-sizing:border-box; }
+.al-workspace-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:20px 0 14px;
+}
+.al-workspace-brand { display:flex; min-width:0; align-items:baseline; gap:12px; }
+.al-workspace-title { font-size:1.35rem; letter-spacing:-.025em; }
+.al-workspace-subtitle { overflow:hidden; color:var(--text-muted); font-size:.72rem; white-space:nowrap; text-overflow:ellipsis; }
+.al-workspace-header-actions { display:flex; flex:0 0 auto; align-items:center; gap:8px; }
+.al-workspace-collect { min-height:36px; padding-inline:13px; }
+.al-workspace-more {
+  display:grid;
+  width:36px;
+  height:36px;
+  place-items:center;
+  padding:0;
+  border:1px solid var(--al-border);
+  border-radius:10px;
+  color:var(--text-muted);
+  background:var(--background-secondary);
+  cursor:pointer;
+}
+.al-workspace-more:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
+.al-workspace-more svg { width:18px; height:18px; }
+.al-workspace-nav {
+  display:flex;
+  gap:4px;
+  overflow-x:auto;
+  border-bottom:1px solid var(--al-border);
+}
+.al-workspace-tab {
+  position:relative;
+  display:flex;
+  flex:0 0 auto;
+  min-height:48px;
+  align-items:center;
+  gap:8px;
+  padding:0 16px;
+  border:0;
+  border-radius:0;
+  color:var(--text-muted);
+  background:transparent;
+  cursor:pointer;
+  font-size:.78rem;
+  font-weight:680;
+  white-space:nowrap;
+}
+.al-workspace-tab::after {
+  position:absolute;
+  right:12px;
+  bottom:-1px;
+  left:12px;
+  height:2px;
+  border-radius:999px 999px 0 0;
+  background:transparent;
+  content:"";
+}
+.al-workspace-tab:hover { color:var(--text-normal); background:color-mix(in srgb,var(--background-modifier-hover) 55%,transparent); }
+.al-workspace-tab.is-active { color:var(--text-normal); }
+.al-workspace-tab.is-active::after { background:var(--al-accent); }
+.al-workspace-tab-icon { display:grid; place-items:center; color:currentColor; }
+.al-workspace-tab-icon svg { width:17px; height:17px; }
+.al-workspace-page { min-width:0; padding-top:12px; }
+.al-workspace-page > .al-shell { width:100%; padding-bottom:0; }
+.al-library-workspace-summary {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:16px;
+  padding:10px 2px 0;
+}
+.al-library-workspace-summary strong { font-size:1.02rem; }
+.al-library-workspace-summary span { color:var(--text-muted); font-size:.68rem; }
+.al-shell.is-workspace-page .al-type-tabs { margin-top:12px; }
+
+@media (max-width:700px) {
+  .al-workspace-shell { padding-bottom:max(30px,env(safe-area-inset-bottom)); }
+  .al-workspace-header { gap:10px; padding:13px 0 8px; }
+  .al-workspace-brand { display:block; }
+  .al-workspace-title { display:block; font-size:1.1rem; }
+  .al-workspace-subtitle { display:none; }
+  .al-workspace-collect { min-height:40px; }
+  .al-workspace-more { width:40px; height:40px; }
+  .al-workspace-nav { margin-inline:-10px; padding-inline:10px; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
+  .al-workspace-tab { min-height:46px; padding-inline:13px; font-size:.72rem; }
+  .al-workspace-page { padding-top:8px; }
+  .al-library-workspace-summary { padding-top:8px; }
+}

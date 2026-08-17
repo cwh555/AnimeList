@@ -87,12 +87,14 @@ try {
   assert.match(checklist, /Ch\.72/);
   assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
+  assert.match(checklist, /AnimeList workspace and Images page/);
+  assert.match(checklist, /Library \/ Timeline \/ Score Dashboard \/ Images/);
   assert.match(checklist, /Reusable image sections/);
   assert.match(checklist, /real works and official anime episode stills/i);
   assert.match(checklist, /Add modal uses the available width without horizontal scrolling/i);
   assert.match(checklist, /Updates & cleanup/i);
   assert.match(checklist, /old default duplicate cover embed/i);
-  assert.match(checklist, /## 8\. Moments sections/);
+  assert.match(checklist, /## 9\. Moments sections/);
   assert.match(checklist, /seven-image Frieren Moment/i);
   assert.match(checklist, /source \/ position-time \/ speaker-character \/ tags \/ note/i);
   assert.match(checklist, /official episode stills/i);
