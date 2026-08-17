@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App, PluginSettingTab } from "obsidian";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
-import { SETTINGS_PAGES, settingsPageForKey } from "../src/app/settings-layout";
+import {
+  SETTINGS_PAGES,
+  getSettingsPageDefinition,
+  settingsPageForKey,
+} from "../src/app/settings-layout";
 import { registerLocaleMessages, resetLocaleForTests, setActiveLocale } from "../src/i18n/catalog";
 import { EN_CORE_MESSAGES } from "../src/i18n/locales/en/core";
 import { EN_SEARCH_MESSAGES } from "../src/i18n/locales/en/search";
@@ -98,6 +102,17 @@ describe("search language settings", () => {
       "Maintenance",
       "Updates & cleanup",
     ]);
+    assert.deepEqual(SETTINGS_PAGES.map((page) => page.description), [
+      "Core settings for the interface, library storage, file locations, and timeline behavior.",
+      "Settings for title search languages and the metadata providers used to enrich your library.",
+      "Settings for optional AnimeList features and their feature-specific behavior.",
+      "Library setup and maintenance actions for folders, templates, and routine upkeep.",
+      "Tools for update-related migrations and cleaning up legacy or obsolete AnimeList data.",
+    ]);
+    assert.equal(
+      getSettingsPageDefinition("features").description,
+      "Settings for optional AnimeList features and their feature-specific behavior.",
+    );
     assert.deepEqual(tab.getSettingsPageSections("general").map((section) => section.heading), [
       "Interface",
       "Library & storage",

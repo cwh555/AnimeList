@@ -5,6 +5,7 @@ import { withActiveLocale } from "../i18n/catalog";
 import { searchFeatureText } from "../features/search/text";
 import {
   SETTINGS_PAGES,
+  getSettingsPageDefinition,
   normalizeSettingsPage,
   settingsPageForKey,
   type SettingsPageId,
@@ -272,7 +273,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
       panel.setAttribute("aria-labelledby", `animelist-settings-tab-${this.activePage}`);
       panel.createEl("p", {
         cls: "animelist-settings-intro",
-        text: uiText("settings.intro"),
+        text: getSettingsPageDefinition(this.activePage).description,
       });
 
       for (const section of this.getSettingsPageSections(this.activePage)) {

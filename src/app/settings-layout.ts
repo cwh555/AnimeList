@@ -11,15 +11,40 @@ export type SettingsPageId = typeof SETTINGS_PAGE_IDS[number];
 export interface SettingsPageDefinition {
   id: SettingsPageId;
   label: string;
+  description: string;
 }
 
 export const SETTINGS_PAGES: readonly SettingsPageDefinition[] = [
-  { id: "general", label: "General" },
-  { id: "search-metadata", label: "Search & metadata" },
-  { id: "features", label: "Features" },
-  { id: "maintenance", label: "Maintenance" },
-  { id: "updates-cleanup", label: "Updates & cleanup" },
+  {
+    id: "general",
+    label: "General",
+    description: "Core settings for the interface, library storage, file locations, and timeline behavior.",
+  },
+  {
+    id: "search-metadata",
+    label: "Search & metadata",
+    description: "Settings for title search languages and the metadata providers used to enrich your library.",
+  },
+  {
+    id: "features",
+    label: "Features",
+    description: "Settings for optional AnimeList features and their feature-specific behavior.",
+  },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    description: "Library setup and maintenance actions for folders, templates, and routine upkeep.",
+  },
+  {
+    id: "updates-cleanup",
+    label: "Updates & cleanup",
+    description: "Tools for update-related migrations and cleaning up legacy or obsolete AnimeList data.",
+  },
 ];
+
+export function getSettingsPageDefinition(page: SettingsPageId): SettingsPageDefinition {
+  return SETTINGS_PAGES.find((definition) => definition.id === page) ?? SETTINGS_PAGES[0];
+}
 
 const FEATURE_SETTINGS_PAGES: Readonly<Record<string, SettingsPageId>> = Object.freeze({
   "release-tracking": "features",
