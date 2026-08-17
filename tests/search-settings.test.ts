@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { App } from "obsidian";
+import { App, PluginSettingTab } from "obsidian";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
 import { SETTINGS_PAGES, settingsPageForKey } from "../src/app/settings-layout";
 import { registerLocaleMessages, resetLocaleForTests, setActiveLocale } from "../src/i18n/catalog";
@@ -76,6 +76,16 @@ describe("search language settings", () => {
     } finally {
       resetLocaleForTests();
     }
+  });
+
+  it("keeps Obsidian 1.13 on the imperative settings lifecycle", () => {
+    const tab = new AnimeListSettingTab(new App(), createHost());
+
+    assert.equal(
+      tab.getSettingDefinitions,
+      PluginSettingTab.prototype.getSettingDefinitions,
+      "AnimeList must inherit the Obsidian declarative hook so display() remains the active renderer",
+    );
   });
 
   it("organizes core settings into five top-level pages with titled sections", () => {
