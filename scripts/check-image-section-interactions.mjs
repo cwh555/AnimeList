@@ -105,7 +105,13 @@ const service={
   requestAnimationFrame(()=>{ document.querySelector("#scroll-shell").scrollTop = 24; });
   return state();
  },
- moveAsset:async(_note,_sourceLoc,_targetLoc,moving,target,placement)=>{current=AnimeListImageSections.reorderImageSectionPaths(current,moving,target,placement);return{sourceSection:state(),targetSection:state(),markdown:""}},
+ moveAsset:async(_note,_sourceLoc,_targetLoc,moving,target,placement)=>{
+  window.__movePersisted=false;
+  await delay(90);
+  current=AnimeListImageSections.reorderImageSectionPaths(current,moving,target,placement);
+  window.__movePersisted=true;
+  return{sourceSection:state(),targetSection:state(),markdown:""}
+ },
  setAsCover:async()=>{},
  removeMany:async()=>source(),
  addAssets:async()=>({source:source(),duplicatesSkipped:0}),
@@ -126,16 +132,36 @@ renderer.onload();
  await delay(260);
  details.mobileFiveColumnsAreExact=section.querySelectorAll('.al-image-masonry-column').length===5 && getComputedStyle(section.querySelector('.al-image-masonry')).gridTemplateColumns.split(' ').filter(Boolean).length===5;
  details.columnPersistKeepsViewportStable=Math.abs(scrollShell.scrollTop-scrollBeforeColumnPersist)<=1;
+
+ // Reducing the column count makes the masonry much taller. Chromium/Obsidian
+ // can apply scroll anchoring during that live relayout, so assert the range
+ // control itself remains at the same viewport Y instead of only checking a
+ // saved scrollTop after persistence.
+ const barTopBeforeDecrease=slider.getBoundingClientRect().top;
+ requestAnimationFrame(()=>{ scrollShell.scrollTop-=120; });
+ slider.value="2"; slider.dispatchEvent(new Event("input",{bubbles:true}));
+ await delay(80);
+ details.columnDecreaseKeepsBarFixedDuringInput=Math.abs(slider.getBoundingClientRect().top-barTopBeforeDecrease)<=1;
+ slider.dispatchEvent(new Event("change",{bubbles:true}));
+ await delay(260);
+ details.columnDecreaseKeepsBarFixedAfterPersist=Math.abs(slider.getBoundingClientRect().top-barTopBeforeDecrease)<=1;
  const moving=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  const movingImage=moving.querySelector('img');
  const handle=moving.querySelector('.al-image-drag-handle');
  const target=section.querySelector('.al-image-item[data-image-path="c.jpg"]');
  const start=center(handle), end=center(target);
+ const movingRectBeforeDrop=moving.getBoundingClientRect();
  touch(handle,"pointerdown",start.x,start.y,21); touch(moving,"pointermove",end.x,end.y+10,21);
  await delay(10);
  details.touchDragUsesGhost=document.querySelectorAll('.al-image-drag-ghost').length===1;
  details.dragSourceDoesNotFade=getComputedStyle(moving).opacity==="1";
- touch(moving,"pointerup",end.x,end.y+10,21); await delay(20);
+ touch(moving,"pointerup",end.x,end.y+10,21);
+ const immediateMoved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
+ const immediateRect=immediateMoved.getBoundingClientRect();
+ details.dragMovesBeforePersistence=window.__movePersisted===false
+   && immediateMoved===moving
+   && (Math.abs(immediateRect.top-movingRectBeforeDrop.top)>1 || Math.abs(immediateRect.left-movingRectBeforeDrop.left)>1);
+ await delay(120);
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  details.touchGalleryReorderPersisted=current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
