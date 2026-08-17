@@ -21,6 +21,16 @@ export interface ImageSectionMoveUpdate {
   targetSection: ImageSectionStateUpdate;
 }
 
+export interface ImageSectionPathMovePlan {
+  sourcePaths: string[];
+  targetPaths: string[];
+  changed: boolean;
+}
+
+function samePathOrder(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((path, index) => path === right[index]);
+}
+
 export function reorderImageSectionPaths(
   paths: readonly string[],
   movingPathValue: unknown,
@@ -41,6 +51,42 @@ export function reorderImageSectionPaths(
   const insertAt = placement === "after" ? targetIndex + 1 : targetIndex;
   next.splice(insertAt, 0, movingPath);
   return next;
+}
+
+export function planImageSectionPathMove(
+  sourcePaths: readonly string[],
+  targetPaths: readonly string[],
+  movingPathValue: unknown,
+  targetPathValue: unknown,
+  placement: ImageSectionDropPlacement,
+  sameSection: boolean,
+): ImageSectionPathMovePlan {
+  const movingPath = normalizeImageSectionPath(movingPathValue);
+  const targetPath = normalizeImageSectionPath(targetPathValue);
+  const sourceBefore = [...sourcePaths];
+  const targetBefore = sameSection ? sourceBefore : [...targetPaths];
+  if (!movingPath || !sourceBefore.includes(movingPath)) {
+    return { sourcePaths: sourceBefore, targetPaths: targetBefore, changed: false };
+  }
+
+  if (sameSection) {
+    const next = reorderImageSectionPaths(sourceBefore, movingPath, targetPath, placement);
+    return { sourcePaths: next, targetPaths: next, changed: !samePathOrder(sourceBefore, next) };
+  }
+
+  const nextSource = sourceBefore.filter((path) => path !== movingPath);
+  const targetWithoutMoving = targetBefore.filter((path) => path !== movingPath);
+  const nextTarget = reorderImageSectionPaths(
+    [...targetWithoutMoving, movingPath],
+    movingPath,
+    targetPath,
+    placement,
+  );
+  return {
+    sourcePaths: nextSource,
+    targetPaths: nextTarget,
+    changed: !samePathOrder(sourceBefore, nextSource) || !samePathOrder(targetBefore, nextTarget),
+  };
 }
 
 function blockIndex(blocks: readonly ImageSectionBlock[], block: ImageSectionBlock): number {
@@ -83,28 +129,22 @@ export function moveImageSectionPath(
     throw new Error("Could not find the dragged image in its source section");
   }
 
+  const sameSection = sourceIndex === targetIndex;
+  const plan = planImageSectionPathMove(
+    sourceBlock.paths,
+    targetBlock.paths,
+    movingPath,
+    targetPath,
+    placement,
+    sameSection,
+  );
   const lines = text.split(/\r?\n/u);
-  if (sourceIndex === targetIndex) {
-    const nextPaths = reorderImageSectionPaths(sourceBlock.paths, movingPath, targetPath, placement);
-    replaceBlockPaths(lines, sourceBlock, nextPaths);
+  if (sameSection) {
+    replaceBlockPaths(lines, sourceBlock, plan.sourcePaths);
   } else {
-    const nextSourcePaths = sourceBlock.paths.filter((path) => path !== movingPath);
-    const targetWithoutMoving = targetBlock.paths.filter((path) => path !== movingPath);
-    let nextTargetPaths: string[];
-    if (placement === "append" || !targetPath) {
-      nextTargetPaths = [...targetWithoutMoving, movingPath];
-    } else {
-      const targetPosition = targetWithoutMoving.indexOf(targetPath);
-      const insertAt = targetPosition < 0
-        ? targetWithoutMoving.length
-        : targetPosition + (placement === "after" ? 1 : 0);
-      nextTargetPaths = [...targetWithoutMoving];
-      nextTargetPaths.splice(insertAt, 0, movingPath);
-    }
-
     const replacements = [
-      { block: sourceBlock, paths: nextSourcePaths },
-      { block: targetBlock, paths: nextTargetPaths },
+      { block: sourceBlock, paths: plan.sourcePaths },
+      { block: targetBlock, paths: plan.targetPaths },
     ].sort((left, right) => right.block.lineStart - left.block.lineStart);
     for (const replacement of replacements) replaceBlockPaths(lines, replacement.block, replacement.paths);
   }

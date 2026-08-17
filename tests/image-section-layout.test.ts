@@ -3,12 +3,15 @@ import { describe, it } from "node:test";
 import { findImageSectionBlocks } from "../src/domain/image-section";
 import {
   DEFAULT_IMAGE_SECTION_COLUMNS,
-  effectiveImageSectionColumns,
   imageSectionColumnBuckets,
   parseImageSectionColumns,
   setImageSectionColumns,
 } from "../src/domain/image-section-layout";
-import { moveImageSectionPath, reorderImageSectionPaths } from "../src/domain/image-section-order";
+import {
+  moveImageSectionPath,
+  planImageSectionPathMove,
+  reorderImageSectionPaths,
+} from "../src/domain/image-section-order";
 
 describe("image section layout model", () => {
   it("keeps legacy sections at four columns and parses explicit column metadata", () => {
@@ -45,10 +48,6 @@ describe("image section layout model", () => {
     assert.deepEqual(imageSectionColumnBuckets([1, 2, 3, 4, 5, 6], 4), [
       [1, 5], [2, 6], [3], [4],
     ]);
-    assert.equal(effectiveImageSectionColumns(6, 900), 6);
-    assert.equal(effectiveImageSectionColumns(6, 700), 6);
-    assert.equal(effectiveImageSectionColumns(6, 500), 6);
-    assert.equal(effectiveImageSectionColumns(6, 320), 6);
   });
 });
 
@@ -58,6 +57,36 @@ describe("image section ordering model", () => {
     assert.deepEqual(reorderImageSectionPaths(paths, "d.jpg", "b.jpg", "before"), ["a.jpg", "d.jpg", "b.jpg", "c.jpg"]);
     assert.deepEqual(reorderImageSectionPaths(paths, "a.jpg", "c.jpg", "after"), ["b.jpg", "c.jpg", "a.jpg", "d.jpg"]);
     assert.deepEqual(reorderImageSectionPaths(paths, "b.jpg", "", "append"), ["a.jpg", "c.jpg", "d.jpg", "b.jpg"]);
+  });
+
+  it("plans same-section and cross-section moves from one ordering model", () => {
+    const same = planImageSectionPathMove(
+      ["a.jpg", "b.jpg", "c.jpg"],
+      ["a.jpg", "b.jpg", "c.jpg"],
+      "c.jpg",
+      "a.jpg",
+      "before",
+      true,
+    );
+    assert.deepEqual(same, {
+      sourcePaths: ["c.jpg", "a.jpg", "b.jpg"],
+      targetPaths: ["c.jpg", "a.jpg", "b.jpg"],
+      changed: true,
+    });
+
+    const cross = planImageSectionPathMove(
+      ["a.jpg", "b.jpg"],
+      ["c.jpg", "d.jpg"],
+      "b.jpg",
+      "d.jpg",
+      "before",
+      false,
+    );
+    assert.deepEqual(cross, {
+      sourcePaths: ["a.jpg"],
+      targetPaths: ["c.jpg", "b.jpg", "d.jpg"],
+      changed: true,
+    });
   });
 
   it("moves an image between sections atomically without changing fence metadata or unrelated Markdown", () => {

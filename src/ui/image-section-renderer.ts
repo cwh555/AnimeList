@@ -9,13 +9,12 @@ import {
 } from "../domain/image-section";
 import {
   DEFAULT_IMAGE_SECTION_COLUMNS,
-  effectiveImageSectionColumns,
   imageSectionColumnBuckets,
   normalizeImageSectionColumns,
   parseImageSectionColumns,
 } from "../domain/image-section-layout";
 import {
-  reorderImageSectionPaths,
+  planImageSectionPathMove,
   type ImageSectionDropPlacement,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
@@ -67,6 +66,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private interactionsBound = false;
   private lineHint: number | undefined;
   private lineHintAuthoritative = false;
+  private lineHintResetTimer: number | null = null;
   private expanded = false;
   private galleryCollapsible = false;
   private selectionMode = false;
@@ -98,6 +98,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
+    if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
+    this.lineHintResetTimer = null;
     this.galleryRelayout = null;
     this.galleryPaths = [];
     this.imageElements.clear();
@@ -119,6 +121,17 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.selectionMode = false;
     this.selectedPaths.clear();
     this.render();
+  }
+
+  private acceptSectionState(update: ImageSectionStateUpdate): void {
+    this.source = update.source;
+    this.lineHint = update.lineStart;
+    this.lineHintAuthoritative = true;
+    if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
+    this.lineHintResetTimer = window.setTimeout(() => {
+      this.lineHintAuthoritative = false;
+      this.lineHintResetTimer = null;
+    }, 250);
   }
 
   private applyAddResult(result: ImageSectionAddResult): void {
@@ -349,10 +362,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
-    this.source = update.source;
-    this.lineHint = update.lineStart;
-    this.lineHintAuthoritative = true;
-    window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
+    this.acceptSectionState(update);
     this.selectionMode = false;
     this.selectedPaths.clear();
     this.applyGalleryPaths(parseImageSectionSource(update.source));
@@ -366,23 +376,19 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   ): { sourceBefore: string[]; targetBefore: string[]; changed: boolean } {
     const sourceBefore = [...source.galleryPaths];
     const targetBefore = source === this ? sourceBefore : [...this.galleryPaths];
-    if (source === this) {
-      const next = reorderImageSectionPaths(sourceBefore, path, targetPath ?? "", placement);
-      const changed = next.some((entry, index) => entry !== sourceBefore[index]);
-      if (changed) source.applyGalleryPaths(next);
-      return { sourceBefore, targetBefore, changed };
+    const plan = planImageSectionPathMove(
+      sourceBefore,
+      targetBefore,
+      path,
+      targetPath ?? "",
+      placement,
+      source === this,
+    );
+    if (plan.changed) {
+      source.applyGalleryPaths(plan.sourcePaths, source === this);
+      if (source !== this) this.applyGalleryPaths(plan.targetPaths, false);
     }
-
-    const nextSource = sourceBefore.filter((entry) => entry !== path);
-    const targetWithMoving = [...targetBefore.filter((entry) => entry !== path), path];
-    const nextTarget = reorderImageSectionPaths(targetWithMoving, path, targetPath ?? "", placement);
-    const changed = nextSource.length !== sourceBefore.length
-      || nextTarget.some((entry, index) => entry !== targetBefore[index]);
-    if (changed) {
-      source.applyGalleryPaths(nextSource, false);
-      this.applyGalleryPaths(nextTarget, false);
-    }
-    return { sourceBefore, targetBefore, changed };
+    return { sourceBefore, targetBefore, changed: plan.changed };
   }
 
   private async handleInternalImageDrop(
@@ -566,7 +572,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.imageElements.clear();
     for (const path of paths) this.imageElements.set(path, this.createImage(path));
     const relayout = (): void => {
-      const columns = effectiveImageSectionColumns(this.preferredColumns, gallery.clientWidth);
+      const columns = normalizeImageSectionColumns(this.preferredColumns);
       gallery.style.setProperty("--al-image-columns", String(columns));
       const columnElements = imageSectionColumnBuckets(this.galleryPaths, columns).map((bucket) => {
         const column = makeEl("div", "al-image-masonry-column");
@@ -749,10 +755,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         scrollPosition.stabilize(12);
         void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
           .then((update) => {
-            this.source = update.source;
-            this.lineHint = update.lineStart;
-            this.lineHintAuthoritative = true;
-            window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
+            this.acceptSectionState(update);
             this.preferredColumns = nextColumns;
             persistedColumns = nextColumns;
             scrollPosition.restore();

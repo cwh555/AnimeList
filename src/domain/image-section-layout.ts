@@ -23,10 +23,6 @@ export function imageSectionColumnBuckets<T>(items: readonly T[], columnsValue: 
   return buckets;
 }
 
-export function effectiveImageSectionColumns(preferredValue: unknown, _widthValue: unknown): number {
-  return normalizeImageSectionColumns(preferredValue);
-}
-
 function openingFenceWithColumns(openingFence: string, columnsValue: unknown): string {
   const columns = normalizeImageSectionColumns(columnsValue);
   const match = /^(\s*```animelist-images)(.*?)(\s*)$/u.exec(openingFence);
