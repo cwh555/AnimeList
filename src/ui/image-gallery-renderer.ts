@@ -225,17 +225,20 @@ export function renderImageGallery(
   const root = makeEl("section", "al-image-gallery-page");
   const header = makeEl("header", "al-gallery-page-header");
   const copy = makeEl("div", "al-gallery-page-copy");
-  copy.append(
-    makeEl("div", "al-gallery-page-kicker", "IMAGE LIBRARY"),
-    makeEl("h1", "al-gallery-page-title", imageGalleryText("title")),
-    makeEl("p", "al-gallery-page-description", imageGalleryText("description")),
-  );
+  copy.appendChild(makeEl("h1", "al-gallery-page-title", imageGalleryText("title")));
   const summary = makeEl("div", "al-gallery-page-summary");
   header.append(copy, summary);
 
   const modeTabs = makeEl("nav", "al-gallery-mode-tabs");
-  const allMode = makeEl("button", "al-gallery-mode-tab", imageGalleryText("allImages"));
-  const worksMode = makeEl("button", "al-gallery-mode-tab", imageGalleryText("byWork"));
+  modeTabs.setAttribute("aria-label", imageGalleryText("title"));
+  const allMode = makeEl("button", "al-gallery-mode-tab");
+  const allModeIcon = makeEl("span", "al-gallery-mode-icon");
+  setAnimeListIcon(allModeIcon, "images");
+  allMode.append(allModeIcon, makeEl("span", "", imageGalleryText("allImages")));
+  const worksMode = makeEl("button", "al-gallery-mode-tab");
+  const worksModeIcon = makeEl("span", "al-gallery-mode-icon");
+  setAnimeListIcon(worksModeIcon, "layout-grid");
+  worksMode.append(worksModeIcon, makeEl("span", "", imageGalleryText("byWork")));
   allMode.type = worksMode.type = "button";
   modeTabs.append(allMode, worksMode);
 

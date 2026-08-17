@@ -34,13 +34,10 @@ export function renderAnimeListWorkspaceShell(
   const activePage = pages.find((page) => page.id === options.activeSection) ?? pages[0];
   if (!activePage) throw new Error("AnimeList workspace requires at least one page");
 
-  const shell = makeEl("section", "al-workspace-shell");
+  const shell = makeEl("section", `al-workspace-shell is-${activePage.id}`);
   const header = makeEl("header", "al-workspace-header");
   const brand = makeEl("div", "al-workspace-brand");
-  brand.append(
-    makeEl("strong", "al-workspace-title", "AnimeList"),
-    makeEl("span", "al-workspace-subtitle", uiText("library.description")),
-  );
+  brand.appendChild(makeEl("strong", "al-workspace-title", "AnimeList"));
 
   const actions = makeEl("div", "al-workspace-header-actions");
   const collect = makeEl("button", "al-add-button al-workspace-collect");
@@ -73,8 +70,9 @@ export function renderAnimeListWorkspaceShell(
     });
     actions.appendChild(more);
   }
-  header.append(brand, actions);
+  header.appendChild(brand);
 
+  const navRow = makeEl("div", "al-workspace-nav-row");
   const nav = makeEl("nav", "al-workspace-nav");
   nav.setAttribute("aria-label", "Primary navigation");
   for (const page of pages) {
@@ -92,8 +90,10 @@ export function renderAnimeListWorkspaceShell(
     nav.appendChild(button);
   }
 
+  navRow.append(nav, actions);
+
   const page = makeEl("div", `al-workspace-page is-${activePage.id}`);
-  shell.append(header, nav, page);
+  shell.append(header, navRow, page);
   container.appendChild(shell);
   return { page, activePage };
 }

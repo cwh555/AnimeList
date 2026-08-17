@@ -159,12 +159,16 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 
 - [ ] The native AnimeList ItemView shows one primary navigation row in this exact order: **Library → Timeline → Score Dashboard → Images**. Switching pages reuses the same ItemView instead of opening a modal or another Obsidian tab.
 - [ ] Primary navigation is visually different from page-local filters: the workspace row is flat/underlined with icon + label, while Library/Images filters remain smaller page-local controls. On mobile the workspace row remains visible and horizontally scrollable.
-- [ ] The shared header keeps **Collect** as the primary action. Timeline, Score Dashboard, and Images are not duplicated as header buttons. When Latest release tracking is enabled, **Release Updates** is available from **More** instead.
+- [ ] The AnimeList header shows only the product name; the old Markdown-description subtitle is absent.
+- [ ] **Collect** and optional **More** share the same navigation row and vertical height as the top-level tabs. Timeline, Score Dashboard, and Images are not duplicated as header buttons. When Latest release tracking is enabled, **Release Updates** is available from **More** instead.
 - [ ] Library retains its existing All/Anime/Manga/Novel, status, search, filter, sort, and Grid/List/Poster behavior inside the Library page. The standalone Markdown `animelist` block retains its existing self-contained header/actions.
 - [ ] Timeline opened from either the workspace tab or command uses the shared AnimeList page and preserves existing timeline filters/scale/navigation.
 - [ ] Score Dashboard opened from either the workspace tab or command uses the shared AnimeList page and preserves score lanes, drag/batch operations, zoom, filtering, and mobile interactions.
 - [ ] Images → **All images** aggregates existing `animelist-images` references across works without creating/copying/moving any image file. One image reused by multiple Image Sections in the same work appears once in the work-level aggregate.
 - [ ] Images media-type filter, search, and exact 1–6 column slider work on desktop and mobile. Lightbox previous/next follows the currently filtered gallery, including images whose source files belong to different media notes.
+- [ ] Images → **All images / By work** uses a clearly segmented page-local switch that does not resemble the flat top-level workspace tabs.
+- [ ] Landscape screenshots render at their natural aspect ratio; Obsidian's default button height must not clip aggregate gallery images into thin strips.
+- [ ] Images → **By work** cards expand to their full preview mosaic and metadata height instead of inheriting Obsidian's normal button height.
 - [ ] Images → **By work** shows one board per work with correct unique-image and Image Session counts. Opening a board exposes **All sessions / Session N**, and **Open source work** opens the owning media note.
 - [ ] Edit, reorder, add, or remove an original Image Section reference, then return to/refresh Images and confirm the aggregate updates without a Vault-wide Markdown scan or duplicated asset. Rename/delete a media note and confirm stale work entries disappear.
 - [ ] A work with an empty Image Section does not create an empty board; an entirely empty aggregate shows the safe empty state. Large galleries progressively append image DOM instead of rendering every image eagerly.
@@ -240,8 +244,8 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 
 ## Timeline
 
-- [ ] The timeline opens in a floating modal instead of replacing the library view.
-- [ ] The modal closes from the title-bar close button, the Escape key, and the backdrop.
+- [ ] Timeline opens as the top-level **Timeline** workspace page and its canvas has a non-zero usable viewport height.
+- [ ] Switch Library → Timeline → Images → Timeline; timeline cards and controls remain visible after every remount.
 - [ ] The All, Anime, Manga, and Novel buttons show only their matching completion records and update the summary count/date range.
 - [ ] A type with no matching records keeps the filter buttons visible so another type can be selected.
 - [ ] Completed anime/manga and legacy completed novels appear when they have a completion date.

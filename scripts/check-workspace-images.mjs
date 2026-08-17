@@ -16,6 +16,7 @@ await build({
     contents: `
       export { renderAnimeListWorkspaceShell } from "./src/ui/workspace-shell";
       export { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "./src/ui/image-gallery-renderer";
+      export { TimelineUI } from "./src/ui/timeline-renderer";
     `,
     resolveDir: root,
     loader: "ts",
@@ -63,9 +64,12 @@ const images = {
 };
 
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{--background-primary:#111;--background-primary-alt:#171717;--background-secondary:#202020;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#8070df;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;}${styles}
-html,body{margin:0;width:100%;min-height:100%;background:#111;color:#eee;font-family:sans-serif}#app{padding:0 10px 40px}button,input{font:inherit}
-</style></head><body data-result="pending"><div id="app"></div>
+:root{--background-primary:#111;--background-primary-alt:#171717;--background-secondary:#202020;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#8070df;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-on-accent:#fff;}
+html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family:sans-serif}button,input{font:inherit}
+/* Approximate Obsidian's normal button constraint. Gallery image/board buttons must explicitly opt out. */
+button:not(.clickable-icon){height:32px;background:#292929;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+${styles}
+</style></head><body class="is-mobile" data-result="pending"><div id="app" class="animelist-native-view"></div>
 <script>window.createEl=(tag)=>document.createElement(tag); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
 <script>${bundle}</script><script>
 const refs=(sourcePath,title,type,paths,sessions)=>({sourcePath,title,originalTitle:title+" original",mediaType:type,sessions:sessions.map((list,index)=>({index,images:list.map(p=>paths.find(x=>x.path===p))})),images:paths});
@@ -75,35 +79,57 @@ const kaguya=[img("Manga/Kaguya.md","Kaguya","manga","d.jpg","k-d"),img("Manga/K
 frieren[1].references.push({sessionIndex:1,position:0});
 const works=[refs("Anime/Frieren.md","Frieren","anime",frieren,[["a.jpg","b.jpg"],["b.jpg","c.jpg"]]),refs("Manga/Kaguya.md","Kaguya","manga",kaguya,[["d.jpg","e.jpg","f.jpg"]])];
 const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"${images.c}","d.jpg":"${images.d}","e.jpg":"${images.e}","f.jpg":"${images.f}"};
+const timelineItem={title:"Frieren",originalTitle:"Frieren",mediaType:"anime",format:"TV",status:"completed",releaseStatus:"finished",progress:28,total:28,unit:"ep",score:9,favorite:false,year:2024,genres:[],people:[],platforms:[],sourceUrls:[],cover:"${images.a}",filePath:"Anime/Frieren.md",updated:0,updatedLabel:"",startedAt:"2023-09-29",completedAt:"2024-03-22",volumeLog:[]};
 let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[];
 const pages=[
  {id:"library",label:"Library",icon:"library",order:10,render(el){el.textContent="LIBRARY PAGE"}},
- {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){el.textContent="TIMELINE PAGE"}},
+ {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){AnimeListWorkspaceImages.TimelineUI.render(el,[timelineItem],{})}},
  {id:"scores",label:"Score Dashboard",icon:"table-properties",order:30,render(el){el.textContent="SCORES PAGE"}},
  {id:"images",label:"Images",icon:"images",order:40,render(el){AnimeListWorkspaceImages.renderImageGallery(el,works,galleryState,{resolve:(image)=>({resourcePath:urlMap[image.path]}),openLightbox:(imgs,start)=>{lightboxKeys=imgs.map(i=>i.key).slice(start)},openSource:(path)=>{sourceOpened=path},onStateChange:(state)=>{galleryState={...state}}})}},
 ];
 const app=document.querySelector("#app");
 const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){}}],onSelect:(section)=>{active=section;render()},onCollect:()=>{}}); result.activePage.render(result.page);};
-render();
+const tab=(section)=>document.querySelector('.al-workspace-tab[data-section="'+section+'"]');
 const click=(el)=>el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true}));
+const frames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+render();
 (async()=>{
  const details={};
  const topTabs=[...document.querySelectorAll('.al-workspace-tab')];
  details.topLevelOrder=topTabs.map(x=>x.dataset.section).join(',')==='library,timeline,scores,images';
- details.primaryNavIsNotPills=getComputedStyle(topTabs[0]).borderRadius==='0px' && !topTabs[0].classList.contains('al-type-tab');
+ details.subtitleRemoved=!document.querySelector('.al-workspace-subtitle');
+ const inactiveStyle=getComputedStyle(tab('timeline'));
+ details.primaryNavIsFlat=inactiveStyle.boxShadow==='none' && inactiveStyle.backgroundColor==='rgba(0, 0, 0, 0)';
  details.primaryNavVisibleOnMobile=getComputedStyle(document.querySelector('.al-workspace-nav')).display!=='none';
+ const collectRect=document.querySelector('.al-workspace-collect').getBoundingClientRect();
+ const tabRect=tab('library').getBoundingClientRect();
+ details.collectAlignedWithTabs=Math.abs(collectRect.top-tabRect.top)<1 && Math.abs(collectRect.height-tabRect.height)<1;
  details.actionsStaySeparate=!!document.querySelector('.al-workspace-collect') && !!document.querySelector('.al-workspace-more');
- details.noTimelineOrScoreHeaderButtons=!document.querySelector('.al-hero-actions');
- click(topTabs.find(x=>x.dataset.section==='images'));
- await new Promise(r=>setTimeout(r,20));
+
+ click(tab('timeline')); await new Promise(r=>setTimeout(r,25)); await frames();
+ const timelineViewport=document.querySelector('.al-timeline-viewport');
+ details.timelineRendersInWorkspace=document.querySelectorAll('.al-timeline-card').length===1 && timelineViewport.getBoundingClientRect().height>240;
+
+ click(tab('images')); await new Promise(r=>setTimeout(r,20)); await frames();
  details.sameWorkspaceSwitch=active==='images' && !!document.querySelector('.al-workspace-shell .al-image-gallery-page');
- details.secondaryNavDistinct=!!document.querySelector('.al-gallery-mode-tabs') && !!document.querySelector('.al-gallery-type-filter') && !document.querySelector('.al-gallery-mode-tab.al-workspace-tab');
- const slider=document.querySelector('.al-gallery-columns input'); slider.value='5'; slider.dispatchEvent(new Event('input',{bubbles:true})); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+ const modeTabs=document.querySelector('.al-gallery-mode-tabs');
+ const modeButton=document.querySelector('.al-gallery-mode-tab');
+ details.secondaryNavDistinct=!!modeTabs && !modeButton.classList.contains('al-workspace-tab') && parseFloat(getComputedStyle(modeTabs).borderRadius)>=8;
+
+ const slider=document.querySelector('.al-gallery-columns input');
+ slider.value='2'; slider.dispatchEvent(new Event('input',{bubbles:true})); await frames();
+ const imageButton=document.querySelector('.al-gallery-image-open');
+ const imageElement=document.querySelector('.al-gallery-image');
+ const imageButtonRect=imageButton.getBoundingClientRect(); const imageRect=imageElement.getBoundingClientRect();
+ details.galleryImagesUseIntrinsicHeight=imageButtonRect.height>70 && imageRect.height>70 && Math.abs(imageButtonRect.height-imageRect.height)<2;
+
+ slider.value='5'; slider.dispatchEvent(new Event('input',{bubbles:true})); await frames();
  details.exactFiveColumns=document.querySelectorAll('.al-gallery-masonry-column').length===5 && getComputedStyle(document.querySelector('.al-gallery-masonry')).gridTemplateColumns.split(' ').filter(Boolean).length===5;
  const typeButtons=[...document.querySelectorAll('.al-gallery-type-filter')]; click(typeButtons[1]); await new Promise(r=>setTimeout(r,10));
  details.typeFilterReducesGallery=document.querySelectorAll('.al-gallery-image-tile').length===3;
- click(document.querySelectorAll('.al-gallery-mode-tab')[1]); await new Promise(r=>setTimeout(r,10));
+ click(document.querySelectorAll('.al-gallery-mode-tab')[1]); await new Promise(r=>setTimeout(r,10)); await frames();
  details.byWorkShowsOneFilteredBoard=document.querySelectorAll('.al-gallery-work-card').length===1;
+ details.workBoardsAreExpanded=document.querySelector('.al-gallery-work-card').getBoundingClientRect().height>120;
  click(document.querySelector('.al-gallery-work-card')); await new Promise(r=>setTimeout(r,10));
  details.workDetailHasSessions=document.querySelectorAll('.al-gallery-session-filter').length===3;
  const sessionButtons=[...document.querySelectorAll('.al-gallery-session-filter')]; click(sessionButtons[2]); await new Promise(r=>setTimeout(r,10));
@@ -122,7 +148,7 @@ try {
   await runChromiumDatasetTest({
     html,
     profile,
-    testName: "AnimeList workspace navigation and Images gallery",
+    testName: "AnimeList workspace navigation, Timeline, and Images gallery",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   });
