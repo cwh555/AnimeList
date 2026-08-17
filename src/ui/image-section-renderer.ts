@@ -326,6 +326,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private applyGalleryPaths(nextPaths: readonly string[], renderEmpty = true): void {
+    const alreadyApplied = Boolean(this.galleryRelayout)
+      && nextPaths.length === this.galleryPaths.length
+      && nextPaths.every((path, index) => path === this.galleryPaths[index] && this.imageElements.has(path));
+    if (alreadyApplied) return;
     if (!this.galleryRelayout || !this.galleryPaths.length || (!nextPaths.length && renderEmpty)) {
       this.galleryPaths = [...nextPaths];
       this.render();

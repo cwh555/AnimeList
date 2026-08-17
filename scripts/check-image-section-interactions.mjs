@@ -90,6 +90,12 @@ for(const [name,fn] of Object.entries({
 })) { if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn}); }
 </script><script>${bundle}</script><script>
 const delay=(ms)=>new Promise(r=>setTimeout(r,ms));
+window.__masonryReplaceCalls=0;
+const originalReplaceChildren=Element.prototype.replaceChildren;
+Element.prototype.replaceChildren=function(...nodes){
+ if(this.classList?.contains("al-image-masonry")) window.__masonryReplaceCalls+=1;
+ return originalReplaceChildren.apply(this,nodes);
+};
 const touch=(target,type,x,y,pointerId=7)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId,pointerType:"touch",isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==="pointerup"?0:1}));
 const mousePointer=(target,type,x,y,pointerId=8)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId,pointerType:"mouse",isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==="pointerup"?0:1}));
 const center=(el)=>{const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}};
@@ -155,13 +161,17 @@ renderer.onload();
  await delay(10);
  details.touchDragUsesGhost=document.querySelectorAll('.al-image-drag-ghost').length===1;
  details.dragSourceDoesNotFade=getComputedStyle(moving).opacity==="1";
+ const masonryRelayoutsBeforeDrop=window.__masonryReplaceCalls;
  touch(moving,"pointerup",end.x,end.y+10,21);
+ const masonryRelayoutsAfterOptimisticDrop=window.__masonryReplaceCalls;
  const immediateMoved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  const immediateRect=immediateMoved.getBoundingClientRect();
  details.dragMovesBeforePersistence=window.__movePersisted===false
    && immediateMoved===moving
    && (Math.abs(immediateRect.top-movingRectBeforeDrop.top)>1 || Math.abs(immediateRect.left-movingRectBeforeDrop.left)>1);
  await delay(120);
+ details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
+   && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop+1;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  details.touchGalleryReorderPersisted=current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
