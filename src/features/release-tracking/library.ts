@@ -1,8 +1,8 @@
 import type { AnimeListFeatureHost } from "../../app/feature-types";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import type { ReleaseTrackingSnapshot } from "../../domain/release-tracking";
-import { makeEl, setAnimeListIcon } from "../../ui/ui-helpers";
-import { openMatchModal, openReleaseDashboard, serviceFor } from "./controller";
+import { makeEl } from "../../ui/ui-helpers";
+import { openMatchModal, serviceFor } from "./controller";
 import { attentionLabel, providerLabel } from "./presentation";
 import { releaseTrackingText } from "./text";
 
@@ -62,19 +62,4 @@ export function decorateReleaseCards(
     }
     progress.appendChild(row);
   }
-}
-
-export function installLibraryRefreshButton(host: AnimeListFeatureHost, container: HTMLElement): void {
-  if (!host.settings.releaseTracking.enabled) return;
-  const actions = container.querySelector<HTMLElement>(".al-hero-actions");
-  if (!actions || actions.querySelector(":scope > .al-release-refresh-button")) return;
-  const button = makeEl("button", "al-secondary-button al-release-refresh-button");
-  button.type = "button";
-  button.replaceChildren();
-  const icon = makeEl("span", "al-icon");
-  setAnimeListIcon(icon, "refresh-cw");
-  button.append(icon, makeEl("span", "", releaseTrackingText("library.check")));
-  button.addEventListener("click", () => { openReleaseDashboard(host); });
-  const add = actions.querySelector<HTMLElement>(".al-add-button");
-  actions.insertBefore(button, add ?? null);
 }

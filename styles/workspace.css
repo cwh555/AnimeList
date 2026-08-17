@@ -1,0 +1,176 @@
+/* Top-level AnimeList workspace shell.
+ * Primary pages use a flat navigation rail; page-local filters use separate
+ * segmented/pill treatments so the two hierarchy levels remain distinct. */
+.al-workspace-shell {
+  --al-accent:var(--interactive-accent,#7867e6);
+  --al-accent-soft:color-mix(in srgb,var(--al-accent) 12%,transparent);
+  --al-border:color-mix(in srgb,var(--background-modifier-border,#34343c) 82%,transparent);
+  width:min(1500px,100%);
+  margin-inline:auto;
+  padding-bottom:52px;
+  color:var(--text-normal);
+}
+.al-workspace-shell * { box-sizing:border-box; }
+.al-workspace-header {
+  display:flex;
+  align-items:center;
+  min-height:58px;
+  padding:18px 2px 8px;
+}
+.al-workspace-brand { display:flex; min-width:0; align-items:center; }
+.al-workspace-title { font-size:1.45rem; letter-spacing:-.035em; }
+
+.al-workspace-nav-row {
+  display:flex;
+  min-width:0;
+  align-items:stretch;
+  gap:14px;
+  border-bottom:1px solid var(--al-border);
+}
+.al-workspace-nav {
+  display:flex;
+  min-width:0;
+  flex:1 1 auto;
+  gap:2px;
+  overflow-x:auto;
+  overflow-y:clip;
+}
+button.al-workspace-tab {
+  position:relative;
+  display:flex;
+  width:auto;
+  height:44px;
+  min-height:44px;
+  flex:0 0 auto;
+  align-items:center;
+  gap:8px;
+  padding:0 14px;
+  border:0;
+  border-radius:8px 8px 0 0;
+  box-shadow:none;
+  color:var(--text-muted);
+  background:transparent;
+  cursor:pointer;
+  font-size:.78rem;
+  font-weight:680;
+  white-space:nowrap;
+}
+button.al-workspace-tab::after {
+  position:absolute;
+  right:10px;
+  bottom:0;
+  left:10px;
+  height:2px;
+  border-radius:999px 999px 0 0;
+  background:transparent;
+  content:"";
+}
+button.al-workspace-tab:hover {
+  color:var(--text-normal);
+  background:color-mix(in srgb,var(--background-modifier-hover) 54%,transparent);
+}
+button.al-workspace-tab.is-active {
+  color:var(--text-normal);
+  background:var(--al-accent-soft);
+}
+button.al-workspace-tab.is-active::after { background:var(--al-accent); }
+.al-workspace-tab-icon { display:grid; place-items:center; color:currentColor; }
+button.al-workspace-tab.is-active .al-workspace-tab-icon { color:var(--al-accent); }
+.al-workspace-tab-icon svg { width:17px; height:17px; }
+
+.al-workspace-header-actions {
+  display:flex;
+  min-height:44px;
+  flex:0 0 auto;
+  align-items:center;
+  gap:8px;
+}
+button.al-workspace-more {
+  display:grid;
+  width:44px;
+  height:44px;
+  min-height:44px;
+  place-items:center;
+  margin:0;
+  padding:0;
+  border:1px solid var(--al-border);
+  border-radius:10px;
+  box-shadow:none;
+  color:var(--text-muted);
+  background:var(--background-secondary);
+  cursor:pointer;
+}
+button.al-workspace-more:hover { color:var(--text-normal); background:var(--background-modifier-hover); }
+.al-workspace-more svg { width:18px; height:18px; }
+
+.al-workspace-page { min-width:0; padding-top:14px; }
+.al-workspace-page > .al-shell { width:100%; padding-bottom:0; }
+
+/* Timeline was originally rendered in a modal with a definite height. The
+ * workspace version must provide the same definite flex height; otherwise its
+ * flex viewport collapses to 0px even though timeline cards were rendered. */
+.al-workspace-shell.is-timeline {
+  display:flex;
+  height:100%;
+  min-height:0;
+  flex-direction:column;
+  padding-bottom:0;
+}
+.al-workspace-shell.is-timeline > .al-workspace-header,
+.al-workspace-shell.is-timeline > .al-workspace-nav-row { flex:0 0 auto; }
+.al-workspace-shell.is-timeline > .al-workspace-page {
+  min-height:0;
+  flex:1 1 auto;
+  padding-bottom:14px;
+}
+.al-workspace-page.is-timeline > .al-timeline-root {
+  width:100%;
+  height:100%;
+  min-height:420px;
+  overflow:hidden;
+  border:1px solid var(--al-border);
+  border-radius:12px;
+}
+
+.al-library-workspace-summary {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:16px;
+  padding:8px 2px 0;
+}
+.al-library-workspace-summary strong { font-size:1.02rem; }
+.al-library-workspace-summary span { color:var(--text-muted); font-size:.68rem; }
+.al-shell.is-workspace-page > .al-type-tabs { margin-top:12px; }
+.al-library-workspace-type-row {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  gap:12px;
+  margin-top:12px;
+}
+.al-library-workspace-type-row > .al-type-tabs {
+  min-width:0;
+  flex:0 1 auto;
+  margin:0;
+}
+button.al-library-workspace-collect {
+  min-height:42px;
+  flex:0 0 auto;
+  margin:0 0 0 auto;
+  padding-inline:14px;
+}
+
+@media (max-width:700px) {
+  .al-workspace-shell { padding-bottom:max(30px,env(safe-area-inset-bottom)); }
+  .al-workspace-header { min-height:48px; padding:11px 2px 6px; }
+  .al-workspace-title { font-size:1.18rem; }
+  .al-workspace-nav-row { gap:8px; }
+  button.al-workspace-tab { height:42px; min-height:42px; padding-inline:11px; font-size:.72rem; }
+  .al-workspace-header-actions { min-height:42px; }
+  button.al-library-workspace-collect { min-height:40px; padding-inline:12px; }
+  button.al-workspace-more { width:42px; height:42px; min-height:42px; }
+  .al-workspace-page { padding-top:10px; }
+  .al-library-workspace-summary { padding-top:6px; }
+  .al-workspace-page.is-timeline > .al-timeline-root { min-height:360px; }
+}

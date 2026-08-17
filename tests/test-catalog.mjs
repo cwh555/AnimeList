@@ -2,6 +2,7 @@ export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", 
 
 export const TEST_FEATURES = [
   "covers",
+  "image-gallery",
   "image-sections",
   "library",
   "legacy-update",
@@ -26,6 +27,8 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/image-gallery.test.ts", kind: "test", suite: "unit", features: ["image-gallery", "image-sections", "markdown"] },
+  { path: "tests/contracts/image-gallery-service.test.ts", kind: "test", suite: "contract", features: ["image-gallery", "image-sections", "markdown", "library"] },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },

@@ -1,21 +1,15 @@
-import { Notice, TAbstractFile, TFile, setIcon, type WorkspaceLeaf } from "obsidian";
+import { Notice, TAbstractFile, TFile, type WorkspaceLeaf } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
-import { ScoreDashboardDragAutoScroller } from "../../domain/score-dashboard/drag-scroll";
-import { prepareScoreDashboardCoverSources } from "../../ui/score-dashboard/cover-sources";
+import { ScoreDashboardRefreshGuard, shouldRefreshScoreDashboardMetadata, shouldRefreshScoreDashboardPath, shouldRefreshScoreDashboardRename } from "../../app/score-dashboard/refresh";
 import { applyScoreDashboardChanges } from "../../data/score-dashboard/score-service";
+import { ScoreDashboardDragAutoScroller } from "../../domain/score-dashboard/drag-scroll";
+import { SCORE_DASHBOARD_DEFAULT_SCALE } from "../../domain/score-dashboard/model";
+import { renderScoreDashboardWithBatchDrag } from "../../ui/score-dashboard/batch-drag";
+import { prepareScoreDashboardCoverSources } from "../../ui/score-dashboard/cover-sources";
 import { confirmScoreDashboardClamp } from "../../ui/score-dashboard/operation-ui";
-import {
-  ScoreDashboardRefreshGuard,
-  shouldRefreshScoreDashboardMetadata,
-  shouldRefreshScoreDashboardPath,
-  shouldRefreshScoreDashboardRename,
-} from "../../app/score-dashboard/refresh";
+import type { ScoreDashboardUiState } from "../../ui/score-dashboard/renderer";
+import { SCORE_DASHBOARD_VIEW_TYPE, ScoreDashboardView, type ScoreDashboardPluginHost } from "../../ui/score-dashboard/view";
 import { scoreDashboardText as text } from "./text";
-import {
-  SCORE_DASHBOARD_VIEW_TYPE,
-  ScoreDashboardView,
-  type ScoreDashboardPluginHost,
-} from "../../ui/score-dashboard/view";
 
 interface ScoreDashboardDomEventRegistrar {
   registerDomEvent?<K extends keyof DocumentEventMap>(
@@ -34,7 +28,8 @@ interface ScoreDashboardDomEventRegistrar {
 
 type ScoreDashboardPlugin = AnimeListFeatureHost & ScoreDashboardDomEventRegistrar;
 
-const OPENERS = new WeakMap<object, () => void>();
+const HOSTS = new WeakMap<object, ScoreDashboardPluginHost>();
+const STATES = new WeakMap<object, ScoreDashboardUiState>();
 
 function createHost(
   plugin: ScoreDashboardPlugin,
@@ -81,25 +76,25 @@ function installDragAutoScroll(plugin: ScoreDashboardPlugin): void {
   plugin.registerDomEvent(window, "blur", stop);
 }
 
-async function openScoreDashboard(plugin: ScoreDashboardPlugin): Promise<void> {
-  let leaf = plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE)[0];
-  if (!leaf) {
-    leaf = plugin.app.workspace.getLeaf("tab");
-    await leaf.setViewState({ type: SCORE_DASHBOARD_VIEW_TYPE, active: true });
-  }
-  plugin.app.workspace.revealLeaf(leaf);
-}
-
 function activateDashboard(plugin: ScoreDashboardPlugin): void {
   const refreshGuard = new ScoreDashboardRefreshGuard();
-  const host = createHost(plugin, refreshGuard);
-  const open = () => void openScoreDashboard(plugin);
-  OPENERS.set(plugin, open);
-  plugin.registerView(SCORE_DASHBOARD_VIEW_TYPE, (leaf) => new ScoreDashboardView(leaf, host));
-  plugin.addCommand({ id: "open-score-dashboard", name: text.open, callback: open });
-  const refresh = () => plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE).forEach((leaf: WorkspaceLeaf) => {
-    if (leaf.view instanceof ScoreDashboardView) leaf.view.scheduleRender();
+  const dashboardHost = createHost(plugin, refreshGuard);
+  HOSTS.set(plugin, dashboardHost);
+
+  // Keep the old view type registered so restored workspaces from earlier versions remain valid.
+  plugin.registerView(SCORE_DASHBOARD_VIEW_TYPE, (leaf) => new ScoreDashboardView(leaf, dashboardHost));
+  plugin.addCommand({
+    id: "open-score-dashboard",
+    name: text.open,
+    callback: () => { void plugin.openLibrarySection("scores"); },
   });
+
+  const refresh = () => {
+    plugin.refreshViews();
+    plugin.app.workspace.getLeavesOfType(SCORE_DASHBOARD_VIEW_TYPE).forEach((leaf: WorkspaceLeaf) => {
+      if (leaf.view instanceof ScoreDashboardView) leaf.view.scheduleRender();
+    });
+  };
   const scanRoots = () => plugin.getScanFolders();
   const coverFolder = () => plugin.settings.coverFolder;
   plugin.registerEvent(plugin.app.metadataCache.on("changed", (file) => {
@@ -123,26 +118,39 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   installDragAutoScroll(plugin);
 }
 
+function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: HTMLElement): void {
+  const dashboardHost = HOSTS.get(plugin);
+  if (!dashboardHost) return;
+  const state = STATES.get(plugin) ?? {
+    type: "all",
+    scale: SCORE_DASHBOARD_DEFAULT_SCALE,
+    showUnrated: false,
+  };
+  container.addClass("animelist-score-dashboard-view");
+  renderScoreDashboardWithBatchDrag(container, dashboardHost.collectMediaItems(), state, {
+    openFile: (path) => dashboardHost.openMediaFile(path),
+    applyChanges: (changes) => dashboardHost.applyScoreChanges(changes),
+    confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
+    showNotice: (message) => dashboardHost.showNotice(message),
+    onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
+  });
+}
+
 export const scoreDashboardFeature = defineFeature<AnimeListFeatureHost>({
   id: "score-dashboard",
   contributions: [{
     kind: "lifecycle",
     activate: activateDashboard,
   }, {
-    kind: "library",
-    afterRender({ host, container }): void {
-      const actions = container.querySelector<HTMLElement>(".al-hero-actions");
-      if (!actions || actions.querySelector(".al-score-dashboard-button")) return;
-      const button = actions.createEl("button", {
-        cls: "al-secondary-button al-score-dashboard-button",
-      });
-      button.type = "button";
-      button.title = text.open;
-      button.setAttribute("aria-label", text.open);
-      setIcon(button, "table-properties");
-      button.createSpan({ text: text.title });
-      button.addEventListener("click", () => OPENERS.get(host)?.());
-      actions.insertBefore(button, actions.querySelector(".al-add-button"));
+    kind: "workspace-page",
+    page(host) {
+      return {
+        id: "scores",
+        label: text.title,
+        icon: "table-properties",
+        order: 30,
+        render: (container) => renderWorkspaceScoreDashboard(host, container),
+      };
     },
   }],
 });

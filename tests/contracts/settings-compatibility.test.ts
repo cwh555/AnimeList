@@ -93,6 +93,16 @@ describe("settings compatibility", () => {
     assert.deepEqual(settings.uiState, DEFAULT_SETTINGS.uiState);
   });
 
+  it("accepts every AnimeList workspace section and rejects unknown sections", async () => {
+    for (const section of ["library", "timeline", "scores", "images"] as const) {
+      const settings = await loadSettings({ uiState: { section } });
+      assert.equal(settings.uiState.section, section);
+    }
+
+    const fallback = await loadSettings({ uiState: { section: "unknown-page" } });
+    assert.equal(fallback.uiState.section, "library");
+  });
+
   it("keeps feature setting normalizers backward compatible", () => {
     assert.deepEqual(normalizeSearchLanguageSettings(undefined), {
       chinese: true,

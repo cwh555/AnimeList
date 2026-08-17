@@ -1057,7 +1057,20 @@ After **Check updates**:
 - Unchanged items are collapsed by default.
 - Footer states that release metadata is updated without changing reading progress.
 
-## 7. Reusable image sections
+## 7. AnimeList workspace and Images page
+
+Open the AnimeList ribbon view and verify the approved workspace hierarchy:
+
+- The primary row is exactly **Library / Timeline / Score Dashboard / Images** and remains visibly different from Library/Images secondary filters. On mobile it stays visible and may scroll horizontally.
+- Switching those four destinations stays in the same AnimeList ItemView. Timeline and Score Dashboard are no longer separate Library-header buttons.
+- **Collect** remains the header primary action. With Latest release tracking enabled, **Release Updates** is available from **More** rather than as another permanent header button.
+- In **Images → All images**, the Frieren and Kaguya Image Sections below appear in one aggregate masonry gallery without creating any duplicate image files. Test All/Anime/Manga/Novel, search, and exact column values 1–6.
+- Open an aggregate image and navigate the lightbox across the current filtered order. Use **Open source work** on images from Frieren and Kaguya and confirm each opens the correct note.
+- In **Images → By work**, Frieren/Kaguya appear as separate work boards with correct image/session counts. Kaguya must expose both seeded Image Sessions in its work detail.
+- Reorder one Kaguya source Image Section, return to Images, and confirm aggregation follows the Markdown source while the physical image is not copied or moved.
+- Re-check the existing Timeline and Score Dashboard interactions after moving them into the shared workspace shell.
+
+## 8. Reusable image sections
 
 Use these **real works and official anime episode stills** for manual verification:
 
@@ -1076,7 +1089,7 @@ Check the approved image-section behavior:
 - OVERLORD intentionally starts with one **old default duplicate cover embed** below \`animelist-detail\`. In Settings → **Updates & cleanup** → **Remove duplicate note covers**, Review cleanup must list OVERLORD before confirmation.
 - Confirming that cleanup must remove only the duplicate standalone cover line; OVERLORD's frontmatter, image section, and other body text must remain unchanged.
 - Real images render as a clean Pinterest/masonry wall without fixed row-height gaps: a shorter image lets the next image in that column move upward immediately.
-- The **Image columns** slider defaults to 4 on desktop. Change it to 2 and 5, reopen the note, and confirm the chosen value persists while narrow layouts still cap the effective column count for readability.
+- The **Image columns** slider defaults to 4 on desktop. Change it to 2 and 5, reopen the note, and confirm the chosen value persists and confirm the exact selected value remains active on narrow layouts without being silently capped.
 - Drag an image within one section and confirm its Markdown list order changes and survives reopening the note.
 - In 輝夜姬, drag an image from the first populated image section into the second. Confirm it disappears from the source, appears at the intended target position, the Markdown paragraph between the two sections remains byte-for-byte untouched, and no image file is moved to trash.
 - Click an image to open the original in the lightbox; left/right arrows navigate within that image section and Esc closes the modal.
@@ -1089,7 +1102,7 @@ Check the approved image-section behavior:
 - The \`animelist-detail\` note header is a compact single-row control strip like the approved mockup; it must not render a second progress card/bar underneath.
 - Run \`npm run test-vault\` again and confirm edits to these seeded sections are preserved; only \`npm run test-vault:fixtures\` intentionally resets the controlled work fixtures.
 
-## 8. Moments sections
+## 9. Moments sections
 
 Use these real media notes with **official episode stills downloaded into the Test Vault at fixture-preparation time**. Moments no longer reuse unrelated cover images:
 

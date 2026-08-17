@@ -87,3 +87,27 @@ test("feature lifecycle cannot activate twice", async () => {
   await registry.activate(host);
   await assert.rejects(registry.activate(host), /already activated/);
 });
+
+
+test("feature registry exposes typed workspace pages and menu actions in manifest order", () => {
+  const registry = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
+  registry.load([
+    defineFeature({
+      id: "images",
+      contributions: [{
+        kind: "workspace-page",
+        page: () => ({ id: "images", label: "Images", icon: "images", order: 40, render() {} }),
+      }],
+    }),
+    defineFeature({
+      id: "tools",
+      contributions: [{
+        kind: "workspace-action",
+        action: () => ({ id: "updates", label: "Updates", order: 10, run() {} }),
+      }],
+    }),
+  ]);
+
+  assert.deepEqual(registry.workspacePageDefinitions(host).map((page) => page.id), ["images"]);
+  assert.deepEqual(registry.workspaceMenuActions(host).map((action) => action.id), ["updates"]);
+});

@@ -77,6 +77,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
     activeProgressiveRenders.delete(container);
     container.replaceChildren();
     const items = inputItems.map(normalize);
+    const workspacePresentation = adapters.presentation === "workspace";
     const filterOptions = collectLibraryFilterOptions(items);
     const initialState = adapters.initialState ?? {};
     const requestedView = initialState.view ?? adapters.initialView;
@@ -119,46 +120,55 @@ export const AnimeListUI: LibraryRenderer = (() => {
     const openTimeline = adapters.openTimeline || null;
     const openFilterModal = adapters.openFilterModal || null;
 
-    const shell = makeEl("section", "al-shell");
+    const shell = makeEl("section", `al-shell${workspacePresentation ? " is-workspace-page" : ""}`);
     container.appendChild(shell);
 
-    const header = makeEl("header", "al-hero");
-    const titleBlock = makeEl("div", "al-hero-copy");
-    titleBlock.append(
-      makeEl("div", "al-kicker", uiText("library.kicker")),
-      makeEl("h1", "al-title", uiText("library.title")),
-      makeEl("p", "al-desc", uiText("library.description")),
-   );
-    const headerRight = makeEl("div", "al-hero-right");
-    const stats = makeEl("div", "al-stats");
-    ([
-      ["anime", MEDIA_UI_LABELS.type.anime],
-      ["manga", MEDIA_UI_LABELS.type.manga],
-      ["novel", MEDIA_UI_LABELS.type.novel],
-    ] as const).forEach(([key, label]) => {
-      const stat = makeEl("div", "al-stat");
-      stat.append(makeEl("strong", "al-stat-number", items.filter((x) => x.mediaType === key).length), makeEl("span", "al-stat-label", label));
-      stats.appendChild(stat);
-    });
-    headerRight.appendChild(stats);
-    const headerActions = makeEl("div", "al-hero-actions");
-    if (openTimeline) {
-      const timelineButton = makeEl("button", "al-secondary-button");
-      timelineButton.type = "button";
-      appendIconLabel(timelineButton, "timeline", uiText("library.timeline"));
-      timelineButton.addEventListener("click", () => { void openTimeline(); });
-      headerActions.appendChild(timelineButton);
+    if (!workspacePresentation) {
+      const header = makeEl("header", "al-hero");
+      const titleBlock = makeEl("div", "al-hero-copy");
+      titleBlock.append(
+        makeEl("div", "al-kicker", uiText("library.kicker")),
+        makeEl("h1", "al-title", uiText("library.title")),
+        makeEl("p", "al-desc", uiText("library.description")),
+      );
+      const headerRight = makeEl("div", "al-hero-right");
+      const stats = makeEl("div", "al-stats");
+      ([
+        ["anime", MEDIA_UI_LABELS.type.anime],
+        ["manga", MEDIA_UI_LABELS.type.manga],
+        ["novel", MEDIA_UI_LABELS.type.novel],
+      ] as const).forEach(([key, label]) => {
+        const stat = makeEl("div", "al-stat");
+        stat.append(makeEl("strong", "al-stat-number", items.filter((x) => x.mediaType === key).length), makeEl("span", "al-stat-label", label));
+        stats.appendChild(stat);
+      });
+      headerRight.appendChild(stats);
+      const headerActions = makeEl("div", "al-hero-actions");
+      if (openTimeline) {
+        const timelineButton = makeEl("button", "al-secondary-button");
+        timelineButton.type = "button";
+        appendIconLabel(timelineButton, "timeline", uiText("library.timeline"));
+        timelineButton.addEventListener("click", () => { void openTimeline(); });
+        headerActions.appendChild(timelineButton);
+      }
+      if (addItem) {
+        const addButton = makeEl("button", "al-add-button");
+        addButton.type = "button";
+        appendIconLabel(addButton, "plus", uiText("action.collect"));
+        addButton.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
+        headerActions.appendChild(addButton);
+      }
+      headerRight.appendChild(headerActions);
+      header.append(titleBlock, headerRight);
+      shell.appendChild(header);
+    } else {
+      const summary = makeEl("div", "al-library-workspace-summary");
+      summary.append(
+        makeEl("strong", "", uiText("library.title")),
+        makeEl("span", "", uiText("library.resultMeta", { shown: items.length, total: items.length, genre: "" })),
+      );
+      shell.appendChild(summary);
     }
-    if (addItem) {
-      const addButton = makeEl("button", "al-add-button");
-      addButton.type = "button";
-      appendIconLabel(addButton, "plus", uiText("action.collect"));
-      addButton.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
-      headerActions.appendChild(addButton);
-    }
-    headerRight.appendChild(headerActions);
-    header.append(titleBlock, headerRight);
-    shell.appendChild(header);
 
     const nav = makeEl("nav", "al-type-tabs");
     const typeButtons = new Map<LibraryMediaFilter, HTMLButtonElement>();
@@ -181,7 +191,17 @@ export const AnimeListUI: LibraryRenderer = (() => {
       typeButtons.set(key, button);
       nav.appendChild(button);
     });
-    shell.appendChild(nav);
+    if (workspacePresentation && addItem) {
+      const typeRow = makeEl("div", "al-library-workspace-type-row");
+      const collect = makeEl("button", "al-add-button al-library-workspace-collect");
+      collect.type = "button";
+      appendIconLabel(collect, "plus", uiText("action.collect"));
+      collect.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
+      typeRow.append(nav, collect);
+      shell.appendChild(typeRow);
+    } else {
+      shell.appendChild(nav);
+    }
 
     const toolbar = makeEl("div", "al-toolbar");
     const searchWrap = makeEl("label", "al-search");

@@ -11,6 +11,7 @@ import { EN_LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { EN_USER_TAG_MESSAGES } from "./user-tag";
 import { EN_IMAGE_SECTION_MESSAGES } from "./image-section";
 import { EN_MOMENTS_MESSAGES } from "./moments";
+import { EN_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
 export const EN_CATALOGS = {
   core: EN_CORE_MESSAGES,
@@ -25,4 +26,5 @@ export const EN_CATALOGS = {
   "user-tag": EN_USER_TAG_MESSAGES,
   "image-section": EN_IMAGE_SECTION_MESSAGES,
   moments: EN_MOMENTS_MESSAGES,
+  "image-gallery": EN_IMAGE_GALLERY_MESSAGES,
 } as const satisfies LocaleCatalogs;

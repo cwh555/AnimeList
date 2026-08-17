@@ -1,6 +1,11 @@
 import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { normalizeTimelineMaxStackDepth } from "../domain/timeline/scale";
 import type { AnimeListSettings, LibrarySection, MediaItem, MediaType } from "../types";
+import { uiText } from "../ui-text";
 import type { LibraryRenderAdapters } from "./library-contracts";
+import { TimelineUI } from "./timeline-renderer";
+import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
+import { renderAnimeListWorkspaceShell } from "./workspace-shell";
 
 export const ANIMELIST_VIEW_TYPE = "animelist-library";
 const DISPLAY_NAME = "AnimeList";
@@ -11,11 +16,12 @@ export interface AnimeListViewHost {
   renderLibrary(container: HTMLElement, items: MediaItem[], adapters?: LibraryRenderAdapters): void;
   collectMediaItems(): MediaItem[];
   updateUiState(state: AnimeListSettings["uiState"]): void;
+  workspacePages(): WorkspacePageDefinition[];
+  workspaceMenuActions(): WorkspaceMenuAction[];
   openMediaFile(path: string): Promise<void>;
   openAddModal(mediaType: MediaType): void;
   openEditModal(path: string): void;
   setFavorite(path: string, next: boolean): Promise<void>;
-  openTimeline(): Promise<void>;
 }
 
 export class AnimeListView extends ItemView {
@@ -37,22 +43,59 @@ export class AnimeListView extends ItemView {
   }
 
   async showSection(section: LibrarySection): Promise<void> {
-    this.host.settings.uiState.section = section;
-    await this.host.saveSettings();
+    if (this.host.settings.uiState.section !== section) {
+      this.host.settings.uiState.section = section;
+      await this.host.saveSettings();
+    }
     await this.render();
+  }
+
+  private corePages(items: MediaItem[]): WorkspacePageDefinition[] {
+    return [{
+      id: "library",
+      label: uiText("library.title"),
+      icon: "library",
+      order: 10,
+      render: (container) => {
+        this.host.renderLibrary(container, items, {
+          presentation: "workspace",
+          initialState: this.host.settings.uiState,
+          onStateChange: (state) => this.host.updateUiState({ ...this.host.settings.uiState, ...state } as AnimeListSettings["uiState"]),
+          openFile: (path) => void this.host.openMediaFile(path),
+          addItem: (mediaType) => this.host.openAddModal(mediaType),
+          editItem: (path) => this.host.openEditModal(path),
+          toggleFavorite: (path, next) => this.host.setFavorite(path, next),
+        });
+      },
+    }, {
+      id: "timeline",
+      label: uiText("timeline.title"),
+      icon: "clock-3",
+      order: 20,
+      render: (container) => {
+        TimelineUI.render(container, items, {
+          maxStackDepth: normalizeTimelineMaxStackDepth(this.host.settings.timelineMaxStackDepth),
+          openFile: (path) => this.host.openMediaFile(path),
+        });
+      },
+    }];
   }
 
   private async render(): Promise<void> {
     this.contentEl.empty();
     this.contentEl.addClass("animelist-native-view");
-    this.host.renderLibrary(this.contentEl, this.host.collectMediaItems(), {
-      initialState: this.host.settings.uiState,
-      onStateChange: (state) => this.host.updateUiState({ ...this.host.settings.uiState, ...state } as AnimeListSettings["uiState"]),
-      openFile: (path) => void this.host.openMediaFile(path),
-      addItem: (mediaType) => this.host.openAddModal(mediaType),
-      editItem: (path) => this.host.openEditModal(path),
-      toggleFavorite: (path, next) => this.host.setFavorite(path, next),
-      openTimeline: () => void this.host.openTimeline(),
+    const items = this.host.collectMediaItems();
+    const pages = [...this.corePages(items), ...this.host.workspacePages()];
+    const result = renderAnimeListWorkspaceShell(this.contentEl, {
+      pages,
+      activeSection: this.host.settings.uiState.section,
+      actions: this.host.workspaceMenuActions(),
+      onSelect: (section) => this.showSection(section),
     });
+    if (result.activePage.id !== this.host.settings.uiState.section) {
+      this.host.settings.uiState.section = result.activePage.id;
+      await this.host.saveSettings();
+    }
+    await result.activePage.render(result.page);
   }
 }

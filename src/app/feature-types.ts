@@ -18,6 +18,8 @@ import type {
   MediaFormSubmitContext,
 } from "../ui/media-form-contracts";
 import type { SearchRenderContext } from "../ui/search-contracts";
+import type { WorkspaceMenuAction, WorkspacePageDefinition } from "../ui/workspace-contracts";
+import type { LibrarySection } from "../domain/settings-types";
 
 export interface FeatureSettingsSection {
   page?: SettingsPageId;
@@ -40,6 +42,7 @@ export interface AnimeListFeatureHost extends Pick<
   collectMediaItems(source?: string): MediaItem[];
   resolveMediaCoverPath(value: unknown, sourcePath: string): string;
   openMediaFile(path: string): Promise<void>;
+  openLibrarySection(section: LibrarySection): Promise<void>;
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
@@ -108,6 +111,16 @@ export interface DetailContribution<Host extends AnimeListFeatureHost> {
   afterRender(context: DetailRenderContext<Host>): void;
 }
 
+export interface WorkspacePageContribution<Host extends AnimeListFeatureHost> {
+  readonly kind: "workspace-page";
+  page(host: Host): WorkspacePageDefinition | null;
+}
+
+export interface WorkspaceActionContribution<Host extends AnimeListFeatureHost> {
+  readonly kind: "workspace-action";
+  action(host: Host): WorkspaceMenuAction | null;
+}
+
 export type AnimeListContribution<Host extends AnimeListFeatureHost> =
   | LifecycleContribution<Host>
   | MediaItemContribution<Host>
@@ -116,7 +129,9 @@ export type AnimeListContribution<Host extends AnimeListFeatureHost> =
   | MediaFormContribution<Host>
   | FavoriteContribution<Host>
   | SettingsContribution<Host>
-  | DetailContribution<Host>;
+  | DetailContribution<Host>
+  | WorkspacePageContribution<Host>
+  | WorkspaceActionContribution<Host>;
 
 export interface AnimeListFeature<Host extends AnimeListFeatureHost = AnimeListFeatureHost> {
   readonly id: string;

@@ -4,6 +4,7 @@ import { additionalProgressUnitsFeature } from "./features/progress/additional-p
 import AnimeListPlugin from "./main";
 import { masterpieceFeature } from "./features/masterpiece/feature";
 import { imageSectionFeature } from "./features/image-sections/feature";
+import { imageGalleryFeature } from "./features/image-gallery/feature";
 import { momentsFeature } from "./features/moments/feature";
 import { progressUiFeature } from "./features/progress/feature";
 import { ratingFeature } from "./features/rating/feature";
@@ -24,6 +25,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   searchEnhancementsFeature,
   ratingFeature,
   imageSectionFeature,
+  imageGalleryFeature,
   momentsFeature,
   releaseTrackingFeature,
   additionalProgressUnitsFeature,

@@ -1,0 +1,18 @@
+export const KO_IMAGE_GALLERY_MESSAGES = {
+  title: "이미지",
+  description: "각 작품의 Image Section 이미지를 파일 복사 없이 한곳에서 봅니다.",
+  allImages: "모든 이미지",
+  byWork: "작품별",
+  searchPlaceholder: "작품 또는 이미지 경로 검색…",
+  columns: "이미지 열 수",
+  summary: "이미지 {images}개 · 작품 {works}개",
+  workSummary: "이미지 {images}개 · Image Session {sessions}개",
+  allSessions: "모든 Sessions",
+  session: "Session {number}",
+  backToWorks: "작품 목록으로",
+  openSource: "원본 작품 열기",
+  emptyTitle: "이미지가 없습니다",
+  emptyDescription: "작품 노트에 Image Section을 추가하면 이미지가 자동으로 여기에 표시됩니다.",
+  loading: "이미지 갤러리를 정리하는 중…",
+  open: "이미지 열기",
+} as const;
