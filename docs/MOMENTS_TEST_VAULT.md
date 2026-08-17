@@ -47,6 +47,6 @@ Edit a Moment and exercise `source`, `position`, `speaker`, `tags`, and `note`.
 This supplemental checklist is complete only when the related general checks also pass:
 
 - interface-language switching does not rewrite Moment text or metadata;
-- Image Section layout remains readable after the compatibility-safe CSS change;
+- Image Section layout keeps natural-height masonry columns, persists the per-section column count, and supports within-section and same-note cross-section drag ordering;
 - Settings and cleanup tools do not modify Moment/Image Section blocks unless the selected cleanup explicitly targets that content;
 - desktop and phone layouts remain free of page-level horizontal overflow.

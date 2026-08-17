@@ -162,8 +162,11 @@ Use the editor context menu **AnimeList → Add image section**.
 - [ ] Inserting an Image Section at the cursor preserves surrounding Markdown and creates an ordinary `animelist-images` fenced block.
 - [ ] Multiple independent Image Sections may exist in one note; editing one does not rewrite another.
 - [ ] Empty Image Section shows an Add target and accepts file picker, drag/drop, clipboard paste, and explicit URL import.
-- [ ] A populated desktop Image Section uses a responsive grid with uncropped images; the layout remains readable without CSS multi-column support.
-- [ ] Desktop/narrow layouts adapt without page-level horizontal overflow; phone layout uses two columns where space permits and one column at very narrow widths.
+- [ ] A populated desktop Image Section uses independent masonry columns with uncropped natural-height images; a short image does not reserve the height of a taller neighbor and the next image rises to fill that column.
+- [ ] **Image columns** defaults to 4; the discrete 1–6 slider previews immediately, persists the selected per-section value, and reopening the note restores it.
+- [ ] Desktop/narrow layouts adapt without page-level horizontal overflow; the requested column count is capped to three/two/one columns as the available width narrows.
+- [ ] Drag an image within one Image Section to reorder it; reopening the note preserves the new Markdown list order.
+- [ ] Drag an image between two Image Sections in the same note; the source loses the reference, the target gains it at the drop position, unrelated Markdown between sections is unchanged, and the image file is not trashed.
 - [ ] Bounded gallery scrolling works and **Show all / Show less** expands/collapses without an unexpected viewport jump.
 - [ ] Click an image → original-image lightbox; ArrowLeft/ArrowRight navigate only that section; Esc closes.
 - [ ] Cmd+C (macOS) / Ctrl+C (Windows/Linux) in the lightbox copies the original image; context-menu **Copy image** also works.
