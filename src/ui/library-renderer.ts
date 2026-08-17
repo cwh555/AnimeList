@@ -191,7 +191,17 @@ export const AnimeListUI: LibraryRenderer = (() => {
       typeButtons.set(key, button);
       nav.appendChild(button);
     });
-    shell.appendChild(nav);
+    if (workspacePresentation && addItem) {
+      const typeRow = makeEl("div", "al-library-workspace-type-row");
+      const collect = makeEl("button", "al-add-button al-library-workspace-collect");
+      collect.type = "button";
+      appendIconLabel(collect, "plus", uiText("action.collect"));
+      collect.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
+      typeRow.append(nav, collect);
+      shell.appendChild(typeRow);
+    } else {
+      shell.appendChild(nav);
+    }
 
     const toolbar = makeEl("div", "al-toolbar");
     const searchWrap = makeEl("label", "al-search");

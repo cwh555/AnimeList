@@ -9,7 +9,6 @@ export interface WorkspaceShellOptions {
   activeSection: LibrarySection;
   actions?: readonly WorkspaceMenuAction[];
   onSelect(section: LibrarySection): void | Promise<void>;
-  onCollect(): void;
 }
 
 export interface WorkspaceShellResult {
@@ -40,13 +39,6 @@ export function renderAnimeListWorkspaceShell(
   brand.appendChild(makeEl("strong", "al-workspace-title", "AnimeList"));
 
   const actions = makeEl("div", "al-workspace-header-actions");
-  const collect = makeEl("button", "al-add-button al-workspace-collect");
-  collect.type = "button";
-  setAnimeListIcon(collect, "plus");
-  collect.appendChild(makeEl("span", "", uiText("action.collect")));
-  collect.addEventListener("click", () => options.onCollect());
-  actions.appendChild(collect);
-
   const menuActions = orderedActions(options.actions ?? []);
   if (menuActions.length) {
     const more = makeEl("button", "al-workspace-more");
@@ -90,7 +82,8 @@ export function renderAnimeListWorkspaceShell(
     nav.appendChild(button);
   }
 
-  navRow.append(nav, actions);
+  navRow.appendChild(nav);
+  if (actions.childElementCount) navRow.appendChild(actions);
 
   const page = makeEl("div", `al-workspace-page is-${activePage.id}`);
   shell.append(header, navRow, page);

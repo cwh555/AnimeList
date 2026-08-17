@@ -17,6 +17,7 @@ await build({
       export { renderAnimeListWorkspaceShell } from "./src/ui/workspace-shell";
       export { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "./src/ui/image-gallery-renderer";
       export { TimelineUI } from "./src/ui/timeline-renderer";
+      export { AnimeListUI } from "./src/ui/library-renderer";
     `,
     resolveDir: root,
     loader: "ts",
@@ -80,15 +81,15 @@ frieren[1].references.push({sessionIndex:1,position:0});
 const works=[refs("Anime/Frieren.md","Frieren","anime",frieren,[["a.jpg","b.jpg"],["b.jpg","c.jpg"]]),refs("Manga/Kaguya.md","Kaguya","manga",kaguya,[["d.jpg","e.jpg","f.jpg"]])];
 const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"${images.c}","d.jpg":"${images.d}","e.jpg":"${images.e}","f.jpg":"${images.f}"};
 const timelineItem={title:"Frieren",originalTitle:"Frieren",mediaType:"anime",format:"TV",status:"completed",releaseStatus:"finished",progress:28,total:28,unit:"ep",score:9,favorite:false,year:2024,genres:[],people:[],platforms:[],sourceUrls:[],cover:"${images.a}",filePath:"Anime/Frieren.md",updated:0,updatedLabel:"",startedAt:"2023-09-29",completedAt:"2024-03-22",volumeLog:[]};
-let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[];
+let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[]; let collectType="";
 const pages=[
- {id:"library",label:"Library",icon:"library",order:10,render(el){el.textContent="LIBRARY PAGE"}},
+ {id:"library",label:"Library",icon:"library",order:10,render(el){AnimeListWorkspaceImages.AnimeListUI.renderLibrary(el,[timelineItem],{presentation:"workspace",addItem:(type)=>{collectType=type}})}},
  {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){AnimeListWorkspaceImages.TimelineUI.render(el,[timelineItem],{})}},
  {id:"scores",label:"Score Dashboard",icon:"table-properties",order:30,render(el){el.textContent="SCORES PAGE"}},
  {id:"images",label:"Images",icon:"images",order:40,render(el){AnimeListWorkspaceImages.renderImageGallery(el,works,galleryState,{resolve:(image)=>({resourcePath:urlMap[image.path]}),openLightbox:(imgs,start)=>{lightboxKeys=imgs.map(i=>i.key).slice(start)},openSource:(path)=>{sourceOpened=path},onStateChange:(state)=>{galleryState={...state}}})}},
 ];
 const app=document.querySelector("#app");
-const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){}}],onSelect:(section)=>{active=section;render()},onCollect:()=>{}}); result.activePage.render(result.page);};
+const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){}}],onSelect:(section)=>{active=section;render()}}); result.activePage.render(result.page);};
 const tab=(section)=>document.querySelector('.al-workspace-tab[data-section="'+section+'"]');
 const click=(el)=>el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true}));
 const frames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -101,10 +102,15 @@ render();
  const inactiveStyle=getComputedStyle(tab('timeline'));
  details.primaryNavIsFlat=inactiveStyle.boxShadow==='none' && inactiveStyle.backgroundColor==='rgba(0, 0, 0, 0)';
  details.primaryNavVisibleOnMobile=getComputedStyle(document.querySelector('.al-workspace-nav')).display!=='none';
- const collectRect=document.querySelector('.al-workspace-collect').getBoundingClientRect();
- const tabRect=tab('library').getBoundingClientRect();
- details.collectAlignedWithTabs=Math.abs(collectRect.top-tabRect.top)<1 && Math.abs(collectRect.height-tabRect.height)<1;
- details.actionsStaySeparate=!!document.querySelector('.al-workspace-collect') && !!document.querySelector('.al-workspace-more');
+ const primaryNav=document.querySelector('.al-workspace-nav');
+ details.primaryNavHasNoVerticalScrollbar=primaryNav.scrollHeight<=primaryNav.clientHeight && !['auto','scroll'].includes(getComputedStyle(primaryNav).overflowY);
+ const typeRow=document.querySelector('.al-library-workspace-type-row');
+ const typeTabs=document.querySelector('.al-type-tabs');
+ const libraryCollect=document.querySelector('.al-library-workspace-collect');
+ details.collectMovedIntoLibraryTypeRow=!!typeRow && libraryCollect?.parentElement===typeRow && typeTabs?.parentElement===typeRow && typeRow.lastElementChild===libraryCollect && !document.querySelector('.al-workspace-collect');
+ click(libraryCollect);
+ details.collectUsesCurrentLibraryType=collectType==='anime';
+ details.moreStaysWorkspaceAction=!!document.querySelector('.al-workspace-more');
 
  click(tab('timeline')); await new Promise(r=>setTimeout(r,25)); await frames();
  const timelineViewport=document.querySelector('.al-timeline-viewport');

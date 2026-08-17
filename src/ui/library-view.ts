@@ -91,10 +91,6 @@ export class AnimeListView extends ItemView {
       activeSection: this.host.settings.uiState.section,
       actions: this.host.workspaceMenuActions(),
       onSelect: (section) => this.showSection(section),
-      onCollect: () => {
-        const type = this.host.settings.uiState.type;
-        this.host.openAddModal(type === "anime" || type === "manga" || type === "novel" ? type : "anime");
-      },
     });
     if (result.activePage.id !== this.host.settings.uiState.section) {
       this.host.settings.uiState.section = result.activePage.id;

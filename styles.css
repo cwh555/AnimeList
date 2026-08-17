@@ -673,6 +673,7 @@
   flex:1 1 auto;
   gap:2px;
   overflow-x:auto;
+  overflow-y:clip;
 }
 button.al-workspace-tab {
   position:relative;
@@ -697,7 +698,7 @@ button.al-workspace-tab {
 button.al-workspace-tab::after {
   position:absolute;
   right:10px;
-  bottom:-1px;
+  bottom:0;
   left:10px;
   height:2px;
   border-radius:999px 999px 0 0;
@@ -721,15 +722,8 @@ button.al-workspace-tab.is-active .al-workspace-tab-icon { color:var(--al-accent
   display:flex;
   min-height:44px;
   flex:0 0 auto;
-  align-items:stretch;
+  align-items:center;
   gap:8px;
-}
-button.al-workspace-collect {
-  height:44px;
-  min-height:44px;
-  margin:0;
-  padding-inline:14px;
-  align-self:stretch;
 }
 button.al-workspace-more {
   display:grid;
@@ -787,7 +781,25 @@ button.al-workspace-more:hover { color:var(--text-normal); background:var(--back
 }
 .al-library-workspace-summary strong { font-size:1.02rem; }
 .al-library-workspace-summary span { color:var(--text-muted); font-size:.68rem; }
-.al-shell.is-workspace-page .al-type-tabs { margin-top:12px; }
+.al-shell.is-workspace-page > .al-type-tabs { margin-top:12px; }
+.al-library-workspace-type-row {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  gap:12px;
+  margin-top:12px;
+}
+.al-library-workspace-type-row > .al-type-tabs {
+  min-width:0;
+  flex:0 1 auto;
+  margin:0;
+}
+button.al-library-workspace-collect {
+  min-height:42px;
+  flex:0 0 auto;
+  margin:0 0 0 auto;
+  padding-inline:14px;
+}
 
 @media (max-width:700px) {
   .al-workspace-shell { padding-bottom:max(30px,env(safe-area-inset-bottom)); }
@@ -796,7 +808,7 @@ button.al-workspace-more:hover { color:var(--text-normal); background:var(--back
   .al-workspace-nav-row { gap:8px; }
   button.al-workspace-tab { height:42px; min-height:42px; padding-inline:11px; font-size:.72rem; }
   .al-workspace-header-actions { min-height:42px; }
-  button.al-workspace-collect { height:42px; min-height:42px; padding-inline:12px; }
+  button.al-library-workspace-collect { min-height:40px; padding-inline:12px; }
   button.al-workspace-more { width:42px; height:42px; min-height:42px; }
   .al-workspace-page { padding-top:10px; }
   .al-library-workspace-summary { padding-top:6px; }
