@@ -1,0 +1,18 @@
+export const IMAGE_GALLERY_MESSAGES = {
+  title: "圖庫",
+  description: "集中瀏覽各作品 Image Sections 中的圖片，不建立重複檔案。",
+  allImages: "全部圖片",
+  byWork: "依作品",
+  searchPlaceholder: "搜尋作品或圖片路徑…",
+  columns: "圖片欄數",
+  summary: "{images} 張圖片 · {works} 部作品",
+  workSummary: "{images} 張圖片 · {sessions} 個 Image Sessions",
+  allSessions: "全部 Sessions",
+  session: "Session {number}",
+  backToWorks: "返回作品圖版",
+  openSource: "開啟來源作品",
+  emptyTitle: "目前沒有圖片",
+  emptyDescription: "在作品筆記中加入 Image Section 後，圖片會自動出現在這裡。",
+  loading: "正在整理圖庫…",
+  open: "開啟圖庫",
+} as const;

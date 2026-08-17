@@ -4,18 +4,26 @@ import { imageSectionText } from "../features/image-sections/text";
 import { copyImageToClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
+export interface ImageLightboxEntry {
+  path: string;
+  sourcePath: string;
+}
+
+export function imageLightboxEntries(sourcePath: string, paths: readonly string[]): ImageLightboxEntry[] {
+  return paths.map((path) => ({ path, sourcePath }));
+}
+
 export class ImageLightboxModal extends Modal {
   private index: number;
 
   constructor(
     app: ConstructorParameters<typeof Modal>[0],
     private readonly service: ImageSectionService,
-    private readonly sourcePath: string,
-    private readonly paths: readonly string[],
+    private readonly entries: readonly ImageLightboxEntry[],
     startIndex: number,
   ) {
     super(app);
-    this.index = Math.max(0, Math.min(paths.length - 1, startIndex));
+    this.index = Math.max(0, Math.min(entries.length - 1, startIndex));
   }
 
   onOpen(): void {
@@ -35,26 +43,26 @@ export class ImageLightboxModal extends Modal {
       void this.copyCurrent();
       return;
     }
-    if (event.key === "ArrowLeft" && this.paths.length > 1) {
+    if (event.key === "ArrowLeft" && this.entries.length > 1) {
       event.preventDefault();
       this.move(-1);
-    } else if (event.key === "ArrowRight" && this.paths.length > 1) {
+    } else if (event.key === "ArrowRight" && this.entries.length > 1) {
       event.preventDefault();
       this.move(1);
     }
   };
 
   private move(delta: number): void {
-    if (!this.paths.length) return;
-    this.index = (this.index + delta + this.paths.length) % this.paths.length;
+    if (!this.entries.length) return;
+    this.index = (this.index + delta + this.entries.length) % this.entries.length;
     this.render();
   }
 
   private async copyCurrent(): Promise<void> {
-    const path = this.paths[this.index];
-    if (!path) return;
+    const entry = this.entries[this.index];
+    if (!entry) return;
     try {
-      await copyImageToClipboard(this.service, this.sourcePath, path);
+      await copyImageToClipboard(this.service, entry.sourcePath, entry.path);
       new Notice(imageSectionText("copied"));
     } catch (error) {
       new Notice(imageSectionText("copyFailed", { error: errorMessage(error) }));
@@ -63,9 +71,9 @@ export class ImageLightboxModal extends Modal {
 
   private render(): void {
     this.contentEl.replaceChildren();
-    const path = this.paths[this.index];
-    if (!path) return;
-    const resolved = this.service.resolve(path, this.sourcePath);
+    const entry = this.entries[this.index];
+    if (!entry) return;
+    const resolved = this.service.resolve(entry.path, entry.sourcePath);
     if (!resolved.resourcePath) {
       this.contentEl.appendChild(makeEl("div", "al-image-lightbox-missing", imageSectionText("missing")));
       return;
@@ -88,7 +96,7 @@ export class ImageLightboxModal extends Modal {
     });
     stage.appendChild(image);
 
-    if (this.paths.length > 1) {
+    if (this.entries.length > 1) {
       const previous = makeEl("button", "al-image-lightbox-nav is-previous");
       previous.type = "button";
       previous.setAttribute("aria-label", imageSectionText("previousImage"));
@@ -102,7 +110,7 @@ export class ImageLightboxModal extends Modal {
       stage.append(previous, next);
     }
 
-    const counter = makeEl("div", "al-image-lightbox-counter", `${this.index + 1} / ${this.paths.length}`);
+    const counter = makeEl("div", "al-image-lightbox-counter", `${this.index + 1} / ${this.entries.length}`);
     this.contentEl.append(stage, counter);
   }
 }

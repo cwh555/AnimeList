@@ -122,7 +122,9 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
     },
     uiState: {
       ...retainedUiState,
-      section: uiState.section === "timeline" ? "timeline" : "library",
+      section: uiState.section === "timeline" || uiState.section === "scores" || uiState.section === "images"
+        ? uiState.section
+        : "library",
       type: uiState.type === "anime" || uiState.type === "manga" || uiState.type === "novel"
         ? uiState.type
         : "all",

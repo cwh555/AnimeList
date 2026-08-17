@@ -12,7 +12,7 @@ import { AnimeListSettingsStore } from "./app/settings-store";
 import { searchFeatureText } from "./features/search/text";
 import { loadMissingSerialCovers, type SerialCoverMigrationProgress, type SerialCoverMigrationSummary } from "./app/serial-covers/serial-cover-service";
 import { MEDIA_STATUS_MIGRATION_VERSION, migrateMediaStatusNotes } from "./app/schema-migration";
-import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "./types";
+import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, LibrarySection, MediaItem, MediaNoteForm, MediaType } from "./types";
 import { uiText } from "./ui-text";
 import { AnimeListUI } from "./ui/library-renderer";
 import { LibraryFilterModal } from "./ui/library-filter-modal";
@@ -25,7 +25,7 @@ import type { MediaFormContext, MediaFormSubmitContext } from "./ui/media-form-c
 import { AddMediaModal, EditMediaModal } from "./ui/media-modals";
 import type { AnimeListUiHost } from "./ui/plugin-host";
 import type { SearchModalAdapter } from "./ui/search-contracts";
-import { TimelineModal } from "./ui/timeline-modal";
+import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./ui/workspace-contracts";
 
 function errorMessage(value: unknown): string {
   return value instanceof Error ? value.message : typeof value === "string" ? value : "Unknown error";
@@ -38,7 +38,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   private readonly features = new AnimeListFeatureRegistry<AnimeListFeatureHost>();
   private application?: AnimeListApplicationServices;
   private saveUiTimer: number | null = null;
-  private libraryOpener?: () => Promise<void>;
+  private libraryOpener?: (section?: LibrarySection) => Promise<void>;
 
   protected featureManifest(): readonly AnimeListFeature<AnimeListFeatureHost>[] { return []; }
 
@@ -177,7 +177,15 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     AnimeListUI.renderLibrary(container, items, prepared);
   }
 
-  private reliableLibraryOpener(): () => Promise<void> {
+  workspacePages(): WorkspacePageDefinition[] {
+    return this.features.workspacePageDefinitions(this);
+  }
+
+  workspaceMenuActions(): WorkspaceMenuAction[] {
+    return this.features.workspaceMenuActions(this);
+  }
+
+  private reliableLibraryOpener(): (section?: LibrarySection) => Promise<void> {
     this.libraryOpener ??= createReliableLibraryOpener({
       findLeaves: () => this.app.workspace.getLeavesOfType(ANIMELIST_VIEW_TYPE),
       createLeaf: () => this.app.workspace.getLeaf("tab"),
@@ -186,6 +194,10 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
       showLibrary: async (leaf) => {
         if (!(leaf.view instanceof AnimeListView)) throw new Error("The AnimeList library view was not available after activation.");
         await leaf.view.showSection("library");
+      },
+      showSection: async (leaf, section) => {
+        if (!(leaf.view instanceof AnimeListView)) throw new Error("The AnimeList library view was not available after activation.");
+        await leaf.view.showSection(section);
       },
       initializeLibrary: () => this.initializeLibrary(false),
       reportOpenFailure: (error) => {
@@ -200,7 +212,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.libraryOpener;
   }
 
-  async openLibrary(): Promise<void> { await this.reliableLibraryOpener()(); }
+  async openLibrary(): Promise<void> { await this.reliableLibraryOpener()("library"); }
+  async openLibrarySection(section: LibrarySection): Promise<void> { await this.reliableLibraryOpener()(section); }
   openAddModal(initialType: MediaType = "anime"): void { new AddMediaModal(this, initialType).open(); }
 
   openEditModal(path: string): void {
@@ -212,10 +225,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     new EditMediaModal(this, file).open();
   }
 
-  async openTimeline(): Promise<void> {
-    await this.initializeLibrary(false);
-    new TimelineModal(this, this.collectMediaItems()).open();
-  }
+  async openTimeline(): Promise<void> { await this.openLibrarySection("timeline"); }
 
   async openMediaFile(path: string): Promise<void> { await this.app.workspace.openLinkText(path, "", false); }
 

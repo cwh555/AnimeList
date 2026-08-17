@@ -1,0 +1,18 @@
+export const JA_IMAGE_GALLERY_MESSAGES = {
+  title: "画像",
+  description: "各作品の Image Section から画像を集約し、ファイルを複製せずに閲覧します。",
+  allImages: "すべての画像",
+  byWork: "作品別",
+  searchPlaceholder: "作品名または画像パスを検索…",
+  columns: "画像の列数",
+  summary: "{images} 枚 · {works} 作品",
+  workSummary: "{images} 枚 · {sessions} Image Sessions",
+  allSessions: "すべての Sessions",
+  session: "Session {number}",
+  backToWorks: "作品一覧へ戻る",
+  openSource: "元の作品を開く",
+  emptyTitle: "画像がありません",
+  emptyDescription: "作品ノートに Image Section を追加すると、画像がここに表示されます。",
+  loading: "画像を整理しています…",
+  open: "画像を開く",
+} as const;

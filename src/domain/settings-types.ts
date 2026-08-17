@@ -6,7 +6,7 @@ import type { LanguagePreference } from "../i18n/locale";
 export type { LanguagePreference } from "../i18n/locale";
 
 export type StorageMode = "managed" | "flat";
-export type LibrarySection = "library" | "timeline";
+export type LibrarySection = "library" | "timeline" | "scores" | "images";
 export type LibraryViewMode = "grid" | "list" | "poster";
 export type SearchLanguage = "chinese" | "english" | "original";
 

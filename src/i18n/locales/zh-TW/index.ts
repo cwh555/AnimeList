@@ -10,6 +10,7 @@ import { SERIAL_COVER_MESSAGES } from "./serial-cover";
 import { USER_TAG_MESSAGES } from "./user-tag";
 import { IMAGE_SECTION_MESSAGES } from "./image-section";
 import { MOMENTS_MESSAGES } from "./moments";
+import { IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
 export {
   CORE_MESSAGES,
@@ -24,6 +25,7 @@ export {
   USER_TAG_MESSAGES,
   IMAGE_SECTION_MESSAGES,
   MOMENTS_MESSAGES,
+  IMAGE_GALLERY_MESSAGES,
 };
 
 export const ZH_TW_CATALOGS = {
@@ -39,6 +41,7 @@ export const ZH_TW_CATALOGS = {
   "user-tag": USER_TAG_MESSAGES,
   "image-section": IMAGE_SECTION_MESSAGES,
   moments: MOMENTS_MESSAGES,
+  "image-gallery": IMAGE_GALLERY_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

@@ -5,7 +5,7 @@ import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
 import { momentsText } from "../features/moments/text";
 import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
-import { ImageLightboxModal } from "./image-lightbox";
+import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
@@ -131,7 +131,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
 
   private openLightbox(moment: MomentItem, path: string): void {
     const index = Math.max(0, moment.images.indexOf(path));
-    new ImageLightboxModal(this.host.app, this.imageService, this.context.sourcePath, moment.images, index).open();
+    new ImageLightboxModal(this.host.app, this.imageService, imageLightboxEntries(this.context.sourcePath, moment.images), index).open();
   }
 
   private bindScroller(

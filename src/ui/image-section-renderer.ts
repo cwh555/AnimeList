@@ -21,7 +21,7 @@ import {
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
-import { ImageLightboxModal } from "./image-lightbox";
+import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
@@ -177,7 +177,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private openLightbox(path: string): void {
     const paths = parseImageSectionSource(this.source);
     const index = Math.max(0, paths.indexOf(path));
-    new ImageLightboxModal(this.host.app, this.service, this.context.sourcePath, paths, index).open();
+    new ImageLightboxModal(this.host.app, this.service, imageLightboxEntries(this.context.sourcePath, paths), index).open();
   }
 
   private async copyPath(path: string): Promise<void> {

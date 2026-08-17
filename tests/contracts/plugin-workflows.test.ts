@@ -4,7 +4,6 @@ import { App, TFile } from "obsidian";
 import AnimeListPlugin from "../../src/main";
 import { createDefaultSettings } from "../../src/app/settings-model";
 import type { MediaItem } from "../../src/types";
-import { TimelineModal } from "../../src/ui/timeline-modal";
 
 function timelineItem(): MediaItem {
   return {
@@ -113,33 +112,15 @@ describe("plugin UI workflows", () => {
     assert.deepEqual(savedGenres, ["動作", "Custom tag"]);
   });
 
-  it("opens timeline items in a modal without navigating the library view", async () => {
+  it("routes the timeline command into the shared AnimeList workspace", async () => {
     const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin;
     plugin.app = new App();
     plugin.settings = createDefaultSettings();
-    const items = [timelineItem()];
-    let initialized = 0;
-    let collected = 0;
-    let opened: TimelineModal | null = null;
-    plugin.initializeLibrary = async () => { initialized += 1; };
-    plugin.collectMediaItems = () => { collected += 1; return items; };
+    const sections: string[] = [];
+    plugin.openLibrarySection = async (section) => { sections.push(section); };
 
-    const originalOpen = TimelineModal.prototype.open;
-    TimelineModal.prototype.open = function open(): void {
-      opened = this;
-    };
-    try {
-      await plugin.openTimeline();
-    } finally {
-      TimelineModal.prototype.open = originalOpen;
-    }
+    await plugin.openTimeline();
 
-    assert.equal(initialized, 1);
-    assert.equal(collected, 1);
-    assert.ok(opened instanceof TimelineModal);
-    assert.equal(
-      (opened as unknown as { items: MediaItem[] }).items,
-      items,
-    );
+    assert.deepEqual(sections, ["timeline"]);
   });
 });
