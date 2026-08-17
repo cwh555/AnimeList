@@ -17,7 +17,7 @@ The primary navigation must remain visually distinct from page-local filters: ic
 
 The shared workspace header shows the **AnimeList** product name only; do not restore the old Markdown-description subtitle. The primary navigation row contains page navigation plus optional low-frequency **More** actions only. It must never produce vertical overflow or a vertical scrollbar.
 
-- **Collect** belongs to the Library page, on the same row as `All / Anime / Manga / Novel`, aligned at that row's far right. It is not a global workspace action.
+- **Collect** belongs to the Library page, on the same row as `All / Anime / Manga / Novel`, aligned at that row's far right. It is not a global workspace action. Opening Collect uses the currently selected media type; `All` falls back to Anime.
 - **More** contains enabled low-frequency tools such as Release Updates and may remain at the far right of the primary navigation row.
 - Images, Timeline, and Score Dashboard must not be reintroduced as header action buttons.
 
