@@ -84,6 +84,10 @@ export class PluginSettingTab {
   plugin: any;
   containerEl: any = { empty() {}, createEl() {} };
   constructor(app?: any, plugin?: any) { this.app = app; this.plugin = plugin; }
+  getSettingDefinitions(): any[] { return []; }
+  display(): void {}
+  update(): void {}
+  hide(): void {}
 }
 
 class SettingControl {

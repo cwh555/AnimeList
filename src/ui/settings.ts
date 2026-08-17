@@ -5,6 +5,7 @@ import { withActiveLocale } from "../i18n/catalog";
 import { searchFeatureText } from "../features/search/text";
 import {
   SETTINGS_PAGES,
+  getSettingsPageDefinition,
   normalizeSettingsPage,
   settingsPageForKey,
   type SettingsPageId,
@@ -53,6 +54,8 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
+// Obsidian 1.13 skips display() when this class overrides getSettingDefinitions().
+// Keep the imperative lifecycle so the tabbed settings shell remains compatible with older Obsidian versions.
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
   private activePage: SettingsPageId = "general";
@@ -70,7 +73,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
     }));
   }
 
-  getSettingDefinitions(): SettingDefinition[] {
+  private getCoreSettingDefinitions(): SettingDefinition[] {
     return withActiveLocale("en", () => [
       {
         name: uiText("settings.storageLayout.name"),
@@ -159,7 +162,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
 
   getSettingSections(): SettingsSection[] {
     return withActiveLocale("en", () => {
-      const base = this.getSettingDefinitions();
+      const base = this.getCoreSettingDefinitions();
       const sections: SettingsSection[] = [
         {
           page: "general",
@@ -223,7 +226,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
 
     for (const page of SETTINGS_PAGES) {
       const active = page.id === this.activePage;
-      const button = tabList.createEl("button", { text: page.label });
+      const button = tabList.createEl("button", {
+        cls: "animelist-settings-tab",
+        text: page.label,
+      });
       button.type = "button";
       button.id = `animelist-settings-tab-${page.id}`;
       button.dataset.settingsPage = page.id;
@@ -231,7 +237,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
       button.setAttribute("aria-selected", String(active));
       button.setAttribute("aria-controls", `animelist-settings-panel-${page.id}`);
       button.tabIndex = active ? 0 : -1;
-      button.toggleClass("mod-cta", active);
+      button.classList.toggle("is-active", active);
       button.addEventListener("click", () => {
         if (page.id !== this.activePage) this.openSettingsPage(page.id);
       });
@@ -265,45 +271,17 @@ export class AnimeListSettingTab extends PluginSettingTab {
       panel.id = `animelist-settings-panel-${this.activePage}`;
       panel.setAttribute("role", "tabpanel");
       panel.setAttribute("aria-labelledby", `animelist-settings-tab-${this.activePage}`);
-      const intro = panel.createEl("p", {
-        text: uiText("settings.intro"),
-      });
-      intro.setCssStyles({
-        margin: "var(--size-4-3) 0 var(--size-4-5)",
-        color: "var(--text-muted)",
+      panel.createEl("p", {
+        cls: "animelist-settings-intro",
+        text: getSettingsPageDefinition(this.activePage).description,
       });
 
       for (const section of this.getSettingsPageSections(this.activePage)) {
         const sectionEl = panel.createEl("section", { cls: "animelist-settings-section" });
-        sectionEl.setCssStyles({
-          margin: "0 0 var(--size-4-6)",
-          overflow: "hidden",
-          border: "1px solid var(--background-modifier-border)",
-          borderRadius: "var(--radius-l)",
-          background: "var(--background-secondary)",
-        });
         if (section.heading) {
           const headerEl = sectionEl.createDiv({ cls: "animelist-settings-section-header" });
-          headerEl.setCssStyles({
-            background: "var(--background-secondary-alt)",
-            borderBottom: "1px solid var(--background-modifier-border)",
-          });
           const heading = new Setting(headerEl).setName(section.heading).setHeading();
-          heading.settingEl.setCssStyles({
-            margin: "0",
-            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
-            border: "0",
-            borderRadius: "0",
-            background: "transparent",
-            boxShadow: "none",
-          });
-          if (section.description) {
-            heading.setDesc(section.description);
-            heading.descEl.setCssStyles({
-              marginTop: "var(--size-4-1)",
-              color: "var(--text-muted)",
-            });
-          }
+          if (section.description) heading.setDesc(section.description);
         }
 
         const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });
@@ -311,18 +289,6 @@ export class AnimeListSettingTab extends PluginSettingTab {
         for (const definition of section.definitions) {
           if (definition.visible && !definition.visible()) continue;
           const setting = new Setting(bodyEl).setName(definition.name);
-          setting.settingEl.setCssStyles({
-            margin: "0",
-            padding: "var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5))",
-            border: "0",
-            borderTop: renderedDefinitions > 0
-              ? "1px solid var(--background-modifier-border)"
-              : "0",
-            borderRadius: "0",
-            background: "transparent",
-            boxShadow: "none",
-          });
-          setting.nameEl.setCssStyles({ fontWeight: "var(--font-medium)" });
           if (definition.desc) setting.setDesc(definition.desc);
           definition.render?.(setting);
           renderedDefinitions += 1;

@@ -653,7 +653,7 @@ describe("repository defaults", () => {
   });
 
 
-  it("exposes declarative settings while preserving storage-mode visibility", () => {
+  it("preserves storage-mode visibility in grouped settings pages", () => {
     const host = {
       settings: structuredClone(DEFAULT_SETTINGS),
       async saveSettings(): Promise<void> {},
@@ -661,28 +661,16 @@ describe("repository defaults", () => {
       refreshViews(): void {},
     };
     const tab = new AnimeListSettingTab(new App(), host);
-    const definitions = tab.getSettingDefinitions();
-    assert.equal(definitions.length, 12);
-    assert.deepEqual(
-      definitions.map((definition) => definition.name),
-      [
-        UI_TEXT["settings.storageLayout.name"],
-        UI_TEXT["settings.libraryRoot.name"],
-        UI_TEXT["settings.flatFolder.name"],
-        UI_TEXT["settings.additionalFolders.name"],
-        UI_TEXT["settings.coverFolder.name"],
-        UI_TEXT["settings.templateFolder.name"],
-        UI_TEXT["settings.timelineMaxStackDepth.name"],
-        UI_TEXT["media.provider.bangumi"],
-        UI_TEXT["media.provider.anilist"],
-        UI_TEXT["media.provider.openlibrary"],
-        UI_TEXT["settings.createFolders.name"],
-        UI_TEXT["settings.copyTemplates.name"],
-      ],
-    );
+    const definitions = tab
+      .getSettingsPageSections("general")
+      .flatMap((section) => section.definitions);
+    const libraryRoot = definitions.find((definition) => (
+      definition.name === UI_TEXT["settings.libraryRoot.name"]
+    ));
+    const flatFolder = definitions.find((definition) => (
+      definition.name === UI_TEXT["settings.flatFolder.name"]
+    ));
 
-    const libraryRoot = definitions.find((definition) => definition.name === UI_TEXT["settings.libraryRoot.name"]);
-    const flatFolder = definitions.find((definition) => definition.name === UI_TEXT["settings.flatFolder.name"]);
     assert.equal(libraryRoot?.visible?.(), true);
     assert.equal(flatFolder?.visible?.(), false);
 
