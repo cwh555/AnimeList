@@ -4,6 +4,7 @@ import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
 import { imageSectionText } from "../features/image-sections/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
+import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
 interface QueuedImage {
@@ -94,6 +95,81 @@ export class AddImageSectionModal extends Modal {
     this.render();
   }
 
+
+  private queueDropTarget(queue: HTMLElement, point: PointerDragPoint): { key: number | null; placement: "before" | "after" | "append" } | null {
+    const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
+    if (!hit || !queue.contains(hit)) return null;
+    const item = hit.closest<HTMLElement>(".al-image-queue-item[data-queue-key]");
+    if (!item) return { key: null, placement: "append" };
+    const key = Number(item.dataset.queueKey);
+    if (!Number.isFinite(key)) return null;
+    const rect = item.getBoundingClientRect();
+    return { key, placement: point.clientX < rect.left + rect.width / 2 ? "before" : "after" };
+  }
+
+  private clearQueueDropIndicators(queue: HTMLElement): void {
+    for (const item of queue.querySelectorAll<HTMLElement>(".al-image-queue-item.is-drop-before, .al-image-queue-item.is-drop-after")) {
+      item.removeClass("is-drop-before", "is-drop-after");
+    }
+  }
+
+  private markQueueDropTarget(queue: HTMLElement, target: { key: number | null; placement: "before" | "after" | "append" } | null): void {
+    this.clearQueueDropIndicators(queue);
+    if (!target?.key) return;
+    const item = queue.querySelector<HTMLElement>(`.al-image-queue-item[data-queue-key="${target.key}"]`);
+    item?.addClass(target.placement === "before" ? "is-drop-before" : "is-drop-after");
+  }
+
+  private reorderQueued(movingKey: number, targetKey: number | null, placement: "before" | "after" | "append"): void {
+    const movingIndex = this.queue.findIndex((entry) => entry.key === movingKey);
+    if (movingIndex < 0 || targetKey === movingKey) return;
+    const [moving] = this.queue.splice(movingIndex, 1);
+    if (!moving) return;
+    if (placement === "append" || targetKey == null) {
+      this.queue.push(moving);
+      return;
+    }
+    const targetIndex = this.queue.findIndex((entry) => entry.key === targetKey);
+    const insertAt = targetIndex < 0 ? this.queue.length : targetIndex + (placement === "after" ? 1 : 0);
+    this.queue.splice(insertAt, 0, moving);
+  }
+
+  private syncQueueDom(queue: HTMLElement): void {
+    const elements = new Map<number, HTMLElement>();
+    for (const item of queue.querySelectorAll<HTMLElement>(".al-image-queue-item[data-queue-key]")) {
+      const key = Number(item.dataset.queueKey);
+      if (Number.isFinite(key)) elements.set(key, item);
+    }
+    queue.replaceChildren(...this.queue.map((entry) => elements.get(entry.key)).filter((item): item is HTMLElement => Boolean(item)));
+  }
+
+  private bindQueuedPointerDrag(item: HTMLElement, queue: HTMLElement, key: number): void {
+    item.addEventListener("pointerdown", (event) => {
+      const target = event.target as Element | null;
+      const handle = target?.closest(".al-image-queue-drag-handle");
+      if (event.pointerType !== "mouse" && !handle) return;
+      if (event.pointerType === "mouse" && target?.closest(".al-image-queue-remove") && !handle) return;
+      let dropTarget: { key: number | null; placement: "before" | "after" | "append" } | null = null;
+      armPointerDrag({
+        event,
+        captureElement: item,
+        dragElement: item,
+        ghostClass: "al-image-queue-drag-ghost",
+        onMove: (point) => {
+          dropTarget = this.queueDropTarget(queue, point);
+          this.markQueueDropTarget(queue, dropTarget);
+        },
+        onDrop: () => {
+          this.clearQueueDropIndicators(queue);
+          if (!dropTarget) return;
+          this.reorderQueued(key, dropTarget.key, dropTarget.placement);
+          this.syncQueueDom(queue);
+        },
+        onCancel: () => this.clearQueueDropIndicators(queue),
+      });
+    });
+  }
+
   private async submit(): Promise<void> {
     if (!this.queue.length || this.busy) return;
     this.busy = true;
@@ -177,14 +253,26 @@ export class AddImageSectionModal extends Modal {
       const queue = makeEl("div", "al-image-queue");
       for (const entry of this.queue) {
         const item = makeEl("div", "al-image-queue-item");
+        item.dataset.queueKey = String(entry.key);
         const image = makeEl("img");
         image.src = entry.previewUrl;
         image.alt = "";
+        image.draggable = false;
         const remove = makeEl("button", "al-image-queue-remove", "×");
         remove.type = "button";
         remove.setAttribute("aria-label", imageSectionText("delete"));
         remove.addEventListener("click", () => this.removeQueued(entry.key));
-        item.append(image, remove);
+        const dragHandle = makeEl("button", "al-image-queue-drag-handle");
+        dragHandle.type = "button";
+        dragHandle.setAttribute("aria-label", imageSectionText("dragImage"));
+        dragHandle.title = imageSectionText("dragImage");
+        setAnimeListIcon(dragHandle, "grip-vertical");
+        dragHandle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        item.append(image, remove, dragHandle);
+        this.bindQueuedPointerDrag(item, queue, entry.key);
         queue.appendChild(item);
       }
       this.contentEl.append(queueHead, queue);

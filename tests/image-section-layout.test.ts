@@ -46,9 +46,9 @@ describe("image section layout model", () => {
       [1, 5], [2, 6], [3], [4],
     ]);
     assert.equal(effectiveImageSectionColumns(6, 900), 6);
-    assert.equal(effectiveImageSectionColumns(6, 700), 3);
-    assert.equal(effectiveImageSectionColumns(6, 500), 2);
-    assert.equal(effectiveImageSectionColumns(6, 320), 1);
+    assert.equal(effectiveImageSectionColumns(6, 700), 6);
+    assert.equal(effectiveImageSectionColumns(6, 500), 6);
+    assert.equal(effectiveImageSectionColumns(6, 320), 6);
   });
 });
 

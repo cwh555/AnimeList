@@ -40,6 +40,7 @@ export const JA_IMAGE_SECTION_MESSAGES = {
   sectionUnavailable: "この画像セクションを安全に特定できません。ノートを開き直して再試行してください。",
   columnsLabel: "画像の列数",
   layoutFailed: "画像レイアウトを更新できませんでした：{error}",
+  dragImage: "ドラッグして並べ替え",
   moveFailed: "画像を移動できませんでした：{error}",
   crossNoteMoveUnsupported: "現在、画像は同じノート内の画像セクション間でのみドラッグ移動できます。",
 } as const;

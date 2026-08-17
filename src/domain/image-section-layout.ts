@@ -23,14 +23,8 @@ export function imageSectionColumnBuckets<T>(items: readonly T[], columnsValue: 
   return buckets;
 }
 
-export function effectiveImageSectionColumns(preferredValue: unknown, widthValue: unknown): number {
-  const preferred = normalizeImageSectionColumns(preferredValue);
-  const width = typeof widthValue === "number" ? widthValue : Number(widthValue);
-  if (!Number.isFinite(width) || width <= 0) return preferred;
-  if (width <= 360) return 1;
-  if (width <= 620) return Math.min(preferred, 2);
-  if (width <= 740) return Math.min(preferred, 3);
-  return preferred;
+export function effectiveImageSectionColumns(preferredValue: unknown, _widthValue: unknown): number {
+  return normalizeImageSectionColumns(preferredValue);
 }
 
 function openingFenceWithColumns(openingFence: string, columnsValue: unknown): string {

@@ -995,9 +995,24 @@
   box-shadow:0 3px 10px color-mix(in srgb,#000 8%,transparent);
   transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease;
 }
-.al-image-item.is-image-dragging {
-  opacity:.48;
-  cursor:grabbing;
+.al-image-item.is-pointer-dragging {
+  border-color:color-mix(in srgb,var(--interactive-accent) 70%,var(--background-modifier-border));
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--interactive-accent) 18%,transparent),0 4px 14px color-mix(in srgb,#000 14%,transparent);
+}
+.al-pointer-drag-ghost {
+  position:fixed;
+  z-index:9999;
+  top:0;
+  left:0;
+  margin:0;
+  opacity:.78;
+  pointer-events:none;
+  transform-origin:top left;
+  box-shadow:0 14px 36px rgba(0,0,0,.34);
+}
+.al-image-drag-ghost {
+  max-width:min(260px,45vw);
+  overflow:hidden;
 }
 .al-image-item.is-drop-before::before,
 .al-image-item.is-drop-after::after {
@@ -1072,6 +1087,34 @@
   color:var(--text-normal);
   background:var(--background-modifier-hover);
   outline:none;
+}
+
+.al-image-drag-handle {
+  position:absolute;
+  z-index:6;
+  top:6px;
+  left:6px;
+  display:grid;
+  width:29px;
+  height:29px;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:8px;
+  opacity:0;
+  color:#fff;
+  background:rgba(15,15,18,.76);
+  cursor:grab;
+  touch-action:none;
+  backdrop-filter:blur(8px);
+  transition:opacity .12s ease,background .12s ease;
+}
+.al-image-drag-handle svg { width:15px; height:15px; }
+.al-image-item:hover .al-image-drag-handle,
+.al-image-drag-handle:focus-visible { opacity:1; }
+.al-image-drag-handle:active { cursor:grabbing; }
+@media (hover:none), (pointer:coarse) {
+  .al-image-drag-handle { opacity:.92; }
 }
 
 .al-image-item-actions { position:absolute; z-index:5; top:6px; right:6px; }
@@ -1173,7 +1216,42 @@
 .al-image-url-row button { min-height:32px; }
 .al-image-queue-head { margin:16px 0 7px; color:var(--text-muted); font-size:.69rem; }
 .al-image-queue { display:grid; width:100%; max-width:100%; max-height:320px; overflow-x:hidden; overflow-y:auto; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; box-sizing:border-box; }
-.al-image-queue-item { position:relative; overflow:hidden; aspect-ratio:1; border:1px solid var(--background-modifier-border); border-radius:9px; background:var(--background-secondary); }
+.al-image-queue-item { position:relative; overflow:hidden; aspect-ratio:1; border:1px solid var(--background-modifier-border); border-radius:9px; background:var(--background-secondary); transition:border-color .12s ease,box-shadow .12s ease; }
+.al-image-queue-item.is-pointer-dragging { border-color:var(--interactive-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--interactive-accent) 18%,transparent); }
+.al-image-queue-item.is-drop-before::before,
+.al-image-queue-item.is-drop-after::after {
+  content:"";
+  position:absolute;
+  z-index:5;
+  top:4px;
+  bottom:4px;
+  width:3px;
+  border-radius:999px;
+  background:var(--interactive-accent);
+  pointer-events:none;
+}
+.al-image-queue-item.is-drop-before::before { left:2px; }
+.al-image-queue-item.is-drop-after::after { right:2px; }
+.al-image-queue-drag-handle {
+  position:absolute;
+  z-index:4;
+  bottom:4px;
+  left:4px;
+  display:grid;
+  width:24px;
+  height:24px;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:6px;
+  color:#fff;
+  background:rgba(0,0,0,.68);
+  cursor:grab;
+  touch-action:none;
+}
+.al-image-queue-drag-handle svg { width:14px; height:14px; }
+.al-image-queue-drag-handle:active { cursor:grabbing; }
+.al-image-queue-drag-ghost { max-width:120px; overflow:hidden; }
 .al-image-queue-item img { width:100%; height:100%; object-fit:cover; }
 .al-image-queue-remove { position:absolute; top:4px; right:4px; display:grid; width:22px; height:22px; place-items:center; padding:0; border:0; border-radius:50%; color:#fff; background:rgba(0,0,0,.72); cursor:pointer; }
 .al-image-modal-actions { display:flex; width:100%; max-width:100%; min-width:0; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:18px; box-sizing:border-box; }

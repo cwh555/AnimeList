@@ -19,6 +19,7 @@ import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal } from "./image-lightbox";
+import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureViewportAnchor } from "./viewport-anchor";
 
@@ -31,14 +32,20 @@ function isInteractiveTarget(target: Element | null): boolean {
   return Boolean(target?.closest("button, a, input, textarea, select, [role='button']"));
 }
 
-const IMAGE_SECTION_DRAG_TYPE = "application/x-animelist-image-section";
-
-let activeImageDrag: { source: ImageSectionRenderChild; path: string } | null = null;
-
-function isInternalImageDrag(dataTransfer: DataTransfer | null): boolean {
-  return activeImageDrag !== null
-    && Boolean(dataTransfer && [...dataTransfer.types].includes(IMAGE_SECTION_DRAG_TYPE));
+interface ImagePointerDropTarget {
+  renderer: ImageSectionRenderChild;
+  path: string | null;
+  placement: ImageSectionDropPlacement;
 }
+
+interface ActiveImagePointerDrag {
+  source: ImageSectionRenderChild;
+  path: string;
+  target: ImagePointerDropTarget | null;
+}
+
+const imageSectionRenderers = new WeakMap<HTMLElement, ImageSectionRenderChild>();
+let activeImageDrag: ActiveImagePointerDrag | null = null;
 
 function clearImageDropIndicators(): void {
   for (const item of document.querySelectorAll<HTMLElement>(
@@ -62,8 +69,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private readonly selectedPaths = new Set<string>();
   private selectionDeleteButton: HTMLButtonElement | null = null;
   private preferredColumns = DEFAULT_IMAGE_SECTION_COLUMNS;
-  private galleryResizeObserver: ResizeObserver | null = null;
   private galleryRelayout: (() => void) | null = null;
+  private galleryPaths: string[] = [];
+  private readonly imageElements = new Map<string, HTMLElement>();
+  private suppressImageClickUntil = 0;
 
   constructor(
     containerEl: HTMLElement,
@@ -80,14 +89,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     const section = this.context.getSectionInfo(this.containerEl);
     this.lineHint = section?.lineStart;
     this.preferredColumns = parseImageSectionColumns(section?.text);
+    imageSectionRenderers.set(this.containerEl, this);
     this.render();
     this.registerDomEvent(document, "click", () => this.closeMenus());
   }
 
   onunload(): void {
-    this.galleryResizeObserver?.disconnect();
-    this.galleryResizeObserver = null;
     this.galleryRelayout = null;
+    this.galleryPaths = [];
+    this.imageElements.clear();
+    imageSectionRenderers.delete(this.containerEl);
     if (activeImageDrag?.source === this) activeImageDrag = null;
     clearImageDropIndicators();
   }
@@ -98,16 +109,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       source: this.source,
       lineStart: this.lineHintAuthoritative ? this.lineHint : section?.lineStart ?? this.lineHint,
     };
-  }
-
-  private applySectionState(update: ImageSectionStateUpdate): void {
-    this.source = update.source;
-    this.lineHint = update.lineStart;
-    this.lineHintAuthoritative = true;
-    window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
-    this.selectionMode = false;
-    this.selectedPaths.clear();
-    this.render();
   }
 
   private setSource(source: string): void {
@@ -278,78 +279,149 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     return clientY < rect.top + rect.height / 2 ? "before" : "after";
   }
 
-  private markDropTarget(item: HTMLElement, placement: ImageSectionDropPlacement): void {
+  private markDropTarget(item: HTMLElement | null, placement: ImageSectionDropPlacement): void {
     clearImageDropIndicators();
     this.containerEl.addClass("is-image-drag-target");
+    if (!item) return;
     item.addClass(placement === "before" ? "is-drop-before" : "is-drop-after");
   }
 
+  private pointerDropTarget(point: PointerDragPoint): ImagePointerDropTarget | null {
+    const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
+    const section = hit?.closest<HTMLElement>(".animelist-image-section") ?? null;
+    if (!section) return null;
+    const renderer = imageSectionRenderers.get(section);
+    if (!renderer) return null;
+    const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
+    if (item && section.contains(item)) {
+      const path = item.dataset.imagePath ?? "";
+      if (!path) return null;
+      return { renderer, path, placement: renderer.dropPlacement(item, point.clientY) };
+    }
+    const galleryTarget = hit?.closest(
+      ".al-image-gallery-viewport, .al-image-masonry, .al-image-masonry-column, .al-image-empty",
+    );
+    return galleryTarget && section.contains(galleryTarget)
+      ? { renderer, path: null, placement: "append" }
+      : null;
+  }
+
+  private updatePointerDropTarget(point: PointerDragPoint): void {
+    if (!activeImageDrag) return;
+    const target = this.pointerDropTarget(point);
+    activeImageDrag.target = target;
+    if (!target) {
+      clearImageDropIndicators();
+      return;
+    }
+    const item = target.path
+      ? target.renderer.containerEl.querySelector<HTMLElement>(
+        `.al-image-item[data-image-path="${CSS.escape(target.path)}"]`,
+      )
+      : null;
+    target.renderer.markDropTarget(item, target.placement);
+  }
+
+  private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
+    this.source = update.source;
+    this.lineHint = update.lineStart;
+    this.lineHintAuthoritative = true;
+    window.setTimeout(() => { this.lineHintAuthoritative = false; }, 250);
+    this.selectionMode = false;
+    this.selectedPaths.clear();
+
+    const nextPaths = parseImageSectionSource(update.source);
+    if (!this.galleryRelayout || !this.galleryPaths.length || !nextPaths.length) {
+      this.render();
+      return;
+    }
+    const nextSet = new Set(nextPaths);
+    for (const [path, element] of this.imageElements) {
+      if (nextSet.has(path)) continue;
+      element.remove();
+      this.imageElements.delete(path);
+    }
+    for (const path of nextPaths) {
+      if (!this.imageElements.has(path)) this.imageElements.set(path, this.createImage(path));
+    }
+    this.galleryPaths = [...nextPaths];
+    this.galleryRelayout();
+  }
+
   private async handleInternalImageDrop(
+    source: ImageSectionRenderChild,
+    path: string,
     targetPath: string | null,
     placement: ImageSectionDropPlacement,
   ): Promise<void> {
-    const drag = activeImageDrag;
     clearImageDropIndicators();
-    if (!drag) return;
-    if (drag.source.context.sourcePath !== this.context.sourcePath) {
+    if (source.context.sourcePath !== this.context.sourcePath) {
       new Notice(imageSectionText("crossNoteMoveUnsupported"));
       return;
     }
     try {
       const update = await this.service.moveAsset(
         this.context.sourcePath,
-        drag.source.locator(),
+        source.locator(),
         this.locator(),
-        drag.path,
+        path,
         targetPath ?? "",
         placement,
       );
-      drag.source.containerEl.removeClass("is-image-drag-source");
-      activeImageDrag = null;
-      if (drag.source === this) {
-        this.applySectionState(update.sourceSection);
+      source.containerEl.removeClass("is-image-drag-source");
+      if (source === this) {
+        this.applyOrderedSectionState(update.sourceSection);
       } else {
-        drag.source.applySectionState(update.sourceSection);
-        this.applySectionState(update.targetSection);
+        source.applyOrderedSectionState(update.sourceSection);
+        this.applyOrderedSectionState(update.targetSection);
       }
     } catch (error) {
       new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
     }
   }
 
-  private bindImageDrag(item: HTMLElement, path: string): void {
-    item.draggable = true;
-    item.addEventListener("dragstart", (event) => {
-      if (this.selectionMode || !event.dataTransfer) {
-        event.preventDefault();
-        return;
-      }
-      activeImageDrag = { source: this, path };
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData(IMAGE_SECTION_DRAG_TYPE, path);
-      item.addClass("is-image-dragging");
-      this.containerEl.addClass("is-image-drag-source");
-      this.closeMenus();
-    });
-    item.addEventListener("dragover", (event) => {
-      if (!isInternalImageDrag(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-      this.markDropTarget(item, this.dropPlacement(item, event.clientY));
-    });
-    item.addEventListener("drop", (event) => {
-      if (!isInternalImageDrag(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const placement = this.dropPlacement(item, event.clientY);
-      void this.handleInternalImageDrop(path, placement);
-    });
-    item.addEventListener("dragend", () => {
-      item.removeClass("is-image-dragging");
-      this.containerEl.removeClass("is-image-drag-source");
-      if (activeImageDrag?.source === this && activeImageDrag.path === path) activeImageDrag = null;
-      clearImageDropIndicators();
+  private canStartImagePointerDrag(item: HTMLElement, event: PointerEvent): boolean {
+    if (this.selectionMode) return false;
+    const target = event.target as Element | null;
+    const handle = target?.closest(".al-image-drag-handle");
+    if (event.pointerType !== "mouse") return Boolean(handle);
+    if (handle) return true;
+    const interactive = target?.closest("button, a, input, textarea, select");
+    return !interactive || interactive === item;
+  }
+
+  private beginImagePointerDrag(item: HTMLElement, path: string, event: PointerEvent): void {
+    if (!this.canStartImagePointerDrag(item, event)) return;
+    activeImageDrag = { source: this, path, target: null };
+    armPointerDrag({
+      event,
+      captureElement: item,
+      dragElement: item,
+      ghostClass: "al-image-drag-ghost",
+      onStart: () => {
+        this.suppressImageClickUntil = performance.now() + 500;
+        this.containerEl.addClass("is-image-drag-source");
+        this.closeMenus();
+      },
+      onMove: (point) => this.updatePointerDropTarget(point),
+      onDrop: () => {
+        const drag = activeImageDrag;
+        activeImageDrag = null;
+        this.containerEl.removeClass("is-image-drag-source");
+        clearImageDropIndicators();
+        if (!drag?.target) return;
+        void drag.target.renderer.handleInternalImageDrop(
+          drag.source,
+          drag.path,
+          drag.target.path,
+          drag.target.placement,
+        );
+      },
+      onCancel: () => {
+        if (activeImageDrag?.source === this && activeImageDrag.path === path) activeImageDrag = null;
+        this.containerEl.removeClass("is-image-drag-source");
+        clearImageDropIndicators();
+      },
     });
   }
 
@@ -403,7 +475,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       item.setAttribute("role", "button");
       item.setAttribute("aria-label", imageSectionText("openImage"));
       item.addEventListener("click", (event) => {
-        if (eventTargetElement(event)?.closest(".al-image-item-actions")) return;
+        if (eventTargetElement(event)?.closest(".al-image-item-actions, .al-image-drag-handle")) return;
+        if (performance.now() < this.suppressImageClickUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         if (event.shiftKey) {
@@ -429,8 +506,17 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         event.stopPropagation();
         this.showImageContextMenu(event, path);
       });
-      item.appendChild(this.createMenu(path));
-      this.bindImageDrag(item, path);
+      const dragHandle = makeEl("button", "al-image-drag-handle");
+      dragHandle.type = "button";
+      dragHandle.setAttribute("aria-label", imageSectionText("dragImage"));
+      dragHandle.title = imageSectionText("dragImage");
+      setAnimeListIcon(dragHandle, "grip-vertical");
+      dragHandle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      item.append(this.createMenu(path), dragHandle);
+      item.addEventListener("pointerdown", (event) => this.beginImagePointerDrag(item, path, event));
     }
     return item;
   }
@@ -438,23 +524,24 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private renderGallery(paths: readonly string[]): void {
     const viewport = makeEl("div", `al-image-gallery-viewport${this.expanded ? " is-expanded" : ""}`);
     const gallery = makeEl("div", "al-image-masonry");
-    const items = paths.map((path) => this.createImage(path));
+    this.galleryPaths = [...paths];
+    this.imageElements.clear();
+    for (const path of paths) this.imageElements.set(path, this.createImage(path));
     const relayout = (): void => {
-      const width = gallery.clientWidth || viewport.clientWidth || this.containerEl.clientWidth;
-      const columns = effectiveImageSectionColumns(this.preferredColumns, width);
+      const columns = effectiveImageSectionColumns(this.preferredColumns, gallery.clientWidth);
       gallery.style.setProperty("--al-image-columns", String(columns));
-      const columnElements = imageSectionColumnBuckets(items, columns).map((bucket) => {
+      const columnElements = imageSectionColumnBuckets(this.galleryPaths, columns).map((bucket) => {
         const column = makeEl("div", "al-image-masonry-column");
-        column.append(...bucket);
+        for (const path of bucket) {
+          const item = this.imageElements.get(path);
+          if (item) column.appendChild(item);
+        }
         return column;
       });
       gallery.replaceChildren(...columnElements);
     };
     this.galleryRelayout = relayout;
     relayout();
-    this.galleryResizeObserver?.disconnect();
-    this.galleryResizeObserver = new ResizeObserver(relayout);
-    this.galleryResizeObserver.observe(gallery);
     viewport.appendChild(gallery);
 
     const toggle = makeEl("button", "al-image-expand-button");
@@ -516,28 +603,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       this.containerEl.focus({ preventScroll: true });
     });
     this.containerEl.addEventListener("dragover", (event) => {
-      if (isInternalImageDrag(event.dataTransfer)) {
-        event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-        this.containerEl.addClass("is-image-drag-target");
-        return;
-      }
       if (![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === "file")) return;
       event.preventDefault();
       this.containerEl.addClass("is-dragging");
     });
     this.containerEl.addEventListener("dragleave", (event) => {
       if (!this.containerEl.contains(event.relatedTarget as Node | null)) {
-        this.containerEl.removeClass("is-dragging", "is-image-drag-target");
+        this.containerEl.removeClass("is-dragging");
       }
     });
     this.containerEl.addEventListener("drop", (event) => {
-      if (isInternalImageDrag(event.dataTransfer)) {
-        event.preventDefault();
-        this.containerEl.removeClass("is-image-drag-target");
-        void this.handleInternalImageDrop(null, "append");
-        return;
-      }
       const files = [...(event.dataTransfer?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
@@ -646,9 +721,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
-    this.galleryResizeObserver?.disconnect();
-    this.galleryResizeObserver = null;
     this.galleryRelayout = null;
+    this.galleryPaths = [];
+    this.imageElements.clear();
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-image-section");
     this.containerEl.toggleClass("is-selecting", this.selectionMode);
