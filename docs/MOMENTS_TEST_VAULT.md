@@ -53,14 +53,16 @@ This supplemental checklist is complete only when the related general checks als
 
 ## Stacked subtitle mode (first-version framework)
 
-The seeded Frieren two-image quote and Oregairu three-image quote are controlled `stacked` examples. This mode is layout metadata only: AnimeList renders the existing image references as live DOM layers and must not create, copy, or save a composite PNG.
+The seeded Frieren two-image quote and Oregairu three-image quote are controlled `stacked` examples. The saved Moment remains layout metadata plus the original image references: AnimeList never writes a composite PNG into the vault. A flattened PNG exists only transiently when the user explicitly copies a stacked Moment to the system clipboard.
 
 - Legacy Moments and newly created multi-image Moments still default to the existing horizontal carousel unless **Stacked** is explicitly selected.
 - In reading view, the first image is shown fully. Every later image remains a full-size `<img>` layer positioned behind the earlier layers, so only its bottom subtitle region is naturally visible. Clicking any exposed layer still opens the original image in the Moment-scoped lightbox.
+- In Stacked mode, both the Moment-level **Copy images** action and an exposed layer's **Copy image** action must place **one flattened PNG matching the current stack** on the clipboard. Carousel mode keeps the existing original-image copy behavior. The composite is generated only on demand from original assets; it is not cached or saved in the vault.
 - In **Edit**, switch between **Carousel** and **Stacked**. Adjust **Overall subtitle reveal** and confirm the lower image layers physically move rather than changing an `object-position` crop.
 - Drag each exposed lower image vertically. Mouse and touch must move the whole image layer; later layers move with it to preserve stack order. The image element height/aspect ratio must not change during the drag, the page must not scroll, and no new image file may be generated.
+- Drag/reposition the stack repeatedly **without copying** and confirm no rasterization side effect is visible: the referenced file set/count stays unchanged and no composite file appears. Then copy the stack repeatedly and confirm the vault file set/count still stays unchanged; only the system clipboard receives the temporary PNG.
 - Save and reopen the note. `imageLayout: stacked` and one `stackGapsY` value per retained image must persist (`0` for the first image, then the vertical reveal gap for each later image). Returning to Carousel removes stacked-only serialization on the next save while preserving image order and files.
 - Compatibility check: a note produced by the earlier draft implementation with `stackReveal` / `stackFocusY` must still open as Stacked; saving it rewrites the layout to `stackGapsY` and removes the obsolete crop metadata.
 - Compare the Moment's referenced image files before and after stacked editing; the file set/count must remain unchanged unless you explicitly add or remove an image.
 - Delete one image until only one remains. A single-image Moment must fall back to the existing featured-image presentation; stacked metadata must not force a one-image stack.
-- OCR / automatic subtitle detection and PNG export are intentionally **not part of this version**. Manual positioning is the source of truth for stacked layout metadata.
+- OCR / automatic subtitle detection and persistent PNG export are intentionally **not part of this version**. Manual positioning is the source of truth for stacked layout metadata; clipboard rasterization is temporary only.

@@ -5,9 +5,10 @@ import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
 import { normalizeMomentStackGapsY } from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
-import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
+import { copyImageToClipboard, copyImagesToClipboard, copyPngBlobToClipboard, copyTextToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { createMomentStackVisual } from "./moment-stack";
+import { rasterizeMomentStackToPng } from "./moment-stack-raster";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
@@ -103,9 +104,23 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     }
   }
 
-  private async copyImages(moment: MomentItem): Promise<void> {
+  private async copyImages(moment: MomentItem, stackDisplayWidth?: number): Promise<void> {
     try {
-      await copyImagesToClipboard(this.imageService, this.context.sourcePath, moment.images);
+      if (moment.imageLayout === "stacked" && moment.images.length > 1) {
+        const composite = await rasterizeMomentStackToPng(
+          this.imageService,
+          this.context.sourcePath,
+          moment.images,
+          normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length),
+          {
+            displayWidth: stackDisplayWidth && stackDisplayWidth > 0 ? stackDisplayWidth : 760,
+            pixelRatio: window.devicePixelRatio,
+          },
+        );
+        await copyPngBlobToClipboard(composite);
+      } else {
+        await copyImagesToClipboard(this.imageService, this.context.sourcePath, moment.images);
+      }
       new Notice(momentsText("copiedImages"));
     } catch (error) {
       new Notice(momentsText("copyFailed", { error: errorMessage(error) }));
@@ -113,10 +128,12 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   }
 
   private showMomentMenu(event: MouseEvent, moment: MomentItem): void {
+    const card = (event.currentTarget as HTMLElement | null)?.closest<HTMLElement>(".al-moment-card");
+    const stackDisplayWidth = card?.querySelector<HTMLElement>(".al-moment-stack")?.clientWidth;
     const menu = new Menu();
     menu.addItem((item) => item.setTitle("Edit").setIcon("pencil").onClick(() => this.openEdit(moment)));
     menu.addItem((item) => item.setTitle("Copy text").setIcon("copy").onClick(() => void this.copyText(moment)));
-    menu.addItem((item) => item.setTitle("Copy images").setIcon("images").onClick(() => void this.copyImages(moment)));
+    menu.addItem((item) => item.setTitle("Copy images").setIcon("images").onClick(() => void this.copyImages(moment, stackDisplayWidth)));
     menu.addItem((item) => item.setTitle("Delete").setIcon("trash").setWarning(true).onClick(() => this.deleteMoment(moment)));
     menu.showAtMouseEvent(event);
   }
@@ -127,6 +144,16 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       void copyImageToClipboard(this.imageService, this.context.sourcePath, path)
         .then(() => new Notice(momentsText("copiedImages")))
         .catch((error) => new Notice(momentsText("copyFailed", { error: errorMessage(error) })));
+    }));
+    menu.showAtMouseEvent(event);
+  }
+
+  private showStackedImageMenu(event: MouseEvent, moment: MomentItem): void {
+    const stackDisplayWidth = (event.currentTarget as HTMLElement | null)
+      ?.closest<HTMLElement>(".al-moment-stack")?.clientWidth;
+    const menu = new Menu();
+    menu.addItem((item) => item.setTitle("Copy image").setIcon("copy").onClick(() => {
+      void this.copyImages(moment, stackDisplayWidth);
     }));
     menu.showAtMouseEvent(event);
   }
@@ -376,7 +403,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       gapsY: normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length),
       className: "al-moment-stack-reading",
       activate: (index) => this.openLightbox(moment, moment.images[index]),
-      contextMenu: (index, event) => this.showImageMenu(event, moment.images[index]),
+      contextMenu: (_index, event) => this.showStackedImageMenu(event, moment),
     });
     media.appendChild(stack.element);
     return media;

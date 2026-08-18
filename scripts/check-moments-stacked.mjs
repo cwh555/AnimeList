@@ -54,11 +54,14 @@ await build({
           export class Notice { constructor(message) { (window.__notices ||= []).push(String(message)); } }
           export class TFile {}
           export class MenuItem {
-            setTitle() { return this; } setIcon() { return this; } setWarning() { return this; }
+            setTitle(value) { this.title = value; return this; }
+            setIcon(value) { this.icon = value; return this; }
+            setWarning(value = true) { this.warning = value; return this; }
             onClick(callback) { this.callback = callback; return this; }
           }
           export class Menu {
-            addItem(callback) { callback(new MenuItem()); return this; }
+            constructor() { this.items = []; (window.__menus ||= []).push(this); }
+            addItem(callback) { const item = new MenuItem(); callback(item); this.items.push(item); return this; }
             showAtMouseEvent() { return this; }
           }
           export function normalizePath(value) { return String(value || ""); }
@@ -115,10 +118,27 @@ const waitForImages=async(root)=>{
 const matchesIntrinsicRatio=(rect,width,height)=>Boolean(rect) && rect.width>1 && rect.height>1
  && Math.abs(rect.height-(rect.width*height/width))<=2;
 const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}"};
+const readAssetPaths=[];
+let storeCalls=0;
 const service={
  resolve:(path)=>({resourcePath:urls[path]}),
+ readAsset:async(path)=>{
+   readAssetPaths.push(path);
+   const image=new Image(); image.src=urls[path]; await image.decode();
+   const canvas=document.createElement("canvas"); canvas.width=image.naturalWidth; canvas.height=image.naturalHeight;
+   canvas.getContext("2d").drawImage(image,0,0);
+   const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error("fixture PNG encode failed")),"image/png"));
+   return {name:path,data:await blob.arrayBuffer(),contentType:"image/png"};
+ },
+ storeAssets:async()=>{storeCalls+=1;throw new Error("stack copy must not persist an image")},
  fetchRemoteAsset:async()=>{throw new Error("unused")},
 };
+window.__clipboardWrites=[];
+class FixtureClipboardItem { constructor(items){ this.items=items; } }
+window.ClipboardItem=FixtureClipboardItem;
+Object.defineProperty(navigator,"clipboard",{configurable:true,value:{
+ write:async(items)=>{window.__clipboardWrites.push(items)},
+}});
 const context={sourcePath:"Anime/Demo.md",getSectionInfo:()=>({lineStart:0,lineEnd:14})};
 const host={app:{}};
 const source=[
@@ -160,6 +180,56 @@ renderer.onload();
    && Math.abs(initialRects[2].height-initialImageRects[2].height)<=1;
  details.mobileReadingDoesNotOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
 
+ const actionButton=reading.querySelector(".al-moment-actions");
+ actionButton.click();
+ const copyMenu=window.__menus?.at(-1);
+ const copyImagesItem=copyMenu?.items?.find(item=>item.title==="Copy images");
+ copyImagesItem?.callback?.();
+ for(let attempt=0;attempt<80 && window.__clipboardWrites.length===0;attempt+=1) await delay(25);
+ const clipboardWrite=window.__clipboardWrites[0]||[];
+ const clipboardItem=clipboardWrite[0];
+ const compositeBlob=clipboardItem?.items?.["image/png"];
+ details.stackedCopyWritesOneCompositePng=window.__clipboardWrites.length===1
+   && clipboardWrite.length===1 && compositeBlob instanceof Blob && compositeBlob.type==="image/png";
+ if(compositeBlob instanceof Blob){
+   const bitmap=await createImageBitmap(compositeBlob);
+   const sampleCanvas=document.createElement("canvas");
+   sampleCanvas.width=bitmap.width; sampleCanvas.height=bitmap.height;
+   const sampleContext=sampleCanvas.getContext("2d");
+   sampleContext.drawImage(bitmap,0,0);
+   const cssWidth=stack.clientWidth;
+   const copyScale=bitmap.width/cssWidth;
+   const topHeightCss=initialRects[0].height;
+   const expectedHeight=(topHeightCss+120)*copyScale;
+   details.stackedCopyUsesCurrentGeometry=Math.abs(bitmap.height-expectedHeight)<=3;
+   const rgbAt=(cssY)=>[...sampleContext.getImageData(Math.floor(bitmap.width*0.08),Math.min(bitmap.height-1,Math.max(0,Math.floor(cssY*copyScale))),1,1).data].slice(0,3);
+   const near=(actual,expected)=>actual.every((value,index)=>Math.abs(value-expected[index])<=3);
+   const sampled=[rgbAt(30),rgbAt(topHeightCss+40),rgbAt(topHeightCss+56+40)];
+   details.stackedCopyPreservesVisibleLayers=near(sampled[0],[78,99,128])
+     && near(sampled[1],[32,32,32])
+     && near(sampled[2],[21,21,21]);
+   bitmap.close();
+ }else{
+   details.stackedCopyUsesCurrentGeometry=false;
+   details.stackedCopyPreservesVisibleLayers=false;
+ }
+ details.stackedCopyReadsOriginalAssetsOnce=JSON.stringify(readAssetPaths)===JSON.stringify(["a.png","c.png","b.png"]);
+ details.stackedCopyDoesNotPersistComposite=storeCalls===0;
+
+ layers[1].dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:20,clientY:20}));
+ const layerMenu=window.__menus?.at(-1);
+ const layerCopyItem=layerMenu?.items?.find(item=>item.title==="Copy image");
+ layerCopyItem?.callback?.();
+ for(let attempt=0;attempt<80 && window.__clipboardWrites.length<2;attempt+=1) await delay(25);
+ const layerWrite=window.__clipboardWrites[1]||[];
+ const layerComposite=layerWrite[0]?.items?.["image/png"];
+ details.stackedLayerCopyAlsoUsesComposite=layerWrite.length===1 && layerComposite instanceof Blob
+   && layerComposite.type==="image/png" && layerComposite.size===compositeBlob.size;
+ details.repeatedCopyDoesNotCacheFiles=storeCalls===0
+   && JSON.stringify(readAssetPaths)===JSON.stringify(["a.png","c.png","b.png","a.png","c.png","b.png"]);
+ const rasterReadsAfterCopy=readAssetPaths.length;
+ const clipboardWritesAfterCopy=window.__clipboardWrites.length;
+
  let saved=null;
  const initial={id:"m_stack123",text:"stacked subtitle fixture",imageLayout:"stacked",stackGapsY:[0,56,64],images:["a.png","b.png","c.png"]};
  const modal=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",initial,async input=>{saved=input});
@@ -186,6 +256,8 @@ renderer.onload();
    && Math.abs((afterRects[2].bottom-beforeRects[2].bottom)+36)<=2
    && Math.abs(afterRects[1].height-beforeRects[1].height)<=1;
  details.touchDragKeepsPageStable=document.documentElement.scrollWidth<=window.innerWidth+1;
+ details.editorDragDoesNotRasterizeOrWriteFiles=readAssetPaths.length===rasterReadsAfterCopy
+   && window.__clipboardWrites.length===clipboardWritesAfterCopy && storeCalls===0;
  const save=modal.contentEl.querySelector('.al-moment-editor-actions .mod-cta');
  save.click(); await delay(20);
  details.editorPersistsWholeImageLayout=Boolean(saved) && saved.imageLayout==="stacked"

@@ -211,8 +211,9 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Multiple Moments blocks in the same note remain independent.
 - [ ] One-image Moment displays a large uncropped featured stage; no horizontal scrollbar is needed for the single image.
 - [ ] Multi-image Moment keeps one horizontal row by default; overflow scrolls horizontally and images do not wrap or crop.
-- [ ] Switch a 2+ image Moment to **Stacked**: the first image stays expanded and later original images expose subtitle strips without creating a composite PNG or duplicate image files.
-- [ ] In the Moment editor, change stacked subtitle reveal height and drag each exposed lower strip vertically with both mouse and touch; save/reopen and confirm the manual crop positions persist.
+- [ ] Switch a 2+ image Moment to **Stacked**: the first image stays expanded and later original images remain whole layers that expose their lower subtitle regions; no persistent composite PNG or duplicate image files are created.
+- [ ] In the Moment editor, change **Overall subtitle reveal** and drag each exposed lower image vertically with both mouse and touch; save/reopen and confirm the whole-image `stackGapsY` positions persist. Repeated movement alone must not rasterize or create image files.
+- [ ] In Stacked reading mode, Moment **Copy images** and an exposed layer's **Copy image** each copy one flattened PNG matching the current stacked geometry. Repeat copying and confirm no composite/cache file appears in the vault. Carousel copy behavior remains unchanged.
 - [ ] Switch Stacked back to Carousel and confirm image order/files remain unchanged; reducing to one image falls back to the existing featured-image layout.
 - [ ] Horizontal scrolling remains usable with native/WebKit scrollbar behavior and does not depend on `scrollbar-width` / `scrollbar-color`.
 - [ ] Long quote/note content exposes the shared Expand/Collapse behavior and returns to the compact state after collapse.

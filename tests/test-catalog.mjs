@@ -37,6 +37,7 @@ export const TEST_TARGETS = [
 
   { path: "tests/moments.test.ts", kind: "test", suite: "unit", features: ["moments", "markdown"] },
   { path: "tests/moment-image-layout.test.ts", kind: "test", suite: "unit", features: ["moments"] },
+  { path: "tests/moment-stack-raster.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
   { path: "tests/media-note-insert-menu.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
   { path: "tests/contracts/moments-service.test.ts", kind: "test", suite: "contract", features: ["moments", "image-sections", "markdown"] },
 
