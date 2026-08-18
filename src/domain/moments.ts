@@ -1,5 +1,9 @@
 import { normalizeImageSectionPath } from "./image-section";
 import { stringValue } from "./value-normalization";
+import {
+  momentImageLayoutState,
+  type MomentImageLayout,
+} from "./moment-image-layout";
 
 export const MOMENTS_LANGUAGE = "animelist-moments";
 
@@ -12,6 +16,9 @@ export interface MomentItem {
   tags?: string[];
   note?: string;
   images: string[];
+  imageLayout?: MomentImageLayout;
+  stackReveal?: number;
+  stackFocusY?: number[];
 }
 
 export interface MomentsLocator {
@@ -95,6 +102,11 @@ function normalizedMoment(input: Partial<MomentItem>): MomentItem {
   const speaker = normalizeOptional(input.speaker);
   const tags = normalizeTags(input.tags);
   const note = normalizeOptional(input.note);
+  const layout = momentImageLayoutState({
+    imageLayout: input.imageLayout,
+    stackReveal: input.stackReveal,
+    stackFocusY: input.stackFocusY,
+  }, images.length);
   return {
     id: stringValue(input.id).trim(),
     text: stringValue(input.text).replace(/\r\n?/g, "\n").replace(/\n+$/g, ""),
@@ -104,6 +116,7 @@ function normalizedMoment(input: Partial<MomentItem>): MomentItem {
     ...(tags ? { tags } : {}),
     ...(note ? { note } : {}),
     images,
+    ...layout,
   };
 }
 
@@ -200,6 +213,30 @@ export function parseMomentsSource(source: unknown): MomentItem[] {
         item.tags = tags;
         continue;
       }
+      const imageLayoutScalar = /^\s{4}imageLayout:\s*(.*)$/.exec(current);
+      if (imageLayoutScalar) {
+        item.imageLayout = parseScalar(imageLayoutScalar[1]) as MomentImageLayout;
+        index += 1;
+        continue;
+      }
+      const stackRevealScalar = /^\s{4}stackReveal:\s*(.*)$/.exec(current);
+      if (stackRevealScalar) {
+        item.stackReveal = Number(parseScalar(stackRevealScalar[1]));
+        index += 1;
+        continue;
+      }
+      if (/^\s{4}stackFocusY:\s*(?:\[\s*\])?\s*$/.test(current)) {
+        index += 1;
+        const values: number[] = [];
+        while (index < lines.length) {
+          const focusLine = /^\s{6}-\s*(.*)$/.exec(lines[index]);
+          if (!focusLine) break;
+          values.push(Number(parseScalar(focusLine[1])));
+          index += 1;
+        }
+        item.stackFocusY = values;
+        continue;
+      }
       if (/^\s{4}images:\s*(?:\[\s*\])?\s*$/.test(current)) {
         index += 1;
         const images: string[] = [];
@@ -242,6 +279,12 @@ export function serializeMomentsSource(values: Iterable<MomentItem>): string {
       const noteLines = moment.note.split("\n");
       if (noteLines.length === 1 && noteLines[0] === "") lines.push("      ");
       else noteLines.forEach((line) => lines.push(`      ${line}`));
+    }
+    if (moment.imageLayout === "stacked") {
+      lines.push("    imageLayout: stacked");
+      lines.push(`    stackReveal: ${moment.stackReveal}`);
+      lines.push("    stackFocusY:");
+      moment.stackFocusY?.forEach((focus) => lines.push(`      - ${focus}`));
     }
     if (moment.images.length) {
       lines.push("    images:");

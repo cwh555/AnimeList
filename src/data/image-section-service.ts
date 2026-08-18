@@ -51,6 +51,7 @@ export interface StoredImageAssetsResult {
   paths: string[];
   addedPaths: string[];
   duplicatesSkipped: number;
+  acceptedAssetIndexes: number[];
 }
 
 export interface ResolvedImageSectionAsset {
@@ -155,7 +156,7 @@ export class ImageSectionService {
   ): Promise<StoredImageAssetsResult> {
     const current = [...new Set(existingPaths.map(normalizeImageSectionPath).filter(Boolean))];
     if (assets.length === 0) {
-      return { paths: current, addedPaths: [], duplicatesSkipped: 0 };
+      return { paths: current, addedPaths: [], duplicatesSkipped: 0, acceptedAssetIndexes: [] };
     }
     const note = this.noteFile(sourcePath);
     const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
@@ -187,8 +188,9 @@ export class ImageSectionService {
     let duplicatesSkipped = 0;
     const acceptedBinary = new Set<string>();
     const acceptedVisual = new Set<string>();
+    const acceptedAssetIndexes: number[] = [];
     try {
-      for (const asset of assets) {
+      for (const [assetIndex, asset] of assets.entries()) {
         const extension = imageExtensionFor(asset.name, asset.contentType);
         if (!extension) throw new Error(`${asset.name || "Image"} is not a supported image format`);
         const binary = await imageContentHash(asset.data);
@@ -203,6 +205,7 @@ export class ImageSectionService {
         const path = await this.host.uniqueFilePath(folder, imageBaseName(asset.name), extension);
         const file = await this.host.app.vault.createBinary(path, asset.data);
         created.push(file);
+        acceptedAssetIndexes.push(assetIndex);
         this.fingerprintCache.set(file.path, {
           size: asset.data.byteLength,
           mtime: file.stat.mtime,
@@ -212,7 +215,7 @@ export class ImageSectionService {
         this.host.getImageThumbnailSources(file);
       }
       const addedPaths = created.map((file) => file.path);
-      return { paths: [...current, ...addedPaths], addedPaths, duplicatesSkipped };
+      return { paths: [...current, ...addedPaths], addedPaths, duplicatesSkipped, acceptedAssetIndexes };
     } catch (error) {
       await this.trashCreatedFiles(created);
       throw error;
