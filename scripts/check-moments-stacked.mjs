@@ -94,6 +94,7 @@ for(const [name,fn] of Object.entries({
  addClass:function(...names){this.classList.add(...names)},
  removeClass:function(...names){this.classList.remove(...names)},
  toggleClass:function(name,force){this.classList.toggle(name,force)},
+ setCssStyles:function(styles){Object.assign(this.style,styles)},
 })) { if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn}); }
 </script><script>${bundle}</script><script>
 const delay=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -109,11 +110,10 @@ const source=[
  '  - id: "m_stack123"',
  "    text: stacked subtitle fixture",
  "    imageLayout: stacked",
- "    stackReveal: 56",
- "    stackFocusY:",
- "      - 50",
- "      - 82",
- "      - 93",
+ "    stackGapsY:",
+ "      - 0",
+ "      - 56",
+ "      - 64",
  "    images:",
  '      - "a.png"',
  '      - "b.png"',
@@ -126,38 +126,52 @@ renderer.onload();
  const details={};
  const reading=document.querySelector("#reading");
  const stack=reading.querySelector(".al-moment-stack-reading");
- const top=stack?.querySelector(".al-moment-stack-top");
- const strips=[...(stack?.querySelectorAll(".al-moment-stack-strip")||[])];
- details.readingUsesRealStack=Boolean(stack) && !reading.querySelector(".al-moment-image-row") && strips.length===2;
- details.topImageIsExpanded=Boolean(top) && top.getBoundingClientRect().height>150;
- details.revealHeightPersists=strips.every(strip=>Math.abs(strip.getBoundingClientRect().height-56)<=1);
- details.focusMetadataControlsCrop=getComputedStyle(strips[0].querySelector("img")).objectPosition.includes("82%")
-   && getComputedStyle(strips[1].querySelector("img")).objectPosition.includes("93%");
+ const layers=[...(stack?.querySelectorAll(".al-moment-stack-layer")||[])];
+ const images=layers.map(layer=>layer.querySelector("img"));
+ const rects=()=>layers.map(layer=>layer.getBoundingClientRect());
+ const imageRects=()=>images.map(image=>image?.getBoundingClientRect());
+ const initialRects=rects();
+ const initialImageRects=imageRects();
+ details.readingUsesRealStack=Boolean(stack) && !reading.querySelector(".al-moment-image-row") && layers.length===3;
+ details.layersKeepWholeImages=initialImageRects.every(rect=>rect && rect.height>150)
+   && Math.abs(initialImageRects[1].width/initialImageRects[1].height-(960/540))<0.04
+   && Math.abs(initialImageRects[2].width/initialImageRects[2].height-(540/760))<0.04;
+ details.gapsPositionWholeLayers=Math.abs(initialRects[1].bottom-initialRects[0].bottom-56)<=2
+   && Math.abs(initialRects[2].bottom-initialRects[1].bottom-64)<=2;
+ details.lowerLayersAreNotCropWindows=initialRects[1].height>150 && initialRects[2].height>300;
  details.mobileReadingDoesNotOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
 
  let saved=null;
- const initial={id:"m_stack123",text:"stacked subtitle fixture",imageLayout:"stacked",stackReveal:56,stackFocusY:[50,82,93],images:["a.png","b.png","c.png"]};
+ const initial={id:"m_stack123",text:"stacked subtitle fixture",imageLayout:"stacked",stackGapsY:[0,56,64],images:["a.png","b.png","c.png"]};
  const modal=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",initial,async input=>{saved=input});
  modal.open();
  await delay(80);
+ const editorLayers=()=>[...modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-layer')];
  details.editorStartsInStackedMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active')?.textContent?.length>0
-   && modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-strip').length===2;
+   && editorLayers().length===3;
  const reveal=modal.contentEl.querySelector('.al-moment-editor-reveal input[type="range"]');
- reveal.value="64"; reveal.dispatchEvent(new Event("input",{bubbles:true}));
- details.revealSliderUpdatesLive=Math.abs(modal.contentEl.querySelector('.al-moment-stack-strip').getBoundingClientRect().height-64)<=1;
- const strip=modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-strip')[0];
- const before=getComputedStyle(strip.querySelector('img')).objectPosition;
- const rect=strip.getBoundingClientRect();
- const x=rect.left+rect.width/2, y=rect.top+rect.height/2;
- const pointer=(type,clientY)=>strip.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:17,pointerType:"touch",isPrimary:true,clientX:x,clientY,button:0,buttons:type==="pointerup"?0:1}));
- pointer("pointerdown",y); pointer("pointermove",y-42); pointer("pointerup",y-42); await delay(20);
- const after=getComputedStyle(strip.querySelector('img')).objectPosition;
- details.touchDragAdjustsSubtitleFocus=before!==after && after.includes("100%");
+ reveal.value="68"; reveal.dispatchEvent(new Event("input",{bubbles:true}));
+ await delay(20);
+ let editorRects=editorLayers().map(layer=>layer.getBoundingClientRect());
+ details.revealSliderMovesWholeLayers=Math.abs(editorRects[1].bottom-editorRects[0].bottom-64)<=2
+   && Math.abs(editorRects[2].bottom-editorRects[1].bottom-72)<=2
+   && editorRects[1].height>150;
+ const layer=editorLayers()[1];
+ const beforeRects=editorLayers().map(entry=>entry.getBoundingClientRect());
+ const rect=layer.getBoundingClientRect();
+ const x=rect.left+rect.width/2, y=rect.bottom-14;
+ const pointer=(type,clientY)=>layer.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:17,pointerType:"touch",isPrimary:true,clientX:x,clientY,button:0,buttons:type==="pointerup"?0:1}));
+ pointer("pointerdown",y); pointer("pointermove",y-36); pointer("pointerup",y-36); await delay(20);
+ const afterRects=editorLayers().map(entry=>entry.getBoundingClientRect());
+ details.touchDragMovesEntireLayer=Math.abs((afterRects[1].bottom-beforeRects[1].bottom)+36)<=2
+   && Math.abs((afterRects[2].bottom-beforeRects[2].bottom)+36)<=2
+   && Math.abs(afterRects[1].height-beforeRects[1].height)<=1;
  details.touchDragKeepsPageStable=document.documentElement.scrollWidth<=window.innerWidth+1;
  const save=modal.contentEl.querySelector('.al-moment-editor-actions .mod-cta');
  save.click(); await delay(20);
- details.editorPersistsManualLayout=Boolean(saved) && saved.imageLayout==="stacked" && saved.stackReveal===64
-   && saved.stackFocusY?.[0]===50 && saved.stackFocusY?.[1]===100 && saved.stackFocusY?.[2]===93;
+ details.editorPersistsWholeImageLayout=Boolean(saved) && saved.imageLayout==="stacked"
+   && saved.stackGapsY?.[0]===0 && saved.stackGapsY?.[1]===28 && saved.stackGapsY?.[2]===72
+   && saved.stackReveal===undefined && saved.stackFocusY===undefined;
 
  const legacyInitial={id:"m_legacy123",text:"legacy",images:["a.png","b.png"]};
  const legacy=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",legacyInitial,async()=>{});
@@ -174,7 +188,7 @@ try {
   await runChromiumDatasetTest({
     html,
     profile,
-    testName: "Moments stacked subtitle layout and touch adjustment",
+    testName: "Moments whole-image stacked subtitle layout and touch adjustment",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   });

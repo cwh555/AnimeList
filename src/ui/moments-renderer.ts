@@ -3,7 +3,7 @@ import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { ImageSectionService } from "../data/image-section-service";
 import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
-import { normalizeMomentStackFocusY, normalizeMomentStackReveal } from "../domain/moment-image-layout";
+import { normalizeMomentStackGapsY } from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
 import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
@@ -361,9 +361,8 @@ export class MomentsRenderChild extends MarkdownRenderChild {
 
   private renderStackedMedia(moment: MomentItem): HTMLElement {
     const media = makeEl("div", "al-moment-media is-stacked");
-    const focusY = normalizeMomentStackFocusY(moment.stackFocusY, moment.images.length);
     const stack = createMomentStackVisual({
-      items: moment.images.map((path, index) => {
+      items: moment.images.map((path) => {
         const resolved = this.imageService.resolve(path, this.context.sourcePath);
         return {
           ...(resolved.resourcePath ? {
@@ -371,11 +370,10 @@ export class MomentsRenderChild extends MarkdownRenderChild {
             ...(resolved.thumbnailSources?.srcset ? { srcset: resolved.thumbnailSources.srcset } : {}),
             sizes: "760px",
           } : {}),
-          focusY: focusY[index],
           missingLabel: momentsText("missingImage"),
         };
       }),
-      reveal: normalizeMomentStackReveal(moment.stackReveal),
+      gapsY: normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length),
       className: "al-moment-stack-reading",
       activate: (index) => this.openLightbox(moment, moment.images[index]),
       contextMenu: (index, event) => this.showImageMenu(event, moment.images[index]),
