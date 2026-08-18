@@ -110,7 +110,6 @@ if (!HTMLElement.prototype.setCssStyles) {
       filters: { companies: [], quarter: '', tags: [] },
       sort: 'title-asc',
       view: 'grid',
-      layoutColumns: { grid: 3, poster: 3 },
     };
 
     let latestState = structuredClone(initialState);
@@ -153,7 +152,7 @@ if (!HTMLElement.prototype.setCssStyles) {
     const firstCard = root.querySelector('.al-card');
 
     const details = {};
-    details.defaultGridThree = slider()?.value === '3' && output()?.textContent === '3' && tracks() === 3;
+    details.defaultGridFour = slider()?.value === '4' && output()?.textContent === '4' && tracks() === 4;
 
     slider().value = '5';
     slider().dispatchEvent(new Event('input', { bubbles: true }));

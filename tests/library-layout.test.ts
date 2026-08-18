@@ -11,12 +11,11 @@ import {
 } from "../src/domain/library-layout";
 
 describe("library layout columns", () => {
-  it("defaults both scalable Library views to three columns", () => {
+  it("defaults Card to four columns and Thumbnail to three", () => {
     assert.deepEqual(normalizeLibraryLayoutColumns(undefined), {
-      grid: DEFAULT_LIBRARY_LAYOUT_COLUMNS,
-      poster: DEFAULT_LIBRARY_LAYOUT_COLUMNS,
+      ...DEFAULT_LIBRARY_LAYOUT_COLUMNS,
     });
-    assert.equal(libraryColumnsForView(normalizeLibraryLayoutColumns(undefined), "grid"), 3);
+    assert.equal(libraryColumnsForView(normalizeLibraryLayoutColumns(undefined), "grid"), 4);
     assert.equal(libraryColumnsForView(normalizeLibraryLayoutColumns(undefined), "poster"), 3);
     assert.equal(libraryColumnsForView(normalizeLibraryLayoutColumns(undefined), "list"), null);
   });
@@ -25,7 +24,8 @@ describe("library layout columns", () => {
     assert.equal(normalizeLibraryLayoutColumnCount(0), MIN_LIBRARY_LAYOUT_COLUMNS);
     assert.equal(normalizeLibraryLayoutColumnCount(4.6), 5);
     assert.equal(normalizeLibraryLayoutColumnCount(99), MAX_LIBRARY_LAYOUT_COLUMNS);
-    assert.equal(normalizeLibraryLayoutColumnCount("bad"), DEFAULT_LIBRARY_LAYOUT_COLUMNS);
+    assert.equal(normalizeLibraryLayoutColumnCount("bad"), DEFAULT_LIBRARY_LAYOUT_COLUMNS.poster);
+    assert.equal(normalizeLibraryLayoutColumnCount("bad", DEFAULT_LIBRARY_LAYOUT_COLUMNS.grid), 4);
     assert.deepEqual(normalizeLibraryLayoutColumns({ grid: 5, poster: 2 }), { grid: 5, poster: 2 });
   });
 

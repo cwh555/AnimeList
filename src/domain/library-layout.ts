@@ -2,7 +2,10 @@ export const LIBRARY_VIEW_MODES = ["grid", "list", "poster"] as const;
 export type LibraryViewMode = (typeof LIBRARY_VIEW_MODES)[number];
 export type LibraryColumnView = Exclude<LibraryViewMode, "list">;
 
-export const DEFAULT_LIBRARY_LAYOUT_COLUMNS = 3;
+export const DEFAULT_LIBRARY_LAYOUT_COLUMNS: Readonly<LibraryLayoutColumns> = Object.freeze({
+  grid: 4,
+  poster: 3,
+});
 export const MIN_LIBRARY_LAYOUT_COLUMNS = 1;
 export const MAX_LIBRARY_LAYOUT_COLUMNS = 6;
 
@@ -15,9 +18,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function normalizeLibraryLayoutColumnCount(value: unknown): number {
+export function normalizeLibraryLayoutColumnCount(
+  value: unknown,
+  fallback = DEFAULT_LIBRARY_LAYOUT_COLUMNS.poster,
+): number {
   const numeric = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(numeric)) return DEFAULT_LIBRARY_LAYOUT_COLUMNS;
+  if (!Number.isFinite(numeric)) return fallback;
   return Math.min(
     MAX_LIBRARY_LAYOUT_COLUMNS,
     Math.max(MIN_LIBRARY_LAYOUT_COLUMNS, Math.round(numeric)),
@@ -27,8 +33,8 @@ export function normalizeLibraryLayoutColumnCount(value: unknown): number {
 export function normalizeLibraryLayoutColumns(value: unknown): LibraryLayoutColumns {
   const record = isRecord(value) ? value : {};
   return {
-    grid: normalizeLibraryLayoutColumnCount(record.grid),
-    poster: normalizeLibraryLayoutColumnCount(record.poster),
+    grid: normalizeLibraryLayoutColumnCount(record.grid, DEFAULT_LIBRARY_LAYOUT_COLUMNS.grid),
+    poster: normalizeLibraryLayoutColumnCount(record.poster, DEFAULT_LIBRARY_LAYOUT_COLUMNS.poster),
   };
 }
 
@@ -46,6 +52,6 @@ export function libraryLayoutColumnsWithView(
 ): LibraryLayoutColumns {
   return {
     ...columns,
-    [view]: normalizeLibraryLayoutColumnCount(value),
+    [view]: normalizeLibraryLayoutColumnCount(value, columns[view]),
   };
 }
