@@ -3,9 +3,11 @@ import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { ImageSectionService } from "../data/image-section-service";
 import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
+import { normalizeMomentStackFocusY, normalizeMomentStackReveal } from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
 import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
+import { createMomentStackVisual } from "./moment-stack";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
@@ -284,20 +286,10 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     return section;
   }
 
-  private renderMoment(moment: MomentItem): HTMLElement {
-    const card = makeEl("article", "al-moment-card");
-    card.dataset.momentId = moment.id;
-    card.dataset.imageCount = String(moment.images.length);
-
-    const actions = makeEl("button", "al-moment-actions");
-    actions.type = "button";
-    actions.setAttribute("aria-label", "Moment actions");
-    actions.textContent = "⋯";
-    actions.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.showMomentMenu(event, moment);
-    });
-
+  private renderCarouselMedia(moment: MomentItem): {
+    media: HTMLElement;
+    scroller: { row: HTMLElement; previous: HTMLButtonElement; next: HTMLButtonElement };
+  } {
     const media = makeEl("div", "al-moment-media");
     media.classList.toggle("is-featured", moment.images.length === 1);
     media.classList.toggle("is-filmstrip", moment.images.length > 1);
@@ -364,6 +356,52 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     setAnimeListIcon(next, "chevron-right");
 
     media.append(viewport, previous, next);
+    return { media, scroller: { row, previous, next } };
+  }
+
+  private renderStackedMedia(moment: MomentItem): HTMLElement {
+    const media = makeEl("div", "al-moment-media is-stacked");
+    const focusY = normalizeMomentStackFocusY(moment.stackFocusY, moment.images.length);
+    const stack = createMomentStackVisual({
+      items: moment.images.map((path, index) => {
+        const resolved = this.imageService.resolve(path, this.context.sourcePath);
+        return {
+          ...(resolved.resourcePath ? {
+            src: resolved.thumbnailSources?.src || resolved.resourcePath,
+            ...(resolved.thumbnailSources?.srcset ? { srcset: resolved.thumbnailSources.srcset } : {}),
+            sizes: "760px",
+          } : {}),
+          focusY: focusY[index],
+          missingLabel: momentsText("missingImage"),
+        };
+      }),
+      reveal: normalizeMomentStackReveal(moment.stackReveal),
+      className: "al-moment-stack-reading",
+      activate: (index) => this.openLightbox(moment, moment.images[index]),
+      contextMenu: (index, event) => this.showImageMenu(event, moment.images[index]),
+    });
+    media.appendChild(stack.element);
+    return media;
+  }
+
+  private renderMoment(moment: MomentItem): HTMLElement {
+    const card = makeEl("article", "al-moment-card");
+    card.dataset.momentId = moment.id;
+    card.dataset.imageCount = String(moment.images.length);
+
+    const actions = makeEl("button", "al-moment-actions");
+    actions.type = "button";
+    actions.setAttribute("aria-label", "Moment actions");
+    actions.textContent = "⋯";
+    actions.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.showMomentMenu(event, moment);
+    });
+
+    const stacked = moment.imageLayout === "stacked" && moment.images.length > 1;
+    const carousel = stacked ? null : this.renderCarouselMedia(moment);
+    const media = stacked ? this.renderStackedMedia(moment) : carousel.media;
+    const scroller = carousel?.scroller ?? null;
 
     const content = makeEl("div", "al-moment-content");
     const metadata = this.renderMeta(moment);
@@ -408,7 +446,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     }
 
     card.append(media, content, actions);
-    this.bindScroller(media, row, previous, next);
+    if (scroller) this.bindScroller(media, scroller.row, scroller.previous, scroller.next);
     return card;
   }
 

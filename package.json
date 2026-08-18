@@ -33,7 +33,7 @@
     "styles:dev": "node scripts/build-styles.mjs --output .tmp/dev/styles.css --watch",
     "typecheck:strict": "tsc --noEmit --pretty false -p tsconfig.strict.json",
     "architecture:check": "node scripts/check-architecture.mjs",
-    "test:browser:mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-mobile-layout.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-interactions.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-workspace-images.mjs",
+    "test:browser:mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-mobile-layout.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-interactions.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-workspace-images.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-moments-stacked.mjs",
     "test:browser:score-mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-dashboard-mobile-interactions.mjs",
     "test:browser:tags": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-tag-chip-interactions.mjs",
     "test:browser:tag-manager": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-user-tag-manager.mjs"

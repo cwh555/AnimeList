@@ -4,14 +4,25 @@ import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
 import type { MomentEditorInput } from "../data/moments-service";
 import type { MomentItem } from "../domain/moments";
+import {
+  DEFAULT_MOMENT_STACK_FOCUS_Y,
+  TOP_MOMENT_STACK_FOCUS_Y,
+  momentStackFocusAfterDrag,
+  normalizeMomentImageLayout,
+  normalizeMomentStackFocusY,
+  normalizeMomentStackReveal,
+  type MomentImageLayout,
+} from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { createMomentStackVisual, type MomentStackVisual } from "./moment-stack";
 
 interface PendingAsset {
   key: number;
   asset: ImageSectionAssetInput;
   previewUrl: string;
+  focusY: number;
 }
 
 function assetPreview(asset: ImageSectionAssetInput): string {
@@ -27,6 +38,9 @@ export class MomentEditorModal extends Modal {
   private tagsValue: string;
   private noteValue: string;
   private retainedImages: string[];
+  private readonly retainedFocusY = new Map<string, number>();
+  private imageLayout: MomentImageLayout;
+  private stackReveal: number;
   private pending: PendingAsset[] = [];
   private nextKey = 1;
   private urlValue = "";
@@ -48,6 +62,10 @@ export class MomentEditorModal extends Modal {
     this.tagsValue = (initial?.tags ?? []).join(", ");
     this.noteValue = initial?.note ?? "";
     this.retainedImages = [...(initial?.images ?? [])];
+    this.imageLayout = normalizeMomentImageLayout(initial?.imageLayout);
+    this.stackReveal = normalizeMomentStackReveal(initial?.stackReveal);
+    const initialFocus = normalizeMomentStackFocusY(initial?.stackFocusY, this.retainedImages.length);
+    this.retainedImages.forEach((path, index) => this.retainedFocusY.set(path, initialFocus[index]));
   }
 
   onOpen(): void {
@@ -75,7 +93,12 @@ export class MomentEditorModal extends Modal {
   private queueAssets(assets: readonly ImageSectionAssetInput[]): void {
     for (const asset of assets) {
       if (!imageExtensionFor(asset.name, asset.contentType)) continue;
-      this.pending.push({ key: this.nextKey++, asset, previewUrl: assetPreview(asset) });
+      this.pending.push({
+        key: this.nextKey++,
+        asset,
+        previewUrl: assetPreview(asset),
+        focusY: DEFAULT_MOMENT_STACK_FOCUS_Y,
+      });
     }
     this.render();
   }
@@ -105,6 +128,8 @@ export class MomentEditorModal extends Modal {
 
   private removeRetained(path: string): void {
     this.retainedImages = this.retainedImages.filter((value) => value !== path);
+    this.retainedFocusY.delete(path);
+    if (this.retainedImages.length + this.pending.length < 2) this.imageLayout = "carousel";
     this.render();
   }
 
@@ -113,6 +138,7 @@ export class MomentEditorModal extends Modal {
     if (index < 0) return;
     URL.revokeObjectURL(this.pending[index].previewUrl);
     this.pending.splice(index, 1);
+    if (this.retainedImages.length + this.pending.length < 2) this.imageLayout = "carousel";
     this.render();
   }
 
@@ -136,6 +162,9 @@ export class MomentEditorModal extends Modal {
         speaker: this.speakerValue,
         tags: this.tagsValue.split(/[\n,，、]/).map((value) => value.trim()).filter(Boolean),
         note: this.noteValue,
+        imageLayout: this.imageLayout,
+        stackReveal: this.stackReveal,
+        stackFocusY: this.stackFocusValues(),
         retainedImages: this.retainedImages,
         newAssets: this.pending.map((entry) => entry.asset),
       });
@@ -183,6 +212,141 @@ export class MomentEditorModal extends Modal {
     const wrapper = makeEl("div", "al-moment-editor-metadata");
     wrapper.append(grid, noteField);
     return wrapper;
+  }
+
+  private stackFocusValues(): number[] {
+    const values = [
+      ...this.retainedImages.map((path) => this.retainedFocusY.get(path) ?? DEFAULT_MOMENT_STACK_FOCUS_Y),
+      ...this.pending.map((entry) => entry.focusY),
+    ];
+    if (values.length) values[0] = TOP_MOMENT_STACK_FOCUS_Y;
+    return values;
+  }
+
+  private setStackFocus(index: number, focusY: number): void {
+    if (index < this.retainedImages.length) {
+      this.retainedFocusY.set(this.retainedImages[index], focusY);
+      return;
+    }
+    const pending = this.pending[index - this.retainedImages.length];
+    if (pending) pending.focusY = focusY;
+  }
+
+  private stackPreviewItems() {
+    const focusY = this.stackFocusValues();
+    return [
+      ...this.retainedImages.map((path, index) => {
+        const resolved = this.imageService.resolve(path, this.sourcePath);
+        return {
+          ...(resolved.resourcePath ? { src: resolved.thumbnailSources?.src || resolved.resourcePath } : {}),
+          focusY: focusY[index],
+          missingLabel: momentsText("missingImage"),
+        };
+      }),
+      ...this.pending.map((entry, pendingIndex) => ({
+        src: entry.previewUrl,
+        focusY: focusY[this.retainedImages.length + pendingIndex],
+        missingLabel: momentsText("missingImage"),
+      })),
+    ];
+  }
+
+  private bindStackFocusDrag(strip: HTMLElement, index: number, view: MomentStackVisual): void {
+    const label = makeEl("span", "al-moment-stack-adjust-value", `${this.stackFocusValues()[index]}%`);
+    strip.appendChild(label);
+    strip.addEventListener("pointerdown", (event) => {
+      if (this.busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pointerId = event.pointerId;
+      const startY = event.clientY;
+      const startFocus = this.stackFocusValues()[index];
+      strip.addClass("is-adjusting");
+      try { strip.setPointerCapture(pointerId); } catch { /* embedded tests may not establish capture */ }
+
+      const move = (moveEvent: PointerEvent): void => {
+        if (moveEvent.pointerId !== pointerId) return;
+        moveEvent.preventDefault();
+        const next = momentStackFocusAfterDrag(startFocus, moveEvent.clientY - startY);
+        this.setStackFocus(index, next);
+        view.setFocusY(index, next);
+        label.textContent = `${next}%`;
+      };
+      const cleanup = (): void => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", cancel);
+        strip.removeClass("is-adjusting");
+        try { if (strip.hasPointerCapture(pointerId)) strip.releasePointerCapture(pointerId); } catch { /* already released */ }
+      };
+      const up = (upEvent: PointerEvent): void => {
+        if (upEvent.pointerId !== pointerId) return;
+        upEvent.preventDefault();
+        cleanup();
+      };
+      const cancel = (cancelEvent: PointerEvent): void => {
+        if (cancelEvent.pointerId !== pointerId) return;
+        cleanup();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", cancel);
+    });
+  }
+
+  private renderImageLayoutControls(): HTMLElement | null {
+    const imageCount = this.retainedImages.length + this.pending.length;
+    if (imageCount < 2) return null;
+
+    const section = makeEl("section", "al-moment-editor-layout");
+    const heading = makeEl("div", "al-moment-editor-layout-head");
+    heading.appendChild(makeEl("span", "al-moment-editor-label", momentsText("imageLayoutLabel")));
+    const modes = makeEl("div", "al-moment-editor-layout-modes");
+    const modeButton = (mode: MomentImageLayout, label: string): HTMLButtonElement => {
+      const button = makeEl("button", "al-moment-editor-layout-mode", label);
+      button.type = "button";
+      button.disabled = this.busy;
+      button.classList.toggle("is-active", this.imageLayout === mode);
+      button.setAttribute("aria-pressed", this.imageLayout === mode ? "true" : "false");
+      button.addEventListener("click", () => { this.imageLayout = mode; this.render(); });
+      return button;
+    };
+    modes.append(
+      modeButton("carousel", momentsText("imageLayoutCarousel")),
+      modeButton("stacked", momentsText("imageLayoutStacked")),
+    );
+    heading.appendChild(modes);
+    section.appendChild(heading);
+    if (this.imageLayout !== "stacked") return section;
+
+    const revealRow = makeEl("label", "al-moment-editor-reveal");
+    revealRow.appendChild(makeEl("span", "al-moment-editor-layout-caption", momentsText("stackRevealLabel")));
+    const reveal = makeEl("input");
+    reveal.type = "range";
+    reveal.min = "28";
+    reveal.max = "96";
+    reveal.step = "1";
+    reveal.value = String(this.stackReveal);
+    reveal.disabled = this.busy;
+    const output = makeEl("output", "al-moment-editor-reveal-value", `${this.stackReveal}px`);
+    revealRow.append(reveal, output);
+
+    const preview = createMomentStackVisual({
+      items: this.stackPreviewItems(),
+      reveal: this.stackReveal,
+      className: "al-moment-stack-editor",
+    });
+    reveal.addEventListener("input", () => {
+      this.stackReveal = normalizeMomentStackReveal(reveal.value);
+      output.textContent = `${this.stackReveal}px`;
+      preview.setReveal(this.stackReveal);
+    });
+    section.append(revealRow, makeEl("div", "al-moment-editor-stack-hint", momentsText("stackAdjustHint")), preview.element);
+    for (let index = 1; index < imageCount; index += 1) {
+      const strip = preview.strip(index);
+      if (strip) this.bindStackFocusDrag(strip, index, preview);
+    }
+    return section;
   }
 
   private renderImageRow(): HTMLElement {
@@ -268,6 +432,8 @@ export class MomentEditorModal extends Modal {
     choose.addEventListener("click", () => input.click());
     imageHead.append(choose, input);
     this.contentEl.append(imageHead, this.renderImageRow());
+    const layoutControls = this.renderImageLayoutControls();
+    if (layoutControls) this.contentEl.appendChild(layoutControls);
 
     const hint = makeEl("div", "al-moment-editor-paste-hint", momentsText("pasteHint"));
     this.contentEl.appendChild(hint);
