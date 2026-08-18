@@ -3,7 +3,7 @@ export type LibraryViewMode = (typeof LIBRARY_VIEW_MODES)[number];
 export type LibraryColumnView = Exclude<LibraryViewMode, "list">;
 
 export const DEFAULT_LIBRARY_LAYOUT_COLUMNS: Readonly<LibraryLayoutColumns> = Object.freeze({
-  grid: 4,
+  grid: 5,
   poster: 3,
 });
 export const MIN_LIBRARY_LAYOUT_COLUMNS = 1;
