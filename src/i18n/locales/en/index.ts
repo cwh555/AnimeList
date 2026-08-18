@@ -13,6 +13,8 @@ import { EN_IMAGE_SECTION_MESSAGES } from "./image-section";
 import { EN_MOMENTS_MESSAGES } from "./moments";
 import { EN_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
+import { EN_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
+
 export const EN_CATALOGS = {
   core: EN_CORE_MESSAGES,
   search: EN_SEARCH_MESSAGES,
@@ -27,4 +29,5 @@ export const EN_CATALOGS = {
   "image-section": EN_IMAGE_SECTION_MESSAGES,
   moments: EN_MOMENTS_MESSAGES,
   "image-gallery": EN_IMAGE_GALLERY_MESSAGES,
+  "library-layout": EN_LIBRARY_LAYOUT_MESSAGES,
 } as const satisfies LocaleCatalogs;

@@ -28,6 +28,8 @@ export {
   IMAGE_GALLERY_MESSAGES,
 };
 
+import { LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
+
 export const ZH_TW_CATALOGS = {
   core: CORE_MESSAGES,
   search: SEARCH_MESSAGES,
@@ -42,6 +44,7 @@ export const ZH_TW_CATALOGS = {
   "image-section": IMAGE_SECTION_MESSAGES,
   moments: MOMENTS_MESSAGES,
   "image-gallery": IMAGE_GALLERY_MESSAGES,
+  "library-layout": LIBRARY_LAYOUT_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

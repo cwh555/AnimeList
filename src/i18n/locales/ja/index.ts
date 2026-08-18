@@ -13,6 +13,8 @@ import { JA_IMAGE_SECTION_MESSAGES } from "./image-section";
 import { JA_MOMENTS_MESSAGES } from "./moments";
 import { JA_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
+import { JA_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
+
 export const JA_CATALOGS = {
   core: JA_CORE_MESSAGES,
   search: JA_SEARCH_MESSAGES,
@@ -27,4 +29,5 @@ export const JA_CATALOGS = {
   "image-section": JA_IMAGE_SECTION_MESSAGES,
   moments: JA_MOMENTS_MESSAGES,
   "image-gallery": JA_IMAGE_GALLERY_MESSAGES,
+  "library-layout": JA_LIBRARY_LAYOUT_MESSAGES,
 } as const satisfies LocaleCatalogs;

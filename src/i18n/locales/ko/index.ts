@@ -13,6 +13,8 @@ import { KO_IMAGE_SECTION_MESSAGES } from "./image-section";
 import { KO_MOMENTS_MESSAGES } from "./moments";
 import { KO_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
+import { KO_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
+
 export const KO_CATALOGS = {
   core: KO_CORE_MESSAGES,
   search: KO_SEARCH_MESSAGES,
@@ -27,4 +29,5 @@ export const KO_CATALOGS = {
   "image-section": KO_IMAGE_SECTION_MESSAGES,
   moments: KO_MOMENTS_MESSAGES,
   "image-gallery": KO_IMAGE_GALLERY_MESSAGES,
+  "library-layout": KO_LIBRARY_LAYOUT_MESSAGES,
 } as const satisfies LocaleCatalogs;

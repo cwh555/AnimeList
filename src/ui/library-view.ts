@@ -3,6 +3,7 @@ import { normalizeTimelineMaxStackDepth } from "../domain/timeline/scale";
 import type { AnimeListSettings, LibrarySection, MediaItem, MediaType } from "../types";
 import { uiText } from "../ui-text";
 import type { LibraryRenderAdapters } from "./library-contracts";
+import { installLibraryLayoutControl, type LibraryLayoutControl } from "./library-layout-controls";
 import { TimelineUI } from "./timeline-renderer";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { renderAnimeListWorkspaceShell } from "./workspace-shell";
@@ -57,14 +58,27 @@ export class AnimeListView extends ItemView {
       icon: "library",
       order: 10,
       render: (container) => {
+        let layoutControl: LibraryLayoutControl | null = null;
         this.host.renderLibrary(container, items, {
           presentation: "workspace",
           initialState: this.host.settings.uiState,
-          onStateChange: (state) => this.host.updateUiState({ ...this.host.settings.uiState, ...state } as AnimeListSettings["uiState"]),
+          onStateChange: (state) => {
+            const next = { ...this.host.settings.uiState, ...state } as AnimeListSettings["uiState"];
+            this.host.updateUiState(next);
+            layoutControl?.sync(next);
+          },
           openFile: (path) => void this.host.openMediaFile(path),
           addItem: (mediaType) => this.host.openAddModal(mediaType),
           editItem: (path) => this.host.openEditModal(path),
           toggleFavorite: (path, next) => this.host.setFavorite(path, next),
+        });
+        layoutControl = installLibraryLayoutControl(container, {
+          initialState: this.host.settings.uiState,
+          onColumnsChange: (layoutColumns) => {
+            const next = { ...this.host.settings.uiState, layoutColumns };
+            this.host.updateUiState(next);
+            layoutControl?.sync(next);
+          },
         });
       },
     }, {

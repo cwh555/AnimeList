@@ -2,6 +2,7 @@ import "../../features/release-tracking/text";
 import "../../features/image-sections/text";
 import "../../features/moments/text";
 import "../../features/image-gallery/text";
+import "../../features/library-layout/text";
 import { registerLocaleMessages } from "../catalog";
 import { EN_CATALOGS } from "./en";
 import { JA_CATALOGS } from "./ja";
