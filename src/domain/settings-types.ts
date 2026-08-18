@@ -2,12 +2,13 @@ import type { MediaStatusFilter } from "./media-status";
 import type { SpecialLabelMode } from "./masterpiece-labels";
 import type { MediaType } from "./media-types";
 import type { LibraryFilters } from "./library-filters";
+import type { LibraryLayoutColumns, LibraryViewMode } from "./library-layout";
+export type { LibraryViewMode } from "./library-layout";
 import type { LanguagePreference } from "../i18n/locale";
 export type { LanguagePreference } from "../i18n/locale";
 
 export type StorageMode = "managed" | "flat";
 export type LibrarySection = "library" | "timeline" | "scores" | "images";
-export type LibraryViewMode = "grid" | "list" | "poster";
 export type SearchLanguage = "chinese" | "english" | "original";
 
 export interface ProviderSettings {
@@ -39,6 +40,7 @@ export interface LibraryUiState {
   filters: LibraryFilters;
   sort: string;
   view: LibraryViewMode;
+  layoutColumns: LibraryLayoutColumns;
 }
 
 export interface AnimeListSettings {
