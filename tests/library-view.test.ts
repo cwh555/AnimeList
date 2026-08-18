@@ -18,6 +18,7 @@ function fakeElement(): any {
     replaceChildren(...nodes: any[]) { children.splice(0, children.length, ...nodes); },
     setAttribute() {},
     addEventListener() {},
+    querySelector() { return null; },
   };
 }
 
@@ -63,4 +64,38 @@ describe("library view refresh ownership", () => {
       Object.defineProperty(globalThis, "createEl", { configurable: true, value: originalCreateEl });
     }
   });
+  it("forwards persisted per-view column layout through the workspace renderer state", async () => {
+    let adapters: LibraryRenderAdapters | undefined;
+    let receivedState: ReturnType<typeof createDefaultSettings>["uiState"] | null = null;
+    const originalCreateEl = globalThis.createEl;
+    Object.defineProperty(globalThis, "createEl", { configurable: true, value: () => fakeElement() });
+    const settings = createDefaultSettings();
+    settings.uiState.layoutColumns = { grid: 5, poster: 2 };
+    const host: AnimeListViewHost = {
+      settings,
+      saveSettings: async () => {},
+      renderLibrary: (_container, _items, nextAdapters) => { adapters = nextAdapters; },
+      collectMediaItems: () => [],
+      updateUiState: (state) => { receivedState = state; },
+      workspacePages: () => [],
+      workspaceMenuActions: () => [],
+      openMediaFile: async () => {},
+      openAddModal: () => {},
+      openEditModal: () => {},
+      setFavorite: async () => {},
+    };
+    const view = new AnimeListView({} as WorkspaceLeaf, host);
+    Object.assign(view.contentEl, fakeElement());
+
+    try {
+      await view.onOpen();
+      assert.deepEqual(adapters?.initialState?.layoutColumns, { grid: 5, poster: 2 });
+      adapters?.onStateChange?.({ layoutColumns: { grid: 4, poster: 2 } });
+      assert.deepEqual(receivedState?.layoutColumns, { grid: 4, poster: 2 });
+      assert.equal(receivedState?.view, "grid");
+    } finally {
+      Object.defineProperty(globalThis, "createEl", { configurable: true, value: originalCreateEl });
+    }
+  });
+
 });
