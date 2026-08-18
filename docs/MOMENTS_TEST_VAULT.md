@@ -11,8 +11,8 @@ Use this supplemental Test Vault checklist for AnimeList release-candidate regre
 - `note` is intentionally different from compact metadata rows: the note label sits above the note body when needed for readable wrapping.
 - A note is shown in full whenever it fits. If the metadata column would become materially taller than the collapsed quote, it shares the quote's **Expand / Collapse** control; expanding the quote also reveals the complete note.
 - Frieren `雖然只是很短的一段時間。`: the single 16:9 still is fully visible in the featured stage with no horizontal scrollbar. Letterboxing is acceptable; cropping is not.
-- Two landscape screenshots should fit side by side across a typical 15-inch desktop viewport before scrolling. Larger groups remain one horizontal row and scroll horizontally; images never wrap or crop.
-- Frieren seven-image Moment: all stills stay on one horizontal row and overflow horizontally.
+- In the default **Carousel** mode, two landscape screenshots should fit side by side across a typical 15-inch desktop viewport before scrolling. Larger carousel groups remain one horizontal row and scroll horizontally; images never wrap or crop.
+- Frieren seven-image Carousel Moment: all stills stay on one horizontal row and overflow horizontally.
 - Frieren long-text regression Moment: the quote is clamped in the normal card, shows **Expand**, and only grows after explicit expansion; its deliberately long note expands and collapses with the same control; **Collapse** restores the compact card.
 - Narrow/mobile views keep media first, then quote, then metadata; no page-level horizontal overflow is allowed.
 
@@ -50,3 +50,15 @@ This supplemental checklist is complete only when the related general checks als
 - Image Section layout keeps natural-height masonry columns, persists the per-section column count, and supports within-section and same-note cross-section drag ordering;
 - Settings and cleanup tools do not modify Moment/Image Section blocks unless the selected cleanup explicitly targets that content;
 - desktop and phone layouts remain free of page-level horizontal overflow.
+
+## Stacked subtitle mode (first-version framework)
+
+The seeded Frieren two-image quote and Oregairu three-image quote are controlled `stacked` examples. This mode is layout metadata only: AnimeList renders the existing image references as live DOM layers and must not create, copy, or save a composite PNG.
+
+- Legacy Moments and newly created multi-image Moments still default to the existing horizontal carousel unless **Stacked** is explicitly selected.
+- In reading view, the first image is shown fully and every later image exposes only the configured subtitle strip. Clicking any layer still opens the original image in the Moment-scoped lightbox.
+- In **Edit**, switch between **Carousel** and **Stacked**. In Stacked mode, adjust **Subtitle reveal** and confirm every lower strip changes height immediately.
+- Drag each exposed lower strip vertically. Mouse and touch must both change the crop focus without scrolling the whole page or generating another image file.
+- Save and reopen the note. `imageLayout: stacked`, `stackReveal`, and one `stackFocusY` value per retained image must persist. Returning to Carousel removes stacked-only serialization on the next save while preserving image order and files.
+- Delete one image until only one remains. A single-image Moment must fall back to the existing featured-image presentation; stacked metadata must not force a one-image stack.
+- OCR / automatic subtitle detection and PNG export are intentionally **not part of this version**. Manual positioning is the source of truth for stacked layout metadata.

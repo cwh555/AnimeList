@@ -78,8 +78,8 @@ const IMAGE_SECTION_PREVIOUS_MARKERS = [".animelist-test-image-sections-v6", ".a
 const IMAGE_SECTION_FIXTURE_START = "<!-- animelist-test-image-sections:start -->";
 const IMAGE_SECTION_FIXTURE_END = "<!-- animelist-test-image-sections:end -->";
 const ANIME_SCENE_ASSET_ROOT = `${IMAGE_SECTION_ASSET_ROOT}/anime-scenes`;
-const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v8";
-const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v7", ".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
+const MOMENTS_FIXTURE_MARKER = ".animelist-test-moments-v9";
+const MOMENTS_PREVIOUS_MARKERS = [".animelist-test-moments-v8", ".animelist-test-moments-v7", ".animelist-test-moments-v6", ".animelist-test-moments-v5", ".animelist-test-moments-v4", ".animelist-test-moments-v3", ".animelist-test-moments-v2"];
 const OREGAIRU_MOMENTS_DEMO_PATH = "AnimeList/Anime/我的青春恋爱物语果然有问题 续.md";
 const OREGAIRU_QUOTE_MARKER = "想到未來又會不安到得憂鬱症";
 const OREGAIRU_IMAGE_FIXTURE_START = "<!-- animelist-test-oregairu-images:start -->";
@@ -205,6 +205,14 @@ function momentsBlock(items) {
     if (item.note) {
       lines.push("    note: |-");
       String(item.note).split(/\r?\n/).forEach((line) => lines.push(`      ${line}`));
+    }
+    if (item.imageLayout === "stacked") {
+      lines.push("    imageLayout: stacked");
+      if (Number.isFinite(item.stackReveal)) lines.push(`    stackReveal: ${Math.round(item.stackReveal)}`);
+      if (Array.isArray(item.stackFocusY) && item.stackFocusY.length) {
+        lines.push("    stackFocusY:");
+        item.stackFocusY.forEach((focus) => lines.push(`      - ${Math.round(focus)}`));
+      }
     }
     lines.push("    images:");
     item.images.forEach((image) => lines.push(`      - ${JSON.stringify(image)}`));
@@ -381,6 +389,9 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
       {
         id: "m_test_frieren_quote_01",
         text: "人間的壽命明明這麼短……\n我當時為什麼沒想過要更了解他呢……",
+        imageLayout: "stacked",
+        stackReveal: 52,
+        stackFocusY: [50, 87],
         images: [scene("frieren-ep01-07"), scene("frieren-ep01-08")],
       },
       {
@@ -475,6 +486,9 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
         source: "果青續 (12)",
         speaker: "比企谷八幡",
         tags: ["大老師語錄", "第 12 話"],
+        imageLayout: "stacked",
+        stackReveal: 58,
+        stackFocusY: [50, 84, 91],
         images: [
           scene("oregairu-zoku-ep12-official"),
           scene("oregairu-zoku-ep12-cafe"),
@@ -488,7 +502,7 @@ async function prepareMomentsDemos(vaultRoot, reset, fetchImpl) {
   seedOregairuMomentsFixture(vaultRoot, oregairuImageBody, oregairuMomentBody);
 
   for (const previous of MOMENTS_PREVIOUS_MARKERS) fs.rmSync(path.join(vaultRoot, previous), { force: true });
-  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v8 seeded. Ordinary test-vault runs preserve later edits.\n");
+  fs.writeFileSync(marker, "Moments sourced episode-scene fixtures v9 with stacked-layout examples seeded. Ordinary test-vault runs preserve later edits.\n");
   return { ...known, assetPaths };
 }
 
@@ -1106,7 +1120,7 @@ Check the approved image-section behavior:
 
 Use these real media notes with **official episode stills downloaded into the Test Vault at fixture-preparation time**. Moments no longer reuse unrelated cover images:
 
-- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — episode 1 official STORY stills, split across **two independent \`animelist-moments\` sections** with five real-scene Moment cards total.
+- [[AnimeList/Anime/葬送的芙莉蓮|葬送的芙莉蓮]] — episode 1 official STORY stills, split across **two independent \`animelist-moments\` sections** with six real-scene Moment cards total.
 - [[AnimeList/Anime/輝夜姬想讓人告白~天才們的戀愛頭腦戰~|輝夜姬想讓人告白～天才們的戀愛頭腦戰～]] — season 1 episode 1 official STORY stills with short recognizable dialogue for cross-note verification.
 - Scene images are stored under \`AnimeList/Images/test-vault/moments/\`; they are downloaded from the official anime STORY pages and are not committed to the repository.
 
@@ -1115,6 +1129,9 @@ Check the approved Moments behavior:
 - Each Moment is **text + 1..N related images**. Text preserves multiple lines. The seeded long-text Frieren case must clamp in the default card and expose **展開 / 收合** instead of making every card endlessly tall.
 - On desktop, each Moment uses the approved **editorial split card**: quote plus any filled optional metadata on the left and media on the right. Empty metadata fields must not render. The Frieren 「雖然只是很短的一段時間。」 case has one landscape still and must show that whole image without a horizontal scrollbar. Every image remains uncropped. The seven-image Frieren Moment must stay on one row and scroll horizontally instead of wrapping. On narrow/mobile widths, text/metadata stacks above the same single-row media area without horizontal page overflow.
 - Edit a Moment and try the optional **source / position-time / speaker-character / tags / note** fields. In reading view, each metadata label is immediately followed by a full-width colon and its value (for example **出處：第 1 話**) instead of reserving a fixed alignment column that forces avoidable wrapping. Clearing a field must remove it from reading view and from serialized YAML; old Moments without metadata must still work.
+- Legacy and ordinary multi-image Moments stay in **horizontal carousel** mode by default. The seven-image Frieren Moment remains the long-filmstrip regression.
+- The two-image Frieren quote and three-image Oregairu quote are seeded as **stacked subtitle** examples: the first image stays expanded while each later original image exposes only its configured subtitle strip. No composite PNG or copied layout image should be created.
+- Edit a stacked Moment: switch **Carousel / Stacked**, change **subtitle reveal height**, then drag each exposed lower strip vertically with mouse and touch to select the subtitle position. Save, reopen the note, and confirm reveal/focus metadata persists. Switching back to Carousel must restore the existing filmstrip without deleting images.
 - When a multi-image filmstrip overflows, the subtle edge fade / previous-next navigation should make the extra images discoverable without changing the Moment data or lightbox scope.
 - Click an image to open the original lightbox. Left/right navigation must remain inside that Moment only.
 - Moment actions are exactly **Edit / Copy text / Copy images / Delete**.
