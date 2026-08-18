@@ -98,6 +98,22 @@ for(const [name,fn] of Object.entries({
 })) { if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn}); }
 </script><script>${bundle}</script><script>
 const delay=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
+const nextLayout=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+const waitForImages=async(root)=>{
+ const images=[...(root?.querySelectorAll("img")||[])];
+ await Promise.all(images.map(async image=>{
+   if(!image.complete){
+     await new Promise(resolve=>{
+       image.addEventListener("load",resolve,{once:true});
+       image.addEventListener("error",resolve,{once:true});
+     });
+   }
+   if(typeof image.decode==="function"){ try{ await image.decode(); }catch{} }
+ }));
+ await nextLayout();
+};
+const matchesIntrinsicRatio=(rect,width,height)=>Boolean(rect) && rect.width>1 && rect.height>1
+ && Math.abs(rect.height-(rect.width*height/width))<=2;
 const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}"};
 const service={
  resolve:(path)=>({resourcePath:urls[path]}),
@@ -122,9 +138,9 @@ const source=[
 const renderer=new AnimeListMomentsStacked.MomentsRenderChild(document.querySelector("#reading"),host,{},service,source,context);
 renderer.onload();
 (async()=>{
- await delay(120);
  const details={};
  const reading=document.querySelector("#reading");
+ await waitForImages(reading);
  const stack=reading.querySelector(".al-moment-stack-reading");
  const layers=[...(stack?.querySelectorAll(".al-moment-stack-layer")||[])];
  const images=layers.map(layer=>layer.querySelector("img"));
@@ -133,35 +149,38 @@ renderer.onload();
  const initialRects=rects();
  const initialImageRects=imageRects();
  details.readingUsesRealStack=Boolean(stack) && !reading.querySelector(".al-moment-image-row") && layers.length===3;
- details.layersKeepWholeImages=initialImageRects.every(rect=>rect && rect.height>150)
-   && Math.abs(initialImageRects[1].width/initialImageRects[1].height-(960/540))<0.04
-   && Math.abs(initialImageRects[2].width/initialImageRects[2].height-(540/760))<0.04;
+ details.layersKeepWholeImages=matchesIntrinsicRatio(initialImageRects[0],960,540)
+   && matchesIntrinsicRatio(initialImageRects[1],960,540)
+   && matchesIntrinsicRatio(initialImageRects[2],540,760);
  details.gapsPositionWholeLayers=Math.abs(initialRects[1].bottom-initialRects[0].bottom-56)<=2
    && Math.abs(initialRects[2].bottom-initialRects[1].bottom-64)<=2;
- details.lowerLayersAreNotCropWindows=initialRects[1].height>150 && initialRects[2].height>300;
+ details.lowerLayersAreNotCropWindows=matchesIntrinsicRatio(initialRects[1],960,540)
+   && matchesIntrinsicRatio(initialRects[2],540,760)
+   && Math.abs(initialRects[1].height-initialImageRects[1].height)<=1
+   && Math.abs(initialRects[2].height-initialImageRects[2].height)<=1;
  details.mobileReadingDoesNotOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
 
  let saved=null;
  const initial={id:"m_stack123",text:"stacked subtitle fixture",imageLayout:"stacked",stackGapsY:[0,56,64],images:["a.png","b.png","c.png"]};
  const modal=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",initial,async input=>{saved=input});
  modal.open();
- await delay(80);
+ await waitForImages(modal.contentEl);
  const editorLayers=()=>[...modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-layer')];
  details.editorStartsInStackedMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active')?.textContent?.length>0
    && editorLayers().length===3;
  const reveal=modal.contentEl.querySelector('.al-moment-editor-reveal input[type="range"]');
  reveal.value="68"; reveal.dispatchEvent(new Event("input",{bubbles:true}));
- await delay(20);
+ await nextLayout();
  let editorRects=editorLayers().map(layer=>layer.getBoundingClientRect());
  details.revealSliderMovesWholeLayers=Math.abs(editorRects[1].bottom-editorRects[0].bottom-64)<=2
    && Math.abs(editorRects[2].bottom-editorRects[1].bottom-72)<=2
-   && editorRects[1].height>150;
+   && matchesIntrinsicRatio(editorRects[1],960,540);
  const layer=editorLayers()[1];
  const beforeRects=editorLayers().map(entry=>entry.getBoundingClientRect());
  const rect=layer.getBoundingClientRect();
  const x=rect.left+rect.width/2, y=rect.bottom-14;
  const pointer=(type,clientY)=>layer.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:17,pointerType:"touch",isPrimary:true,clientX:x,clientY,button:0,buttons:type==="pointerup"?0:1}));
- pointer("pointerdown",y); pointer("pointermove",y-36); pointer("pointerup",y-36); await delay(20);
+ pointer("pointerdown",y); pointer("pointermove",y-36); pointer("pointerup",y-36); await nextLayout();
  const afterRects=editorLayers().map(entry=>entry.getBoundingClientRect());
  details.touchDragMovesEntireLayer=Math.abs((afterRects[1].bottom-beforeRects[1].bottom)+36)<=2
    && Math.abs((afterRects[2].bottom-beforeRects[2].bottom)+36)<=2
