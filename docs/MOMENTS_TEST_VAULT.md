@@ -60,5 +60,6 @@ The seeded Frieren two-image quote and Oregairu three-image quote are controlled
 - In **Edit**, switch between **Carousel** and **Stacked**. In Stacked mode, adjust **Subtitle reveal** and confirm every lower strip changes height immediately.
 - Drag each exposed lower strip vertically. Mouse and touch must both change the crop focus without scrolling the whole page or generating another image file.
 - Save and reopen the note. `imageLayout: stacked`, `stackReveal`, and one `stackFocusY` value per retained image must persist. Returning to Carousel removes stacked-only serialization on the next save while preserving image order and files.
+- Compare the Moment's referenced image files before and after stacked editing; the file set/count must remain unchanged unless you explicitly add or remove an image.
 - Delete one image until only one remains. A single-image Moment must fall back to the existing featured-image presentation; stacked metadata must not force a one-image stack.
 - OCR / automatic subtitle detection and PNG export are intentionally **not part of this version**. Manual positioning is the source of truth for stacked layout metadata.
