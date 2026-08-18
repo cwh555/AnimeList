@@ -110,6 +110,7 @@ if (!HTMLElement.prototype.setCssStyles) {
       filters: { companies: [], quarter: '', tags: [] },
       sort: 'title-asc',
       view: 'grid',
+      layoutColumns: { grid: 5, poster: 3 },
     };
 
     let latestState = structuredClone(initialState);
@@ -152,14 +153,14 @@ if (!HTMLElement.prototype.setCssStyles) {
     const firstCard = root.querySelector('.al-card');
 
     const details = {};
-    details.defaultGridFour = slider()?.value === '4' && output()?.textContent === '4' && tracks() === 4;
+    details.defaultGridFive = slider()?.value === '5' && output()?.textContent === '5' && tracks() === 5;
 
-    slider().value = '5';
+    slider().value = '6';
     slider().dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    details.gridFiveImmediate = tracks() === 5 && output()?.textContent === '5';
+    details.gridSixImmediate = tracks() === 6 && output()?.textContent === '6';
     details.sliderDoesNotRebuildCards = root.querySelector('.al-card') === firstCard;
-    details.gridStateRecorded = latestState.layoutColumns?.grid === 5 && latestState.layoutColumns?.poster === 3;
+    details.gridStateRecorded = latestState.layoutColumns?.grid === 6 && latestState.layoutColumns?.poster === 3;
 
     clickViewByIcon('image');
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -169,12 +170,12 @@ if (!HTMLElement.prototype.setCssStyles) {
     slider().dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise((resolve) => requestAnimationFrame(resolve));
     details.posterTwoImmediate = tracks() === 2
-      && latestState.layoutColumns?.grid === 5
+      && latestState.layoutColumns?.grid === 6
       && latestState.layoutColumns?.poster === 2;
 
     clickViewByIcon('layout-grid');
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    details.gridReturnsToFive = slider()?.value === '5' && tracks() === 5;
+    details.gridReturnsToSix = slider()?.value === '6' && tracks() === 6;
 
     clickViewByIcon('list');
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -185,7 +186,7 @@ if (!HTMLElement.prototype.setCssStyles) {
     const stateBeforeRerender = structuredClone(latestState);
     render(stateBeforeRerender);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    details.rerenderPersistsGridFive = slider()?.value === '5' && tracks() === 5;
+    details.rerenderPersistsGridSix = slider()?.value === '6' && tracks() === 6;
     clickViewByIcon('image');
     await new Promise((resolve) => requestAnimationFrame(resolve));
     details.rerenderPersistsPosterTwo = slider()?.value === '2' && tracks() === 2;
