@@ -18,6 +18,16 @@ function clipboardAvailable(): boolean {
   return Boolean(navigator.clipboard?.write && typeof ClipboardItem !== "undefined");
 }
 
+export async function copyPngBlobToClipboard(blob: Blob): Promise<void> {
+  if (!clipboardAvailable()) {
+    throw new Error("Image clipboard writing is unavailable in this Obsidian build");
+  }
+  if (blob.type.split(";")[0].trim().toLocaleLowerCase() !== "image/png") {
+    throw new Error("Clipboard image must be PNG");
+  }
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
 async function blobDataUrl(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
@@ -76,11 +86,11 @@ export async function copyImagesToClipboard(
     const asset = await service.readAsset(path, sourcePath);
     return toPngBlob(asset.data, asset.contentType ?? "");
   }));
-  const items = blobs.map((blob) => new ClipboardItem({ "image/png": blob }));
-  if (items.length === 1) {
-    await navigator.clipboard.write(items);
+  if (blobs.length === 1) {
+    await copyPngBlobToClipboard(blobs[0]);
     return;
   }
+  const items = blobs.map((blob) => new ClipboardItem({ "image/png": blob }));
   try {
     await navigator.clipboard.write(items);
     return;

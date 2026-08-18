@@ -4,14 +4,28 @@ import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
 import type { MomentEditorInput } from "../data/moments-service";
 import type { MomentItem } from "../domain/moments";
+import {
+  DEFAULT_MOMENT_STACK_GAP,
+  MAX_MOMENT_STACK_GAP,
+  MIN_MOMENT_STACK_GAP,
+  momentStackAverageGap,
+  momentStackGapAfterDrag,
+  momentStackGapsWithDelta,
+  normalizeMomentImageLayout,
+  normalizeMomentStackGap,
+  normalizeMomentStackGapsY,
+  type MomentImageLayout,
+} from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { createMomentStackVisual, type MomentStackVisual } from "./moment-stack";
 
 interface PendingAsset {
   key: number;
   asset: ImageSectionAssetInput;
   previewUrl: string;
+  stackGapY: number;
 }
 
 function assetPreview(asset: ImageSectionAssetInput): string {
@@ -27,6 +41,9 @@ export class MomentEditorModal extends Modal {
   private tagsValue: string;
   private noteValue: string;
   private retainedImages: string[];
+  private readonly retainedStackGapsY = new Map<string, number>();
+  private imageLayout: MomentImageLayout;
+  private stackGapControl = DEFAULT_MOMENT_STACK_GAP;
   private pending: PendingAsset[] = [];
   private nextKey = 1;
   private urlValue = "";
@@ -48,6 +65,10 @@ export class MomentEditorModal extends Modal {
     this.tagsValue = (initial?.tags ?? []).join(", ");
     this.noteValue = initial?.note ?? "";
     this.retainedImages = [...(initial?.images ?? [])];
+    this.imageLayout = normalizeMomentImageLayout(initial?.imageLayout);
+    const initialGaps = normalizeMomentStackGapsY(initial?.stackGapsY, this.retainedImages.length);
+    this.stackGapControl = momentStackAverageGap(initialGaps, this.retainedImages.length);
+    this.retainedImages.forEach((path, index) => this.retainedStackGapsY.set(path, initialGaps[index]));
   }
 
   onOpen(): void {
@@ -75,7 +96,12 @@ export class MomentEditorModal extends Modal {
   private queueAssets(assets: readonly ImageSectionAssetInput[]): void {
     for (const asset of assets) {
       if (!imageExtensionFor(asset.name, asset.contentType)) continue;
-      this.pending.push({ key: this.nextKey++, asset, previewUrl: assetPreview(asset) });
+      this.pending.push({
+        key: this.nextKey++,
+        asset,
+        previewUrl: assetPreview(asset),
+        stackGapY: this.stackGapControl,
+      });
     }
     this.render();
   }
@@ -105,6 +131,8 @@ export class MomentEditorModal extends Modal {
 
   private removeRetained(path: string): void {
     this.retainedImages = this.retainedImages.filter((value) => value !== path);
+    this.retainedStackGapsY.delete(path);
+    if (this.retainedImages.length + this.pending.length < 2) this.imageLayout = "carousel";
     this.render();
   }
 
@@ -113,6 +141,7 @@ export class MomentEditorModal extends Modal {
     if (index < 0) return;
     URL.revokeObjectURL(this.pending[index].previewUrl);
     this.pending.splice(index, 1);
+    if (this.retainedImages.length + this.pending.length < 2) this.imageLayout = "carousel";
     this.render();
   }
 
@@ -136,6 +165,8 @@ export class MomentEditorModal extends Modal {
         speaker: this.speakerValue,
         tags: this.tagsValue.split(/[\n,，、]/).map((value) => value.trim()).filter(Boolean),
         note: this.noteValue,
+        imageLayout: this.imageLayout,
+        stackGapsY: this.stackGapsValues(),
         retainedImages: this.retainedImages,
         newAssets: this.pending.map((entry) => entry.asset),
       });
@@ -183,6 +214,164 @@ export class MomentEditorModal extends Modal {
     const wrapper = makeEl("div", "al-moment-editor-metadata");
     wrapper.append(grid, noteField);
     return wrapper;
+  }
+
+  private stackGapsValues(): number[] {
+    const values = [
+      ...this.retainedImages.map((path) => this.retainedStackGapsY.get(path) ?? this.stackGapControl),
+      ...this.pending.map((entry) => entry.stackGapY),
+    ];
+    return normalizeMomentStackGapsY(values, values.length, this.stackGapControl);
+  }
+
+  private setStackGap(index: number, gapY: number): void {
+    if (index < this.retainedImages.length) {
+      this.retainedStackGapsY.set(this.retainedImages[index], gapY);
+      return;
+    }
+    const pending = this.pending[index - this.retainedImages.length];
+    if (pending) pending.stackGapY = gapY;
+  }
+
+  private setStackGaps(gapsY: readonly number[]): void {
+    const normalized = normalizeMomentStackGapsY(gapsY, this.retainedImages.length + this.pending.length);
+    normalized.forEach((gap, index) => this.setStackGap(index, gap));
+  }
+
+  private stackPreviewItems() {
+    return [
+      ...this.retainedImages.map((path) => {
+        const resolved = this.imageService.resolve(path, this.sourcePath);
+        return {
+          ...(resolved.resourcePath ? { src: resolved.thumbnailSources?.src || resolved.resourcePath } : {}),
+          missingLabel: momentsText("missingImage"),
+        };
+      }),
+      ...this.pending.map((entry) => ({
+        src: entry.previewUrl,
+        missingLabel: momentsText("missingImage"),
+      })),
+    ];
+  }
+
+  private bindStackLayerDrag(
+    layer: HTMLElement,
+    index: number,
+    view: MomentStackVisual,
+    onGapsChanged: (gapsY: readonly number[]) => void,
+  ): void {
+    const label = makeEl("span", "al-moment-stack-adjust-value", `${this.stackGapsValues()[index]}px`);
+    layer.appendChild(label);
+    layer.addEventListener("pointerdown", (event) => {
+      if (this.busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pointerId = event.pointerId;
+      const startY = event.clientY;
+      const startGap = this.stackGapsValues()[index];
+      layer.addClass("is-adjusting");
+      try { layer.setPointerCapture(pointerId); } catch { /* embedded tests may not establish capture */ }
+
+      const move = (moveEvent: PointerEvent): void => {
+        if (moveEvent.pointerId !== pointerId) return;
+        moveEvent.preventDefault();
+        const nextGap = momentStackGapAfterDrag(startGap, moveEvent.clientY - startY);
+        this.setStackGap(index, nextGap);
+        const gaps = this.stackGapsValues();
+        view.setGapsY(gaps);
+        label.textContent = `${gaps[index]}px`;
+        onGapsChanged(gaps);
+      };
+      const cleanup = (): void => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", cancel);
+        layer.removeClass("is-adjusting");
+        try { if (layer.hasPointerCapture(pointerId)) layer.releasePointerCapture(pointerId); } catch { /* already released */ }
+      };
+      const up = (upEvent: PointerEvent): void => {
+        if (upEvent.pointerId !== pointerId) return;
+        upEvent.preventDefault();
+        cleanup();
+      };
+      const cancel = (cancelEvent: PointerEvent): void => {
+        if (cancelEvent.pointerId !== pointerId) return;
+        cleanup();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", cancel);
+    });
+  }
+
+  private renderImageLayoutControls(): HTMLElement | null {
+    const imageCount = this.retainedImages.length + this.pending.length;
+    if (imageCount < 2) return null;
+
+    const section = makeEl("section", "al-moment-editor-layout");
+    const heading = makeEl("div", "al-moment-editor-layout-head");
+    heading.appendChild(makeEl("span", "al-moment-editor-label", momentsText("imageLayoutLabel")));
+    const modes = makeEl("div", "al-moment-editor-layout-modes");
+    const modeButton = (mode: MomentImageLayout, label: string): HTMLButtonElement => {
+      const button = makeEl("button", "al-moment-editor-layout-mode", label);
+      button.type = "button";
+      button.disabled = this.busy;
+      button.classList.toggle("is-active", this.imageLayout === mode);
+      button.setAttribute("aria-pressed", this.imageLayout === mode ? "true" : "false");
+      button.addEventListener("click", () => { this.imageLayout = mode; this.render(); });
+      return button;
+    };
+    modes.append(
+      modeButton("carousel", momentsText("imageLayoutCarousel")),
+      modeButton("stacked", momentsText("imageLayoutStacked")),
+    );
+    heading.appendChild(modes);
+    section.appendChild(heading);
+    if (this.imageLayout !== "stacked") return section;
+
+    const gaps = this.stackGapsValues();
+    this.stackGapControl = momentStackAverageGap(gaps, imageCount);
+    const revealRow = makeEl("label", "al-moment-editor-reveal");
+    revealRow.appendChild(makeEl("span", "al-moment-editor-layout-caption", momentsText("stackRevealLabel")));
+    const reveal = makeEl("input");
+    reveal.type = "range";
+    reveal.min = String(MIN_MOMENT_STACK_GAP);
+    reveal.max = String(MAX_MOMENT_STACK_GAP);
+    reveal.step = "1";
+    reveal.value = String(this.stackGapControl);
+    reveal.disabled = this.busy;
+    const output = makeEl("output", "al-moment-editor-reveal-value", `${this.stackGapControl}px`);
+    revealRow.append(reveal, output);
+
+    const preview = createMomentStackVisual({
+      items: this.stackPreviewItems(),
+      gapsY: gaps,
+      className: "al-moment-stack-editor",
+    });
+    const syncGapControls = (nextGaps: readonly number[]): void => {
+      this.stackGapControl = momentStackAverageGap(nextGaps, imageCount);
+      reveal.value = String(this.stackGapControl);
+      output.textContent = `${this.stackGapControl}px`;
+      nextGaps.forEach((gap, index) => {
+        if (index === 0) return;
+        const layer = preview.layer(index);
+        const label = layer?.querySelector<HTMLElement>(".al-moment-stack-adjust-value");
+        if (label) label.textContent = `${gap}px`;
+      });
+    };
+    reveal.addEventListener("input", () => {
+      const nextControl = normalizeMomentStackGap(reveal.value);
+      const adjusted = momentStackGapsWithDelta(this.stackGapsValues(), imageCount, nextControl - this.stackGapControl);
+      this.setStackGaps(adjusted);
+      preview.setGapsY(adjusted);
+      syncGapControls(adjusted);
+    });
+    section.append(revealRow, makeEl("div", "al-moment-editor-stack-hint", momentsText("stackAdjustHint")), preview.element);
+    for (let index = 1; index < imageCount; index += 1) {
+      const layer = preview.layer(index);
+      if (layer) this.bindStackLayerDrag(layer, index, preview, syncGapControls);
+    }
+    return section;
   }
 
   private renderImageRow(): HTMLElement {
@@ -268,6 +457,8 @@ export class MomentEditorModal extends Modal {
     choose.addEventListener("click", () => input.click());
     imageHead.append(choose, input);
     this.contentEl.append(imageHead, this.renderImageRow());
+    const layoutControls = this.renderImageLayoutControls();
+    if (layoutControls) this.contentEl.appendChild(layoutControls);
 
     const hint = makeEl("div", "al-moment-editor-paste-hint", momentsText("pasteHint"));
     this.contentEl.appendChild(hint);

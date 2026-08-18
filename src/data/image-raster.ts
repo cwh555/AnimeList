@@ -39,6 +39,20 @@ export async function decodeRasterImage(
   }
 }
 
+export function encodeCanvasImage(
+  canvas: HTMLCanvasElement,
+  contentType: "image/png" | "image/webp",
+  quality?: number,
+): Promise<Blob> {
+  if (canvas.width <= 0 || canvas.height <= 0) throw new Error("Canvas has invalid dimensions");
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error(`${contentType === "image/png" ? "PNG" : "WebP"} encoding failed`));
+    }, contentType, quality);
+  });
+}
+
 export async function encodeRasterImage(
   decoded: DecodedRasterImage,
   width: number,
@@ -56,12 +70,7 @@ export async function encodeRasterImage(
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.drawImage(decoded.source, 0, 0, targetWidth, targetHeight);
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (result) resolve(result);
-      else reject(new Error(`${contentType === "image/png" ? "PNG" : "WebP"} encoding failed`));
-    }, contentType, quality);
-  });
+  return encodeCanvasImage(canvas, contentType, quality);
 }
 
 export async function visualImageFingerprint(

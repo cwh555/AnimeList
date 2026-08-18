@@ -1,5 +1,10 @@
 import { normalizeImageSectionPath } from "./image-section";
 import { stringValue } from "./value-normalization";
+import {
+  momentImageLayoutState,
+  normalizeMomentStackGapsY,
+  type MomentImageLayout,
+} from "./moment-image-layout";
 
 export const MOMENTS_LANGUAGE = "animelist-moments";
 
@@ -12,6 +17,8 @@ export interface MomentItem {
   tags?: string[];
   note?: string;
   images: string[];
+  imageLayout?: MomentImageLayout;
+  stackGapsY?: number[];
 }
 
 export interface MomentsLocator {
@@ -95,6 +102,10 @@ function normalizedMoment(input: Partial<MomentItem>): MomentItem {
   const speaker = normalizeOptional(input.speaker);
   const tags = normalizeTags(input.tags);
   const note = normalizeOptional(input.note);
+  const layout = momentImageLayoutState({
+    imageLayout: input.imageLayout,
+    stackGapsY: input.stackGapsY,
+  }, images.length);
   return {
     id: stringValue(input.id).trim(),
     text: stringValue(input.text).replace(/\r\n?/g, "\n").replace(/\n+$/g, ""),
@@ -104,6 +115,7 @@ function normalizedMoment(input: Partial<MomentItem>): MomentItem {
     ...(tags ? { tags } : {}),
     ...(note ? { note } : {}),
     images,
+    ...layout,
   };
 }
 
@@ -140,6 +152,7 @@ export function parseMomentsSource(source: unknown): MomentItem[] {
     if (!itemStart) { index += 1; continue; }
 
     const item: Partial<MomentItem> = { id: parseScalar(itemStart[1]), text: "", images: [] };
+    let legacyStackReveal: number | undefined;
     index += 1;
     while (index < lines.length && !/^\s{2}-\s+id:\s*/.test(lines[index])) {
       const current = lines[index];
@@ -200,6 +213,38 @@ export function parseMomentsSource(source: unknown): MomentItem[] {
         item.tags = tags;
         continue;
       }
+      const imageLayoutScalar = /^\s{4}imageLayout:\s*(.*)$/.exec(current);
+      if (imageLayoutScalar) {
+        item.imageLayout = parseScalar(imageLayoutScalar[1]) as MomentImageLayout;
+        index += 1;
+        continue;
+      }
+      if (/^\s{4}stackGapsY:\s*(?:\[\s*\])?\s*$/.test(current)) {
+        index += 1;
+        const values: number[] = [];
+        while (index < lines.length) {
+          const gapLine = /^\s{6}-\s*(.*)$/.exec(lines[index]);
+          if (!gapLine) break;
+          values.push(Number(parseScalar(gapLine[1])));
+          index += 1;
+        }
+        item.stackGapsY = values;
+        continue;
+      }
+      // Draft stacked-layout builds used a scalar reveal plus crop-focus values.
+      // Keep those notes readable by mapping the reveal to whole-image stack gaps;
+      // the obsolete crop focus has no equivalent and is intentionally discarded.
+      const stackRevealScalar = /^\s{4}stackReveal:\s*(.*)$/.exec(current);
+      if (stackRevealScalar) {
+        legacyStackReveal = Number(parseScalar(stackRevealScalar[1]));
+        index += 1;
+        continue;
+      }
+      if (/^\s{4}stackFocusY:\s*(?:\[\s*\])?\s*$/.test(current)) {
+        index += 1;
+        while (index < lines.length && /^\s{6}-\s*/.test(lines[index])) index += 1;
+        continue;
+      }
       if (/^\s{4}images:\s*(?:\[\s*\])?\s*$/.test(current)) {
         index += 1;
         const images: string[] = [];
@@ -214,6 +259,9 @@ export function parseMomentsSource(source: unknown): MomentItem[] {
         continue;
       }
       index += 1;
+    }
+    if ((!item.stackGapsY || item.stackGapsY.length === 0) && legacyStackReveal !== undefined) {
+      item.stackGapsY = normalizeMomentStackGapsY(undefined, item.images?.length ?? 0, legacyStackReveal);
     }
     moments.push(normalizedMoment(item));
   }
@@ -242,6 +290,11 @@ export function serializeMomentsSource(values: Iterable<MomentItem>): string {
       const noteLines = moment.note.split("\n");
       if (noteLines.length === 1 && noteLines[0] === "") lines.push("      ");
       else noteLines.forEach((line) => lines.push(`      ${line}`));
+    }
+    if (moment.imageLayout === "stacked") {
+      lines.push("    imageLayout: stacked");
+      lines.push("    stackGapsY:");
+      moment.stackGapsY?.forEach((gap) => lines.push(`      - ${gap}`));
     }
     if (moment.images.length) {
       lines.push("    images:");

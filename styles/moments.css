@@ -730,3 +730,229 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Stacked Moments keep every original image as a live DOM node. The first image is
+   shown in full; later images expose only a user-positioned subtitle strip. */
+.al-moment-media.is-stacked {
+  justify-content: center;
+  padding: 0.85rem;
+}
+
+.al-moment-stack {
+  --al-moment-stack-reveal: 46px;
+  display: grid;
+  width: min(100%, 880px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+  box-shadow: 0 8px 22px color-mix(in srgb, #000 16%, transparent);
+}
+
+.al-moment-stack-top,
+.al-moment-stack-strip {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--background-secondary) 80%, var(--background-primary));
+  box-shadow: none;
+}
+
+button.al-moment-stack-top,
+button.al-moment-stack-strip {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  box-shadow: none;
+  cursor: zoom-in;
+}
+
+button.al-moment-stack-top {
+  height: auto;
+  min-height: 180px;
+}
+
+button.al-moment-stack-strip {
+  height: var(--al-moment-stack-reveal);
+  min-height: var(--al-moment-stack-reveal);
+}
+
+.al-moment-stack-top {
+  height: auto;
+  min-height: 180px;
+}
+
+.al-moment-stack-strip {
+  height: var(--al-moment-stack-reveal);
+  min-height: var(--al-moment-stack-reveal);
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+}
+
+.al-moment-stack-top-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 430px;
+  margin: 0;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--background-secondary) 82%, var(--background-primary));
+}
+
+.al-moment-stack-strip-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: cover;
+  object-position: 50% var(--al-moment-stack-focus-y, 86%);
+  transform: translateZ(0);
+}
+
+.al-moment-stack-missing {
+  display: grid;
+  min-height: inherit;
+  place-items: center;
+  padding: 0.7rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+button.al-moment-stack-top:hover,
+button.al-moment-stack-top:focus-visible,
+button.al-moment-stack-strip:hover,
+button.al-moment-stack-strip:focus-visible {
+  background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-secondary));
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.al-moment-editor-layout {
+  display: grid;
+  gap: 0.72rem;
+  margin-top: 0.78rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 66%, var(--background-primary));
+}
+
+.al-moment-editor-layout-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.al-moment-editor-layout-modes {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+}
+
+.al-moment-editor-layout-mode {
+  min-height: 30px;
+  padding: 0.2rem 0.65rem;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+.al-moment-editor-layout-mode.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.al-moment-editor-reveal {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.al-moment-editor-layout-caption,
+.al-moment-editor-stack-hint {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.al-moment-editor-reveal input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.al-moment-editor-reveal-value {
+  min-width: 42px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.al-moment-stack-editor {
+  width: min(100%, 680px);
+  justify-self: center;
+}
+
+.al-moment-stack-editor .al-moment-stack-strip {
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.al-moment-stack-editor .al-moment-stack-strip.is-adjusting {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 76%, transparent);
+}
+
+.al-moment-stack-adjust-value {
+  position: absolute;
+  z-index: 2;
+  right: 8px;
+  bottom: 6px;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .al-moment-media.is-stacked { padding: 0.64rem; }
+  .al-moment-stack-top { min-height: 128px; }
+  .al-moment-stack-top-image { max-height: 330px; }
+}
+
+@media (max-width: 640px) {
+  .al-moment-editor-layout-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .al-moment-editor-layout-modes {
+    align-self: stretch;
+  }
+
+  .al-moment-editor-layout-mode { flex: 1 1 0; }
+  .al-moment-editor-reveal { grid-template-columns: 1fr auto; }
+  .al-moment-editor-layout-caption { grid-column: 1 / -1; }
+}

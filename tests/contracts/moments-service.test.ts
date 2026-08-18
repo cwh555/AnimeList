@@ -112,6 +112,30 @@ describe("moments storage service", () => {
     assert.equal(parseMomentsSource(edited.source)[0].id, id);
   });
 
+  it("persists stacked whole-image gaps and keeps them aligned when a queued duplicate is skipped", async () => {
+    const h = harness(["# Demo", "```animelist-moments", "moments: []", "```"].join("\n"));
+    const block = findMomentsBlocks(h.data.get(h.note.path) ?? "")[0];
+    const duplicate = new Uint8Array([1, 2, 3, 4]).buffer;
+    const added = await h.service.addMoment(h.note.path, block, {
+      text: "疊圖字幕測試",
+      imageLayout: "stacked",
+      stackGapsY: [0, 65, 58],
+      retainedImages: [],
+      newAssets: [
+        { name: "first.png", contentType: "image/png", data: duplicate },
+        { name: "duplicate.png", contentType: "image/png", data: duplicate.slice(0) },
+        { name: "third.png", contentType: "image/png", data: new Uint8Array([9, 8, 7, 6]).buffer },
+      ],
+    });
+    assert.equal(added.duplicatesSkipped, 1);
+    assert.equal(added.moment?.imageLayout, "stacked");
+    assert.deepEqual(added.moment?.stackGapsY, [0, 58]);
+    assert.equal(added.moment?.images.length, 2);
+    const persisted = parseMomentsSource(findMomentsBlocks(h.data.get(h.note.path) ?? "")[0].source)[0];
+    assert.equal(persisted.imageLayout, "stacked");
+    assert.deepEqual(persisted.stackGapsY, [0, 58]);
+  });
+
   it("deletes a moment but keeps an image file when another moments block still references it", async () => {
     const shared = "AnimeList/Images/anime/demo-bangumi-42/shared.jpg";
     const source = [

@@ -3,9 +3,12 @@ import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { ImageSectionService } from "../data/image-section-service";
 import type { MomentsService } from "../data/moments-service";
 import { parseMomentsSource, type MomentItem, type MomentsLocator } from "../domain/moments";
+import { normalizeMomentStackGapsY } from "../domain/moment-image-layout";
 import { momentsText } from "../features/moments/text";
-import { copyImageToClipboard, copyImagesToClipboard, copyTextToClipboard } from "./image-clipboard";
+import { copyImageToClipboard, copyImagesToClipboard, copyPngBlobToClipboard, copyTextToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
+import { createMomentStackVisual } from "./moment-stack";
+import { rasterizeMomentStackToPng } from "./moment-stack-raster";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
@@ -101,9 +104,23 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     }
   }
 
-  private async copyImages(moment: MomentItem): Promise<void> {
+  private async copyImages(moment: MomentItem, stackDisplayWidth?: number): Promise<void> {
     try {
-      await copyImagesToClipboard(this.imageService, this.context.sourcePath, moment.images);
+      if (moment.imageLayout === "stacked" && moment.images.length > 1) {
+        const composite = await rasterizeMomentStackToPng(
+          this.imageService,
+          this.context.sourcePath,
+          moment.images,
+          normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length),
+          {
+            displayWidth: stackDisplayWidth && stackDisplayWidth > 0 ? stackDisplayWidth : 760,
+            pixelRatio: window.devicePixelRatio,
+          },
+        );
+        await copyPngBlobToClipboard(composite);
+      } else {
+        await copyImagesToClipboard(this.imageService, this.context.sourcePath, moment.images);
+      }
       new Notice(momentsText("copiedImages"));
     } catch (error) {
       new Notice(momentsText("copyFailed", { error: errorMessage(error) }));
@@ -111,10 +128,12 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   }
 
   private showMomentMenu(event: MouseEvent, moment: MomentItem): void {
+    const card = (event.currentTarget as HTMLElement | null)?.closest<HTMLElement>(".al-moment-card");
+    const stackDisplayWidth = card?.querySelector<HTMLElement>(".al-moment-stack")?.clientWidth;
     const menu = new Menu();
     menu.addItem((item) => item.setTitle("Edit").setIcon("pencil").onClick(() => this.openEdit(moment)));
     menu.addItem((item) => item.setTitle("Copy text").setIcon("copy").onClick(() => void this.copyText(moment)));
-    menu.addItem((item) => item.setTitle("Copy images").setIcon("images").onClick(() => void this.copyImages(moment)));
+    menu.addItem((item) => item.setTitle("Copy images").setIcon("images").onClick(() => void this.copyImages(moment, stackDisplayWidth)));
     menu.addItem((item) => item.setTitle("Delete").setIcon("trash").setWarning(true).onClick(() => this.deleteMoment(moment)));
     menu.showAtMouseEvent(event);
   }
@@ -125,6 +144,16 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       void copyImageToClipboard(this.imageService, this.context.sourcePath, path)
         .then(() => new Notice(momentsText("copiedImages")))
         .catch((error) => new Notice(momentsText("copyFailed", { error: errorMessage(error) })));
+    }));
+    menu.showAtMouseEvent(event);
+  }
+
+  private showStackedImageMenu(event: MouseEvent, moment: MomentItem): void {
+    const stackDisplayWidth = (event.currentTarget as HTMLElement | null)
+      ?.closest<HTMLElement>(".al-moment-stack")?.clientWidth;
+    const menu = new Menu();
+    menu.addItem((item) => item.setTitle("Copy image").setIcon("copy").onClick(() => {
+      void this.copyImages(moment, stackDisplayWidth);
     }));
     menu.showAtMouseEvent(event);
   }
@@ -284,20 +313,10 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     return section;
   }
 
-  private renderMoment(moment: MomentItem): HTMLElement {
-    const card = makeEl("article", "al-moment-card");
-    card.dataset.momentId = moment.id;
-    card.dataset.imageCount = String(moment.images.length);
-
-    const actions = makeEl("button", "al-moment-actions");
-    actions.type = "button";
-    actions.setAttribute("aria-label", "Moment actions");
-    actions.textContent = "⋯";
-    actions.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.showMomentMenu(event, moment);
-    });
-
+  private renderCarouselMedia(moment: MomentItem): {
+    media: HTMLElement;
+    scroller: { row: HTMLElement; previous: HTMLButtonElement; next: HTMLButtonElement };
+  } {
     const media = makeEl("div", "al-moment-media");
     media.classList.toggle("is-featured", moment.images.length === 1);
     media.classList.toggle("is-filmstrip", moment.images.length > 1);
@@ -364,6 +383,50 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     setAnimeListIcon(next, "chevron-right");
 
     media.append(viewport, previous, next);
+    return { media, scroller: { row, previous, next } };
+  }
+
+  private renderStackedMedia(moment: MomentItem): HTMLElement {
+    const media = makeEl("div", "al-moment-media is-stacked");
+    const stack = createMomentStackVisual({
+      items: moment.images.map((path) => {
+        const resolved = this.imageService.resolve(path, this.context.sourcePath);
+        return {
+          ...(resolved.resourcePath ? {
+            src: resolved.thumbnailSources?.src || resolved.resourcePath,
+            ...(resolved.thumbnailSources?.srcset ? { srcset: resolved.thumbnailSources.srcset } : {}),
+            sizes: "760px",
+          } : {}),
+          missingLabel: momentsText("missingImage"),
+        };
+      }),
+      gapsY: normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length),
+      className: "al-moment-stack-reading",
+      activate: (index) => this.openLightbox(moment, moment.images[index]),
+      contextMenu: (_index, event) => this.showStackedImageMenu(event, moment),
+    });
+    media.appendChild(stack.element);
+    return media;
+  }
+
+  private renderMoment(moment: MomentItem): HTMLElement {
+    const card = makeEl("article", "al-moment-card");
+    card.dataset.momentId = moment.id;
+    card.dataset.imageCount = String(moment.images.length);
+
+    const actions = makeEl("button", "al-moment-actions");
+    actions.type = "button";
+    actions.setAttribute("aria-label", "Moment actions");
+    actions.textContent = "⋯";
+    actions.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.showMomentMenu(event, moment);
+    });
+
+    const stacked = moment.imageLayout === "stacked" && moment.images.length > 1;
+    const carousel = stacked ? null : this.renderCarouselMedia(moment);
+    const media = stacked ? this.renderStackedMedia(moment) : carousel.media;
+    const scroller = carousel?.scroller ?? null;
 
     const content = makeEl("div", "al-moment-content");
     const metadata = this.renderMeta(moment);
@@ -408,7 +471,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     }
 
     card.append(media, content, actions);
-    this.bindScroller(media, row, previous, next);
+    if (scroller) this.bindScroller(media, scroller.row, scroller.previous, scroller.next);
     return card;
   }
 
