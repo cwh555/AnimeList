@@ -153,9 +153,13 @@ export class LibraryExportService {
     return serializeLibraryExportDocument(this.createDocument(items, exportedAt));
   }
 
-  async saveToVault(content: string, format: LibraryExportFormat, date = new Date()): Promise<string> {
+  exportFolderPath(): string {
     const root = this.host.settings.libraryRoot.trim() || "AnimeList";
-    const folder = normalizePath(`${root}/Exports`);
+    return normalizePath(`${root}/Exports`);
+  }
+
+  async saveToVault(content: string, format: LibraryExportFormat, date = new Date()): Promise<string> {
+    const folder = this.exportFolderPath();
     await this.host.ensureFolder(folder);
     const extension = format === "json" ? "animelist.json" : "txt";
     const path = await this.host.uniqueFilePath(folder, `AnimeList-${dateStamp(date)}`, extension);

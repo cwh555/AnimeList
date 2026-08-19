@@ -2,16 +2,19 @@ import { Modal, Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { MediaItem } from "../domain/media-types";
 import {
-  DEFAULT_LIBRARY_TEXT_EXPORT_FIELDS,
   buildLibraryTextExportRows,
   filterLibraryExportItems,
   type LibraryExportFormat,
   type LibraryExportScope,
-  type LibraryTextExportField,
 } from "../domain/library-export";
 import { LibraryExportService } from "../data/library-export-service";
+import {
+  compileLibraryTextExportTemplate,
+  defaultLibraryTextExportTemplate,
+  formatLibraryTextExport,
+  libraryTextTemplateIssueMessage,
+} from "../features/library-export/format";
 import { libraryExportText } from "../features/library-export/text";
-import { formatLibraryTextExport } from "../features/library-export/format";
 import { uiText } from "../ui-text";
 import { errorMessage, makeEl } from "./ui-helpers";
 import { createLibraryExportOptions, type LibraryExportOptionsView } from "./library-export-options";
@@ -24,7 +27,7 @@ import {
 interface LibraryExportModalState {
   format: LibraryExportFormat;
   scope: LibraryExportScope;
-  textFields: Set<LibraryTextExportField>;
+  textTemplate: string;
 }
 
 export class LibraryExportModal extends Modal {
@@ -33,11 +36,13 @@ export class LibraryExportModal extends Modal {
   private readonly state: LibraryExportModalState = {
     format: "json",
     scope: { mediaType: "all", status: "all" },
-    textFields: new Set(DEFAULT_LIBRARY_TEXT_EXPORT_FIELDS),
+    textTemplate: defaultLibraryTextExportTemplate(),
   };
   private items: MediaItem[] = [];
   private optionsView: LibraryExportOptionsView | null = null;
   private previewView: LibraryExportPreviewView | null = null;
+  private copyButton: HTMLButtonElement | null = null;
+  private saveButton: HTMLButtonElement | null = null;
 
   constructor(private readonly host: AnimeListFeatureHost) {
     super(host.app);
@@ -62,12 +67,25 @@ export class LibraryExportModal extends Modal {
       return { content: this.service.createJson(items, this.exportedAt), count: items.length };
     }
     const rows = buildLibraryTextExportRows(items);
-    return { content: formatLibraryTextExport(rows, this.state.textFields), count: rows.length };
+    const compilation = compileLibraryTextExportTemplate(this.state.textTemplate);
+    return {
+      content: formatLibraryTextExport(rows, this.state.textTemplate, compilation),
+      count: rows.length,
+    };
+  }
+
+  private templateIssueMessages(): string[] {
+    if (this.state.format !== "text") return [];
+    return compileLibraryTextExportTemplate(this.state.textTemplate).issues.map(libraryTextTemplateIssueMessage);
   }
 
   private syncView(): void {
-    this.optionsView?.update(this.state.format, this.state.scope, this.state.textFields);
+    const issues = this.templateIssueMessages();
+    this.optionsView?.update(this.state.format, this.state.scope, this.state.textTemplate, issues);
     this.previewView?.update(this.state.format, this.output());
+    const disabled = this.state.format === "text" && issues.length > 0;
+    if (this.copyButton) this.copyButton.disabled = disabled;
+    if (this.saveButton) this.saveButton.disabled = disabled;
   }
 
   private async copy(): Promise<void> {
@@ -108,10 +126,12 @@ export class LibraryExportModal extends Modal {
       minWidth: "0",
     });
 
+    const initialIssues = this.templateIssueMessages();
     this.optionsView = createLibraryExportOptions(
       this.state.format,
       this.state.scope,
-      this.state.textFields,
+      this.state.textTemplate,
+      initialIssues,
       {
         onFormatChange: (format) => {
           if (this.state.format === format) return;
@@ -122,15 +142,15 @@ export class LibraryExportModal extends Modal {
           this.state.scope = scope;
           this.syncView();
         },
-        onFieldChange: (field, checked) => {
-          if (checked) this.state.textFields.add(field);
-          else this.state.textFields.delete(field);
+        onTemplateChange: (template) => {
+          if (this.state.textTemplate === template) return;
+          this.state.textTemplate = template;
           this.syncView();
         },
       },
     );
     this.previewView = createLibraryExportPreview(this.state.format, this.output());
-    Object.assign(this.optionsView.element.style, { flex: "1 1 260px", minWidth: "0" });
+    Object.assign(this.optionsView.element.style, { flex: "1 1 300px", minWidth: "0" });
     Object.assign(this.previewView.element.style, { flex: "2 1 440px", minWidth: "0" });
     body.append(this.optionsView.element, this.previewView.element);
 
@@ -139,6 +159,16 @@ export class LibraryExportModal extends Modal {
       marginTop: "14px",
       paddingTop: "14px",
       borderTop: "1px solid var(--background-modifier-border)",
+    });
+    const destination = makeEl("span", "al-library-export-save-location", libraryExportText("saveLocation", {
+      path: `${this.service.exportFolderPath()}/`,
+    }));
+    Object.assign(destination.style, {
+      flex: "1 1 220px",
+      minWidth: "0",
+      color: "var(--text-faint)",
+      fontSize: ".64rem",
+      overflowWrap: "anywhere",
     });
     const cancel = makeEl("button", "", uiText("action.cancel"));
     cancel.type = "button";
@@ -149,14 +179,19 @@ export class LibraryExportModal extends Modal {
     const save = makeEl("button", "mod-cta", libraryExportText("save"));
     save.type = "button";
     save.addEventListener("click", () => { void this.save(); });
-    actions.append(cancel, copy, save);
+    this.copyButton = copy;
+    this.saveButton = save;
+    actions.append(destination, cancel, copy, save);
 
     this.contentEl.append(intro, body, actions);
+    this.syncView();
   }
 
   onClose(): void {
     this.optionsView = null;
     this.previewView = null;
+    this.copyButton = null;
+    this.saveButton = null;
     this.contentEl.replaceChildren();
   }
 }

@@ -1,13 +1,14 @@
-import {
-  LIBRARY_TEXT_EXPORT_FIELDS,
-  type LibraryExportFormat,
-  type LibraryExportMediaFilter,
-  type LibraryExportScope,
-  type LibraryTextExportField,
+import type {
+  LibraryExportFormat,
+  LibraryExportMediaFilter,
+  LibraryExportScope,
 } from "../domain/library-export";
 import { MEDIA_STATUS_VALUES, type MediaStatusFilter } from "../domain/media-status";
+import {
+  defaultLibraryTextExportTemplate,
+  libraryTextTemplateVariableOptions,
+} from "../features/library-export/format";
 import { libraryExportText } from "../features/library-export/text";
-import { libraryTextFieldLabel } from "../features/library-export/format";
 import { uiText } from "../ui-text";
 import { makeEl, MEDIA_UI_LABELS } from "./ui-helpers";
 
@@ -20,22 +21,25 @@ function appendOption(select: HTMLSelectElement, value: string, label: string): 
 export interface LibraryExportOptionsCallbacks {
   onFormatChange(format: LibraryExportFormat): void;
   onScopeChange(scope: LibraryExportScope): void;
-  onFieldChange(field: LibraryTextExportField, checked: boolean): void;
+  onTemplateChange(template: string): void;
 }
 
 export interface LibraryExportOptionsView {
   element: HTMLElement;
+  template: HTMLTextAreaElement;
   update(
     format: LibraryExportFormat,
     scope: LibraryExportScope,
-    selected: ReadonlySet<LibraryTextExportField>,
+    template: string,
+    templateIssues: readonly string[],
   ): void;
 }
 
 export function createLibraryExportOptions(
   format: LibraryExportFormat,
   scope: LibraryExportScope,
-  selected: ReadonlySet<LibraryTextExportField>,
+  templateValue: string,
+  templateIssues: readonly string[],
   callbacks: LibraryExportOptionsCallbacks,
 ): LibraryExportOptionsView {
   const root = makeEl("div", "al-library-export-controls");
@@ -129,50 +133,105 @@ export function createLibraryExportOptions(
   media.addEventListener("change", emitScope);
   status.addEventListener("change", emitScope);
 
-  const fieldsSection = makeEl("section", "al-library-export-card al-library-export-fields-section");
-  styleCard(fieldsSection);
-  const fieldsTitle = makeEl("strong", "al-library-export-section-title", libraryExportText("fields"));
-  styleTitle(fieldsTitle);
-  const fieldsDescription = makeEl("p", "al-library-export-description", libraryExportText("requiredFields"));
-  styleDescription(fieldsDescription);
-  fieldsSection.append(fieldsTitle, fieldsDescription);
-  const fields = makeEl("div", "al-library-export-fields");
-  Object.assign(fields.style, {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))",
-    gap: "6px",
-    marginTop: "10px",
+  const templateSection = makeEl("section", "al-library-export-card al-library-export-template-section");
+  styleCard(templateSection);
+  const templateHeading = makeEl("div", "al-library-export-template-heading");
+  Object.assign(templateHeading.style, {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    marginBottom: "8px",
   });
-  const fieldInputs = new Map<LibraryTextExportField, HTMLInputElement>();
-  for (const field of LIBRARY_TEXT_EXPORT_FIELDS) {
-    const label = makeEl("label", "al-library-export-checkbox");
-    Object.assign(label.style, {
-      display: "flex",
-      minWidth: "0",
-      minHeight: "34px",
-      alignItems: "center",
-      gap: "9px",
-      padding: "6px 8px",
-      borderRadius: "8px",
-      color: "var(--text-muted)",
-      fontSize: ".7rem",
-      cursor: "pointer",
-    });
-    const input = makeEl("input");
-    input.type = "checkbox";
-    input.addEventListener("change", () => callbacks.onFieldChange(field, input.checked));
-    label.append(input, makeEl("span", "", libraryTextFieldLabel(field)));
-    fieldInputs.set(field, input);
-    fields.appendChild(label);
-  }
-  fieldsSection.appendChild(fields);
+  const templateTitle = makeEl("strong", "al-library-export-section-title", libraryExportText("template"));
+  styleTitle(templateTitle);
+  Object.assign(templateTitle.style, { margin: "0" });
+  const reset = makeEl("button", "al-secondary-button", libraryExportText("templateReset"));
+  reset.type = "button";
+  Object.assign(reset.style, { minHeight: "30px", padding: "0 9px", fontSize: ".66rem" });
+  reset.addEventListener("click", () => callbacks.onTemplateChange(defaultLibraryTextExportTemplate()));
+  templateHeading.append(templateTitle, reset);
 
-  root.append(formatSection, scopeSection, fieldsSection);
+  const templateDescription = makeEl("p", "al-library-export-description", libraryExportText("templateDescription"));
+  styleDescription(templateDescription);
+  Object.assign(templateDescription.style, { margin: "0 0 9px" });
+
+  const template = makeEl("textarea", "al-library-export-template");
+  template.spellcheck = false;
+  template.setAttribute("aria-label", libraryExportText("template"));
+  Object.assign(template.style, {
+    width: "100%",
+    minWidth: "0",
+    minHeight: "104px",
+    resize: "vertical",
+    padding: "10px 11px",
+    border: "1px solid var(--background-modifier-border)",
+    borderRadius: "8px",
+    background: "var(--background-primary)",
+    color: "var(--text-normal)",
+    fontFamily: "var(--font-monospace)",
+    fontSize: ".68rem",
+    lineHeight: "1.5",
+    boxSizing: "border-box",
+  });
+  template.addEventListener("input", () => callbacks.onTemplateChange(template.value));
+
+  const variableLabel = makeEl("span", "al-library-export-variable-label", libraryExportText("templateVariables"));
+  Object.assign(variableLabel.style, {
+    display: "block",
+    marginTop: "9px",
+    color: "var(--text-muted)",
+    fontSize: ".66rem",
+    fontWeight: "650",
+  });
+  const variables = makeEl("div", "al-library-export-template-variables");
+  Object.assign(variables.style, {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "6px",
+  });
+  for (const variable of libraryTextTemplateVariableOptions()) {
+    const button = makeEl("button", "al-secondary-button al-library-export-template-variable", variable.token);
+    button.type = "button";
+    button.title = variable.label;
+    Object.assign(button.style, {
+      minHeight: "28px",
+      padding: "0 8px",
+      fontFamily: "var(--font-monospace)",
+      fontSize: ".61rem",
+    });
+    button.addEventListener("click", () => {
+      const start = template.selectionStart ?? template.value.length;
+      const end = template.selectionEnd ?? start;
+      template.setRangeText(variable.token, start, end, "end");
+      template.focus();
+      callbacks.onTemplateChange(template.value);
+    });
+    variables.appendChild(button);
+  }
+
+  const safety = makeEl("p", "al-library-export-description", libraryExportText("templateSafety"));
+  styleDescription(safety);
+  const error = makeEl("p", "al-library-export-template-error");
+  error.setAttribute("role", "alert");
+  error.setAttribute("aria-live", "polite");
+  Object.assign(error.style, {
+    margin: "8px 0 0",
+    color: "var(--text-error)",
+    fontSize: ".65rem",
+    lineHeight: "1.45",
+    whiteSpace: "pre-line",
+  });
+
+  templateSection.append(templateHeading, templateDescription, template, variableLabel, variables, safety, error);
+  root.append(formatSection, scopeSection, templateSection);
 
   const update = (
     nextFormat: LibraryExportFormat,
     nextScope: LibraryExportScope,
-    nextSelected: ReadonlySet<LibraryTextExportField>,
+    nextTemplate: string,
+    nextTemplateIssues: readonly string[],
   ): void => {
     for (const [value, button] of formatButtons) {
       const active = value === nextFormat;
@@ -182,15 +241,15 @@ export function createLibraryExportOptions(
     formatDescription.textContent = libraryExportText(
       nextFormat === "json" ? "jsonDescription" : "textDescription",
     );
-    fieldsSection.hidden = nextFormat !== "text";
+    templateSection.hidden = nextFormat !== "text";
     if (media.value !== nextScope.mediaType) media.value = nextScope.mediaType;
     if (status.value !== nextScope.status) status.value = nextScope.status;
-    for (const [field, input] of fieldInputs) {
-      const checked = nextSelected.has(field);
-      if (input.checked !== checked) input.checked = checked;
-    }
+    if (template.value !== nextTemplate) template.value = nextTemplate;
+    error.textContent = nextTemplateIssues.join("\n");
+    error.hidden = nextTemplateIssues.length === 0;
+    template.setAttribute("aria-invalid", nextTemplateIssues.length ? "true" : "false");
   };
 
-  update(format, scope, selected);
-  return { element: root, update };
+  update(format, scope, templateValue, templateIssues);
+  return { element: root, template, update };
 }

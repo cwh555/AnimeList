@@ -92,23 +92,6 @@ export interface LibraryExportDocumentV1 {
   records: LibraryExportRecordV1[];
 }
 
-export const LIBRARY_TEXT_EXPORT_FIELDS = [
-  "mediaType",
-  "originalTitle",
-  "score",
-  "progress",
-  "startedAt",
-  "status",
-  "favorite",
-  "genres",
-] as const;
-
-export type LibraryTextExportField = (typeof LIBRARY_TEXT_EXPORT_FIELDS)[number];
-
-export const DEFAULT_LIBRARY_TEXT_EXPORT_FIELDS: readonly LibraryTextExportField[] = [
-  "mediaType",
-];
-
 export interface LibraryTextExportRow {
   time: string;
   work: string;
