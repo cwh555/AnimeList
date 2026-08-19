@@ -8,6 +8,7 @@ import {
   ANIMELIST_LIBRARY_EXPORT_FORMAT,
   ANIMELIST_LIBRARY_EXPORT_VERSION,
   buildLibraryTextExportRows,
+  LIBRARY_TEXT_EXPORT_FIELDS,
   isLibraryExportDocumentV1,
   serializeLibraryExportDocument,
 } from "../src/domain/library-export";
@@ -181,8 +182,23 @@ describe("library export model", () => {
       ["2026-02-10", "Anime Done", undefined],
     ]);
     assert.equal(rows.some((row) => row.time === "2026-02-20"), false);
-    const text = formatLibraryTextExport(rows, new Set(["entry", "score"]));
-    assert.match(text, /^Time \| Work \| Entry \/ unit \| Score$/m);
-    assert.doesNotMatch(text, /Progress|Genres/);
+    assert.deepEqual(LIBRARY_TEXT_EXPORT_FIELDS.includes("entry" as never), false);
+    const text = formatLibraryTextExport(rows, new Set(["score"]));
+    assert.equal(text, [
+      "2026-01-03",
+      "Serial — 第 1 卷",
+      "  評分：9",
+      "",
+      "2026-01-12",
+      "Serial — 第 2 卷",
+      "  評分：9",
+      "",
+      "2026-02-10",
+      "Anime Done",
+      "  評分：8.5",
+      "",
+    ].join("\n"));
+    assert.doesNotMatch(text, /\|/);
+    assert.doesNotMatch(text, /進度|分類／標籤/);
   });
 });
