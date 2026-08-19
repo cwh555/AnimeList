@@ -13,15 +13,17 @@ The export modal supports:
 - All / Ongoing / Completed / Planned / Dropped status scope.
 - A live preview.
 - Copying the full export to the clipboard.
-- Saving the full export under `<Library root>/Exports/`.
+- Saving the full export as a file under `<Library root>/Exports/`.
 
-Preview text may be truncated for large libraries; Copy and Save always use the complete output.
+The footer shows the exact export folder. **Save export file** only creates a new `.animelist.json` or `.txt` export file there; it does not edit media notes or other Library data.
+
+Preview text may be truncated for large libraries; Copy and Save still use the complete output.
 
 ### Interaction and layout
 
-The modal is mounted once. Format buttons, scope selectors, and Text-field checkboxes update only their own state and the existing preview textarea; they do **not** rebuild the modal DOM. This keeps focus, scroll position, and control identity stable while options are changed.
+The modal is mounted once. Format buttons, scope selectors, and the Text template editor update only their own state and the existing preview textarea; they do **not** rebuild the modal DOM. This keeps focus, scroll position, and control identity stable while options are changed.
 
-On desktop, controls occupy a compact left column and the preview gets the larger right column. On narrow/mobile layouts the same sections stack vertically. Format, scope, optional Text details, preview, and footer actions are visually separated instead of sharing one dense form grid.
+On desktop, controls occupy a compact left column and the preview gets the larger right column. On narrow/mobile layouts the same sections stack vertically. Format, scope, Text template, preview, and footer actions are visually separated instead of sharing one dense form grid.
 
 ## JSON contract
 
@@ -58,38 +60,37 @@ V1 still does not expose an Import UI or write imported notes. It does include a
 
 ## Text contract
 
-Text export shares the same completion-event source used by Timeline. This prevents Timeline and Export from developing separate serial-entry rules.
+Text export shares the same completion-event source used by Timeline. Manga and novel serial completions are split into individual events, and the `work` template value uses Timeline's localized serial-entry title. For example, the work value becomes `葬送的芙莉蓮 — 第 13 卷` rather than losing the unit and label.
 
-Completion time and work are always emitted and therefore are **not** shown as checkboxes. Optional details are:
-
-- Media type
-- Original title
-- Score
-- Progress
-- Started at
-- Status
-- Favorite
-- Genres / tags
-
-For manga and novels with completed serial entries, each completed chapter/season/volume becomes its own event. The work line reuses Timeline's localized serial-entry title, so the unit and label are always explicit (for example `第 13 卷`, `第 42 話`, or `第 2 季`). Once serial completion entries exist for a work, Text export does not add a second whole-work completion event. Anime and works without completed serial entries use the whole-work completed date when the work is completed.
-
-Text is formatted as readable event blocks rather than a pipe-delimited table. Blank lines separate events, and selected optional details are indented below the work:
+Text output is controlled by a safe, per-event template. The default template is localized and keeps the required completion time and work name. In Traditional Chinese it is:
 
 ```text
-2026-05-03
-葬送的芙莉蓮 — 第 13 卷
-  作品類型：漫畫
-  評分：9
-
-2026-06-12
-葬送的芙莉蓮 — 第 14 卷
-  作品類型：漫畫
-  評分：9
-
-2026-07-01
-劇場版作品
-  作品類型：動畫
+{$完成時間}
+{$作品名稱}
+  作品類型：{$作品類型}
 ```
+
+A user can replace it with a one-line layout such as:
+
+```text
+({$作品類型}) {$作品名稱} : {$完成時間}
+```
+
+The variable buttons insert supported tokens at the caret. Available values include completion time, Timeline-style work name, base series name, media type, serial unit, original title, score, progress, started time, status, favorite, and genres/tags.
+
+### Template safety rules
+
+The Text template is deliberately **not** a shell, JavaScript, expression language, or `eval` surface. It only performs bounded literal substitutions:
+
+- template length is capped at 4096 characters;
+- at most 64 variable references are accepted;
+- unknown or unclosed variables make the template invalid;
+- completion time and work name are required, preserving the minimum Timeline information;
+- inserted values are never parsed again, so a title containing `{$評分}` remains literal text;
+- no variable can alter the export path or filename;
+- `\{$` emits a literal `{$` opener.
+
+When the template is invalid, the modal shows the validation error and disables Copy / Save until it is fixed. The preview updates in place while typing without rebuilding the modal.
 
 Text is a human-readable report and is not intended to be reversible. Future Import should consume only the versioned JSON format.
 
@@ -97,10 +98,11 @@ Text is a human-readable report and is not intended to be reversible. Future Imp
 
 1. Use the explicit **Export** workspace action from each workspace page; the same modal should open and there should be no one-item `…` menu.
 2. JSON starts with `animelist-library-export` / version `1` and contains one record per scoped Library work.
-3. Switch format, media type/status filters, and several Text checkboxes repeatedly. Controls/focus must stay stable with no full-modal flash or reset while record/event counts and preview contents update.
-4. Confirm the desktop modal uses a controls column + larger preview column; at narrow/mobile width the sections stack cleanly without horizontal overflow.
-5. Switch to Text. Completion time and work are shown in the output but not as checkbox options; only optional details can be toggled.
-6. For manga/novel serial histories, confirm completed units are split exactly like Timeline and each work line includes the localized unit + label.
-7. Copy, paste into a text editor, and confirm the full output is copied even when preview is truncated.
-8. Save JSON and Text and confirm files are created in `<Library root>/Exports/` with `.animelist.json` / `.txt` extensions.
-9. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
+3. Switch format and media type/status filters repeatedly. Controls/focus must stay stable with no full-modal flash while record/event counts and preview update.
+4. Switch to Text and edit the template continuously. Typing and variable insertion must keep the same editor/preview DOM nodes and must not flash or reset focus.
+5. Try `({$作品類型}) {$作品名稱} : {$完成時間}` and confirm manga/novel events still include Timeline unit labels such as `第 13 卷` / `第 42 話`.
+6. Remove `{$完成時間}` or enter an unknown variable. Copy and Save must disable until the template is valid again.
+7. Confirm the desktop modal uses a controls column + larger preview column; at narrow/mobile width the sections stack cleanly without horizontal overflow.
+8. Copy and paste into a text editor; the full output must be copied even when preview is truncated.
+9. Use **Save export file** and confirm the displayed destination matches the created file under `<Library root>/Exports/` with `.animelist.json` / `.txt` extension.
+10. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.

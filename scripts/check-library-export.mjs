@@ -15,7 +15,6 @@ await build({
   stdin: {
     contents: `
       export { LibraryExportModal } from "./src/ui/library-export-modal";
-      export { LIBRARY_TEXT_EXPORT_FIELDS } from "./src/domain/library-export";
     `,
     resolveDir: root,
     loader: "ts",
@@ -90,7 +89,7 @@ const item = ({ title, mediaType, completedAt, unit, volumeLog = [], score = 9 }
 });
 
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{--background-primary:#111;--background-primary-alt:#171717;--background-secondary:#202020;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#8070df;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-on-accent:#fff;--font-monospace:ui-monospace,monospace;}
+:root{--background-primary:#111;--background-primary-alt:#171717;--background-secondary:#202020;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#8070df;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-error:#ff6b6b;--text-on-accent:#fff;--font-monospace:ui-monospace,monospace;}
 html,body{margin:0;width:100%;min-height:100%;background:#111;color:#eee;font-family:sans-serif}button,input,select,textarea{font:inherit}
 .modal{margin:12px auto;padding:18px;border:1px solid #444;border-radius:12px;background:#181818}.modal-title{margin:0 0 8px}
 ${styles}
@@ -109,7 +108,7 @@ try {
     ${JSON.stringify(item({title:"Anime Done",mediaType:"anime",completedAt:"2026-02-10",unit:"episode"}))},
     ${JSON.stringify(item({title:"葬送的芙莉蓮",mediaType:"manga",completedAt:"2026-06-20",unit:"volume",volumeLog:[{label:"13",startedAt:"2026-05-01",completedAt:"2026-05-03"},{label:"14",startedAt:"2026-06-10",completedAt:"2026-06-12"}]}))},
   ];
-  let creates = [];
+  const creates = [];
   const host = {
     app: {
       vault: {
@@ -136,25 +135,44 @@ try {
   const replacesAfterOpen = contentReplaceCalls;
   const content = modal.contentEl;
   const preview = content.querySelector(".al-library-export-preview");
-  const layout = content.querySelector(".al-library-export-layout");
   const controls = content.querySelector(".al-library-export-controls");
   const textButton = [...content.querySelectorAll(".al-library-export-format")].find((button)=>button.textContent.trim()==="Text");
   const jsonButton = [...content.querySelectorAll(".al-library-export-format")].find((button)=>button.textContent.trim()==="JSON");
   const scopeSelects = [...content.querySelectorAll(".al-library-export-scope select")];
 
   textButton.click();
-  const fieldsSection = content.querySelector(".al-library-export-fields-section");
-  const checkboxInputs = [...content.querySelectorAll(".al-library-export-checkbox input")];
-  const checkboxLabels = [...content.querySelectorAll(".al-library-export-checkbox")].map((node)=>node.textContent.trim());
-  const scoreLabel = [...content.querySelectorAll(".al-library-export-checkbox")].find((node)=>node.textContent.includes("評分"));
-  const scoreCheckbox = scoreLabel?.querySelector("input");
-  scoreCheckbox?.focus();
-  scoreCheckbox?.click();
-  const focusedAfterCheckbox = document.activeElement === scoreCheckbox;
+  const templateSection = content.querySelector(".al-library-export-template-section");
+  const template = content.querySelector(".al-library-export-template");
+  const templateError = content.querySelector(".al-library-export-template-error");
+  const saveButton = [...content.querySelectorAll("button")].find((button)=>button.textContent.trim()==="儲存匯出檔");
+  const copyButton = [...content.querySelectorAll("button")].find((button)=>button.textContent.trim()==="複製");
+  const saveLocation = content.querySelector(".al-library-export-save-location")?.textContent || "";
+  const scoreVariable = [...content.querySelectorAll(".al-library-export-template-variable")].find((button)=>button.textContent.includes("評分"));
+
+  template.focus();
+  template.value = "({$作品類型}) {$作品名稱} : {$完成時間}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const focusedAfterTemplateInput = document.activeElement === template;
 
   scopeSelects[0].value = "manga";
   scopeSelects[0].dispatchEvent(new Event("change", { bubbles:true }));
   const previewAfterManga = preview.value;
+
+  template.value = "{$作品名稱}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const invalidTemplateBlocksActions = !!templateError?.textContent?.includes("完成時間") && saveButton?.disabled && copyButton?.disabled;
+
+  template.value = "({$作品類型}) {$作品名稱} : {$完成時間}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  template.setSelectionRange(template.value.length, template.value.length);
+  scoreVariable?.click();
+  const variableInsertKeepsFocus = document.activeElement === template && template.value.includes("{$評分}");
+
+  template.value = "({$作品類型}) {$作品名稱} : {$完成時間}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  saveButton?.click();
+  await new Promise((resolve)=>setTimeout(resolve,0));
+
   jsonButton.click();
   textButton.click();
 
@@ -167,13 +185,14 @@ try {
     noContentRerenderAfterInteractions: contentReplaceCalls === replacesAfterOpen,
     stableContentNode: modal.contentEl === content && content.querySelector(".al-library-export-preview") === preview,
     stableControlsNode: content.querySelector(".al-library-export-controls") === controls,
-    checkboxFocusPreserved: focusedAfterCheckbox,
-    onlyOptionalFieldsAreCheckboxes: checkboxInputs.length === AnimeListLibraryExport.LIBRARY_TEXT_EXPORT_FIELDS.length && checkboxInputs.every((input)=>!input.disabled),
-    fixedFieldsAbsentFromOptions: !checkboxLabels.some((label)=>["完成時間","作品","單位紀錄"].includes(label)),
-    serialUsesTimelineTitle: previewAfterManga.includes("葬送的芙莉蓮 — 第 13 卷") && previewAfterManga.includes("葬送的芙莉蓮 — 第 14 卷"),
-    readableSpacing: previewAfterManga.includes("第 13 卷") && previewAfterManga.includes("\\n\\n2026-06-12"),
-    noPipeTable: !previewAfterManga.includes("|"),
-    textOptionsVisibilityStable: fieldsSection && !fieldsSection.hidden,
+    templateFocusPreserved: focusedAfterTemplateInput,
+    noCheckboxFieldPicker: content.querySelectorAll(".al-library-export-checkbox input").length === 0,
+    templateVisibleInTextMode: templateSection && !templateSection.hidden,
+    customTemplateRendersTimelineUnits: previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 13 卷 : 2026-05-03") && previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 14 卷 : 2026-06-12"),
+    invalidTemplateBlocksActions,
+    variableInsertKeepsFocus,
+    saveActionExplainsDestination: saveLocation.includes("AnimeList/Exports/"),
+    saveCreatesExportFileOnly: creates.length === 1 && creates[0].path.startsWith("AnimeList/Exports/AnimeList-") && creates[0].path.endsWith(".txt"),
     responsiveLayout: isMobile
       ? previewSectionRect.top >= controlsRect.bottom - 1
       : previewSectionRect.left >= controlsRect.right - 1,
@@ -193,14 +212,14 @@ try {
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "desktop"),
-    testName: "Library Export stable controls and spacious desktop layout",
+    testName: "Library Export stable custom template and save-file layout",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 1100, height: 850, deviceScaleFactor: 1 },
   });
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "mobile"),
-    testName: "Library Export stable controls and responsive mobile layout",
+    testName: "Library Export custom template remains stable on mobile",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   });

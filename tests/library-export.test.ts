@@ -129,21 +129,17 @@ describe("library export", () => {
       ["2026-02-10", "Anime Done", undefined],
     ]);
     assert.equal(rows.some((row) => row.time === "2026-02-20"), false);
-    const text = formatLibraryTextExport(rows, new Set(["score"]));
+    const text = formatLibraryTextExport(
+      rows,
+      "({$作品類型}) {$作品名稱} : {$完成時間} | {$評分}",
+    );
     assert.equal(text, [
-      "2026-01-03",
-      "Serial — 第 1 卷",
-      "  評分：9",
+      "(漫畫) Serial — 第 1 卷 : 2026-01-03 | 9",
       "",
-      "2026-01-12",
-      "Serial — 第 2 卷",
-      "  評分：9",
+      "(漫畫) Serial — 第 2 卷 : 2026-01-12 | 9",
       "",
-      "2026-02-10",
-      "Anime Done",
-      "  評分：8.5",
+      "(動畫) Anime Done : 2026-02-10 | 8.5",
       "",
     ].join("\n"));
-    assert.doesNotMatch(text, /\|/);
   });
 });

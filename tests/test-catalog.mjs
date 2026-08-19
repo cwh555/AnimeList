@@ -74,6 +74,7 @@ export const TEST_TARGETS = [
   { path: "tests/user-tag-settings.test.ts", kind: "test", suite: "integration", features: ["tags", "settings"] },
   { path: "tests/media-library-index.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-export.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
+  { path: "tests/library-text-template.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
   { path: "tests/library-import.test.ts", kind: "test", suite: "unit", features: ["library", "import"] },
   { path: "tests/markdown-refresh-scope.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
