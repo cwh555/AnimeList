@@ -4,6 +4,8 @@ import { App, TFile } from "obsidian";
 import AnimeListPlugin from "../../src/main";
 import { createDefaultSettings } from "../../src/app/settings-model";
 import type { MediaItem } from "../../src/types";
+import { libraryExportFeature } from "../../src/features/library-export/feature";
+import type { AnimeListFeatureHost } from "../../src/app/feature-types";
 
 function timelineItem(): MediaItem {
   return {
@@ -123,4 +125,24 @@ describe("plugin UI workflows", () => {
 
     assert.deepEqual(sections, ["timeline"]);
   });
+
+  it("registers Library export as a command and workspace action rather than a new workspace page", async () => {
+    const commands: Array<{ id: string; name: string }> = [];
+    const host = {
+      app: new App(),
+      addCommand(command: { id: string; name: string }) { commands.push(command); },
+    } as unknown as AnimeListFeatureHost;
+    const lifecycle = libraryExportFeature.contributions.find((contribution) => contribution.kind === "lifecycle");
+    assert.ok(lifecycle && lifecycle.kind === "lifecycle");
+    await lifecycle.activate(host);
+    assert.equal(commands[0]?.id, "export-library");
+
+    const workspace = libraryExportFeature.contributions.find((contribution) => contribution.kind === "workspace-action");
+    assert.ok(workspace && workspace.kind === "workspace-action");
+    const action = workspace.action(host);
+    assert.equal(action?.id, "export-library");
+    assert.equal(action?.icon, "download");
+    assert.equal(libraryExportFeature.contributions.some((contribution) => contribution.kind === "workspace-page"), false);
+  });
+
 });
