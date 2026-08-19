@@ -92,15 +92,6 @@ export function renderLibraryExportTextFields(
     makeEl("p", "al-library-export-description", libraryExportText("requiredFields")),
   );
   const fields = makeEl("div", "al-media-form al-library-export-fields");
-  for (const fixed of ["fieldTime", "fieldWork"] as const) {
-    const label = makeEl("label", "al-form-checkbox al-library-export-checkbox is-required");
-    const input = makeEl("input");
-    input.type = "checkbox";
-    input.checked = true;
-    input.disabled = true;
-    label.append(input, makeEl("span", "", libraryExportText(fixed)));
-    fields.appendChild(label);
-  }
   for (const field of LIBRARY_TEXT_EXPORT_FIELDS) {
     const label = makeEl("label", "al-form-checkbox al-library-export-checkbox");
     const input = makeEl("input");

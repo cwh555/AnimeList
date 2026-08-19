@@ -93,7 +93,6 @@ export interface LibraryExportDocumentV1 {
 }
 
 export const LIBRARY_TEXT_EXPORT_FIELDS = [
-  "entry",
   "mediaType",
   "originalTitle",
   "score",
@@ -107,7 +106,6 @@ export const LIBRARY_TEXT_EXPORT_FIELDS = [
 export type LibraryTextExportField = (typeof LIBRARY_TEXT_EXPORT_FIELDS)[number];
 
 export const DEFAULT_LIBRARY_TEXT_EXPORT_FIELDS: readonly LibraryTextExportField[] = [
-  "entry",
   "mediaType",
 ];
 

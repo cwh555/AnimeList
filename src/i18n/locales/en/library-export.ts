@@ -1,5 +1,5 @@
 export const EN_LIBRARY_EXPORT_MESSAGES = {
-  action: "Export Library…",
+  action: "Export",
   command: "Export Library",
   title: "Export Library",
   description: "Export the current AnimeList Library as portable JSON or as a Timeline-style completion log.",
@@ -12,7 +12,7 @@ export const EN_LIBRARY_EXPORT_MESSAGES = {
   mediaType: "Media type",
   status: "Library status",
   fields: "Text fields",
-  requiredFields: "Time and Work are always included. Choose any additional fields below.",
+  requiredFields: "Completion time and work are always included. Only optional details are listed below.",
   preview: "Preview",
   jsonSummary: "{count} Library records",
   textSummary: "{count} completion events",
@@ -37,6 +37,7 @@ export const EN_LIBRARY_EXPORT_MESSAGES = {
   yes: "Yes",
   no: "No",
   entryValue: "{unit} {label}",
+  fieldLine: "{label}: {value}",
   progressWithTotal: "{current}/{total} {unit}",
   progressCurrentOnly: "{current} {unit}",
   emptyValue: "",

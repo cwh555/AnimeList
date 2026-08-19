@@ -2,7 +2,7 @@ import { Menu, setIcon } from "obsidian";
 import type { LibrarySection } from "../domain/settings-types";
 import { uiText } from "../ui-text";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
-import { makeEl, setAnimeListIcon } from "./ui-helpers";
+import { appendIconLabel, makeEl, setAnimeListIcon } from "./ui-helpers";
 
 export interface WorkspaceShellOptions {
   pages: readonly WorkspacePageDefinition[];
@@ -40,7 +40,16 @@ export function renderAnimeListWorkspaceShell(
 
   const actions = makeEl("div", "al-workspace-header-actions");
   const menuActions = orderedActions(options.actions ?? []);
-  if (menuActions.length) {
+  if (menuActions.length === 1) {
+    const action = menuActions[0];
+    const direct = makeEl("button", "al-secondary-button al-workspace-action");
+    direct.type = "button";
+    direct.title = action.label;
+    if (action.icon) appendIconLabel(direct, action.icon, action.label);
+    else direct.textContent = action.label;
+    direct.addEventListener("click", () => { void action.run(); });
+    actions.appendChild(direct);
+  } else if (menuActions.length > 1) {
     const more = makeEl("button", "al-workspace-more");
     more.type = "button";
     const moreLabel = uiText("detail.more");

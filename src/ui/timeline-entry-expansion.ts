@@ -1,31 +1,7 @@
-import type { ReadingProgressUnit } from "../domain/progress-units";
 import { buildLibraryCompletionEvents } from "../domain/timeline/completion-events";
 import type { MediaItem, TimelineMediaEntry } from "../types";
-import { progressUnitFeatureText, progressUnitLabel } from "../features/progress/text";
-
-export interface TimelineEntryCopy {
-  title: string;
-  label: string;
-}
-
-export function timelineEntryCopy(
-  seriesTitle: string,
-  entryLabel: string,
-  unit: ReadingProgressUnit,
-): TimelineEntryCopy {
-  const unitLabel = progressUnitLabel(unit);
-  return {
-    title: progressUnitFeatureText("timelineEntryTitle", {
-      title: seriesTitle,
-      label: entryLabel,
-      unit: unitLabel,
-    }),
-    label: progressUnitFeatureText("timelineEntryLabel", {
-      label: entryLabel,
-      unit: unitLabel,
-    }),
-  };
-}
+import { timelineEntryCopy } from "../features/progress/timeline-entry-text";
+export { timelineEntryCopy } from "../features/progress/timeline-entry-text";
 
 export function expandTimelineEntries(items: MediaItem[]): TimelineMediaEntry[] {
   return buildLibraryCompletionEvents(items).map((event): TimelineMediaEntry => {
