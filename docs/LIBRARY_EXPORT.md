@@ -17,6 +17,12 @@ The export modal supports:
 
 Preview text may be truncated for large libraries; Copy and Save always use the complete output.
 
+### Interaction and layout
+
+The modal is mounted once. Format buttons, scope selectors, and Text-field checkboxes update only their own state and the existing preview textarea; they do **not** rebuild the modal DOM. This keeps focus, scroll position, and control identity stable while options are changed.
+
+On desktop, controls occupy a compact left column and the preview gets the larger right column. On narrow/mobile layouts the same sections stack vertically. Format, scope, optional Text details, preview, and footer actions are visually separated instead of sharing one dense form grid.
+
 ## JSON contract
 
 JSON uses a stable versioned envelope:
@@ -45,6 +51,10 @@ Each record contains only portable Library state needed for analysis and a futur
 The JSON deliberately excludes filesystem mtime-derived values, provider scores, note templates, serial-entry `extra` payloads, arbitrary frontmatter, note body Markdown, Images, and Moments.
 
 The note path and local cover paths are hints, not portable identity. A future Import should match records by provider + source id, then AniList id, then a reviewed media-type/title fallback.
+
+### Import contract readiness
+
+V1 still does not expose an Import UI or write imported notes. It does include a typed Import contract parser used by automated tests. The parser accepts only `animelist-library-export` version `1`, rejects malformed nested records, rejects foreign/unsupported formats, and exposes match candidates in the intended **source → AniList → title** order. A cross-contract test feeds JSON produced by the current Export record builder back through this parser and verifies that status, progress, serial history, and source identity survive intact.
 
 ## Text contract
 
@@ -87,10 +97,10 @@ Text is a human-readable report and is not intended to be reversible. Future Imp
 
 1. Use the explicit **Export** workspace action from each workspace page; the same modal should open and there should be no one-item `…` menu.
 2. JSON starts with `animelist-library-export` / version `1` and contains one record per scoped Library work.
-3. Switch media type/status filters and confirm record/event counts and preview contents update together.
-4. Switch to Text. Completion time and work are shown in the output but not as checkbox options; only optional details can be toggled.
-5. For manga/novel serial histories, confirm completed units are split exactly like Timeline and each work line includes the localized unit + label.
-6. Copy, paste into a text editor, and confirm the full output is copied even when preview is truncated.
-7. Save JSON and Text and confirm files are created in `<Library root>/Exports/` with `.animelist.json` / `.txt` extensions.
-8. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
-9. Repeat at narrow/mobile width and confirm the modal remains usable without horizontal page overflow.
+3. Switch format, media type/status filters, and several Text checkboxes repeatedly. Controls/focus must stay stable with no full-modal flash or reset while record/event counts and preview contents update.
+4. Confirm the desktop modal uses a controls column + larger preview column; at narrow/mobile width the sections stack cleanly without horizontal overflow.
+5. Switch to Text. Completion time and work are shown in the output but not as checkbox options; only optional details can be toggled.
+6. For manga/novel serial histories, confirm completed units are split exactly like Timeline and each work line includes the localized unit + label.
+7. Copy, paste into a text editor, and confirm the full output is copied even when preview is truncated.
+8. Save JSON and Text and confirm files are created in `<Library root>/Exports/` with `.animelist.json` / `.txt` extensions.
+9. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.

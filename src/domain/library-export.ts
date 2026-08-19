@@ -190,21 +190,110 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function isProgressValue(value: unknown): boolean {
+  return typeof value === "string" || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isStringArray(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+}
+
+function isReleaseStatus(value: unknown): boolean {
+  return value === undefined
+    || value === "releasing"
+    || value === "finished"
+    || value === "hiatus"
+    || value === "cancelled"
+    || value === "unknown";
+}
+
+function isSerialCover(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  return isOptionalString(value.path)
+    && isOptionalString(value.provider)
+    && isOptionalString(value.sourceId)
+    && (value.manual === undefined || typeof value.manual === "boolean");
+}
+
+function isSerialEntry(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.label !== "string") return false;
+  return isOptionalString(value.startedAt)
+    && isOptionalString(value.completedAt)
+    && isSerialCover(value.cover);
+}
+
+function isMetadata(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  const yearLike = (entry: unknown) => entry === undefined || typeof entry === "string" || typeof entry === "number";
+  return yearLike(value.year)
+    && isOptionalString(value.season)
+    && yearLike(value.seasonYear)
+    && isStringArray(value.genres)
+    && isStringArray(value.mediaTags)
+    && isOptionalString(value.sourceMaterial)
+    && isOptionalString(value.countryOfOrigin)
+    && isStringArray(value.people)
+    && isStringArray(value.platforms);
+}
+
+function isSource(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  return isOptionalString(value.provider)
+    && isOptionalString(value.id)
+    && isOptionalString(value.anilistId)
+    && isStringArray(value.urls);
+}
+
+function isCover(value: unknown): boolean {
+  if (value === undefined) return true;
+  return isRecord(value) && isOptionalString(value.path) && isOptionalString(value.remote);
+}
+
+function isDates(value: unknown): boolean {
+  if (value === undefined) return true;
+  return isRecord(value) && isOptionalString(value.startedAt) && isOptionalString(value.completedAt);
+}
+
+function isExportRecordV1(record: unknown): boolean {
+  if (!isRecord(record) || !isRecord(record.progress)) return false;
+  return typeof record.title === "string"
+    && record.title.trim().length > 0
+    && isOptionalString(record.originalTitle)
+    && isOptionalString(record.romajiTitle)
+    && (record.mediaType === "anime" || record.mediaType === "manga" || record.mediaType === "novel")
+    && (record.status === "planned" || record.status === "ongoing" || record.status === "completed" || record.status === "dropped")
+    && typeof record.format === "string"
+    && record.format.trim().length > 0
+    && typeof record.progress.unit === "string"
+    && record.progress.unit.trim().length > 0
+    && isProgressValue(record.progress.current)
+    && (record.progress.total === undefined || isProgressValue(record.progress.total))
+    && (record.score === undefined || (typeof record.score === "number" && Number.isFinite(record.score)))
+    && typeof record.favorite === "boolean"
+    && isReleaseStatus(record.releaseStatus)
+    && isDates(record.dates)
+    && (record.serialEntries === undefined
+      || (Array.isArray(record.serialEntries) && record.serialEntries.every(isSerialEntry)))
+    && isMetadata(record.metadata)
+    && isSource(record.source)
+    && isOptionalString(record.notePath)
+    && isCover(record.cover);
+}
+
 export function isLibraryExportDocumentV1(value: unknown): value is LibraryExportDocumentV1 {
   if (!isRecord(value)
     || value.format !== ANIMELIST_LIBRARY_EXPORT_FORMAT
     || value.version !== ANIMELIST_LIBRARY_EXPORT_VERSION
     || typeof value.exportedAt !== "string"
+    || !value.exportedAt.trim()
     || !Array.isArray(value.records)) return false;
 
-  return value.records.every((record) => {
-    if (!isRecord(record) || !isRecord(record.progress)) return false;
-    return typeof record.title === "string"
-      && (record.mediaType === "anime" || record.mediaType === "manga" || record.mediaType === "novel")
-      && (record.status === "planned" || record.status === "ongoing" || record.status === "completed" || record.status === "dropped")
-      && typeof record.format === "string"
-      && typeof record.progress.unit === "string"
-      && (typeof record.progress.current === "string" || typeof record.progress.current === "number")
-      && typeof record.favorite === "boolean";
-  });
+  return value.records.every(isExportRecordV1);
 }
