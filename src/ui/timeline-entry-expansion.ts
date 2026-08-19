@@ -1,5 +1,5 @@
-import { normalizeVolumeLog } from "../domain/progress/novel-progress";
-import { defaultProgressUnit, type ReadingProgressUnit } from "../domain/progress-units";
+import type { ReadingProgressUnit } from "../domain/progress-units";
+import { buildLibraryCompletionEvents } from "../domain/timeline/completion-events";
 import type { MediaItem, TimelineMediaEntry } from "../types";
 import { progressUnitFeatureText, progressUnitLabel } from "../features/progress/text";
 
@@ -28,32 +28,21 @@ export function timelineEntryCopy(
 }
 
 export function expandTimelineEntries(items: MediaItem[]): TimelineMediaEntry[] {
-  const output: TimelineMediaEntry[] = [];
-  for (const item of items) {
-    const completedVolumes = item.mediaType === "novel" || item.mediaType === "manga"
-      ? normalizeVolumeLog(item.volumeLog).filter((entry) => Boolean(entry.completedAt))
-      : [];
-    if (completedVolumes.length) {
-      for (const volume of completedVolumes) {
-        const unit = defaultProgressUnit(item.mediaType, item.unit);
-        const copy = timelineEntryCopy(
-          item.title,
-          volume.label,
-          unit === "episode" ? "volume" : unit,
-        );
-        output.push({
-          ...item,
-          seriesTitle: item.title,
-          title: copy.title,
-          serialEntryLabel: copy.label,
-          completedAt: volume.completedAt,
-          cover: volume.cover || item.cover,
-          volumeLabel: volume.label,
-        });
-      }
-      continue;
-    }
-    if (item.status === "completed" && item.completedAt) output.push({ ...item });
-  }
-  return output;
+  return buildLibraryCompletionEvents(items).map((event): TimelineMediaEntry => {
+    if (!event.serialEntry || !event.serialUnit) return { ...event.item };
+    const copy = timelineEntryCopy(
+      event.item.title,
+      event.serialEntry.label,
+      event.serialUnit,
+    );
+    return {
+      ...event.item,
+      seriesTitle: event.item.title,
+      title: copy.title,
+      serialEntryLabel: copy.label,
+      completedAt: event.completedAt,
+      cover: event.serialEntry.cover || event.item.cover,
+      volumeLabel: event.serialEntry.label,
+    };
+  });
 }
