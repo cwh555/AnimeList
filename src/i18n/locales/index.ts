@@ -3,6 +3,7 @@ import "../../features/image-sections/text";
 import "../../features/moments/text";
 import "../../features/image-gallery/text";
 import "../../features/library-layout/text";
+import "../../features/library-export/text";
 import { registerLocaleMessages } from "../catalog";
 import { EN_CATALOGS } from "./en";
 import { JA_CATALOGS } from "./ja";

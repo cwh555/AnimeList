@@ -8,6 +8,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/base.css",
   "styles/settings.css",
   "styles/workspace.css",
+  "styles/library-export.css",
   "styles/image-gallery.css",
   "styles/timeline.css",
   "styles/serial-reading.css",
