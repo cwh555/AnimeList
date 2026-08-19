@@ -36,6 +36,7 @@ describe("settings compatibility", () => {
         genre: "戀愛",
         sort: "score-desc",
         view: "list",
+        layoutColumns: { grid: 5, poster: 2 },
       },
     });
 
@@ -54,6 +55,7 @@ describe("settings compatibility", () => {
       filters: { companies: [], quarter: "", tags: ["戀愛"] },
       sort: "score-desc",
       view: "list",
+      layoutColumns: { grid: 5, poster: 2 },
     });
   });
 
@@ -81,7 +83,7 @@ describe("settings compatibility", () => {
       additionalScanFolders: "Archive",
       providers: { bangumi: "yes" },
       migrations: { mediaStatus: "6" },
-      uiState: { type: "podcast", status: "all", view: "table" },
+      uiState: { type: "podcast", status: "all", view: "table", layoutColumns: { grid: 0, poster: 99 } },
     });
 
     assert.equal(settings.interfaceLanguage, "zh-TW");
@@ -90,7 +92,10 @@ describe("settings compatibility", () => {
     assert.deepEqual(settings.tagCatalog, []);
     assert.deepEqual(settings.providers, DEFAULT_SETTINGS.providers);
     assert.equal(settings.migrations.mediaStatus, 0);
-    assert.deepEqual(settings.uiState, DEFAULT_SETTINGS.uiState);
+    assert.deepEqual(settings.uiState, {
+      ...DEFAULT_SETTINGS.uiState,
+      layoutColumns: { grid: 1, poster: 6 },
+    });
   });
 
   it("accepts every AnimeList workspace section and rejects unknown sections", async () => {

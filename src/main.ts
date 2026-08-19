@@ -146,6 +146,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
       filters: state.filters,
       sort: state.sort,
       view: state.view,
+      layoutColumns: state.layoutColumns,
     };
     if (this.saveUiTimer !== null) window.clearTimeout(this.saveUiTimer);
     this.saveUiTimer = window.setTimeout(() => {

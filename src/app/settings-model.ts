@@ -11,6 +11,7 @@ import {
 } from "../domain/timeline/scale";
 import type { AnimeListSettings } from "../domain/settings-types";
 import { normalizeLibraryFilters } from "../domain/library-filters";
+import { normalizeLibraryLayoutColumns } from "../domain/library-layout";
 import { normalizeUserTagCatalog } from "../domain/user-tag-catalog";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,6 +61,7 @@ export const DEFAULT_SETTINGS: AnimeListSettings = {
     filters: { companies: [], quarter: "", tags: [] },
     sort: "completed-desc",
     view: "grid",
+    layoutColumns: normalizeLibraryLayoutColumns(undefined),
   },
 };
 
@@ -132,6 +134,7 @@ export function normalizeAnimeListSettings(value: unknown): AnimeListSettings {
       filters: normalizeLibraryFilters(uiState.filters, legacyGenre),
       sort: stringValue(uiState.sort, DEFAULT_SETTINGS.uiState.sort),
       view: uiState.view === "list" || uiState.view === "poster" ? uiState.view : "grid",
+      layoutColumns: normalizeLibraryLayoutColumns(uiState.layoutColumns),
     },
   };
 }
