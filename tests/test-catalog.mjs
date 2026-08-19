@@ -2,6 +2,8 @@ export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", 
 
 export const TEST_FEATURES = [
   "covers",
+  "export",
+  "import",
   "image-gallery",
   "image-sections",
   "library",
@@ -71,6 +73,9 @@ export const TEST_TARGETS = [
   { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },
   { path: "tests/user-tag-settings.test.ts", kind: "test", suite: "integration", features: ["tags", "settings"] },
   { path: "tests/media-library-index.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/library-export.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
+  { path: "tests/library-text-template.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
+  { path: "tests/library-import.test.ts", kind: "test", suite: "unit", features: ["library", "import"] },
   { path: "tests/markdown-refresh-scope.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
   { path: "tests/library-view.test.ts", kind: "test", suite: "unit", features: ["library", "masterpiece"] },

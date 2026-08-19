@@ -89,7 +89,7 @@ const pages=[
  {id:"images",label:"Images",icon:"images",order:40,render(el){AnimeListWorkspaceImages.renderImageGallery(el,works,galleryState,{resolve:(image)=>({resourcePath:urlMap[image.path]}),openLightbox:(imgs,start)=>{lightboxKeys=imgs.map(i=>i.key).slice(start)},openSource:(path)=>{sourceOpened=path},onStateChange:(state)=>{galleryState={...state}}})}},
 ];
 const app=document.querySelector("#app");
-const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){}}],onSelect:(section)=>{active=section;render()}}); result.activePage.render(result.page);};
+const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){window.__workspaceActionRuns=(window.__workspaceActionRuns||0)+1}}],onSelect:(section)=>{active=section;render()}}); result.activePage.render(result.page);};
 const tab=(section)=>document.querySelector('.al-workspace-tab[data-section="'+section+'"]');
 const click=(el)=>el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true}));
 const frames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -110,7 +110,10 @@ render();
  details.collectMovedIntoLibraryTypeRow=!!typeRow && libraryCollect?.parentElement===typeRow && typeTabs?.parentElement===typeRow && typeRow.lastElementChild===libraryCollect && !document.querySelector('.al-workspace-collect');
  click(libraryCollect);
  details.collectUsesCurrentLibraryType=collectType==='anime';
- details.moreStaysWorkspaceAction=!!document.querySelector('.al-workspace-more');
+ const directAction=document.querySelector('.al-workspace-action');
+ details.singleWorkspaceActionIsDirect=!!directAction && directAction.textContent.includes('Release updates') && !document.querySelector('.al-workspace-more');
+ click(directAction);
+ details.directWorkspaceActionRuns=window.__workspaceActionRuns===1;
 
  click(tab('timeline')); await new Promise(r=>setTimeout(r,25)); await frames();
  const timelineViewport=document.querySelector('.al-timeline-viewport');
@@ -144,8 +147,6 @@ render();
  details.sourceRouteUsesOwningNote=sourceOpened==='Anime/Frieren.md';
  click(document.querySelector('.al-gallery-image-open'));
  details.lightboxUsesFilteredOrder=lightboxKeys.length===2;
- document.querySelector('.al-workspace-more').click();
- details.moreContainsReleaseTool=(window.__menuItems||[]).includes('Release updates');
  document.body.dataset.details=JSON.stringify(details); document.body.dataset.result=Object.values(details).every(Boolean)?'pass':'fail';
 })().catch(error=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result='fail'});
 </script></body></html>`;
