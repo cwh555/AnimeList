@@ -16,8 +16,9 @@ await build({
     contents: `
       export { renderAnimeListWorkspaceShell } from "./src/ui/workspace-shell";
       export { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "./src/ui/image-gallery-renderer";
-      export { TimelineUI } from "./src/ui/timeline-renderer";
+      export { renderTimelineWorkspace } from "./src/ui/timeline-workspace-renderer";
       export { AnimeListUI } from "./src/ui/library-renderer";
+      export { installLibraryWorkspaceLayout } from "./src/ui/library-workspace-layout";
     `,
     resolveDir: root,
     loader: "ts",
@@ -71,7 +72,7 @@ html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family
 button:not(.clickable-icon){height:32px;background:#292929;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 ${styles}
 </style></head><body class="is-mobile" data-result="pending"><div id="app" class="animelist-native-view"></div>
-<script>window.createEl=(tag)=>document.createElement(tag); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
+<script>window.createEl=(tag)=>document.createElement(tag); if(!Node.prototype.createSvg)Object.defineProperty(Node.prototype,"createSvg",{value:function(tag){const el=document.createElementNS("http://www.w3.org/2000/svg",tag);this.appendChild(el);return el;}}); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
 <script>${bundle}</script><script>
 const refs=(sourcePath,title,type,paths,sessions)=>({sourcePath,title,originalTitle:title+" original",mediaType:type,sessions:sessions.map((list,index)=>({index,images:list.map(p=>paths.find(x=>x.path===p))})),images:paths});
 const img=(sourcePath,title,type,path,key)=>({key,path,sourcePath,mediaTitle:title,originalTitle:title+" original",mediaType:type,references:[{sessionIndex:0,position:0}]});
@@ -83,8 +84,8 @@ const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"${images.c}",
 const timelineItem={title:"Frieren",originalTitle:"Frieren",mediaType:"anime",format:"TV",status:"completed",releaseStatus:"finished",progress:28,total:28,unit:"ep",score:9,favorite:false,year:2024,genres:[],people:[],platforms:[],sourceUrls:[],cover:"${images.a}",filePath:"Anime/Frieren.md",updated:0,updatedLabel:"",startedAt:"2023-09-29",completedAt:"2024-03-22",volumeLog:[]};
 let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[]; let collectType="";
 const pages=[
- {id:"library",label:"Library",icon:"library",order:10,render(el){AnimeListWorkspaceImages.AnimeListUI.renderLibrary(el,[timelineItem],{presentation:"workspace",addItem:(type)=>{collectType=type}})}},
- {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){AnimeListWorkspaceImages.TimelineUI.render(el,[timelineItem],{})}},
+ {id:"library",label:"Library",icon:"library",order:10,render(el){AnimeListWorkspaceImages.AnimeListUI.renderLibrary(el,[timelineItem],{presentation:"workspace",addItem:(type)=>{collectType=type}});AnimeListWorkspaceImages.installLibraryWorkspaceLayout(el)}},
+ {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){AnimeListWorkspaceImages.renderTimelineWorkspace(el,[timelineItem],{})}},
  {id:"scores",label:"Score Dashboard",icon:"table-properties",order:30,render(el){el.textContent="SCORES PAGE"}},
  {id:"images",label:"Images",icon:"images",order:40,render(el){AnimeListWorkspaceImages.renderImageGallery(el,works,galleryState,{resolve:(image)=>({resourcePath:urlMap[image.path]}),openLightbox:(imgs,start)=>{lightboxKeys=imgs.map(i=>i.key).slice(start)},openSource:(path)=>{sourceOpened=path},onStateChange:(state)=>{galleryState={...state}}})}},
 ];
@@ -104,10 +105,11 @@ render();
  details.primaryNavVisibleOnMobile=getComputedStyle(document.querySelector('.al-workspace-nav')).display!=='none';
  const primaryNav=document.querySelector('.al-workspace-nav');
  details.primaryNavHasNoVerticalScrollbar=primaryNav.scrollHeight<=primaryNav.clientHeight && !['auto','scroll'].includes(getComputedStyle(primaryNav).overflowY);
- const typeRow=document.querySelector('.al-library-workspace-type-row');
- const typeTabs=document.querySelector('.al-type-tabs');
+ const librarySummary=document.querySelector('.al-library-workspace-summary');
+ const pageActions=document.querySelector('.al-workspace-page-actions');
+ const typeTabs=document.querySelector('.al-library-workspace-type-tabs');
  const libraryCollect=document.querySelector('.al-library-workspace-collect');
- details.collectMovedIntoLibraryTypeRow=!!typeRow && libraryCollect?.parentElement===typeRow && typeTabs?.parentElement===typeRow && typeRow.lastElementChild===libraryCollect && !document.querySelector('.al-workspace-collect');
+ details.collectAttachedToSharedPageHeader=!!librarySummary && !!pageActions && libraryCollect?.parentElement===pageActions && typeTabs?.parentElement===document.querySelector('.al-shell.is-workspace-page') && !document.querySelector('.al-library-workspace-type-row') && !document.querySelector('.al-workspace-collect');
  click(libraryCollect);
  details.collectUsesCurrentLibraryType=collectType==='anime';
  const directAction=document.querySelector('.al-workspace-action');
@@ -117,7 +119,20 @@ render();
 
  click(tab('timeline')); await new Promise(r=>setTimeout(r,25)); await frames();
  const timelineViewport=document.querySelector('.al-timeline-viewport');
+ const timelineCard=document.querySelector('.al-timeline-card');
+ const timelineImage=timelineCard?.querySelector('img');
+ const timelineCopy=timelineCard?.querySelector('.al-timeline-card-copy');
+ const timelineShade=timelineCard?.querySelector('.al-cover-shade');
  details.timelineRendersInWorkspace=document.querySelectorAll('.al-timeline-card').length===1 && timelineViewport.getBoundingClientRect().height>240;
+ if(!timelineCard||!timelineImage||!timelineCopy||!timelineShade) throw new Error('Missing compact Timeline card parts');
+ const timelineCardRect=timelineCard.getBoundingClientRect();
+ const timelineImageRect=timelineImage.getBoundingClientRect();
+ const timelineCopyRect=timelineCopy.getBoundingClientRect();
+ details.timelineCardUsesCompactOverlay=timelineCardRect.height>=178 && timelineCardRect.height<=182
+   && Math.abs(timelineImageRect.height-timelineCardRect.height)<=2
+   && getComputedStyle(timelineCopy).position==='absolute'
+   && Math.abs(timelineCopyRect.bottom-timelineCardRect.bottom)<=12
+   && !timelineCopy.querySelector('small');
 
  click(tab('images')); await new Promise(r=>setTimeout(r,20)); await frames();
  details.sameWorkspaceSwitch=active==='images' && !!document.querySelector('.al-workspace-shell .al-image-gallery-page');

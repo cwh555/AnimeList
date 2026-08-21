@@ -1,4 +1,8 @@
 declare global {
+  interface Node {
+    createSvg<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K];
+  }
+
   interface HTMLElement {
     empty(): void;
     createDiv(options?: string | DomElementInfo): HTMLDivElement;

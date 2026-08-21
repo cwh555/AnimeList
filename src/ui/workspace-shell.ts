@@ -16,6 +16,8 @@ export interface WorkspaceShellResult {
   activePage: WorkspacePageDefinition;
 }
 
+const activeResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
 function orderedPages(pages: readonly WorkspacePageDefinition[]): WorkspacePageDefinition[] {
   return [...pages].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
 }
@@ -24,14 +26,36 @@ function orderedActions(actions: readonly WorkspaceMenuAction[]): WorkspaceMenuA
   return [...actions].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
 }
 
+function syncWindowSize(shell: HTMLElement): void {
+  const measuredWidth = typeof shell.getBoundingClientRect === "function"
+    ? shell.getBoundingClientRect().width
+    : 0;
+  const width = measuredWidth || shell.clientWidth || 840;
+  shell.dataset.windowSize = width < 600 ? "compact" : width < 840 ? "medium" : "expanded";
+}
+
+function observeWindowSize(container: HTMLElement, shell: HTMLElement): void {
+  activeResizeObservers.get(container)?.disconnect();
+  activeResizeObservers.delete(container);
+  syncWindowSize(shell);
+  if (typeof ResizeObserver !== "function") return;
+  const observer = new ResizeObserver(() => syncWindowSize(shell));
+  observer.observe(shell);
+  activeResizeObservers.set(container, observer);
+}
+
 export function renderAnimeListWorkspaceShell(
   container: HTMLElement,
   options: WorkspaceShellOptions,
 ): WorkspaceShellResult {
+  activeResizeObservers.get(container)?.disconnect();
+  activeResizeObservers.delete(container);
   container.replaceChildren();
+
   const pages = orderedPages(options.pages);
   const activePage = pages.find((page) => page.id === options.activeSection) ?? pages[0];
   if (!activePage) throw new Error("AnimeList workspace requires at least one page");
+  container.classList.toggle("is-timeline-workspace", activePage.id === "timeline");
 
   const shell = makeEl("section", `al-workspace-shell is-${activePage.id}`);
   const header = makeEl("header", "al-workspace-header");
@@ -71,7 +95,7 @@ export function renderAnimeListWorkspaceShell(
     });
     actions.appendChild(more);
   }
-  header.appendChild(brand);
+  header.append(brand, actions);
 
   const navRow = makeEl("div", "al-workspace-nav-row");
   const nav = makeEl("nav", "al-workspace-nav");
@@ -90,12 +114,19 @@ export function renderAnimeListWorkspaceShell(
     });
     nav.appendChild(button);
   }
-
   navRow.appendChild(nav);
-  if (actions.childElementCount) navRow.appendChild(actions);
 
-  const page = makeEl("div", `al-workspace-page is-${activePage.id}`);
+  const page = makeEl("section", `al-workspace-page is-${activePage.id}`);
+  const pageHeader = makeEl("header", "al-workspace-page-header");
+  const pageHeading = makeEl("div", "al-workspace-page-heading");
+  pageHeading.appendChild(makeEl("h1", "al-workspace-page-title", activePage.label));
+  const pageActions = makeEl("div", "al-workspace-page-actions");
+  pageHeader.append(pageHeading, pageActions);
+  const pageBody = makeEl("div", "al-workspace-page-body");
+  page.append(pageHeader, pageBody);
+
   shell.append(header, navRow, page);
   container.appendChild(shell);
-  return { page, activePage };
+  observeWindowSize(container, shell);
+  return { page: pageBody, activePage };
 }

@@ -31,17 +31,17 @@ function laneCount(points: number[], minimumDistance: number): number {
 }
 
 describe("timeline scale defaults", () => {
-  it("uses a full-width portrait cover frame in the taller timeline card geometry", () => {
+  it("uses the portrait cover as the full compact timeline card", () => {
     assert.deepEqual(TIMELINE_CARD_GEOMETRY, {
       width: 120,
       coverHeight: 180,
-      cardHeight: 242,
+      cardHeight: 180,
       gapX: 16,
       gapY: 18,
       stemGap: 44,
     });
     assert.equal(TIMELINE_CARD_GEOMETRY.coverHeight / TIMELINE_CARD_GEOMETRY.width, 1.5);
-    assert.ok(TIMELINE_CARD_GEOMETRY.cardHeight > TIMELINE_CARD_GEOMETRY.coverHeight);
+    assert.equal(TIMELINE_CARD_GEOMETRY.cardHeight, TIMELINE_CARD_GEOMETRY.coverHeight);
   });
   it("supports a 10 percent minimum scene scale", () => {
     assert.equal(MIN_TIMELINE_VIEW_SCALE, 0.1);
@@ -301,8 +301,8 @@ function parseTransform(value: string): { x: number; y: number; scale: number } 
 function screenCenter(card: FakeElement, scene: FakeElement): { x: number; y: number } {
   const transform = parseTransform(scene.style.transform ?? "");
   return {
-    x: transform.x + (Number.parseFloat(card.style.left) + 60) * transform.scale,
-    y: transform.y + (Number.parseFloat(card.style.top) + 73) * transform.scale,
+    x: transform.x + (Number.parseFloat(card.style.left) + TIMELINE_CARD_GEOMETRY.width / 2) * transform.scale,
+    y: transform.y + (Number.parseFloat(card.style.top) + TIMELINE_CARD_GEOMETRY.cardHeight / 2) * transform.scale,
   };
 }
 

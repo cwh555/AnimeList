@@ -90,6 +90,7 @@ export const TEST_TARGETS = [
 
   { path: "tests/timeline-scale.test.ts", kind: "test", suite: "integration", features: ["timeline"] },
   { path: "tests/timeline-scale-work-items.test.ts", kind: "test", suite: "unit", features: ["timeline"] },
+  { path: "tests/timeline-workspace-layout.test.ts", kind: "test", suite: "unit", features: ["timeline"] },
   { path: "tests/timeline-corrections.test.ts", kind: "test", suite: "unit", features: ["timeline", "progress"] },
 
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },

@@ -4,7 +4,8 @@ import type { AnimeListSettings, LibrarySection, MediaItem, MediaType } from "..
 import { uiText } from "../ui-text";
 import type { LibraryRenderAdapters } from "./library-contracts";
 import { installLibraryLayoutControl, type LibraryLayoutControl } from "./library-layout-controls";
-import { TimelineUI } from "./timeline-renderer";
+import { installLibraryWorkspaceLayout } from "./library-workspace-layout";
+import { renderTimelineWorkspace } from "./timeline-workspace-renderer";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { renderAnimeListWorkspaceShell } from "./workspace-shell";
 
@@ -80,6 +81,7 @@ export class AnimeListView extends ItemView {
             layoutControl?.sync(next);
           },
         });
+        installLibraryWorkspaceLayout(container);
       },
     }, {
       id: "timeline",
@@ -87,7 +89,7 @@ export class AnimeListView extends ItemView {
       icon: "clock-3",
       order: 20,
       render: (container) => {
-        TimelineUI.render(container, items, {
+        renderTimelineWorkspace(container, items, {
           maxStackDepth: normalizeTimelineMaxStackDepth(this.host.settings.timelineMaxStackDepth),
           openFile: (path) => this.host.openMediaFile(path),
         });

@@ -15,6 +15,7 @@ import { JA_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 
 import { JA_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
 import { JA_LIBRARY_EXPORT_MESSAGES } from "./library-export";
+import { JA_TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
 
 export const JA_CATALOGS = {
   core: JA_CORE_MESSAGES,
@@ -32,4 +33,5 @@ export const JA_CATALOGS = {
   "image-gallery": JA_IMAGE_GALLERY_MESSAGES,
   "library-layout": JA_LIBRARY_LAYOUT_MESSAGES,
   "library-export": JA_LIBRARY_EXPORT_MESSAGES,
+  "timeline-workspace": JA_TIMELINE_WORKSPACE_MESSAGES,
 } as const satisfies LocaleCatalogs;
