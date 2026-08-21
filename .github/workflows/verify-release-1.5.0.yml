@@ -1,0 +1,53 @@
+name: Verify AnimeList 1.5.0 release
+
+on:
+  push:
+    branches:
+      - fix/settings-declarative-search
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 705e77b2175c1ce0e9c070ede120427310ae1a28
+          fetch-depth: 0
+      - name: Verify release, tag, and published assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: 705e77b2175c1ce0e9c070ede120427310ae1a28
+        run: |
+          set -euo pipefail
+          info="$(gh release view 1.5.0 --repo cwh555/AnimeList --json tagName,name,isDraft,isPrerelease,url,assets)"
+          test "$(jq -r '.tagName' <<<"$info")" = "1.5.0"
+          test "$(jq -r '.name' <<<"$info")" = "AnimeList 1.5.0"
+          test "$(jq -r '.isDraft' <<<"$info")" = "false"
+          test "$(jq -r '.isPrerelease' <<<"$info")" = "false"
+          printf '%s\n' "$info" | jq -e '[.assets[].name] | sort == ["main.js","manifest.json","styles.css"]' >/dev/null
+
+          git fetch origin refs/tags/1.5.0:refs/tags/1.5.0
+          test "$(git rev-parse '1.5.0^{commit}')" = "$TARGET_SHA"
+
+          rm -rf /tmp/animelist-release-1.5.0
+          mkdir -p /tmp/animelist-release-1.5.0
+          gh release download 1.5.0 --repo cwh555/AnimeList --dir /tmp/animelist-release-1.5.0
+          cmp manifest.json /tmp/animelist-release-1.5.0/manifest.json
+          cmp main.js /tmp/animelist-release-1.5.0/main.js
+          cmp styles.css /tmp/animelist-release-1.5.0/styles.css
+
+          {
+            echo "AnimeList 1.5.0 release verified"
+            echo "target=$TARGET_SHA"
+            echo "release=$(jq -r '.url' <<<\"$info\")"
+            sha256sum /tmp/animelist-release-1.5.0/main.js /tmp/animelist-release-1.5.0/manifest.json /tmp/animelist-release-1.5.0/styles.css
+          } > /tmp/release-verification.txt
+
+          content="$(base64 -w0 /tmp/release-verification.txt)"
+          gh api --method PUT repos/cwh555/AnimeList/contents/.release-1.5.0-verified.txt \
+            -f message='chore: record 1.5.0 release verification' \
+            -f content="$content" \
+            -f branch='fix/settings-declarative-search' >/dev/null
