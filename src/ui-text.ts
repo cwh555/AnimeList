@@ -5,8 +5,8 @@ import {
   MEDIA_STATUS_FILTER_ORDER,
   MEDIA_STATUS_VALUES,
   normalizeMediaStatus,
-} from "./media-status";
-import type { MediaStatus, MediaStatusFilter } from "./media-status";
+} from "./domain/media-status";
+import type { MediaStatus, MediaStatusFilter } from "./domain/media-status";
 
 /**
  * Typed adapter for AnimeList's core user-visible text catalog.

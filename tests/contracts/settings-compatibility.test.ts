@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import AnimeListPlugin from "../../src/main";
-import { normalizeSpecialLabelMode } from "../../src/masterpiece-labels";
-import { normalizeSearchLanguageSettings } from "../../src/multilingual-search";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { normalizeSpecialLabelMode } from "../../src/domain/masterpiece-labels";
+import { normalizeSearchLanguageSettings } from "../../src/app/search/multilingual-search";
+import { DEFAULT_SETTINGS } from "../../src/ui/settings";
 
 async function loadSettings(raw: unknown): Promise<AnimeListPlugin["settings"]> {
   const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin & {
@@ -36,6 +36,7 @@ describe("settings compatibility", () => {
         genre: "戀愛",
         sort: "score-desc",
         view: "list",
+        layoutColumns: { grid: 5, poster: 2 },
       },
     });
 
@@ -54,6 +55,7 @@ describe("settings compatibility", () => {
       filters: { companies: [], quarter: "", tags: ["戀愛"] },
       sort: "score-desc",
       view: "list",
+      layoutColumns: { grid: 5, poster: 2 },
     });
   });
 
@@ -81,7 +83,7 @@ describe("settings compatibility", () => {
       additionalScanFolders: "Archive",
       providers: { bangumi: "yes" },
       migrations: { mediaStatus: "6" },
-      uiState: { type: "podcast", status: "all", view: "table" },
+      uiState: { type: "podcast", status: "all", view: "table", layoutColumns: { grid: 0, poster: 99 } },
     });
 
     assert.equal(settings.interfaceLanguage, "zh-TW");
@@ -90,7 +92,20 @@ describe("settings compatibility", () => {
     assert.deepEqual(settings.tagCatalog, []);
     assert.deepEqual(settings.providers, DEFAULT_SETTINGS.providers);
     assert.equal(settings.migrations.mediaStatus, 0);
-    assert.deepEqual(settings.uiState, DEFAULT_SETTINGS.uiState);
+    assert.deepEqual(settings.uiState, {
+      ...DEFAULT_SETTINGS.uiState,
+      layoutColumns: { grid: 1, poster: 6 },
+    });
+  });
+
+  it("accepts every AnimeList workspace section and rejects unknown sections", async () => {
+    for (const section of ["library", "timeline", "scores", "images"] as const) {
+      const settings = await loadSettings({ uiState: { section } });
+      assert.equal(settings.uiState.section, section);
+    }
+
+    const fallback = await loadSettings({ uiState: { section: "unknown-page" } });
+    assert.equal(fallback.uiState.section, "library");
   });
 
   it("keeps feature setting normalizers backward compatible", () => {
@@ -126,7 +141,7 @@ it("preserves unknown feature settings through the shared settings store", async
       saved.push(value);
     },
   };
-  const { AnimeListSettingsStore } = await import("../../src/settings-store");
+  const { AnimeListSettingsStore } = await import("../../src/app/settings-store");
   const store = new AnimeListSettingsStore(storage);
   const settings = await store.load();
   await store.save(settings);

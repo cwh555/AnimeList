@@ -87,13 +87,17 @@ try {
   assert.match(checklist, /Ch\.72/);
   assert.match(checklist, /Ch\.281/);
   assert.match(checklist, /npm run test-vault.*must not reset edits/i);
+  assert.match(checklist, /AnimeList workspace and Images page/);
+  assert.match(checklist, /Library \/ Timeline \/ Score Dashboard \/ Images/);
   assert.match(checklist, /Reusable image sections/);
   assert.match(checklist, /real works and official anime episode stills/i);
   assert.match(checklist, /Add modal uses the available width without horizontal scrolling/i);
   assert.match(checklist, /Updates & cleanup/i);
   assert.match(checklist, /old default duplicate cover embed/i);
-  assert.match(checklist, /## 8\. Moments sections/);
+  assert.match(checklist, /## 9\. Moments sections/);
   assert.match(checklist, /seven-image Frieren Moment/i);
+  assert.match(checklist, /stacked subtitle/i);
+  assert.match(checklist, /subtitle reveal height/i);
   assert.match(checklist, /source \/ position-time \/ speaker-character \/ tags \/ note/i);
   assert.match(checklist, /official episode stills/i);
   assert.match(checklist, /出處：第 1 話/);
@@ -107,7 +111,8 @@ try {
     assert.equal(fs.statSync(file).isFile(), true);
     assert.deepEqual([...fs.readFileSync(file).subarray(0, 3)], [0xff, 0xd8, 0xff]);
   }
-  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v8")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v9")), true);
+  assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v8")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v7")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v6")), false);
   assert.equal(fs.existsSync(path.join(vaultRoot, ".animelist-test-moments-v5")), false);
@@ -133,6 +138,7 @@ try {
   assert.equal((read(frierenAnimePath).match(/```animelist-moments/g) ?? []).length, 2);
   assert.equal((read(frierenAnimePath).match(/^  - id: "m_test_frieren_/gm) ?? []).length, 6);
   assert.match(read(frierenAnimePath), /m_test_frieren_journey_02[\s\S]*AnimeList\/Images\/test-vault\/anime-scenes\/frieren-ep01-/);
+  assert.match(read(frierenAnimePath), /m_test_frieren_quote_01[\s\S]*imageLayout: stacked[\s\S]*stackReveal: 52[\s\S]*stackFocusY:[\s\S]*- 50[\s\S]*- 87/);
   assert.match(read(frierenAnimePath), /m_test_frieren_promise_04[\s\S]*source: "第 1 話"[\s\S]*position: "旅途的記憶"[\s\S]*speaker: "芙莉蓮"[\s\S]*tags:[\s\S]*回憶片段[\s\S]*辛美爾/);
   assert.match(read(frierenAnimePath), /m_test_frieren_long_06[\s\S]*長文字排版[\s\S]*展開／收合[\s\S]*Test Vault UI regression/);
   assert.equal((read(kaguyaAnimePath).match(/```animelist-images/g) ?? []).length, 2);
@@ -152,6 +158,7 @@ try {
   assert.doesNotMatch(oregairuImageSection, /blog-imgs-71|ep12-(?:cafe|hachiman)/);
   assert.match(oregairu, /## 大老師語錄[\s\S]*m_test_oregairu_zoku_ep12_hachiman/);
   assert.match(oregairu, /想到未來又會不安到得憂鬱症[\s\S]*source: "果青續 \(12\)"[\s\S]*speaker: "比企谷八幡"/);
+  assert.match(oregairu, /m_test_oregairu_zoku_ep12_hachiman[\s\S]*imageLayout: stacked[\s\S]*stackReveal: 58[\s\S]*stackFocusY:[\s\S]*- 50[\s\S]*- 84[\s\S]*- 91/);
   assert.equal((oregairu.match(/AnimeList\/Images\/test-vault\/anime-scenes\/oregairu-zoku-ep(?:04|07|10|12|13)-[a-z]+\.jpg/g) ?? []).length, 8);
   assert.doesNotMatch(oregairu, /fixture_version:/);
   assert.match(read(overlordPath), /```animelist-images\n```/);

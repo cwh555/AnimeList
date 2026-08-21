@@ -1,0 +1,18 @@
+export const EN_IMAGE_GALLERY_MESSAGES = {
+  title: "Images",
+  description: "Browse images referenced by Image Sections across your library without creating duplicate files.",
+  allImages: "All images",
+  byWork: "By work",
+  searchPlaceholder: "Search works or image paths…",
+  columns: "Image columns",
+  summary: "{images} images · {works} works",
+  workSummary: "{images} images · {sessions} Image Sessions",
+  allSessions: "All sessions",
+  session: "Session {number}",
+  backToWorks: "Back to works",
+  openSource: "Open source work",
+  emptyTitle: "No images yet",
+  emptyDescription: "Add an Image Section to a media note and its images will appear here automatically.",
+  loading: "Building image gallery…",
+  open: "Open images",
+} as const;

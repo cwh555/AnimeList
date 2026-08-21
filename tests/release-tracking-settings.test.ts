@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Setting } from "obsidian";
 import type { AnimeListFeatureHost } from "../src/app/feature-types";
-import { createReleaseTrackingSettingsSection } from "../src/release-tracking-feature";
-import { createDefaultSettings } from "../src/settings-model";
+import { createReleaseTrackingSettingsSection } from "../src/features/release-tracking/settings";
+import { createDefaultSettings } from "../src/app/settings-model";
 
 describe("release tracking settings", () => {
   it("exposes an explicit opt-in toggle, daily check toggle, and manual check action", () => {

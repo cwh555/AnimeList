@@ -38,4 +38,9 @@ export const KO_IMAGE_SECTION_MESSAGES = {
   coverFailed: "표지를 설정할 수 없습니다: {error}",
   urlFailed: "이미지 URL을 불러올 수 없습니다: {error}",
   sectionUnavailable: "이 이미지 섹션을 안전하게 찾을 수 없습니다. 노트를 다시 열고 시도하세요.",
+  columnsLabel: "이미지 열 수",
+  layoutFailed: "이미지 레이아웃을 업데이트할 수 없습니다: {error}",
+  dragImage: "드래그하여 순서 변경",
+  moveFailed: "이미지를 이동할 수 없습니다: {error}",
+  crossNoteMoveUnsupported: "현재 이미지는 같은 노트의 이미지 섹션 사이에서만 드래그하여 이동할 수 있습니다.",
 } as const;

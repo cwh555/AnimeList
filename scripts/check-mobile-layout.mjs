@@ -269,7 +269,12 @@ async function imageSectionExpandFixture() {
     #editor-scroll{height:800px;overflow-y:auto}.spacer{height:900px}.tail{height:1400px}.al-image-item{height:180px}
   </style></head><body data-result="pending"><div id="editor-scroll" class="cm-scroller"><div class="spacer"></div>
     <section id="section" class="animelist-image-section">
-      <div id="viewport" class="al-image-gallery-viewport"><div class="al-image-masonry">${'<div class="al-image-item"></div>'.repeat(14)}</div></div>
+      <div id="viewport" class="al-image-gallery-viewport"><div id="gallery" class="al-image-masonry" style="--al-image-columns:4">
+        <div class="al-image-masonry-column"><div id="tall" class="al-image-item" style="height:240px"></div><div id="after-tall" class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div></div>
+        <div class="al-image-masonry-column"><div id="short" class="al-image-item" style="height:80px"></div><div id="after-short" class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div></div>
+        <div class="al-image-masonry-column"><div class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div></div>
+        <div class="al-image-masonry-column"><div class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div><div class="al-image-item"></div></div>
+      </div></div>
       <button id="toggle" class="al-image-expand-button" type="button">Show all images</button>
     </section><div class="tail"></div></div>
     <script>${anchorScript}</script>
@@ -306,10 +311,16 @@ async function imageSectionExpandFixture() {
           if (frames < 14) { requestAnimationFrame(check); return; }
           const afterTop = section.getBoundingClientRect().top;
           const afterHeight = viewport.getBoundingClientRect().height;
+          const tall = document.querySelector('#tall').getBoundingClientRect();
+          const short = document.querySelector('#short').getBoundingClientRect();
+          const afterShort = document.querySelector('#after-short').getBoundingClientRect();
+          const galleryColumns = getComputedStyle(document.querySelector('#gallery')).gridTemplateColumns.split(' ').filter(Boolean).length;
           const details = {
             sectionAnchorStable: Math.abs(afterTop - beforeTop) <= 1,
             contentExpandedDownward: afterHeight > beforeHeight + 100,
             editorMouseDownBlocked: !editorMouseDown,
+            fourColumnDefault: galleryColumns === 4,
+            masonryCompactsShortColumn: Math.abs(afterShort.top - short.bottom - 8) <= 1 && afterShort.top < tall.bottom - 20,
           };
           document.body.dataset.details = JSON.stringify(details);
           document.body.dataset.result = Object.values(details).every(Boolean) ? 'pass' : 'fail';

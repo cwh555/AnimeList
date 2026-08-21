@@ -8,15 +8,23 @@ import {
   imageExtensionFor,
   imageSectionFolderForNote,
   imageSectionRootFromCoverFolder,
+  locateImageSectionBlock,
   normalizeImageSectionPath,
   parseImageSectionSource,
   replaceImageSectionPaths,
   serializeImageSectionPaths,
   type ImageSectionLocator,
 } from "../domain/image-section";
+import { setImageSectionColumns } from "../domain/image-section-layout";
+import {
+  moveImageSectionPath,
+  type ImageSectionDropPlacement,
+  type ImageSectionMoveUpdate,
+  type ImageSectionStateUpdate,
+} from "../domain/image-section-order";
 import { allManagedImageReferences } from "../domain/media-image-references";
 import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
-import { visualImageFingerprint } from "../image-raster";
+import { visualImageFingerprint } from "./image-raster";
 
 export interface ImageSectionHost {
   app: App;
@@ -43,6 +51,7 @@ export interface StoredImageAssetsResult {
   paths: string[];
   addedPaths: string[];
   duplicatesSkipped: number;
+  acceptedAssetIndexes: number[];
 }
 
 export interface ResolvedImageSectionAsset {
@@ -51,6 +60,11 @@ export interface ResolvedImageSectionAsset {
   thumbnailSources?: CoverSources;
   file: TFile | null;
   remote: boolean;
+}
+
+function findSectionState(markdown: string, locator: ImageSectionLocator): ImageSectionStateUpdate {
+  const block = locateImageSectionBlock(markdown, locator);
+  return { source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd };
 }
 
 function isManagedPath(path: string, root: string): boolean {
@@ -142,7 +156,7 @@ export class ImageSectionService {
   ): Promise<StoredImageAssetsResult> {
     const current = [...new Set(existingPaths.map(normalizeImageSectionPath).filter(Boolean))];
     if (assets.length === 0) {
-      return { paths: current, addedPaths: [], duplicatesSkipped: 0 };
+      return { paths: current, addedPaths: [], duplicatesSkipped: 0, acceptedAssetIndexes: [] };
     }
     const note = this.noteFile(sourcePath);
     const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
@@ -174,8 +188,9 @@ export class ImageSectionService {
     let duplicatesSkipped = 0;
     const acceptedBinary = new Set<string>();
     const acceptedVisual = new Set<string>();
+    const acceptedAssetIndexes: number[] = [];
     try {
-      for (const asset of assets) {
+      for (const [assetIndex, asset] of assets.entries()) {
         const extension = imageExtensionFor(asset.name, asset.contentType);
         if (!extension) throw new Error(`${asset.name || "Image"} is not a supported image format`);
         const binary = await imageContentHash(asset.data);
@@ -190,6 +205,7 @@ export class ImageSectionService {
         const path = await this.host.uniqueFilePath(folder, imageBaseName(asset.name), extension);
         const file = await this.host.app.vault.createBinary(path, asset.data);
         created.push(file);
+        acceptedAssetIndexes.push(assetIndex);
         this.fingerprintCache.set(file.path, {
           size: asset.data.byteLength,
           mtime: file.stat.mtime,
@@ -199,7 +215,7 @@ export class ImageSectionService {
         this.host.getImageThumbnailSources(file);
       }
       const addedPaths = created.map((file) => file.path);
-      return { paths: [...current, ...addedPaths], addedPaths, duplicatesSkipped };
+      return { paths: [...current, ...addedPaths], addedPaths, duplicatesSkipped, acceptedAssetIndexes };
     } catch (error) {
       await this.trashCreatedFiles(created);
       throw error;
@@ -260,6 +276,45 @@ export class ImageSectionService {
       added: stored.addedPaths.length,
       duplicatesSkipped: stored.duplicatesSkipped,
     };
+  }
+
+  async setColumns(
+    sourcePath: string,
+    locator: ImageSectionLocator,
+    columns: number,
+  ): Promise<ImageSectionStateUpdate> {
+    const note = this.noteFile(sourcePath);
+    const updated = await this.host.app.vault.process(
+      note,
+      (markdown) => setImageSectionColumns(markdown, locator, columns),
+    );
+    const block = findSectionState(updated, locator);
+    return block;
+  }
+
+  async moveAsset(
+    sourcePath: string,
+    sourceLocator: ImageSectionLocator,
+    targetLocator: ImageSectionLocator,
+    pathValue: unknown,
+    targetPathValue: unknown,
+    placement: ImageSectionDropPlacement,
+  ): Promise<ImageSectionMoveUpdate> {
+    const note = this.noteFile(sourcePath);
+    let result: ImageSectionMoveUpdate | null = null;
+    await this.host.app.vault.process(note, (markdown) => {
+      result = moveImageSectionPath(
+        markdown,
+        sourceLocator,
+        targetLocator,
+        pathValue,
+        targetPathValue,
+        placement,
+      );
+      return result.markdown;
+    });
+    if (!result) throw new Error("Could not update image section order");
+    return result;
   }
 
   async remove(

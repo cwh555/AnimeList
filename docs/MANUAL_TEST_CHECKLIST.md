@@ -24,6 +24,7 @@ Run this checklist before every public release and before any release-candidate 
 ## Library UI
 
 - [ ] Card view renders correct 2:3 covers.
+- [ ] Card and Thumbnail/poster views expose exact 1–6 items-per-row controls, remember independent values, persist after restart, and do not rebuild cards unnecessarily while the slider changes.
 - [ ] List view renders correct 2:3 covers without metadata wrapping over the poster.
 - [ ] Compact view shows the edit button, rating badge, and favorite button.
 - [ ] Compact rows never exceed the cover height; long titles and metadata end with an ellipsis instead of stretching the row.
@@ -109,6 +110,14 @@ Run this checklist before every public release and before any release-candidate 
 - [ ] Older notes remain readable before cleanup; cleanup backfills supported company/quarter metadata without losing source identity, progress, rating, custom frontmatter, or body content.
 - [ ] Legacy `user_tags` and supported `classification_*` fields consolidate into canonical metadata without losing the selected work tags.
 
+## Settings search and version compatibility
+
+- [ ] On Obsidian 1.13 or later, open Settings search and confirm AnimeList options such as **Display language**, **Storage layout**, **Chinese titles**, and at least one enabled feature setting are discoverable.
+- [ ] Select search results from General, Search & metadata, and Features; each result opens the correct AnimeList declarative settings page and exposes the same editable control as normal navigation.
+- [ ] Change a conditionally visible setting (for example storage layout) and confirm the declarative page updates without duplicate rows or stale controls.
+- [ ] Confirm the five settings pages remain English and retain their intended grouping on Obsidian 1.13+.
+- [ ] On an older supported Obsidian build when available, confirm the compatibility five-page tabbed renderer still opens and edits the same persisted settings without migration.
+
 ## Interface localization
 
 - [ ] Switch **Interface language** among Traditional Chinese, English, Japanese, and Korean; Library, dialogs, notices, Image Sections, Moments, release tracking, Score Dashboard, Timeline, and reusable-tag UI update to the selected locale.
@@ -154,6 +163,26 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] Release refresh may update only release-tracking/latest-release fields; `progress`, `progress_unit`, `volume_log`, personal status, score, tags, unrelated frontmatter, and Markdown body remain unchanged.
 - [ ] Close/reopen the note and restart Obsidian; verified release state and source provenance remain stable.
 
+
+## AnimeList workspace and Images
+
+- [ ] The native AnimeList ItemView shows one primary navigation row in this exact order: **Library → Timeline → Score Dashboard → Images**. Switching pages reuses the same ItemView instead of opening a modal or another Obsidian tab.
+- [ ] Primary navigation is visually different from page-local filters: the workspace row is flat/underlined with icon + label, while Library/Images filters remain smaller page-local controls. On mobile the workspace row remains visible and horizontally scrollable.
+- [ ] The AnimeList header shows only the product name; the old Markdown-description subtitle is absent.
+- [ ] The top-level workspace navigation has no vertical scrollbar and contains page destinations only. Workspace actions live in the header: **Export** is direct when it is the only action; enabling Latest release tracking collapses Export + Release Updates into the native **More** menu. Timeline, Score Dashboard, and Images are not duplicated as header buttons.
+- [ ] In **Library**, **Collect** is on the same row as **All / Anime / Manga / Novel**, aligned to the far right; it is not shown as a global workspace action on Timeline, Score Dashboard, or Images.
+- [ ] Library retains its existing All/Anime/Manga/Novel, status, search, filter, sort, and Grid/List/Poster behavior inside the Library page. The standalone Markdown `animelist` block retains its existing self-contained header/actions.
+- [ ] Timeline opened from either the workspace tab or command uses the shared AnimeList page and preserves existing timeline filters/scale/navigation.
+- [ ] Score Dashboard opened from either the workspace tab or command uses the shared AnimeList page and preserves score lanes, drag/batch operations, zoom, filtering, and mobile interactions.
+- [ ] Images → **All images** aggregates existing `animelist-images` references across works without creating/copying/moving any image file. One image reused by multiple Image Sections in the same work appears once in the work-level aggregate.
+- [ ] Images media-type filter, search, and exact 1–6 column slider work on desktop and mobile. Lightbox previous/next follows the currently filtered gallery, including images whose source files belong to different media notes.
+- [ ] Images → **All images / By work** uses a clearly segmented page-local switch that does not resemble the flat top-level workspace tabs.
+- [ ] Landscape screenshots render at their natural aspect ratio; Obsidian's default button height must not clip aggregate gallery images into thin strips.
+- [ ] Images → **By work** cards expand to their full preview mosaic and metadata height instead of inheriting Obsidian's normal button height.
+- [ ] Images → **By work** shows one board per work with correct unique-image and Image Session counts. Opening a board exposes **All sessions / Session N**, and **Open source work** opens the owning media note.
+- [ ] Edit, reorder, add, or remove an original Image Section reference, then return to/refresh Images and confirm the aggregate updates without a Vault-wide Markdown scan or duplicated asset. Rename/delete a media note and confirm stale work entries disappear.
+- [ ] A work with an empty Image Section does not create an empty board; an entirely empty aggregate shows the safe empty state. Large galleries progressively append image DOM instead of rendering every image eagerly.
+
 ## Image Sections
 
 Use the editor context menu **AnimeList → Add image section**.
@@ -162,8 +191,11 @@ Use the editor context menu **AnimeList → Add image section**.
 - [ ] Inserting an Image Section at the cursor preserves surrounding Markdown and creates an ordinary `animelist-images` fenced block.
 - [ ] Multiple independent Image Sections may exist in one note; editing one does not rewrite another.
 - [ ] Empty Image Section shows an Add target and accepts file picker, drag/drop, clipboard paste, and explicit URL import.
-- [ ] A populated desktop Image Section uses a responsive grid with uncropped images; the layout remains readable without CSS multi-column support.
-- [ ] Desktop/narrow layouts adapt without page-level horizontal overflow; phone layout uses two columns where space permits and one column at very narrow widths.
+- [ ] A populated desktop Image Section uses independent masonry columns with uncropped natural-height images; a short image does not reserve the height of a taller neighbor and the next image rises to fill that column.
+- [ ] **Image columns** defaults to 4; the discrete 1–6 slider previews immediately, persists the selected per-section value, and reopening the note restores it.
+- [ ] Desktop/narrow layouts keep the exact requested 1–6 column count without page-level horizontal overflow; the plugin must not silently reduce the selected value.
+- [ ] Drag an image within one Image Section to reorder it; reopening the note preserves the new Markdown list order.
+- [ ] Drag an image between two Image Sections in the same note; the source loses the reference, the target gains it at the drop position, unrelated Markdown between sections is unchanged, and the image file is not trashed.
 - [ ] Bounded gallery scrolling works and **Show all / Show less** expands/collapses without an unexpected viewport jump.
 - [ ] Click an image → original-image lightbox; ArrowLeft/ArrowRight navigate only that section; Esc closes.
 - [ ] Cmd+C (macOS) / Ctrl+C (Windows/Linux) in the lightbox copies the original image; context-menu **Copy image** also works.
@@ -187,7 +219,11 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Editing a Moment preserves its stable `id`.
 - [ ] Multiple Moments blocks in the same note remain independent.
 - [ ] One-image Moment displays a large uncropped featured stage; no horizontal scrollbar is needed for the single image.
-- [ ] Multi-image Moment keeps one horizontal row; overflow scrolls horizontally and images do not wrap or crop.
+- [ ] Multi-image Moment keeps one horizontal row by default; overflow scrolls horizontally and images do not wrap or crop.
+- [ ] Switch a 2+ image Moment to **Stacked**: the first image stays expanded and later original images remain whole layers that expose their lower subtitle regions; no persistent composite PNG or duplicate image files are created.
+- [ ] In the Moment editor, change **Overall subtitle reveal** and drag each exposed lower image vertically with both mouse and touch; save/reopen and confirm the whole-image `stackGapsY` positions persist. Repeated movement alone must not rasterize or create image files.
+- [ ] In Stacked reading mode, Moment **Copy images** and an exposed layer's **Copy image** each copy one flattened PNG matching the current stacked geometry. Repeat copying and confirm no composite/cache file appears in the vault. Carousel copy behavior remains unchanged.
+- [ ] Switch Stacked back to Carousel and confirm image order/files remain unchanged; reducing to one image falls back to the existing featured-image layout.
 - [ ] Horizontal scrolling remains usable with native/WebKit scrollbar behavior and does not depend on `scrollbar-width` / `scrollbar-color`.
 - [ ] Long quote/note content exposes the shared Expand/Collapse behavior and returns to the compact state after collapse.
 - [ ] Lightbox navigation remains scoped to the current Moment.
@@ -220,23 +256,31 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] A custom-template image, a body image at another location, an ambiguous path, or an image not exactly matching `cover` is skipped.
 - [ ] Cleanup preserves frontmatter, Image Sections, Moments, unrelated embeds, and note prose.
 
+## Library Export
+
+- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens without changing workspace data.
+- [ ] JSON output uses `animelist-library-export` version `1`, applies media/status scope correctly, and preserves portable status/progress/serial/source identity without exporting arbitrary frontmatter, note-body Markdown, Images, or Moments.
+- [ ] Text output uses the same Timeline completion semantics and keeps serial-entry unit labels. Editing the safe template updates preview without replacing the editor DOM or losing focus.
+- [ ] Remove a required variable or enter an unknown variable; Copy and Save remain disabled until the template is valid.
+- [ ] Copy uses the complete output even when preview is truncated. **Save export file** writes only a new `.animelist.json` / `.txt` under the displayed Library `Exports` folder.
+- [ ] Compare media notes, covers, Image Sections, Moments, and settings before/after export; none are changed.
+
 ## Timeline
 
-- [ ] The timeline opens in a floating modal instead of replacing the library view.
-- [ ] The modal closes from the title-bar close button, the Escape key, and the backdrop.
-- [ ] The All, Anime, Manga, and Novel buttons show only their matching completion records and update the summary count/date range.
-- [ ] A type with no matching records keeps the filter buttons visible so another type can be selected.
-- [ ] Completed anime/manga and legacy completed novels appear when they have a completion date.
-- [ ] Every saved dated chapter, season, or volume row appears on the timeline because missing completion dates default to today.
-- [ ] A dated-entry card uses its own cover when available and falls back to the normal series cover when the entry cover is absent or cannot be resolved.
-- [ ] Every dated-entry card visibly shows the work title and its chapter, season, or volume label.
-- [ ] Records on the same or nearby dates move into alternating vertical lanes and do not overlap at fit, zoomed-in, or zoomed-out scales.
-- [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and serial entries appear in `1`, `2`, `3` order.
-- [ ] Dragging pans the timeline.
-- [ ] Date-spacing controls change horizontal time distance without resizing cards.
-- [ ] Visual-size controls independently shrink and enlarge the complete timeline scene.
-- [ ] Fit shows all completion dates at the selected visual size.
-- [ ] Selecting a poster opens the media note.
+- [ ] Timeline opens as the top-level **Timeline** workspace page and the AnimeList/Obsidian leaf has no outer vertical page scrollbar caused by Timeline content.
+- [ ] Switch Library → Timeline → Images → Timeline; timeline cards, controls, density overview, and current view state remain usable after remount.
+- [ ] The All, Anime, Manga, and Novel buttons show only their matching completion records and update the summary count/date range. A type with no matches keeps filters available.
+- [ ] **Actual time** keeps horizontal distance proportional to real completion time; **History** groups newest-first by year/month and scrolls inside its own bounded content area.
+- [ ] Completed anime/manga and legacy completed novels appear when they have a completion date. Every saved dated chapter, season, or volume completion appears separately and keeps its unit label.
+- [ ] A dated-entry card uses its own cover when available and falls back to the normal series cover when the entry cover is absent/unresolvable.
+- [ ] Same/nearby dates use alternating lanes without avoidable overlap. Same-day related titles/serial labels stay naturally ordered.
+- [ ] Horizontal trackpad movement and pointer dragging pan the scene without moving the density footer or creating outer page scroll.
+- [ ] **Time spacing** changes horizontal time distance without resizing the poster base; **View scale** independently scales the complete scene.
+- [ ] Time-spacing zoom and whole-scene zoom keep the main timeline axis at the same screen-space Y coordinate instead of jumping vertically.
+- [ ] First open and **Reset** center the newest work horizontally, center the timeline axis vertically, and restore default scene scale.
+- [ ] The smooth density overview is directly below the canvas, remains visible inside the leaf, uses a Material tonal current-range indicator rather than a heavy outline, and can navigate the timeline without changing its own vertical position.
+- [ ] Shrink the Obsidian leaf height substantially; the canvas becomes shorter while the workspace remains bounded and the density overview stays below the canvas rather than extending the page.
+- [ ] Selecting a poster opens the owning Markdown note.
 
 ## Score Dashboard
 
@@ -265,5 +309,5 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 
 - [ ] Compare representative notes before/after ordinary edit, release refresh, Image Section edit, Moment edit, legacy metadata cleanup, and duplicate-cover cleanup.
 - [ ] Each operation changes only its owned fields/block and preserves unrelated frontmatter/body content.
-- [ ] No optional 1.4 feature performs a vault-wide automatic rewrite on startup.
+- [ ] No optional feature introduced by the current release performs a vault-wide automatic rewrite on startup.
 - [ ] Disabling optional features leaves stored Markdown readable and does not delete user data.

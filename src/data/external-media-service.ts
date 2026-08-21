@@ -1,8 +1,8 @@
 import type { ProviderSettings, SearchLanguageSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, ExternalMediaSearchPage, MediaType } from "../domain/media-types";
-import { searchMultilingualProviders, type SearchProviderAdapter } from "../multilingual-search";
-import { rankSearchResults } from "../search";
-import { searchFeatureText } from "../search-feature-text";
+import { searchMultilingualProviders, type SearchProviderAdapter } from "../app/search/multilingual-search";
+import { rankSearchResults } from "../domain/search/ranking";
+import { searchFeatureText } from "../features/search/text";
 import {
   enabledMetadataProviders,
   type MetadataProviderClients,

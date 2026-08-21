@@ -12,7 +12,7 @@
 
 > New features and capabilities that expand what the plugin can do.
 
-- Export library data as plain text or JSON
+- Add a reviewed Library Import workflow for the existing versioned JSON export contract.
 
 ---
 
@@ -20,4 +20,4 @@
 
 > Performance and usability improvements that preserve existing functionality and behavior.
 
-- Improve layouts and use of available space
+- Continue profiling very large libraries and image collections while keeping indexing, thumbnails, and workspace rendering incremental.

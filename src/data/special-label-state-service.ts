@@ -2,7 +2,7 @@ import { TFile, type App } from "obsidian";
 import {
   normalizeMasterpieceLabels,
   type SpecialLabelState,
-} from "../masterpiece-labels";
+} from "../domain/masterpiece-labels";
 import { uiText } from "../ui-text";
 
 export interface SpecialLabelStateCallbacks {

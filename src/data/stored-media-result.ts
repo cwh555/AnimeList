@@ -1,7 +1,7 @@
 import type { ExternalMediaResult, ExternalMediaSourceRef, MediaType } from "../domain/media-types";
 import { numeric, stringArray, stringValue } from "../domain/value-normalization";
 import { compatibleGenres, compatibleSeasonMetadata, compatibleSourceGenres, compatibleStudios } from "./media-frontmatter-compat";
-import { normalizeReleaseStatus } from "../novel-progress";
+import { normalizeReleaseStatus } from "../domain/progress/novel-progress";
 
 function sourceRefs(frontmatter: Record<string, unknown>): ExternalMediaSourceRef[] {
   const output: ExternalMediaSourceRef[] = [];

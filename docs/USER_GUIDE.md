@@ -10,6 +10,8 @@ AnimeList supports a managed library with separate Anime, Manga, Novel, Covers, 
 
 The AnimeList interface can use Traditional Chinese, English, Japanese, or Korean, or follow Obsidian's interface language. The Settings page intentionally remains English.
 
+The native AnimeList view is one shared workspace with four peer destinations: **Library**, **Timeline**, **Score Dashboard**, and **Images**. Switching destinations reuses the same Obsidian ItemView; page-local filters remain inside their own page instead of becoming global navigation.
+
 ## Library and media statuses
 
 The library uses four personal statuses:
@@ -21,7 +23,7 @@ The library uses four personal statuses:
 
 Legacy status values remain readable. Watching, Reading, and Active map to Ongoing; Wishlist, On Hold, and Paused map to Wishlist.
 
-Use the library controls to search, filter by media type or status, open the dedicated Filter dialog, change sorting, and switch between card, list, and poster views. The Filter dialog groups animation companies, anime quarters, and reusable work tags. Company and tag groups support multiple selections; quarter is single-select; all active groups apply together.
+Use the library controls to search, filter by media type or status, open the dedicated Filter dialog, change sorting, and switch between card, list, and poster views. Card and poster/thumbnail views also expose an items-per-row control from 1–6 columns; the two view modes remember their own values, while list view ignores the column setting. The same Card/Thumbnail defaults can be edited under Settings → General. The Filter dialog groups animation companies, anime quarters, and reusable work tags. Company and tag groups support multiple selections; quarter is single-select; all active groups apply together.
 
 ## Progress, ratings, and dated entries
 
@@ -122,6 +124,19 @@ For novels, the tracker excludes recognized spin-offs, side stories, short-story
 
 If a result is ambiguous, unmatched, unavailable, or lower than trusted stored data, AnimeList surfaces an attention state instead of overwriting trusted information. Use the review/manager UI to resolve a binding or disable tracking for that title.
 
+## AnimeList workspace and Images
+
+The top-level AnimeList workspace uses one shared header and four destinations in this order: **Library → Timeline → Score Dashboard → Images**. The workspace tabs are primary navigation; media-type switches, gallery modes, timeline controls, and score controls remain page-local. On narrow layouts the top-level row remains available and may scroll horizontally instead of being hidden.
+
+The **Images** page is a derived view over the `animelist-images` blocks already stored in media notes. It does not copy, move, or create gallery assets.
+
+- **All images** shows a natural-height gallery across matching works. Media type, search, and exact 1–6 column controls apply before lightbox ordering.
+- **By work** shows one board per work. Opening a board exposes All sessions / Session N and can open the owning media note.
+- Reusing the same image path across multiple Image Sections in one work does not duplicate it in the work-level aggregate, while the original session references remain intact.
+- Editing, reordering, adding, or removing an Image Section updates the derived Images page on refresh without introducing a separate image database.
+
+See [`IMAGES_WORKSPACE.md`](IMAGES_WORKSPACE.md) for the detailed workspace/data contract.
+
 ## Image Sections
 
 Image Sections let a media note keep reusable groups of related images as ordinary Markdown.
@@ -150,7 +165,7 @@ An Image Section accepts:
 - clipboard paste;
 - an explicit image URL.
 
-Reading view shows a responsive image grid with bounded scrolling and **Show all / Show less** when needed. Images keep their full aspect ratio rather than being cropped. Clicking an image opens the original in a lightbox; keyboard arrows navigate only within that Image Section and Escape closes the lightbox.
+Reading view uses natural-height masonry columns with bounded scrolling and **Show all / Show less** when needed. **Image columns** chooses an exact 1–6 column count for that section and persists it in the section metadata. Images keep their full aspect ratio rather than being cropped. Dragging can reorder images within a section or move an image between Image Sections in the same note without trashing the shared asset or rewriting unrelated Markdown. Clicking an image opens the original in a lightbox; keyboard arrows navigate only within that Image Section and Escape closes the lightbox.
 
 Image actions include:
 
@@ -210,9 +225,11 @@ Moment IDs are stable across edits. Empty optional metadata is omitted instead o
 
 ### Reading and editing Moments
 
-A desktop Moment places media first, then quote/metadata content. One image uses a large uncropped featured stage; multiple images remain one horizontal row and scroll instead of wrapping or cropping. Long text can expand/collapse explicitly. Narrow layouts keep media first and rearrange quote/metadata vertically without page-level horizontal overflow.
+A desktop Moment places media first, then quote/metadata content. One image uses a large uncropped featured stage. Multi-image Moments default to **Carousel**, where images remain one horizontal row and scroll instead of wrapping or cropping. Long text can expand/collapse explicitly. Narrow layouts keep media first and rearrange quote/metadata vertically without page-level horizontal overflow.
 
-Moment images can be added by file, drag/drop, clipboard paste, or URL. Reading view supports scoped lightbox navigation and copy actions. Deleting a Moment does not trash a managed image while another cover, Image Section, or Moment still references it.
+For two or more images, the editor can switch to **Stacked**. The first image stays fully expanded and later original images remain whole layers positioned underneath it. **Overall subtitle reveal** and per-layer vertical dragging change the saved whole-image gaps; they do not crop or rasterize the source files. `imageLayout: stacked` and `stackGapsY` are stored only for the Moment layout. Switching back to Carousel preserves image order/files and removes stacked-only serialization on save.
+
+In Stacked reading mode, **Copy images** (and Copy image on an exposed stacked layer) creates one flattened PNG matching the current geometry only when the copy action is invoked. The composite is sent to the system clipboard and is not cached or written into the vault. Moment images can otherwise be added by file, drag/drop, clipboard paste, or URL. Reading view supports scoped lightbox navigation. Deleting a Moment does not trash a managed image while another cover, Image Section, or Moment still references it.
 
 See [`MOMENTS_TEST_VAULT.md`](MOMENTS_TEST_VAULT.md) for the dedicated real-scene Test Vault regression cases.
 
@@ -229,7 +246,7 @@ Unchecking every category and saving removes the title from Masterpiece. Existin
 
 ## Score Dashboard
 
-Open the Score Dashboard from the library action beside Timeline. It groups each media note once across scores from 10.0 to 0.0 and keeps unrated titles separate from the valid 0.0 lane.
+Open **Score Dashboard** from the top-level AnimeList workspace (or its command). It groups each media note once across scores from 10.0 to 0.0 and keeps unrated titles separate from the valid 0.0 lane.
 
 The dashboard supports:
 
@@ -245,11 +262,28 @@ A batch containing unrated titles cannot use ±0.5 adjustment until those titles
 
 ## Timeline
 
-The timeline shows completion records and dated serial entries. Use the media-type filters to show all records, anime, manga, or novels.
+Timeline is a full workspace page for completion records and dated serial entries. Use **Actual time / History** to switch between the spatial timeline and newest-first grouped history, and use the media-type filters to show all records, anime, manga, or novels.
 
-Date spacing and visual scale are independent controls. **Fit** displays the complete timeline, while **Reset** restores the calculated default view. The default spacing considers the date range, record density, and unavoidable same-day stacks.
+In Actual time, horizontal distance remains proportional to completion time. Two independent controls affect the view:
+
+- **Time spacing** changes horizontal distance per day without resizing cards.
+- **View scale** scales the complete timeline scene.
+
+Trackpad horizontal movement or dragging pans the scene. Ctrl/Cmd-modified wheel or pinch can change whole-scene scale, while the dedicated spacing controls change temporal spacing. Scaling keeps the timeline axis at the same screen-space vertical position instead of making the scene jump. The initial view and **Reset** center the newest work horizontally and center the timeline axis vertically.
+
+The scene is contained inside the Obsidian leaf like Graph View: pan/zoom stays inside the canvas and does not make the AnimeList page taller than the visible leaf. A smooth density overview is rendered as a footer directly below the canvas. Its tonal highlighted region represents the currently visible time range; selecting the overview navigates the timeline without moving the overview itself. History has its own bounded scroll area.
 
 Completed chapter, season, or volume entries appear as separate dated events. Each event prefers its own entry cover and falls back to the normal series cover when no entry cover is available. Select a card to open its Markdown note.
+
+## Library Export
+
+Choose **Export** from the shared AnimeList workspace (or the Export Library command) to create a portable Library report without rewriting any media note.
+
+- **JSON** uses the versioned `animelist-library-export` envelope and contains portable Library state suitable for a future reviewed Import path. It deliberately excludes arbitrary frontmatter, note-body Markdown, Image Sections, Moments, and cache data.
+- **Text** is a human-readable completion report built from the same completion-event source as Timeline. A bounded literal template can change the output layout; it is not JavaScript, shell, or an expression evaluator.
+- Scope controls can limit media type and personal status. Copy always uses the complete output even when the preview is truncated. **Save export file** writes a new `.animelist.json` or `.txt` file under the configured Library `Exports` folder and does not mutate Library notes.
+
+See [`LIBRARY_EXPORT.md`](LIBRARY_EXPORT.md) for the exact JSON/Text contracts and template safety rules.
 
 ## Markdown data and templates
 
@@ -303,13 +337,15 @@ The built-in template is intentionally minimal. Custom templates can be placed i
 
 Settings are organized into five top-level pages:
 
-1. **General** — interface, library/storage, file locations, and Timeline defaults.
+1. **General** — interface, library/storage, file locations, Library Card/Thumbnail row density, and Timeline defaults.
 2. **Search & metadata** — search-language expansion and metadata providers.
 3. **Features** — optional feature settings such as Latest release tracking, serial-cover lookup, reusable tags, and Favorite/Masterpiece behavior.
 4. **Maintenance** — recurring repair/setup operations such as serial-cover recovery and library setup.
 5. **Updates & cleanup** — explicit version/update cleanup operations that may rewrite recognized AnimeList content after review.
 
-The selected Settings page is UI state only; changing tabs does not change persisted user configuration.
+On Obsidian 1.13 and later, these five pages use Obsidian's declarative Settings API. AnimeList settings therefore participate in the native Settings search, and selecting a search result opens the page that owns that setting. The declarations and visible controls are generated from the same settings-section model, so search metadata and the editable settings cannot drift apart.
+
+Older supported Obsidian versions keep the compatibility five-page tabbed renderer. Both paths read and write the same AnimeList settings; switching Obsidian versions does not migrate or rewrite persisted configuration. The selected Settings page is presentation state only.
 
 ### Interface language
 

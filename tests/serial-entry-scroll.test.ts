@@ -4,7 +4,7 @@ import {
   captureScrollPosition,
   findNewestSerialLabelInput,
   scheduleStableSerialEntryFocus,
-} from "../src/serial-entry-scroll-stability";
+} from "../src/ui/serial-covers/scroll-stability";
 
 interface MutableView {
   scrollX: number;

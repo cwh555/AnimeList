@@ -1,0 +1,958 @@
+/* Moments reading view: editorial quote cards with featured single-image stages and single-row filmstrips. */
+.block-language-animelist-moments { overflow: visible; }
+
+.animelist-moments-section {
+  position: relative;
+  box-sizing: border-box;
+  margin: 0.8rem 0 1.35rem;
+  padding: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 7% 0%, color-mix(in srgb, var(--interactive-accent) 6%, transparent), transparent 32%),
+    color-mix(in srgb, var(--background-secondary) 52%, var(--background-primary));
+  box-shadow: 0 10px 28px color-mix(in srgb, #000 9%, transparent);
+}
+
+.al-moments-toolbar {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  padding: 0.08rem 0.32rem 0.76rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 62%, transparent);
+}
+
+.al-moments-identity {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.54rem;
+  color: var(--text-normal);
+}
+
+.al-moments-icon {
+  display: inline-flex;
+  color: color-mix(in srgb, var(--interactive-accent) 76%, var(--text-muted));
+}
+
+.al-moments-icon svg { width: 18px; height: 18px; }
+
+.al-moments-title {
+  font-size: var(--font-ui-medium);
+  font-weight: 720;
+  letter-spacing: 0.01em;
+}
+
+.al-moments-count {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--interactive-accent) 66%, var(--text-muted));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+}
+
+.al-moments-add,
+.al-moment-actions,
+.al-moment-scroll-nav,
+.al-moment-text-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--background-primary) 72%, transparent);
+  box-shadow: none;
+}
+
+.al-moments-add {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.al-moments-add:hover,
+.al-moments-add:focus-visible,
+.al-moment-actions:hover,
+.al-moment-actions:focus-visible,
+.al-moment-scroll-nav:hover:not(:disabled),
+.al-moment-scroll-nav:focus-visible:not(:disabled),
+.al-moment-text-toggle:hover,
+.al-moment-text-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+  outline: none;
+}
+
+.al-moments-add svg { width: 17px; height: 17px; }
+
+.al-moments-list {
+  display: grid;
+  gap: 0.86rem;
+}
+
+.al-moments-empty {
+  padding: 1.35rem 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.al-moment-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
+  border-radius: 14px;
+  background: var(--background-primary);
+  box-shadow: 0 5px 18px color-mix(in srgb, #000 8%, transparent);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.al-moment-card:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
+  box-shadow: 0 9px 24px color-mix(in srgb, #000 12%, transparent);
+}
+
+.al-moment-content {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(168px, 0.27fr) minmax(0, 0.73fr);
+  align-items: start;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 66%, transparent);
+  background:
+    radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 44%),
+    linear-gradient(155deg, color-mix(in srgb, var(--background-secondary) 32%, var(--background-primary)), var(--background-primary));
+}
+
+.al-moment-content.without-metadata {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.al-moment-quote-panel {
+  position: relative;
+  min-width: 0;
+  padding: 2.4rem 1.2rem 1rem 1.35rem;
+}
+
+.al-moment-quote-panel::before {
+  content: "“";
+  position: absolute;
+  top: 0.76rem;
+  left: 1.2rem;
+  height: 1.15rem;
+  color: color-mix(in srgb, var(--interactive-accent) 72%, var(--text-faint));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.35rem;
+  font-weight: 700;
+  line-height: 0.85;
+  user-select: none;
+}
+
+.al-moment-quote {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.al-moment-text {
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: clamp(1rem, 0.28vw + 0.94rem, 1.15rem);
+  font-weight: 610;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.al-moment-quote:not(.is-expanded) .al-moment-text {
+  max-height: 4.86em;
+  overflow: hidden;
+}
+
+.al-moment-quote.is-clampable:not(.is-expanded)::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 1.6rem;
+  left: 0;
+  height: 2.8rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background-primary) 94%, transparent));
+}
+
+.al-moment-text-toggle {
+  z-index: 1;
+  justify-self: start;
+  min-height: 26px;
+  margin-top: 0.08rem;
+  padding: 0.12rem 0.54rem;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
+  border-radius: 8px;
+  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-muted));
+  background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.3;
+}
+
+.al-moment-text-toggle:hover,
+.al-moment-text-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+}
+
+.al-moment-text-toggle::before {
+  content: "⌄";
+  margin-right: 0.22rem;
+  font-size: 0.9em;
+}
+
+.al-moment-quote.is-expanded .al-moment-text-toggle::before { content: "⌃"; }
+.al-moment-text-toggle[hidden] { display: none; }
+
+.al-moment-meta-section {
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  min-width: 0;
+  align-content: start;
+  gap: 0.48rem;
+  padding: 1.05rem 1rem;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--background-modifier-border) 66%, transparent);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--background-secondary) 24%, transparent);
+}
+
+.al-moment-meta-section.is-clamped::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2.25rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background-secondary) 96%, var(--background-primary)));
+}
+
+.al-moment-meta {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.al-moment-meta-row {
+  display: block;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: clamp(0.7rem, 0.08vw + 0.68rem, 0.77rem);
+  line-height: 1.34;
+}
+
+.al-moment-meta-label {
+  margin-right: 0.16rem;
+  color: color-mix(in srgb, var(--interactive-accent) 64%, var(--text-muted));
+  font-size: 0.92em;
+  font-weight: 680;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.al-moment-meta-value,
+.al-moment-note-text {
+  display: inline;
+  min-width: 0;
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.al-moment-note {
+  display: block;
+  padding-top: 0.06rem;
+  color: var(--text-muted);
+  font-size: clamp(0.7rem, 0.08vw + 0.68rem, 0.77rem);
+  line-height: 1.42;
+}
+
+.al-moment-note-text {
+  overflow: visible;
+}
+
+.al-moment-tags-row {
+  padding-top: 0.06rem;
+}
+
+.al-moment-tags {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  vertical-align: middle;
+}
+
+.al-moment-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.38rem;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 22%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary));
+  color: var(--text-normal);
+  font-size: clamp(0.66rem, 0.08vw + 0.64rem, 0.72rem);
+  line-height: 1.35;
+}
+
+.al-moment-actions {
+  position: absolute;
+  z-index: 6;
+  top: 0.82rem;
+  right: 0.82rem;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+  border-radius: 10px;
+  opacity: 0.78;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-primary) 72%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px color-mix(in srgb, #000 18%, transparent);
+  font-size: 1.04rem;
+  line-height: 1;
+}
+
+.al-moment-card:hover .al-moment-actions,
+.al-moment-actions:focus-visible { opacity: 1; }
+
+.al-moment-media {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding: 0.78rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--interactive-accent) 5%, transparent), transparent 58%),
+    linear-gradient(180deg, color-mix(in srgb, var(--background-secondary) 66%, var(--background-primary)), color-mix(in srgb, var(--background-primary) 94%, #000));
+}
+
+.al-moment-image-viewport {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 11px;
+}
+
+.al-moment-image-viewport::before,
+.al-moment-image-viewport::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 10px;
+  width: 34px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.al-moment-image-viewport::before {
+  left: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--background-primary) 94%, transparent), transparent);
+}
+
+.al-moment-image-viewport::after {
+  right: 0;
+  background: linear-gradient(270deg, color-mix(in srgb, var(--background-primary) 94%, transparent), transparent);
+}
+
+.al-moment-media.is-scrollable:not(.is-at-start) .al-moment-image-viewport::before,
+.al-moment-media.is-scrollable:not(.is-at-end) .al-moment-image-viewport::after { opacity: 1; }
+
+.al-moment-image-row {
+  --al-moment-image-height: clamp(220px, 23vw, 330px);
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0.72rem;
+  padding: 0.12rem 0.14rem 0.46rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 0.14rem;
+  overscroll-behavior-inline: contain;
+}
+
+.al-moment-image {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: calc(var(--al-moment-image-height) * var(--al-moment-image-ratio, 0.72));
+  min-width: 150px;
+  max-width: calc(100% - 2.4rem);
+  height: var(--al-moment-image-height);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+  box-shadow: 0 3px 12px color-mix(in srgb, #000 10%, transparent);
+  scroll-snap-align: start;
+  cursor: zoom-in;
+}
+
+.al-moment-image:hover,
+.al-moment-image:focus-visible {
+  border-color: color-mix(in srgb, var(--interactive-accent) 44%, var(--background-modifier-border));
+  box-shadow: 0 5px 16px color-mix(in srgb, #000 13%, transparent);
+  outline: none;
+}
+
+.al-moment-image img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+/* A single image is a large cinematic stage above the text/metadata band. */
+.al-moment-media.is-featured {
+  padding: 0.85rem;
+}
+
+.al-moment-media.is-featured .al-moment-image-viewport {
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--background-secondary) 88%, #000), color-mix(in srgb, var(--background-secondary) 70%, var(--background-primary)));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text-faint) 5%, transparent),
+    0 8px 22px color-mix(in srgb, #000 16%, transparent);
+}
+
+.al-moment-image-row[data-image-count="1"] {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  scroll-snap-type: none;
+}
+
+.al-moment-image-row[data-image-count="1"] .al-moment-image {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--background-secondary) 80%, var(--background-primary));
+  box-shadow: none;
+}
+
+.al-moment-image-row[data-image-count="1"] .al-moment-image:hover,
+.al-moment-image-row[data-image-count="1"] .al-moment-image:focus-visible {
+  border: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.al-moment-image-missing {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 96px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.al-moment-scroll-nav {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px color-mix(in srgb, #000 18%, transparent);
+}
+
+.al-moment-scroll-nav svg { width: 18px; height: 18px; }
+.al-moment-scroll-prev { left: 0.46rem; }
+.al-moment-scroll-next { right: 0.46rem; }
+.al-moment-scroll-nav:disabled { opacity: 0.25; cursor: default; }
+.al-moment-scroll-nav[hidden] { display: none; }
+
+@media (hover: none) {
+  .al-moment-actions { opacity: 0.86; }
+  .al-moment-scroll-nav { opacity: 0.9; }
+}
+
+@media (max-width: 760px) {
+  .animelist-moments-section {
+    padding: 0.6rem;
+    border-radius: 13px;
+  }
+
+  .al-moments-toolbar { padding-right: 0.2rem; }
+  .al-moments-list { gap: 0.82rem; }
+
+  .al-moment-content,
+  .al-moment-content.without-metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .al-moment-quote-panel {
+    order: 1;
+    padding: 2rem 0.92rem 0.88rem;
+  }
+
+  .al-moment-quote-panel::before { top: 0.64rem; left: 0.88rem; }
+
+  .al-moment-meta-section {
+    order: 2;
+    padding: 0.8rem 0.92rem 0.9rem;
+    border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 62%, transparent);
+    border-right: 0;
+  }
+
+  .al-moment-text {
+    font-size: var(--font-ui-medium);
+    line-height: 1.56;
+  }
+
+  .al-moment-quote:not(.is-expanded) .al-moment-text { max-height: 4.68em; }
+
+  .al-moment-media { padding: 0.62rem; }
+  .al-moment-media.is-featured { padding: 0.64rem; }
+
+  .al-moment-image-row {
+    --al-moment-image-height: clamp(170px, 46vw, 230px);
+    gap: 0.56rem;
+  }
+
+  .al-moment-image {
+    min-width: 132px;
+    max-width: calc(100% - 1.9rem);
+  }
+
+  .al-moment-image-row[data-image-count="1"] {
+    aspect-ratio: 16 / 9;
+  }
+
+  .al-moment-scroll-prev { left: 0.3rem; }
+  .al-moment-scroll-next { right: 0.3rem; }
+}
+
+.animelist-moment-editor-modal {
+  width: min(760px, calc(100vw - 36px));
+  max-width: min(760px, calc(100vw - 36px));
+}
+
+.animelist-moment-editor-modal .modal-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.al-moment-editor-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.al-moment-editor-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.al-moment-editor-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+}
+
+.al-moment-editor-image-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.al-moment-editor-metadata {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.al-moment-editor-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.al-moment-editor-note {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+
+.al-moment-editor-add-images {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.al-moment-editor-file-input {
+  display: none;
+}
+
+.al-moment-editor-images {
+  display: flex;
+  gap: 0.5rem;
+  min-height: 116px;
+  margin-top: 0.45rem;
+  padding: 0.55rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.al-moment-editor-images.is-dragging {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.al-moment-editor-image {
+  position: relative;
+  flex: 0 0 auto;
+  width: 150px;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--background-primary);
+}
+
+.al-moment-editor-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.al-moment-editor-image-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.al-moment-editor-image-missing,
+.al-moment-editor-images-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 160px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.al-moment-editor-paste-hint {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.al-moment-editor-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.al-moment-editor-url-row input {
+  min-width: 0;
+  width: 100%;
+}
+
+.al-moment-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.al-moment-delete-copy {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .al-moment-editor-metadata-grid,
+  .al-moment-editor-url-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Stacked Moments keep every original image as a live DOM node. The first image is
+   shown in full; later images expose only a user-positioned subtitle strip. */
+.al-moment-media.is-stacked {
+  justify-content: center;
+  padding: 0.85rem;
+}
+
+.al-moment-stack {
+  --al-moment-stack-reveal: 46px;
+  display: grid;
+  width: min(100%, 880px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+  box-shadow: 0 8px 22px color-mix(in srgb, #000 16%, transparent);
+}
+
+.al-moment-stack-top,
+.al-moment-stack-strip {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--background-secondary) 80%, var(--background-primary));
+  box-shadow: none;
+}
+
+button.al-moment-stack-top,
+button.al-moment-stack-strip {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  box-shadow: none;
+  cursor: zoom-in;
+}
+
+button.al-moment-stack-top {
+  height: auto;
+  min-height: 180px;
+}
+
+button.al-moment-stack-strip {
+  height: var(--al-moment-stack-reveal);
+  min-height: var(--al-moment-stack-reveal);
+}
+
+.al-moment-stack-top {
+  height: auto;
+  min-height: 180px;
+}
+
+.al-moment-stack-strip {
+  height: var(--al-moment-stack-reveal);
+  min-height: var(--al-moment-stack-reveal);
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+}
+
+.al-moment-stack-top-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 430px;
+  margin: 0;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--background-secondary) 82%, var(--background-primary));
+}
+
+.al-moment-stack-strip-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: cover;
+  object-position: 50% var(--al-moment-stack-focus-y, 86%);
+  transform: translateZ(0);
+}
+
+.al-moment-stack-missing {
+  display: grid;
+  min-height: inherit;
+  place-items: center;
+  padding: 0.7rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+button.al-moment-stack-top:hover,
+button.al-moment-stack-top:focus-visible,
+button.al-moment-stack-strip:hover,
+button.al-moment-stack-strip:focus-visible {
+  background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-secondary));
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.al-moment-editor-layout {
+  display: grid;
+  gap: 0.72rem;
+  margin-top: 0.78rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 66%, var(--background-primary));
+}
+
+.al-moment-editor-layout-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.al-moment-editor-layout-modes {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+}
+
+.al-moment-editor-layout-mode {
+  min-height: 30px;
+  padding: 0.2rem 0.65rem;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+.al-moment-editor-layout-mode.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.al-moment-editor-reveal {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.al-moment-editor-layout-caption,
+.al-moment-editor-stack-hint {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.al-moment-editor-reveal input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.al-moment-editor-reveal-value {
+  min-width: 42px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.al-moment-stack-editor {
+  width: min(100%, 680px);
+  justify-self: center;
+}
+
+.al-moment-stack-editor .al-moment-stack-strip {
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.al-moment-stack-editor .al-moment-stack-strip.is-adjusting {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 76%, transparent);
+}
+
+.al-moment-stack-adjust-value {
+  position: absolute;
+  z-index: 2;
+  right: 8px;
+  bottom: 6px;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .al-moment-media.is-stacked { padding: 0.64rem; }
+  .al-moment-stack-top { min-height: 128px; }
+  .al-moment-stack-top-image { max-height: 330px; }
+}
+
+@media (max-width: 640px) {
+  .al-moment-editor-layout-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .al-moment-editor-layout-modes {
+    align-self: stretch;
+  }
+
+  .al-moment-editor-layout-mode { flex: 1 1 0; }
+  .al-moment-editor-reveal { grid-template-columns: 1fr auto; }
+  .al-moment-editor-layout-caption { grid-column: 1 / -1; }
+}

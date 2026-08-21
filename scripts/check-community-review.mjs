@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { collectVersionMetadataFailures, loadVersionMetadata } from "./version-metadata.mjs";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -13,16 +14,15 @@ function walk(directory) {
   });
 }
 
-const manifest = JSON.parse(read("manifest.json"));
-const packageJson = JSON.parse(read("package.json"));
-const versions = JSON.parse(read("versions.json"));
+const versionMetadata = loadVersionMetadata(root);
+const { manifest } = versionMetadata;
 const sourceFiles = walk(path.join(root, "src"))
   .filter((file) => file.endsWith(".ts"))
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
 const main = read("src/main.ts");
-const settings = read("src/settings.ts");
-const scopedVault = read("src/vault-scope.ts");
+const settings = read("src/ui/settings.ts");
+const scopedVault = read("src/data/vault-scope.ts");
 const shim = read("types/obsidian.d.ts");
 const styles = read("styles.css");
 const releaseWorkflow = read(".github/workflows/release.yml");
@@ -34,8 +34,7 @@ function rejectMatch(value, pattern, message) {
   if (pattern.test(value)) failures.push(message);
 }
 
-if (manifest.version !== packageJson.version) failures.push("manifest.json and package.json versions must match");
-if (versions[manifest.version] !== manifest.minAppVersion) failures.push(`versions.json must map ${manifest.version} to manifest minAppVersion`);
+failures.push(...collectVersionMetadataFailures(versionMetadata));
 
 rejectMatch(sourceFiles, /\.innerHTML\s*=|\.outerHTML\s*=|insertAdjacentHTML\s*\(/, "unsafe HTML assignment remains");
 rejectMatch(sourceFiles, /document\.create(?:Element|DocumentFragment|TextNode)\s*\(/, "native DOM creation remains; use Obsidian createEl helpers");
@@ -46,7 +45,6 @@ rejectMatch(scopedVault, /\bas\s+(?:TAbstractFile|TFile|TFolder)\b/, "vault trav
 rejectMatch(sourceFiles, /eslint-disable/, "source lint suppressions remain");
 rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
 rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
-requireMatch(settings, /getSettingDefinitions\(\):\s*SettingDefinition\[\]/, "declarative settings definitions are missing");
 rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
 rejectMatch(
   styles,

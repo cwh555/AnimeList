@@ -2,6 +2,9 @@ export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", 
 
 export const TEST_FEATURES = [
   "covers",
+  "export",
+  "import",
+  "image-gallery",
   "image-sections",
   "library",
   "legacy-update",
@@ -26,12 +29,17 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/image-gallery.test.ts", kind: "test", suite: "unit", features: ["image-gallery", "image-sections", "markdown"] },
+  { path: "tests/contracts/image-gallery-service.test.ts", kind: "test", suite: "contract", features: ["image-gallery", "image-sections", "markdown", "library"] },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },
 
   { path: "tests/moments.test.ts", kind: "test", suite: "unit", features: ["moments", "markdown"] },
+  { path: "tests/moment-image-layout.test.ts", kind: "test", suite: "unit", features: ["moments"] },
+  { path: "tests/moment-stack-raster.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
   { path: "tests/media-note-insert-menu.test.ts", kind: "test", suite: "unit", features: ["moments", "image-sections"] },
   { path: "tests/contracts/moments-service.test.ts", kind: "test", suite: "contract", features: ["moments", "image-sections", "markdown"] },
 
@@ -59,11 +67,15 @@ export const TEST_TARGETS = [
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-progressive-render.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/library-layout.test.ts", kind: "test", suite: "unit", features: ["library", "settings"] },
   { path: "tests/library-filters.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/studio-identity.test.ts", kind: "test", suite: "unit", features: ["library", "search"] },
   { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },
   { path: "tests/user-tag-settings.test.ts", kind: "test", suite: "integration", features: ["tags", "settings"] },
   { path: "tests/media-library-index.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/library-export.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
+  { path: "tests/library-text-template.test.ts", kind: "test", suite: "unit", features: ["library", "export"] },
+  { path: "tests/library-import.test.ts", kind: "test", suite: "unit", features: ["library", "import"] },
   { path: "tests/markdown-refresh-scope.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
   { path: "tests/library-view.test.ts", kind: "test", suite: "unit", features: ["library", "masterpiece"] },
@@ -78,6 +90,7 @@ export const TEST_TARGETS = [
 
   { path: "tests/timeline-scale.test.ts", kind: "test", suite: "integration", features: ["timeline"] },
   { path: "tests/timeline-scale-work-items.test.ts", kind: "test", suite: "unit", features: ["timeline"] },
+  { path: "tests/timeline-workspace-layout.test.ts", kind: "test", suite: "unit", features: ["timeline"] },
   { path: "tests/timeline-corrections.test.ts", kind: "test", suite: "unit", features: ["timeline", "progress"] },
 
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },
@@ -101,6 +114,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/style-bundle.test.ts", kind: "test", suite: "contract", features: ["styles", "release", "timeline"] },
   { path: "tests/contracts/text-catalog.test.ts", kind: "test", suite: "contract", features: ["text", "settings"] },
   { path: "tests/contracts/test-catalog.test.ts", kind: "test", suite: "contract", features: ["test-infrastructure"] },
+  { path: "tests/contracts/version-metadata.test.ts", kind: "test", suite: "contract", features: ["release", "test-infrastructure"] },
   { path: "scripts/check-architecture.mjs", kind: "script", suite: "contract", features: ["test-infrastructure"] },
 
   { path: "tests/legacy-characterization.test.ts", kind: "test", suite: "legacy", features: ["library", "markdown", "progress", "release", "search", "settings", "text", "timeline", "serial-covers"] },

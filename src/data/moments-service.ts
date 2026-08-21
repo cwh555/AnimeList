@@ -13,6 +13,11 @@ import {
   type MomentsLocator,
 } from "../domain/moments";
 import { normalizeImageSectionPath } from "../domain/image-section";
+import {
+  momentImageLayoutState,
+  normalizeMomentStackGapsY,
+  type MomentImageLayout,
+} from "../domain/moment-image-layout";
 
 export interface MomentEditorInput {
   text: string;
@@ -21,6 +26,8 @@ export interface MomentEditorInput {
   speaker?: string;
   tags?: readonly string[];
   note?: string;
+  imageLayout?: MomentImageLayout;
+  stackGapsY?: readonly number[];
   retainedImages: readonly string[];
   newAssets: readonly ImageSectionAssetInput[];
 }
@@ -52,12 +59,21 @@ function normalizedTags(values: readonly string[] | undefined): string[] | undef
   return tags.length ? tags : undefined;
 }
 
-function buildMomentPayload(id: string, input: MomentEditorInput, images: string[]): MomentItem {
+function buildMomentPayload(
+  id: string,
+  input: MomentEditorInput,
+  images: string[],
+  stackGapsY: readonly number[],
+): MomentItem {
   const source = normalizedOptional(input.source);
   const position = normalizedOptional(input.position);
   const speaker = normalizedOptional(input.speaker);
   const tags = normalizedTags(input.tags);
   const note = normalizedOptional(input.note);
+  const layout = momentImageLayoutState({
+    imageLayout: input.imageLayout,
+    stackGapsY,
+  }, images.length);
   return {
     id,
     text: normalizedText(input.text),
@@ -67,7 +83,23 @@ function buildMomentPayload(id: string, input: MomentEditorInput, images: string
     ...(tags ? { tags } : {}),
     ...(note ? { note } : {}),
     images,
+    ...layout,
   };
+}
+
+function stackGapsForStoredImages(
+  input: MomentEditorInput,
+  retainedSourceIndexes: readonly number[],
+  acceptedAssetIndexes: readonly number[],
+  assetGapOffset: number,
+  imageCount: number,
+): number[] {
+  const requested = [...(input.stackGapsY ?? [])];
+  const selected = [
+    ...retainedSourceIndexes.map((index) => requested[index]),
+    ...acceptedAssetIndexes.map((index) => requested[assetGapOffset + index]),
+  ];
+  return normalizeMomentStackGapsY(selected, imageCount);
 }
 
 export class MomentsService {
@@ -98,7 +130,14 @@ export class MomentsService {
         throw new Error("This note has missing or duplicate Moment IDs; fix the YAML before adding another moment");
       }
       const id = createMomentId(allMomentIds(markdown));
-      const moment = buildMomentPayload(id, input, stored.paths);
+      const stackGapsY = stackGapsForStoredImages(
+        input,
+        [],
+        stored.acceptedAssetIndexes,
+        0,
+        stored.paths.length,
+      );
+      const moment = buildMomentPayload(id, input, stored.paths, stackGapsY);
       const next = [...current, moment];
       await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
       return { source: serializeMomentsSource(next), moment, duplicatesSkipped: stored.duplicatesSkipped };
@@ -123,16 +162,30 @@ export class MomentsService {
     const index = indexes[0];
     const previous = current[index];
     const previousSet = new Set(previous.images);
-    const retained = [...new Set(input.retainedImages
-      .map(normalizeImageSectionPath)
-      .filter((path) => path && previousSet.has(path)))];
+    const retained: string[] = [];
+    const retainedSourceIndexes: number[] = [];
+    const seenRetained = new Set<string>();
+    input.retainedImages.forEach((value, sourceIndex) => {
+      const path = normalizeImageSectionPath(value);
+      if (!path || !previousSet.has(path) || seenRetained.has(path)) return;
+      seenRetained.add(path);
+      retained.push(path);
+      retainedSourceIndexes.push(sourceIndex);
+    });
     const stored = await this.images.storeAssets(sourcePath, retained, input.newAssets);
     if (!stored.paths.length) {
       await this.images.rollbackStoredPaths(stored.addedPaths);
       throw new Error("A moment must keep at least one image");
     }
 
-    const nextMoment = buildMomentPayload(previous.id, input, stored.paths);
+    const stackGapsY = stackGapsForStoredImages(
+      input,
+      retainedSourceIndexes,
+      stored.acceptedAssetIndexes,
+      input.retainedImages.length,
+      stored.paths.length,
+    );
+    const nextMoment = buildMomentPayload(previous.id, input, stored.paths, stackGapsY);
     const next = current.map((moment, position) => position === index ? nextMoment : moment);
     const note = this.noteFile(sourcePath);
     try {

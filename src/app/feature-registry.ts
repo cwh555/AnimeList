@@ -1,8 +1,9 @@
-import { settingsPageForFeature } from "../settings-layout";
+import { settingsPageForFeature } from "./settings-layout";
 import type { MediaItem } from "../types";
 import type { LibraryRenderAdapters, LibraryRenderContext } from "../ui/library-contracts";
 import type { MediaFormContext, MediaFormSubmitContext } from "../ui/media-form-contracts";
 import type { SearchRenderContext } from "../ui/search-contracts";
+import type { WorkspaceMenuAction, WorkspacePageDefinition } from "../ui/workspace-contracts";
 import type {
   AnimeListFeature,
   AnimeListFeatureHost,
@@ -17,6 +18,8 @@ import type {
   MediaItemContribution,
   SearchContribution,
   SettingsContribution,
+  WorkspaceActionContribution,
+  WorkspacePageContribution,
 } from "./feature-types";
 
 interface SettingsRegistration<Host extends AnimeListFeatureHost> {
@@ -55,6 +58,8 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
   private readonly favorites: FavoriteContribution<Host>[] = [];
   private readonly settings: SettingsRegistration<Host>[] = [];
   private readonly details: DetailContribution<Host>[] = [];
+  private readonly workspacePages: WorkspacePageContribution<Host>[] = [];
+  private readonly workspaceActions: WorkspaceActionContribution<Host>[] = [];
   private loaded = false;
   private activated = false;
 
@@ -73,6 +78,8 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
           case "favorite": this.favorites.push(contribution); break;
           case "settings": this.settings.push({ featureId: feature.id, contribution }); break;
           case "detail": this.details.push(contribution); break;
+          case "workspace-page": this.workspacePages.push(contribution); break;
+          case "workspace-action": this.workspaceActions.push(contribution); break;
         }
       }
     }
@@ -142,5 +149,17 @@ export class AnimeListFeatureRegistry<Host extends AnimeListFeatureHost> {
 
   afterDetailRender(context: DetailRenderContext<Host>): void {
     for (const contribution of this.details) contribution.afterRender(context);
+  }
+
+  workspacePageDefinitions(host: Host): WorkspacePageDefinition[] {
+    return this.workspacePages
+      .map((contribution) => contribution.page(host))
+      .filter((page) => page !== null);
+  }
+
+  workspaceMenuActions(host: Host): WorkspaceMenuAction[] {
+    return this.workspaceActions
+      .map((contribution) => contribution.action(host))
+      .filter((action) => action !== null);
   }
 }

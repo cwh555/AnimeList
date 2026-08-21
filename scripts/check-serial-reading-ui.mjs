@@ -15,16 +15,16 @@ const [
   pluginEntrySource,
   packageSource,
 ] = await Promise.all([
-  readFile("styles.serial-reading.css", "utf8"),
-  readFile("styles.serial-cover.css", "utf8"),
-  readFile("styles.progress.css", "utf8"),
+  readFile("styles/serial-reading.css", "utf8"),
+  readFile("styles/serial-cover.css", "utf8"),
+  readFile("styles/progress.css", "utf8"),
   readFile("scripts/style-bundle.mjs", "utf8"),
   readFile("styles.css", "utf8"),
-  readFile("src/additional-progress-units-ui.ts", "utf8"),
-  readFile("src/segmented-date-input.ts", "utf8"),
-  readFile("src/serial-cover-picker.ts", "utf8"),
-  readFile("src/serial-cover-feature.ts", "utf8"),
-  readFile("src/serial-cover-migration-modal.ts", "utf8"),
+  readFile("src/features/progress/additional-progress-units.ts", "utf8"),
+  readFile("src/ui/segmented-date-input.ts", "utf8"),
+  readFile("src/ui/serial-covers/picker.ts", "utf8"),
+  readFile("src/features/serial-covers/feature.ts", "utf8"),
+  readFile("src/ui/serial-covers/migration-modal.ts", "utf8"),
   readFile("src/plugin-entry.ts", "utf8"),
   readFile("package.json", "utf8"),
 ]);
@@ -89,9 +89,9 @@ assert.equal(
 );
 
 assert.match(styleBundleSource, /"styles\/base\.css"/);
-assert.match(styleBundleSource, /"styles\.serial-reading\.css"/);
-assert.match(styleBundleSource, /"styles\.serial-cover\.css"/);
-assert.match(styleBundleSource, /"styles\.progress\.css"/);
+assert.match(styleBundleSource, /"styles\/serial-reading\.css"/);
+assert.match(styleBundleSource, /"styles\/serial-cover\.css"/);
+assert.match(styleBundleSource, /"styles\/progress\.css"/);
 assert.ok(releaseStyles.includes(serialStyles.trim()));
 assert.ok(releaseStyles.includes(coverStyles.trim()));
 assert.ok(releaseStyles.includes(progressStyles.trim()));

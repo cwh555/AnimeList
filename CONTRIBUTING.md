@@ -68,9 +68,22 @@ Browser-sensitive UI behavior has dedicated Chromium regressions:
 ```bash
 npm run test:browser:date
 npm run test:browser:mobile
+npm run test:browser:score-mobile
 npm run test:browser:tags
 npm run test:browser:tag-manager
 ```
+
+## Release version metadata
+
+`package.json` is the single hand-edited source for the AnimeList plugin version. Do not independently edit the version in `manifest.json`, the root package entries in `package-lock.json`, `versions.json`, or runtime source.
+
+For a normal release bump, pass the new `x.y.z` value once:
+
+```bash
+npm run release:version -- <new-version>
+```
+
+The command updates `package.json` and synchronizes the derived release metadata. Runtime `PLUGIN_VERSION` is bundled directly from `package.json`. If `package.json` was edited manually, run `npm run version:sync` to regenerate the derived metadata. Historical release prose such as `CHANGELOG.md` remains intentionally authored rather than globally rewritten; `npm run release:check` requires a changelog section for the current package version.
 
 Before opening or updating a pull request, run:
 

@@ -10,6 +10,9 @@ import { SERIAL_COVER_MESSAGES } from "./serial-cover";
 import { USER_TAG_MESSAGES } from "./user-tag";
 import { IMAGE_SECTION_MESSAGES } from "./image-section";
 import { MOMENTS_MESSAGES } from "./moments";
+import { IMAGE_GALLERY_MESSAGES } from "./image-gallery";
+import { LIBRARY_EXPORT_MESSAGES } from "./library-export";
+import { TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
 
 export {
   CORE_MESSAGES,
@@ -24,7 +27,12 @@ export {
   USER_TAG_MESSAGES,
   IMAGE_SECTION_MESSAGES,
   MOMENTS_MESSAGES,
+  IMAGE_GALLERY_MESSAGES,
+  LIBRARY_EXPORT_MESSAGES,
+  TIMELINE_WORKSPACE_MESSAGES,
 };
+
+import { LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
 
 export const ZH_TW_CATALOGS = {
   core: CORE_MESSAGES,
@@ -39,6 +47,10 @@ export const ZH_TW_CATALOGS = {
   "user-tag": USER_TAG_MESSAGES,
   "image-section": IMAGE_SECTION_MESSAGES,
   moments: MOMENTS_MESSAGES,
+  "image-gallery": IMAGE_GALLERY_MESSAGES,
+  "library-layout": LIBRARY_LAYOUT_MESSAGES,
+  "library-export": LIBRARY_EXPORT_MESSAGES,
+  "timeline-workspace": TIMELINE_WORKSPACE_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

@@ -3,10 +3,10 @@ import { describe, it } from "node:test";
 import {
   createReliableLibraryOpener,
   type LibraryNavigationAdapter,
-} from "../src/library-navigation";
+} from "../src/app/library-navigation";
 
 interface TestLeaf {
-  view?: { showSection(section: "library"): Promise<void> };
+  view?: { showSection(section: "library" | "timeline" | "scores" | "images"): Promise<void> };
   setViewState(state: { type: string; active: boolean }): Promise<void>;
 }
 
@@ -30,6 +30,10 @@ function adapter(overrides: Partial<LibraryNavigationAdapter<TestLeaf>> = {}) {
     showLibrary: async (target) => {
       if (!target.view) throw new Error("The AnimeList library view was not available after activation.");
       await target.view.showSection("library");
+    },
+    showSection: async (target, section) => {
+      if (!target.view) throw new Error("The AnimeList library view was not available after activation.");
+      await target.view.showSection(section);
     },
     initializeLibrary: async () => { events.push("initialize"); },
     reportOpenFailure: (error) => events.push(`open-failure:${String(error)}`),
@@ -74,6 +78,20 @@ describe("reliable library navigation", () => {
 
     assert.equal(created, 0);
     assert.deepEqual(setup.events, ["reveal", "show:library", "initialize"]);
+  });
+
+  it("routes top-level workspace sections through the same AnimeList leaf", async () => {
+    const setup = adapter();
+    setup.adapter.findLeaves = () => [setup.leaf];
+    const open = createReliableLibraryOpener(setup.adapter);
+
+    await open("images");
+    await open("scores");
+
+    assert.deepEqual(setup.events, [
+      "reveal", "show:images", "initialize",
+      "reveal", "show:scores", "initialize",
+    ]);
   });
 
   it("coalesces repeated clicks into one navigation operation", async () => {

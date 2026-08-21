@@ -1,0 +1,13 @@
+/* Timeline poster cards share one compact 2:3 footprint in modal and workspace presentations. */
+.al-timeline-card {
+  height: 180px;
+}
+
+.al-timeline-card img {
+  width: 100%;
+  height: 100%;
+  flex: none;
+  object-fit: cover;
+  object-position: center;
+  background: var(--background-primary-alt, #202026);
+}

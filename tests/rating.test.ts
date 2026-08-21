@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatRating, normalizeRating } from "../src/rating";
+import { formatRating, normalizeRating } from "../src/domain/rating";
 
 describe("rating domain", () => {
   it("keeps ratings that already use half-point increments", () => {

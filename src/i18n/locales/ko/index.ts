@@ -11,6 +11,11 @@ import { KO_LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { KO_USER_TAG_MESSAGES } from "./user-tag";
 import { KO_IMAGE_SECTION_MESSAGES } from "./image-section";
 import { KO_MOMENTS_MESSAGES } from "./moments";
+import { KO_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
+
+import { KO_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
+import { KO_LIBRARY_EXPORT_MESSAGES } from "./library-export";
+import { KO_TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
 
 export const KO_CATALOGS = {
   core: KO_CORE_MESSAGES,
@@ -25,4 +30,8 @@ export const KO_CATALOGS = {
   "user-tag": KO_USER_TAG_MESSAGES,
   "image-section": KO_IMAGE_SECTION_MESSAGES,
   moments: KO_MOMENTS_MESSAGES,
+  "image-gallery": KO_IMAGE_GALLERY_MESSAGES,
+  "library-layout": KO_LIBRARY_LAYOUT_MESSAGES,
+  "library-export": KO_LIBRARY_EXPORT_MESSAGES,
+  "timeline-workspace": KO_TIMELINE_WORKSPACE_MESSAGES,
 } as const satisfies LocaleCatalogs;

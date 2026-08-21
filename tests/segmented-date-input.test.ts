@@ -4,7 +4,7 @@ import {
   focusSegmentedDateCompletion,
   handleSegmentedDateBackspace,
   normalizeDateParts,
-} from "../src/segmented-date-input";
+} from "../src/ui/segmented-date-input";
 
 describe("segmented serial date input", () => {
   it("accepts only complete real calendar dates", () => {

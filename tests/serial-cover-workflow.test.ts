@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expandTimelineEntries } from "../src/novel-progress";
-import { SerialCoverLoadQueue } from "../src/serial-cover-load-queue";
+import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
+import { SerialCoverLoadQueue } from "../src/app/serial-covers/load-queue";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
-} from "../src/serial-cover-provider";
-import { findSerialCoverCandidates } from "../src/serial-cover-service";
-import { resolveSerialEntryCoverPaths } from "../src/serial-cover-timeline";
-import { normalizeManualSerialCoverQuery } from "../src/serial-entry-cover";
+} from "../src/data/serial-covers/provider";
+import { findSerialCoverCandidates } from "../src/app/serial-covers/serial-cover-service";
+import { resolveSerialEntryCoverPaths } from "../src/domain/serial-covers/timeline";
+import { normalizeManualSerialCoverQuery } from "../src/domain/serial-covers/ranking";
 import { setRequestUrlMock } from "./mocks/obsidian";
 
 function candidate(sourceId: string, score = 200) {

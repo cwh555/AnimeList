@@ -6,7 +6,7 @@ import {
   appendSearchResultRows,
   mergeSearchPages,
   synchronizePaginationState,
-} from "../src/search-pagination";
+} from "../src/features/search/pagination";
 import type { ExternalMediaResult, ExternalMediaSearchPage } from "../src/types";
 
 function result(id: number): ExternalMediaResult {

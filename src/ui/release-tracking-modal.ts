@@ -8,7 +8,7 @@ import type {
   ReleaseRefreshSummary,
   ReleaseTrackingService,
 } from "../data/release-tracking-service";
-import { releaseTrackingText } from "../release-tracking-text";
+import { releaseTrackingText } from "../features/release-tracking/text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 export interface ReleaseTrackingModalActions {

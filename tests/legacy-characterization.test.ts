@@ -1,31 +1,30 @@
+import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { App, TFile, TFolder } from "obsidian";
 import AnimeListPlugin from "../src/main";
-import { PLUGIN_VERSION } from "../src/app-metadata";
-import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/builtin-templates";
-import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/settings";
+import { BUILTIN_TEMPLATES, getBuiltInTemplateOptions } from "../src/app/builtin-templates";
+import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
 import { legacyTest } from "../src/legacy";
-import { SEGMENTED_DATE_PARTS } from "../src/segmented-date-input";
+import { SEGMENTED_DATE_PARTS } from "../src/ui/segmented-date-input";
 import { libraryCoverSizes, libraryEagerCoverCount } from "../src/ui/library-renderer";
 import { TIMELINE_MEDIA_FILTERS, timelineStemGeometry } from "../src/ui/timeline-renderer";
-import { getScopedMarkdownFiles } from "../src/vault-scope";
+import { getScopedMarkdownFiles } from "../src/data/vault-scope";
 import {
   compareVolumeLabels,
-  expandTimelineEntries,
   normalizeVolumeLabel,
   normalizeVolumeLog,
   progressRatio,
   serializeVolumeLog,
-} from "../src/novel-progress";
+} from "../src/domain/progress/novel-progress";
 import { UI_TEXT, mediaFormatLabel, mediaProviderLabel, statusFilterOptions, uiText } from "../src/ui-text";
-import { rankSearchResults, searchQueryVariants } from "../src/search";
+import { rankSearchResults, searchQueryVariants } from "../src/domain/search/ranking";
 import {
   MIN_TIMELINE_VIEW_SCALE,
   calculateDefaultTimelineView,
-} from "../src/timeline-scale";
+} from "../src/domain/timeline/scale";
 
 const PathExists = existsSync;
 
@@ -443,7 +442,7 @@ describe("serial progress and novel volume records", () => {
 
 describe("serial-entry cover UI", () => {
   it("places the thumbnail panel on the row right side", () => {
-    const stylesheet = readFileSync(path.join(process.cwd(), "styles.serial-cover.css"), "utf8");
+    const stylesheet = readFileSync(path.join(process.cwd(), "styles/serial-cover.css"), "utf8");
     assert.match(stylesheet, /\.animelist-modal \.al-volume-row \{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto auto;/);
     assert.match(stylesheet, /\.al-serial-cover-panel/);
   });
@@ -654,7 +653,7 @@ describe("repository defaults", () => {
   });
 
 
-  it("exposes declarative settings while preserving storage-mode visibility", () => {
+  it("preserves storage-mode visibility in grouped settings pages", () => {
     const host = {
       settings: structuredClone(DEFAULT_SETTINGS),
       async saveSettings(): Promise<void> {},
@@ -662,28 +661,16 @@ describe("repository defaults", () => {
       refreshViews(): void {},
     };
     const tab = new AnimeListSettingTab(new App(), host);
-    const definitions = tab.getSettingDefinitions();
-    assert.equal(definitions.length, 12);
-    assert.deepEqual(
-      definitions.map((definition) => definition.name),
-      [
-        UI_TEXT["settings.storageLayout.name"],
-        UI_TEXT["settings.libraryRoot.name"],
-        UI_TEXT["settings.flatFolder.name"],
-        UI_TEXT["settings.additionalFolders.name"],
-        UI_TEXT["settings.coverFolder.name"],
-        UI_TEXT["settings.templateFolder.name"],
-        UI_TEXT["settings.timelineMaxStackDepth.name"],
-        UI_TEXT["media.provider.bangumi"],
-        UI_TEXT["media.provider.anilist"],
-        UI_TEXT["media.provider.openlibrary"],
-        UI_TEXT["settings.createFolders.name"],
-        UI_TEXT["settings.copyTemplates.name"],
-      ],
-    );
+    const definitions = tab
+      .getSettingsPageSections("general")
+      .flatMap((section) => section.definitions);
+    const libraryRoot = definitions.find((definition) => (
+      definition.name === UI_TEXT["settings.libraryRoot.name"]
+    ));
+    const flatFolder = definitions.find((definition) => (
+      definition.name === UI_TEXT["settings.flatFolder.name"]
+    ));
 
-    const libraryRoot = definitions.find((definition) => definition.name === UI_TEXT["settings.libraryRoot.name"]);
-    const flatFolder = definitions.find((definition) => definition.name === UI_TEXT["settings.flatFolder.name"]);
     assert.equal(libraryRoot?.visible?.(), true);
     assert.equal(flatFolder?.visible?.(), false);
 
@@ -711,7 +698,7 @@ describe("version documentation", () => {
     assert.match(changelog, /## 1\.2\.0 - 2026-07-26/);
     assert.match(changelog, /## 1\.1\.2 - 2026-07-22/);
     assert.match(readme, /> \[!NOTE\]/);
-    assert.match(readme, /> \*\*What's new in 1\.4\.0\*\*/);
+    assert.match(readme, /> \*\*What's new\*\*/);
     assert.match(readme, /\[User Guide\]\(docs\/USER_GUIDE\.md\)/);
     assert.match(userGuide, /## Latest release tracking/);
     assert.match(userGuide, /## Image Sections/);
@@ -723,22 +710,6 @@ describe("version documentation", () => {
     assert.doesNotMatch(roadmap, /Add an image section/);
     assert.doesNotMatch(roadmap, /Add a meme section/);
     assert.doesNotMatch(readme, /## Library data/);
-  });
-
-  it("keeps every runtime and release version synchronized", () => {
-    const manifest = JSON.parse(readFileSync(path.join(process.cwd(), "manifest.json"), "utf8")) as { version: string };
-    const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
-    const packageLock = JSON.parse(readFileSync(path.join(process.cwd(), "package-lock.json"), "utf8")) as {
-      version: string;
-      packages: Record<string, { version?: string }>;
-    };
-    const versions = JSON.parse(readFileSync(path.join(process.cwd(), "versions.json"), "utf8")) as Record<string, string>;
-    assert.equal(manifest.version, "1.4.0");
-    assert.equal(packageJson.version, manifest.version);
-    assert.equal(packageLock.version, manifest.version);
-    assert.equal(packageLock.packages[""]?.version, manifest.version);
-    assert.equal(versions[manifest.version], "1.5.0");
-    assert.equal(PLUGIN_VERSION, manifest.version);
   });
 });
 

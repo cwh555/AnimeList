@@ -55,6 +55,75 @@ describe("moments Markdown model", () => {
     assert.deepEqual(parseMomentsSource(serializeMomentsSource(parsed)), parsed);
   });
 
+  it("round-trips whole-image stack gaps while legacy moments stay carousel-compatible", () => {
+    const source = [
+      "moments:",
+      '  - id: "m_stacked123"',
+      "    text: stacked subtitles",
+      "    imageLayout: stacked",
+      "    stackGapsY:",
+      "      - 0",
+      "      - 52",
+      "      - 58",
+      "    images:",
+      '      - "a.jpg"',
+      '      - "b.jpg"',
+      '      - "c.jpg"',
+      '  - id: "m_legacy123"',
+      "    text: legacy carousel",
+      "    images:",
+      '      - "legacy-a.jpg"',
+      '      - "legacy-b.jpg"',
+    ].join("\n");
+    const parsed = parseMomentsSource(source);
+    assert.deepEqual(parsed[0], {
+      id: "m_stacked123",
+      text: "stacked subtitles",
+      imageLayout: "stacked",
+      stackGapsY: [0, 52, 58],
+      images: ["a.jpg", "b.jpg", "c.jpg"],
+    });
+    assert.deepEqual(parsed[1], {
+      id: "m_legacy123",
+      text: "legacy carousel",
+      images: ["legacy-a.jpg", "legacy-b.jpg"],
+    });
+    const serialized = serializeMomentsSource(parsed);
+    assert.match(serialized, /imageLayout: stacked/);
+    assert.match(serialized, /stackGapsY:\n      - 0\n      - 52\n      - 58/);
+    assert.doesNotMatch(serialized.split('m_legacy123')[1] ?? "", /imageLayout:/);
+    assert.deepEqual(parseMomentsSource(serialized), parsed);
+  });
+
+  it("reads the previous draft crop metadata as a whole-image stack and rewrites it cleanly", () => {
+    const source = [
+      "moments:",
+      '  - id: "m_draft123"',
+      "    text: old draft stack",
+      "    imageLayout: stacked",
+      "    stackReveal: 52",
+      "    stackFocusY:",
+      "      - 50",
+      "      - 81",
+      "      - 94",
+      "    images:",
+      '      - "a.jpg"',
+      '      - "b.jpg"',
+      '      - "c.jpg"',
+    ].join("\n");
+    const parsed = parseMomentsSource(source);
+    assert.deepEqual(parsed[0], {
+      id: "m_draft123",
+      text: "old draft stack",
+      imageLayout: "stacked",
+      stackGapsY: [0, 52, 52],
+      images: ["a.jpg", "b.jpg", "c.jpg"],
+    });
+    const serialized = serializeMomentsSource(parsed);
+    assert.match(serialized, /stackGapsY:/);
+    assert.doesNotMatch(serialized, /stackReveal|stackFocusY/);
+  });
+
   it("updates only one reusable moments block while preserving unrelated note content", () => {
     const markdown = [
       "---", "title: Demo", "custom: keep", "---", "", "# Demo", "",

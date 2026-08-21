@@ -1,24 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { scoreDashboardDragStackDepth } from "../src/score-dashboard-drag-preview";
+import { scoreDashboardDragStackDepth } from "../src/ui/score-dashboard/drag-preview";
 import {
   ScoreDashboardRefreshGuard,
   shouldRefreshScoreDashboardMetadata,
   shouldRefreshScoreDashboardPath,
   shouldRefreshScoreDashboardRename,
-} from "../src/score-dashboard-refresh";
+} from "../src/app/score-dashboard/refresh";
 import {
   applyScoreDashboardSelectionClick,
   parseScoreDashboardDraggedPaths,
   scoreDashboardDraggedPaths,
   serializeScoreDashboardDraggedPaths,
   toggleScoreDashboardPathSelection,
-} from "../src/score-dashboard-selection";
+} from "../src/domain/score-dashboard/selection";
 import {
   SCORE_DASHBOARD_TOUCH_DRAG_THRESHOLD_PX,
   scoreDashboardTouchIntent,
   shouldExitScoreDashboardTouchBatchMode,
-} from "../src/score-dashboard-touch";
+} from "../src/ui/score-dashboard/touch";
 
 describe("score dashboard incremental selection", () => {
   it("updates the existing selection set without rebuilding dashboard data", () => {

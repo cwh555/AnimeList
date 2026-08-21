@@ -13,9 +13,10 @@ Always compare this checklist with the latest official Obsidian developer docume
 
 ## Release preparation
 
-1. Make sure `package.json`, `manifest.json`, `versions.json`, and the runtime plugin version contain the same final release information.
-2. Create a tag that exactly matches the manifest version, without a `v` prefix.
-3. Confirm that the GitHub release contains these assets:
+1. Set the plugin version once with `npm run release:version -- <new-version>`. `package.json` is authoritative; the command synchronizes `package-lock.json`, `manifest.json`, and `versions.json`, while runtime metadata reads the package version directly. Do not hand-edit the derived version fields.
+2. Add the intentionally authored release notes for that version to `CHANGELOG.md`, then run `npm run release:check`.
+3. Create a tag that exactly matches the package/manifest version, without a `v` prefix.
+4. Confirm that the GitHub release contains these assets:
 
    ```text
    manifest.json
@@ -23,8 +24,8 @@ Always compare this checklist with the latest official Obsidian developer docume
    styles.css
    ```
 
-4. Download the assets from GitHub and perform one clean manual installation.
-5. Confirm the release stylesheet passes the repository Community preflight without suppressing compatibility warnings.
+5. Download the assets from GitHub and perform one clean manual installation.
+6. Confirm the release stylesheet passes the repository Community preflight without suppressing compatibility warnings.
 
 ## Developer Dashboard / Community review
 

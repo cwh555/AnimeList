@@ -84,6 +84,10 @@ export class PluginSettingTab {
   plugin: any;
   containerEl: any = { empty() {}, createEl() {} };
   constructor(app?: any, plugin?: any) { this.app = app; this.plugin = plugin; }
+  getSettingDefinitions(): any[] { return []; }
+  display(): void {}
+  update(): void {}
+  hide(): void {}
 }
 
 class SettingControl {
@@ -110,6 +114,8 @@ export class Setting {
 export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\.\//, "");
 }
+
+export function requireApiVersion(_version: string): boolean { return true; }
 
 type RequestUrlHandler = (options: any) => any | Promise<any>;
 let requestUrlHandler: RequestUrlHandler | null = null;

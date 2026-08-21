@@ -1,0 +1,81 @@
+.animelist-settings-tabs {
+  display: flex;
+  width: 100%;
+  gap: var(--size-4-1);
+  margin: 0 0 var(--size-4-3);
+  padding: var(--size-4-1);
+  overflow-x: auto;
+  white-space: nowrap;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.animelist-settings-tabs .animelist-settings-tab {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 var(--size-4-3);
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.animelist-settings-tabs .animelist-settings-tab:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.animelist-settings-tabs .animelist-settings-tab.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.animelist-settings-tabs .animelist-settings-tab:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.animelist-settings-intro {
+  margin: var(--size-4-3) 0 var(--size-4-5);
+  color: var(--text-muted);
+}
+
+.animelist-settings-section {
+  margin: 0 0 var(--size-4-6);
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  background: var(--background-secondary);
+}
+
+.animelist-settings-section-header {
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary-alt);
+}
+
+.animelist-settings-section-header > .setting-item,
+.animelist-settings-section-body > .setting-item {
+  margin: 0;
+  padding: var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5));
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.animelist-settings-section-header > .setting-item .setting-item-description {
+  margin-top: var(--size-4-1);
+  color: var(--text-muted);
+}
+
+.animelist-settings-section-body > .setting-item + .setting-item {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.animelist-settings-section-body > .setting-item .setting-item-name {
+  font-weight: var(--font-medium);
+}

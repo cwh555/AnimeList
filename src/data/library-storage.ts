@@ -3,12 +3,12 @@ import {
   BUILTIN_TEMPLATES,
   BUILTIN_TEMPLATE_PREFIX,
   getBuiltInTemplateOptions,
-} from "../builtin-templates";
+} from "../app/builtin-templates";
 import type { AnimeListSettings } from "../domain/settings-types";
 import type { MediaType, TemplateOption } from "../domain/media-types";
 import { sanitizePathPart } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "./vault-scope";
 
 export type SettingsProvider = () => AnimeListSettings;
 

@@ -16,6 +16,7 @@ export interface LibraryRenderState {
 }
 
 export interface LibraryRenderAdapters {
+  presentation?: "standalone" | "workspace";
   initialState?: LibraryRenderState;
   initialView?: LibraryViewMode;
   openFile?: (path: string) => void;

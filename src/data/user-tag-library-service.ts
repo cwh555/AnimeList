@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { normalizeUserTag } from "../domain/user-tags";
 import { mediaTypeOf, stringValue } from "../domain/value-normalization";
-import { getScopedMarkdownFiles } from "../vault-scope";
+import { getScopedMarkdownFiles } from "./vault-scope";
 import { compatibleGenres, writeCompatibleGenres } from "./media-frontmatter-compat";
 
 export interface UserTagMutationResult {

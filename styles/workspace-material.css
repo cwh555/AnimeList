@@ -1,0 +1,497 @@
+.animelist-native-view .al-workspace-shell {
+  --al-m3-primary: var(--interactive-accent, #6750a4);
+  --al-m3-on-primary: var(--text-on-accent, #fff);
+  --al-m3-surface: var(--background-primary, #1e1e22);
+  --al-m3-surface-container: var(--background-secondary, #25252b);
+  --al-m3-surface-container-high: var(--background-secondary-alt, #2b2b32);
+  --al-m3-outline: var(--background-modifier-border, #3a3a42);
+  --al-m3-on-surface: var(--text-normal, #e5e5e5);
+  --al-m3-on-surface-variant: var(--text-muted, #aaa);
+  --al-m3-primary-container: color-mix(in srgb, var(--al-m3-primary) 16%, var(--al-m3-surface));
+  width: min(1500px, 100%);
+  margin-inline: auto;
+  padding-bottom: 48px;
+  color: var(--al-m3-on-surface);
+}
+.animelist-native-view .al-workspace-shell * { box-sizing: border-box; }
+
+/* Material 3 small top app bar: product identity and global actions only. */
+.animelist-native-view .al-workspace-header {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 4px;
+}
+.animelist-native-view .al-workspace-brand { min-width: 0; }
+.animelist-native-view .al-workspace-title {
+  overflow: hidden;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.animelist-native-view .al-workspace-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+.animelist-native-view button.al-workspace-action,
+.animelist-native-view button.al-workspace-more {
+  min-height: 40px;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--al-m3-primary);
+  background: var(--al-m3-primary-container);
+  font-size: .74rem;
+  font-weight: 700;
+}
+.animelist-native-view button.al-workspace-action { padding: 0 16px; }
+.animelist-native-view button.al-workspace-more {
+  display: grid;
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  place-items: center;
+}
+.animelist-native-view button.al-workspace-action:hover,
+.animelist-native-view button.al-workspace-more:hover {
+  color: var(--al-m3-primary);
+  background: color-mix(in srgb, var(--al-m3-primary) 22%, var(--al-m3-surface));
+}
+
+/* Primary destination tabs. Active state is an indicator, not a filled pill. */
+.animelist-native-view .al-workspace-nav-row {
+  display: block;
+  min-width: 0;
+  border-bottom: 1px solid var(--al-m3-outline);
+}
+.animelist-native-view .al-workspace-nav {
+  display: flex;
+  min-width: 0;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: clip;
+}
+.animelist-native-view button.al-workspace-tab {
+  position: relative;
+  display: inline-flex;
+  width: auto;
+  min-width: 96px;
+  min-height: 48px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--al-m3-on-surface-variant);
+  background: transparent;
+  font-size: .76rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.animelist-native-view button.al-workspace-tab::after {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+  content: "";
+}
+.animelist-native-view button.al-workspace-tab:hover {
+  color: var(--al-m3-on-surface);
+  background: color-mix(in srgb, var(--al-m3-on-surface) 6%, transparent);
+}
+.animelist-native-view button.al-workspace-tab.is-active {
+  color: var(--al-m3-primary);
+  background: transparent;
+}
+.animelist-native-view button.al-workspace-tab.is-active::after { background: var(--al-m3-primary); }
+.animelist-native-view .al-workspace-tab-icon { display: grid; place-items: center; }
+.animelist-native-view .al-workspace-tab-icon svg { width: 18px; height: 18px; }
+
+/* Every destination gets exactly one shared page header. Page actions stay attached to the title. */
+.animelist-native-view .al-workspace-page {
+  min-width: 0;
+  padding-top: 18px;
+}
+.animelist-native-view .al-workspace-page-header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 2px;
+}
+.animelist-native-view .al-workspace-page-heading { min-width: 0; }
+.animelist-native-view .al-workspace-page-title {
+  margin: 0;
+  color: var(--al-m3-on-surface);
+  font-size: 1.34rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+.animelist-native-view .al-workspace-page-actions {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.animelist-native-view .al-workspace-page-body { min-width: 0; padding-top: 10px; }
+
+/* Dynamic summaries live below the shared title and use the same secondary text treatment. */
+.animelist-native-view .al-library-workspace-summary,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-copy,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-header,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-page-header {
+  margin: 0 0 12px;
+  padding: 0 2px;
+  border: 0;
+  color: var(--al-m3-on-surface-variant);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+.animelist-native-view .al-library-workspace-summary strong,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-copy strong,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-copy,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-page-copy { display: none; }
+.animelist-native-view .al-library-workspace-summary {
+  display: block;
+  min-height: 0;
+}
+.animelist-native-view .al-library-workspace-summary span { color: inherit; font-size: inherit; }
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-header {
+  display: block;
+}
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-summary {
+  max-width: none;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+.animelist-native-view .al-workspace-page.is-images .al-gallery-page-header {
+  display: block;
+}
+.animelist-native-view .al-workspace-page.is-images .al-gallery-page-summary {
+  color: inherit;
+  font-size: inherit;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-copy {
+  display: block;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-copy span { display: block; }
+
+/* Library page: connected segmented media switch, task toolbar, then filter chips. */
+.animelist-native-view .al-library-workspace-type-tabs,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-tabs,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-type-filters,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-mode-tabs,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0;
+  border: 1px solid var(--al-m3-outline);
+  border-radius: 20px;
+  background: transparent;
+}
+.animelist-native-view .al-library-workspace-type-tabs { margin: 0 0 16px; }
+.animelist-native-view .al-library-workspace-type-tabs > button,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-tabs > button,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-type-filters > button,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-mode-tabs > button,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters > button {
+  min-height: 40px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid var(--al-m3-outline);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--al-m3-on-surface-variant);
+  background: transparent;
+  font-size: .72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.animelist-native-view .al-library-workspace-type-tabs > button:last-child,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-tabs > button:last-child,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-type-filters > button:last-child,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-mode-tabs > button:last-child,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters > button:last-child { border-right: 0; }
+.animelist-native-view .al-library-workspace-type-tabs > button.is-active,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-tabs > button.is-active,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-type-filters > button.is-active,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-mode-tabs > button.is-active,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters > button.is-active {
+  color: var(--al-m3-primary);
+  background: var(--al-m3-primary-container);
+}
+.animelist-native-view .al-library-workspace-type-tabs .al-tab-count {
+  margin-left: 6px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.animelist-native-view button.al-library-workspace-collect {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--al-m3-on-primary);
+  background: var(--al-m3-primary);
+  font-size: .74rem;
+  font-weight: 700;
+}
+.animelist-native-view button.al-library-workspace-collect:hover { filter: brightness(1.06); transform: none; }
+
+.animelist-native-view .al-library-workspace-toolbar,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-controls,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-filters,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-toolbar {
+  border: 0;
+  border-radius: 16px;
+  background: var(--al-m3-surface-container);
+  box-shadow: none;
+}
+.animelist-native-view .al-library-workspace-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px;
+}
+.animelist-native-view .al-library-workspace-query-tools {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 620px;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(170px, auto);
+  gap: 8px;
+}
+.animelist-native-view .al-library-workspace-display-tools {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 320px;
+  align-items: stretch;
+}
+.animelist-native-view .al-library-workspace-toolbar .al-search,
+.animelist-native-view .al-library-workspace-toolbar .al-filter-button,
+.animelist-native-view .al-library-workspace-toolbar .al-sort,
+.animelist-native-view .al-library-workspace-toolbar .al-view-switch {
+  min-height: 40px;
+  margin: 0;
+  border-color: var(--al-m3-outline);
+  background: var(--al-m3-surface);
+}
+.animelist-native-view .al-library-workspace-toolbar .al-view-switch { width: 100%; }
+.animelist-native-view .al-library-workspace-toolbar .al-sort select { min-width: 168px; }
+.animelist-native-view .al-workspace-page.is-library .al-status-bar {
+  gap: 8px;
+  margin: 0 0 22px;
+}
+.animelist-native-view .al-workspace-page.is-library .al-status-chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border-color: var(--al-m3-outline);
+  border-radius: 8px;
+  color: var(--al-m3-on-surface-variant);
+  background: transparent;
+}
+.animelist-native-view .al-workspace-page.is-library .al-status-chip.is-active {
+  border-color: transparent;
+  color: var(--al-m3-primary);
+  background: var(--al-m3-primary-container);
+}
+.animelist-native-view .al-workspace-page.is-library .al-result-head { margin: 0 0 12px; }
+
+/* Other workspace pages reuse the same component vocabulary instead of separate hero styles. */
+.animelist-native-view .al-workspace-page-body.animelist-score-dashboard-view { padding: 0 0 48px; }
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px;
+}
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-tabs { margin: 0; }
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-action-group,
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-zoom {
+  min-height: 40px;
+  border: 1px solid var(--al-m3-outline);
+  border-radius: 12px;
+  background: var(--al-m3-surface);
+}
+.animelist-native-view .al-workspace-page.is-scores .al-score-dashboard-zoom { margin-left: auto; }
+
+.animelist-native-view .al-workspace-page.is-images .al-gallery-mode-tabs { margin: 0 0 12px; }
+.animelist-native-view .al-workspace-page.is-images .al-gallery-filters {
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 10px;
+}
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters { border-radius: 18px; }
+.animelist-native-view .al-workspace-page.is-images .al-gallery-type-filters > button { min-height: 36px; padding-inline: 11px; }
+.animelist-native-view .al-workspace-page.is-images .al-gallery-search,
+.animelist-native-view .al-workspace-page.is-images .al-gallery-columns {
+  border-color: var(--al-m3-outline);
+  background: var(--al-m3-surface);
+}
+
+.animelist-native-view .al-workspace-page.is-timeline {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-workspace-page-body {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-root {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--al-m3-outline);
+  border-radius: 16px;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-copy {
+  flex: 1 1 220px;
+  margin: 0;
+  padding: 0 4px;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-type-filters { flex: 0 0 auto; }
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-controls { margin-left: auto; }
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-control-group,
+.animelist-native-view .al-workspace-page.is-timeline .al-timeline-controls > button {
+  border-color: var(--al-m3-outline);
+  background: var(--al-m3-surface);
+}
+
+/* M3 window-size classes are based on the actual Obsidian leaf width. */
+.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-library-workspace-toolbar {
+  flex-wrap: wrap;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-library-workspace-query-tools {
+  flex: 1 1 100%;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-library-workspace-display-tools {
+  flex: 0 1 320px;
+  margin-left: auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] {
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-header {
+  min-height: 56px;
+  padding-inline: 2px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-title { font-size: 1.12rem; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-workspace-tab {
+  min-width: 82px;
+  min-height: 44px;
+  padding-inline: 12px;
+  font-size: .7rem;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page {
+  padding-top: 14px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-header {
+  min-height: 44px;
+  gap: 10px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-title { font-size: 1.18rem; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-body { padding-top: 8px; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-library-workspace-collect {
+  min-height: 38px;
+  padding-inline: 13px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-type-tabs {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-type-tabs > button {
+  min-width: max-content;
+  flex: 1 0 auto;
+  padding-inline: 11px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-toolbar {
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-query-tools {
+  width: 100%;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-query-tools .al-search {
+  grid-column: 1 / -1;
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-query-tools .al-filter-button,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-query-tools .al-sort {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-query-tools .al-sort select {
+  width: 100%;
+  min-width: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-display-tools {
+  width: 100%;
+  flex: 0 0 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-library-workspace-display-tools .al-view-switch {
+  width: 100%;
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-zoom {
+  width: 100%;
+  margin-left: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-filters {
+  grid-template-columns: 1fr;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-type-filters {
+  width: 100%;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-toolbar {
+  align-items: stretch;
+  flex-direction: column;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-type-filters {
+  width: 100%;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-controls {
+  margin-left: 0;
+}

@@ -21,13 +21,14 @@ npm run check
 npm run release:check
 ```
 
-`npm run check` is the complete repository gate: TypeScript, strict TypeScript, lint, architecture checks, automated tests, Community preflight, reproducible styles, and the production build. `npm run release:check` verifies the currently committed release metadata and release artifacts; version metadata is intentionally changed only in the dedicated final version-bump step.
+`npm run check` is the complete repository gate: TypeScript, strict TypeScript, lint, architecture checks, automated tests, Community preflight, reproducible styles, and the production build. `npm run release:check` verifies the currently committed release metadata and release artifacts. `package.json` is the single plugin-version source: use `npm run release:version -- <new-version>` for a release bump, or `npm run version:sync` after manually editing only `package.json`. Derived version fields must not be edited independently.
 
 For browser-sensitive changes, also run the relevant Chromium regressions:
 
 ```bash
 npm run test:browser:date
 npm run test:browser:mobile
+npm run test:browser:score-mobile
 npm run test:browser:tags
 npm run test:browser:tag-manager
 ```
@@ -42,6 +43,7 @@ TZ=UTC npm run check
 TZ=Asia/Taipei npm test
 segmented-date Chromium regression
 responsive mobile Chromium regression
+Score Dashboard mobile Chromium regression
 tag-chip Chromium regression
 Tag Manager Chromium regression
 npm run release:check

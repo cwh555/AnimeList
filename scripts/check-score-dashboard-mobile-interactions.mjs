@@ -13,7 +13,7 @@ await mkdir(output, { recursive: true });
 await build({
   absWorkingDir: root,
   stdin: {
-    contents: `export { renderScoreDashboardWithBatchDrag } from "./src/score-dashboard-batch-drag";`,
+    contents: `export { renderScoreDashboardWithBatchDrag } from "./src/ui/score-dashboard/batch-drag";`,
     resolveDir: root,
     loader: "ts",
   },
