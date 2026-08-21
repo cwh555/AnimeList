@@ -6,17 +6,11 @@ import { MAX_TIMELINE_DAY_SPACING, MAX_TIMELINE_VIEW_SCALE, MIN_TIMELINE_DAY_SPA
 import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
+import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 
 const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
 
-export const TIMELINE_CARD_GEOMETRY = Object.freeze({
-  width: 120,
-  coverHeight: 180,
-  cardHeight: 242,
-  gapX: 16,
-  gapY: 18,
-  stemGap: 44,
-});
+export { TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 
 export const TIMELINE_MEDIA_FILTERS: readonly LibraryMediaFilter[] = [
   "all",
@@ -337,28 +331,11 @@ export const TimelineUI = (() => {
         stem.style.height = `${geometry.height}px`;
         scene.appendChild(stem);
 
-        const card = makeEl("button", "al-timeline-card");
-        card.type = "button";
+        const card = createTimelinePosterCard(item, { time, openFile });
         card.dataset.timelineLane = String(lane);
         card.style.left = `${x - CARD_WIDTH / 2}px`;
         card.style.top = `${cardY}px`;
-        card.title = uiText("timeline.cardTitle", { title: item.title, date: formatDate(time) });
-        if (item.cover) {
-          const image = makeEl("img", "", "");
-          image.src = item.cover;
-          image.alt = uiText("timeline.coverAlt", { title: item.title });
-          card.appendChild(image);
-        }
-        const text = makeEl("span", "al-timeline-card-copy");
-        const displayTitle = item.seriesTitle || item.title;
-        text.appendChild(makeEl("strong", "", displayTitle));
-        if (item.volumeLabel) {
-          text.appendChild(makeEl("span", "al-timeline-volume-label", item.serialEntryLabel || uiText("timeline.volumeLabel", { volume: item.volumeLabel })));
-        }
-        text.appendChild(makeEl("small", "", formatDate(time)));
-        card.appendChild(text);
-        if (item.score != null) card.appendChild(makeEl("span", "al-timeline-score", `★ ${Number(item.score).toFixed(1)}`));
-        card.addEventListener("click", () => { void openFile(item.filePath); });
+        card.style.height = `${CARD_HEIGHT}px`;
         scene.appendChild(card);
         if (index === laidOutItems.length - 1) state.latestItemCenterX = x;
       });
@@ -491,4 +468,3 @@ export const TimelineUI = (() => {
 
   return { render };
 })();
-
