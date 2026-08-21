@@ -27,6 +27,10 @@
 - Release metadata now uses `package.json` as the single hand-edited plugin-version source, with derived manifest/lock/versions metadata synchronized by repository tooling and verified by release checks.
 - Architecture checks enforce typed feature/domain boundaries, keep `src/legacy.ts` thin, and prevent feature styles or domain logic from drifting back into shared conflict hotspots.
 
+### Fixed
+
+- Adopted Obsidian 1.13+ declarative Settings definitions so AnimeList options participate in the native Settings search while retaining the existing imperative five-page renderer for older supported Obsidian versions. Both renderers are generated from the same settings-section model and use the same persisted configuration.
+
 ### Compatibility and migration
 
 - The media schema remains version 6. AnimeList 1.4.0 and older supported notes remain readable; 1.5.0 introduces no automatic startup media migration.

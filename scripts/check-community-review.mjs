@@ -45,9 +45,6 @@ rejectMatch(scopedVault, /\bas\s+(?:TAbstractFile|TFile|TFolder)\b/, "vault trav
 rejectMatch(sourceFiles, /eslint-disable/, "source lint suppressions remain");
 rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
 rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
-// The tabbed settings shell intentionally stays on PluginSettingTab.display().
-// Obsidian 1.13 bypasses display() when getSettingDefinitions() is overridden;
-// the runtime lifecycle contract is covered by the settings integration tests.
 rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
 rejectMatch(
   styles,

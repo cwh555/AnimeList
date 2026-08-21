@@ -280,18 +280,48 @@ declare module "obsidian" {
     setMessage(message: string | DocumentFragment): this;
   }
 
-  export interface SettingDefinition {
+  export interface SettingDefinitionBase {
     name: string;
     desc?: string | DocumentFragment;
     aliases?: string[];
-    visible?: () => boolean;
-    render?: (setting: Setting) => void;
+    searchable?: boolean | (() => boolean);
+    visible?: boolean | (() => boolean);
   }
+
+  export interface SettingDefinitionRender extends SettingDefinitionBase {
+    render: (setting: Setting, group?: SettingGroup) => void | (() => void);
+  }
+
+  export interface SettingDefinitionEmpty extends SettingDefinitionBase {
+    render?: never;
+  }
+
+  export type SettingDefinition = SettingDefinitionRender | SettingDefinitionEmpty;
+
+  export interface SettingDefinitionGroup {
+    type: "group" | "list";
+    heading?: string;
+    cls?: string;
+    items?: (SettingDefinition | SettingDefinitionPage)[];
+    visible?: boolean | (() => boolean);
+  }
+
+  export interface SettingDefinitionPage {
+    type: "page";
+    name: string;
+    desc?: string | DocumentFragment;
+    items?: SettingDefinitionItem[];
+    visible?: boolean | (() => boolean);
+  }
+
+  export type SettingDefinitionItem = SettingDefinition | SettingDefinitionGroup | SettingDefinitionPage;
+
+  export class SettingGroup {}
 
   export class PluginSettingTab {
     containerEl: HTMLElement;
     constructor(app: App, plugin: Plugin);
-    getSettingDefinitions(): SettingDefinition[];
+    getSettingDefinitions(): SettingDefinitionItem[];
     display(): void;
     update(): void;
     hide(): void;
@@ -352,6 +382,7 @@ declare module "obsidian" {
   }
 
   export function normalizePath(path: string): string;
+  export function requireApiVersion(version: string): boolean;
   export function requestUrl(request: RequestUrlParam | string): Promise<RequestUrlResponse>;
   export function setIcon(parent: HTMLElement, iconId: string): void;
 }
