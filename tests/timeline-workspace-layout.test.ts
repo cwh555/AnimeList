@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  buildTimelineDensity,
+  buildTimelineDensityCurve,
+  timelineDensityBandwidth,
   groupTimelineHistory,
   timelineTimeForX,
   timelineXForTime,
@@ -22,13 +23,22 @@ describe("timeline workspace layout", () => {
     assert.equal(timelineTimeForX(day30, minimum, spacing, 64), minimum + 30 * DAY);
   });
 
-  it("accounts for every filtered completion event in density bins", () => {
+  it("builds a smooth Gaussian density curve instead of histogram bins", () => {
     const minimum = new Date(2025, 0, 1).getTime();
-    const times = [minimum, minimum + DAY, minimum + 2 * DAY, minimum + 90 * DAY];
-    const bins = buildTimelineDensity(times, minimum, times.at(-1)!, 24);
-    assert.equal(bins.reduce((sum, bin) => sum + bin.count, 0), times.length);
-    assert.equal(bins[0].ratioStart, 0);
-    assert.equal(bins.at(-1)!.ratioEnd, 1);
+    const times = [minimum, minimum, minimum + DAY, minimum + 2 * DAY, minimum + 90 * DAY];
+    const curve = buildTimelineDensityCurve(times, minimum, times.at(-1)!, 128);
+    assert.equal(curve.points.length, 128);
+    assert.equal(curve.points[0].ratio, 0);
+    assert.equal(curve.points.at(-1)!.ratio, 1);
+    assert.ok(curve.points.every((point) => Number.isFinite(point.density) && point.density >= 0));
+    assert.ok(curve.bandwidthMs >= DAY);
+    const peak = curve.points.reduce((best, point) => point.density > best.density ? point : best);
+    assert.ok(peak.ratio < 0.2, `expected dense early cluster to dominate, got ratio ${peak.ratio}`);
+  });
+
+  it("uses at least one day of density bandwidth for discrete completion dates", () => {
+    const time = new Date(2026, 0, 1).getTime();
+    assert.equal(timelineDensityBandwidth([time, time, time]), DAY);
   });
 
   it("groups history by descending year, month, and completion time", () => {

@@ -1671,6 +1671,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   display: flex;
   min-width: 0;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   margin-left: auto;
 }
@@ -1704,7 +1705,8 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   color: var(--al-m3-on-surface);
   background: color-mix(in srgb, var(--al-m3-on-surface) 8%, transparent);
 }
-.animelist-native-view .al-timeline-workspace .al-timeline-zoom {
+.animelist-native-view .al-timeline-workspace .al-timeline-zoom,
+.animelist-native-view .al-timeline-workspace .al-timeline-scale {
   min-width: 70px;
   color: var(--al-m3-on-surface-variant);
   font-size: .68rem;
@@ -1730,7 +1732,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   width: 100%;
   height: 100%;
   min-height: 420px;
-  overflow: auto hidden;
+  overflow: hidden;
   cursor: grab;
   background: var(--al-m3-surface);
   touch-action: none;
@@ -1783,19 +1785,28 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   cursor: pointer;
 }
 .animelist-native-view .al-timeline-overview-label { padding-bottom: 7px; font-size: .66rem; font-weight: 650; }
-.animelist-native-view .al-timeline-overview-bars {
+.animelist-native-view .al-timeline-overview-chart {
   position: relative;
-  display: flex;
   height: 34px;
-  align-items: end;
-  gap: 1px;
+  overflow: hidden;
   border-bottom: 1px solid var(--al-m3-outline-variant, var(--al-m3-outline));
 }
-.animelist-native-view .al-timeline-overview-bar {
-  min-width: 1px;
-  flex: 1 1 0;
-  border-radius: 2px 2px 0 0;
-  background: color-mix(in srgb, var(--al-m3-primary) 46%, var(--al-m3-surface-container));
+.animelist-native-view .al-timeline-density-svg {
+  display: block;
+  width: 100%;
+  height: 34px;
+  overflow: visible;
+}
+.animelist-native-view .al-timeline-density-area {
+  fill: color-mix(in srgb, var(--al-m3-primary) 14%, transparent);
+}
+.animelist-native-view .al-timeline-density-line {
+  fill: none;
+  stroke: var(--al-m3-primary);
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .animelist-native-view .al-timeline-overview-window {
   position: absolute;
@@ -1858,7 +1869,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-timeline-view-mode,
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline button.al-timeline-type-filter { flex: 1 1 0; padding-inline: 9px; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-actions { width: 100%; margin-left: 0; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group { flex: 1 1 auto; justify-content: center; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group { flex: 1 1 150px; justify-content: center; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap,
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-viewport { min-height: 360px; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview { grid-template-columns: 1fr; gap: 2px; }

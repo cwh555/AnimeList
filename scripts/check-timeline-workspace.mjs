@@ -58,7 +58,7 @@ const items = [
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 :root{--background-primary:#111;--background-primary-alt:#171717;--background-secondary:#202020;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--background-modifier-box-shadow:#000;--interactive-accent:#8070df;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-on-accent:#fff;}
 html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family:sans-serif}button{font:inherit}${styles}</style></head><body data-result="pending"><div id="app" class="animelist-native-view"></div>
-<script>window.createEl=(tag)=>document.createElement(tag); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
+<script>window.createEl=(tag)=>document.createElement(tag); if(!Node.prototype.createSvg)Object.defineProperty(Node.prototype,"createSvg",{value:function(tag){const el=document.createElementNS("http://www.w3.org/2000/svg",tag);this.appendChild(el);return el;}}); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
 <script>${bundle}</script><script>
 const items=[${items}];
 const app=document.querySelector('#app');
@@ -67,24 +67,47 @@ const result=AnimeListTimelineTest.renderAnimeListWorkspaceShell(app,{pages:[pag
 const click=(el,x)=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x||0}));
 const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
 (async()=>{ await frames(); const d={};
- const shell=document.querySelector('.al-workspace-shell'); const root=document.querySelector('.al-timeline-workspace'); const viewport=document.querySelector('.al-timeline-workspace-viewport');
+ const shell=document.querySelector('.al-workspace-shell'); const root=document.querySelector('.al-timeline-workspace'); let viewport=document.querySelector('.al-timeline-workspace-viewport');
+ const axisScreenY=()=>{const a=document.querySelector('.al-timeline-axis');const r=a.getBoundingClientRect();return r.top+r.height/2;};
+ const viewportCenter=()=>{const r=viewport.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+ const latestCenterX=()=>{const c=[...document.querySelectorAll('.al-timeline-card')].at(-1).getBoundingClientRect();return c.left+c.width/2;};
  d.fullPageNoModalFrame=!!root&&!document.querySelector('.al-timeline-toolbar')&&!document.querySelector('.al-timeline-copy')&&parseFloat(getComputedStyle(root).borderRadius||'0')===0;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
- d.hasDensity=document.querySelectorAll('.al-timeline-overview-bar').length>0&&!!document.querySelector('.al-timeline-overview-window');
- const cards=[...document.querySelectorAll('.al-timeline-card')]; const axis=document.querySelector('.al-timeline-axis');
- d.fixedPoster=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
+ d.hasDensityCurve=!!document.querySelector('.al-timeline-density-line')&&!!document.querySelector('.al-timeline-density-area')&&!document.querySelector('.al-timeline-overview-bar')&&!!document.querySelector('.al-timeline-overview-window');
+ let cards=[...document.querySelectorAll('.al-timeline-card')]; let axis=document.querySelector('.al-timeline-axis');
+ d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
+ d.initialLatestCentered=Math.abs(latestCenterX()-viewportCenter().x)<=2;
+ d.initialAxisCentered=Math.abs(axisScreenY()-viewportCenter().y)<=2;
  const sameDay=cards.slice(0,2); const axisY=parseFloat(axis.style.top); const above=sameDay.filter(c=>parseFloat(c.style.top)+180<axisY+1).length; const below=sameDay.filter(c=>parseFloat(c.style.top)>axisY-1).length;
  d.responsiveLane=shell.dataset.windowSize==='compact'?above===2&&below===0:above>=1&&below>=1;
- const beforeGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left)); const beforeHeight=cards[0].getBoundingClientRect().height;
- click(document.querySelector('.al-timeline-control-group button:last-child')); await frames();
- const zoomCards=[...document.querySelectorAll('.al-timeline-card')]; const afterGap=Math.abs(parseFloat(zoomCards[2].style.left)-parseFloat(zoomCards[0].style.left));
- d.temporalZoomOnly=afterGap>beforeGap&&Math.abs(zoomCards[0].getBoundingClientRect().height-beforeHeight)<=2;
- const overview=document.querySelector('.al-timeline-overview'); const scene=document.querySelector('.al-timeline-scene'); const beforeTransform=scene.style.transform; const r=overview.getBoundingClientRect(); click(overview,r.left+r.width*.15); await frames(); d.overviewNavigation=scene.style.transform!==beforeTransform;
+ const beforeGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left)); const beforeHeight=cards[0].getBoundingClientRect().height; const axisBeforeTemporal=axisScreenY();
+ click(document.querySelector('.al-timeline-spacing-controls button:last-child')); await frames();
+ cards=[...document.querySelectorAll('.al-timeline-card')]; const afterGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
+ d.temporalZoomOnly=afterGap>beforeGap&&Math.abs(cards[0].getBoundingClientRect().height-beforeHeight)<=2;
+ d.temporalZoomKeepsAxisY=Math.abs(axisScreenY()-axisBeforeTemporal)<=1;
+ const rawGapBeforeScreenZoom=afterGap; const screenHeightBefore=cards[0].getBoundingClientRect().height; const axisBeforeScreenZoom=axisScreenY();
+ click(document.querySelector('.al-timeline-view-scale-controls button:last-child')); await frames();
+ cards=[...document.querySelectorAll('.al-timeline-card')]; const rawGapAfterScreenZoom=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
+ d.screenZoomScalesScene=cards[0].getBoundingClientRect().height>screenHeightBefore*1.1&&Math.abs(rawGapAfterScreenZoom-rawGapBeforeScreenZoom)<=0.1;
+ d.screenZoomKeepsAxisY=Math.abs(axisScreenY()-axisBeforeScreenZoom)<=1;
+ const scene=document.querySelector('.al-timeline-scene'); const transformBeforeSwipe=scene.style.transform; const axisBeforeSwipe=axisScreenY();
+ viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:120,deltaY:0})); await frames();
+ d.horizontalSwipePans=scene.style.transform!==transformBeforeSwipe;
+ d.horizontalSwipeKeepsAxisY=Math.abs(axisScreenY()-axisBeforeSwipe)<=1;
+ const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; click(resetButton); await frames();
+ viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=[...document.querySelectorAll('.al-timeline-card')];
+ d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
+ d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
+ d.resetRestoresScale=Math.abs(cards[0].getBoundingClientRect().height-180)<=2;
+ const overview=document.querySelector('.al-timeline-overview'); const chart=document.querySelector('.al-timeline-overview-chart'); const beforeTransform=scene.style.transform; const axisBeforeOverview=axisScreenY(); const r=chart.getBoundingClientRect(); click(overview,r.left+r.width*.15); await frames(); d.overviewNavigation=scene.style.transform!==beforeTransform;
+ d.overviewKeepsAxisY=Math.abs(axisScreenY()-axisBeforeOverview)<=1;
+ d.overviewAccessible=overview.getAttribute('role')==='slider'&&overview.hasAttribute('aria-valuenow')&&!!overview.getAttribute('aria-valuetext');
  const manga=[...document.querySelectorAll('.al-timeline-type-filter')].find(b=>b.textContent.includes('Manga')||b.textContent.includes('漫畫')); click(manga); await frames();
  d.filterApplied=document.querySelectorAll('.al-timeline-card').length===1;
  click(document.querySelectorAll('.al-timeline-view-mode')[1]); await frames(); d.historyMode=!!document.querySelector('.al-timeline-history')&&document.querySelectorAll('.al-timeline-history-item').length===1;
  d.filterPreserved=manga.getAttribute('aria-pressed')==='true';
  d.historyHasExternalDate=!!document.querySelector('.al-timeline-history-date')&&!document.querySelector('.al-timeline-history-item .al-timeline-card-copy small');
+ d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
  document.body.dataset.details=JSON.stringify(d); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
 })().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result='fail'});
 </script></body></html>`;

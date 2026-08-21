@@ -1,11 +1,14 @@
 export const TIMELINE_DAY_MS = 24 * 60 * 60 * 1000;
 
-export interface TimelineDensityBin {
-  startTime: number;
-  endTime: number;
-  count: number;
-  ratioStart: number;
-  ratioEnd: number;
+export interface TimelineDensityPoint {
+  time: number;
+  ratio: number;
+  density: number;
+}
+
+export interface TimelineDensityCurve {
+  points: TimelineDensityPoint[];
+  bandwidthMs: number;
 }
 
 export interface TimelineHistoryMonth<T> {
@@ -56,29 +59,65 @@ export function formatTimelineDay(time: number): string {
   return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function buildTimelineDensity(
+function quantile(sorted: readonly number[], probability: number): number {
+  if (!sorted.length) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const position = Math.max(0, Math.min(1, probability)) * (sorted.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower];
+  const weight = position - lower;
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+}
+
+/** Silverman's robust rule-of-thumb bandwidth, with one day as the minimum meaningful width. */
+export function timelineDensityBandwidth(times: readonly number[]): number {
+  const sorted = times.filter(Number.isFinite).slice().sort((left, right) => left - right);
+  if (sorted.length <= 1) return TIMELINE_DAY_MS;
+  const mean = sorted.reduce((sum, value) => sum + value, 0) / sorted.length;
+  const variance = sorted.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (sorted.length - 1);
+  const standardDeviation = Math.sqrt(Math.max(0, variance));
+  const interquartileRange = quantile(sorted, 0.75) - quantile(sorted, 0.25);
+  const robustScale = Math.min(
+    standardDeviation || Number.POSITIVE_INFINITY,
+    interquartileRange > 0 ? interquartileRange / 1.34 : Number.POSITIVE_INFINITY,
+  );
+  const fallbackScale = standardDeviation || interquartileRange / 1.34 || TIMELINE_DAY_MS;
+  const scale = Number.isFinite(robustScale) && robustScale > 0 ? robustScale : fallbackScale;
+  return Math.max(TIMELINE_DAY_MS, 0.9 * scale * sorted.length ** (-1 / 5));
+}
+
+/**
+ * Gaussian kernel-density estimate sampled across the visible completion-time range.
+ * This is a continuous density model, not a histogram with interpolated bar heights.
+ */
+export function buildTimelineDensityCurve(
   times: readonly number[],
   minimumTime: number,
   maximumTime: number,
-  requestedBins = 48,
-): TimelineDensityBin[] {
+  requestedPoints = 256,
+): TimelineDensityCurve {
   const finite = times.filter(Number.isFinite);
-  if (!finite.length) return [];
+  if (!finite.length) return { points: [], bandwidthMs: TIMELINE_DAY_MS };
   const range = Math.max(TIMELINE_DAY_MS, maximumTime - minimumTime);
-  const binCount = Math.max(1, Math.min(requestedBins, Math.ceil(range / TIMELINE_DAY_MS) + 1));
-  const binWidth = range / binCount;
-  const counts = Array.from({ length: binCount }, () => 0);
-  for (const time of finite) {
-    const normalized = Math.min(0.999999999, Math.max(0, (time - minimumTime) / range));
-    counts[Math.floor(normalized * binCount)] += 1;
-  }
-  return counts.map((count, index) => ({
-    startTime: minimumTime + index * binWidth,
-    endTime: minimumTime + (index + 1) * binWidth,
-    count,
-    ratioStart: index / binCount,
-    ratioEnd: (index + 1) / binCount,
-  }));
+  const pointCount = Math.max(2, Math.min(1024, Math.round(requestedPoints)));
+  const bandwidthMs = timelineDensityBandwidth(finite);
+  const gaussianNormalization = 1 / Math.sqrt(2 * Math.PI);
+  const points = Array.from({ length: pointCount }, (_, index): TimelineDensityPoint => {
+    const ratio = index / (pointCount - 1);
+    const time = minimumTime + ratio * range;
+    let kernelSum = 0;
+    for (const sample of finite) {
+      const normalized = (time - sample) / bandwidthMs;
+      kernelSum += Math.exp(-0.5 * normalized * normalized) * gaussianNormalization;
+    }
+    return {
+      time,
+      ratio,
+      density: kernelSum / (finite.length * bandwidthMs),
+    };
+  });
+  return { points, bandwidthMs };
 }
 
 export function groupTimelineHistory<T extends { completedTime: number }>(items: readonly T[]): TimelineHistoryYear<T>[] {
