@@ -19,6 +19,17 @@ jobs:
         with:
           ref: 705e77b2175c1ce0e9c070ede120427310ae1a28
           fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Validate release metadata against tag
+        run: npm run release:check
+        env:
+          GITHUB_REF_NAME: 1.5.0
+          GITHUB_REF_TYPE: tag
       - name: Verify release, tag, and published assets
         env:
           GH_TOKEN: ${{ github.token }}
