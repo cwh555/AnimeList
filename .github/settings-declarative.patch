@@ -1,0 +1,376 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c1f4145..ac5bdda 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -27,6 +27,10 @@
+ - Release metadata now uses `package.json` as the single hand-edited plugin-version source, with derived manifest/lock/versions metadata synchronized by repository tooling and verified by release checks.
+ - Architecture checks enforce typed feature/domain boundaries, keep `src/legacy.ts` thin, and prevent feature styles or domain logic from drifting back into shared conflict hotspots.
+ 
++### Fixed
++
++- Adopted Obsidian 1.13+ declarative Settings definitions so AnimeList options participate in the native Settings search while retaining the existing imperative five-page renderer for older supported Obsidian versions. Both renderers are generated from the same settings-section model and use the same persisted configuration.
++
+ ### Compatibility and migration
+ 
+ - The media schema remains version 6. AnimeList 1.4.0 and older supported notes remain readable; 1.5.0 introduces no automatic startup media migration.
+diff --git a/docs/MANUAL_TEST_CHECKLIST.md b/docs/MANUAL_TEST_CHECKLIST.md
+index 335de0f..67367d0 100644
+--- a/docs/MANUAL_TEST_CHECKLIST.md
++++ b/docs/MANUAL_TEST_CHECKLIST.md
+@@ -110,6 +110,14 @@ Run this checklist before every public release and before any release-candidate
+ - [ ] Older notes remain readable before cleanup; cleanup backfills supported company/quarter metadata without losing source identity, progress, rating, custom frontmatter, or body content.
+ - [ ] Legacy `user_tags` and supported `classification_*` fields consolidate into canonical metadata without losing the selected work tags.
+ 
++## Settings search and version compatibility
++
++- [ ] On Obsidian 1.13 or later, open Settings search and confirm AnimeList options such as **Display language**, **Storage layout**, **Chinese titles**, and at least one enabled feature setting are discoverable.
++- [ ] Select search results from General, Search & metadata, and Features; each result opens the correct AnimeList declarative settings page and exposes the same editable control as normal navigation.
++- [ ] Change a conditionally visible setting (for example storage layout) and confirm the declarative page updates without duplicate rows or stale controls.
++- [ ] Confirm the five settings pages remain English and retain their intended grouping on Obsidian 1.13+.
++- [ ] On an older supported Obsidian build when available, confirm the compatibility five-page tabbed renderer still opens and edits the same persisted settings without migration.
++
+ ## Interface localization
+ 
+ - [ ] Switch **Interface language** among Traditional Chinese, English, Japanese, and Korean; Library, dialogs, notices, Image Sections, Moments, release tracking, Score Dashboard, Timeline, and reusable-tag UI update to the selected locale.
+diff --git a/docs/USER_GUIDE.md b/docs/USER_GUIDE.md
+index ca2fa4a..31b743f 100644
+--- a/docs/USER_GUIDE.md
++++ b/docs/USER_GUIDE.md
+@@ -343,7 +343,9 @@ Settings are organized into five top-level pages:
+ 4. **Maintenance** — recurring repair/setup operations such as serial-cover recovery and library setup.
+ 5. **Updates & cleanup** — explicit version/update cleanup operations that may rewrite recognized AnimeList content after review.
+ 
+-The selected Settings page is UI state only; changing tabs does not change persisted user configuration.
++On Obsidian 1.13 and later, these five pages use Obsidian's declarative Settings API. AnimeList settings therefore participate in the native Settings search, and selecting a search result opens the page that owns that setting. The declarations and visible controls are generated from the same settings-section model, so search metadata and the editable settings cannot drift apart.
++
++Older supported Obsidian versions keep the compatibility five-page tabbed renderer. Both paths read and write the same AnimeList settings; switching Obsidian versions does not migrate or rewrite persisted configuration. The selected Settings page is presentation state only.
+ 
+ ### Interface language
+ 
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index 5a31ac3..adf1540 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -19,12 +19,4 @@ export default defineConfig([
+       },
+     },
+   },
+-  {
+-    // AnimeList keeps an imperative tabbed settings shell for Obsidian <1.13 compatibility.
+-    // On 1.13+, overriding getSettingDefinitions() bypasses display() and removes that shell.
+-    files: ["src/ui/settings.ts"],
+-    rules: {
+-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
+-    },
+-  },
+ ]);
+diff --git a/scripts/check-community-review.mjs b/scripts/check-community-review.mjs
+index ae49570..4a8dfa4 100644
+--- a/scripts/check-community-review.mjs
++++ b/scripts/check-community-review.mjs
+@@ -45,9 +45,6 @@ rejectMatch(scopedVault, /\bas\s+(?:TAbstractFile|TFile|TFolder)\b/, "vault trav
+ rejectMatch(sourceFiles, /eslint-disable/, "source lint suppressions remain");
+ rejectMatch(main, /\bany\b/, "explicit any remains in src/main.ts");
+ rejectMatch(shim, /\bany\b/, "explicit any remains in types/obsidian.d.ts");
+-// The tabbed settings shell intentionally stays on PluginSettingTab.display().
+-// Obsidian 1.13 bypasses display() when getSettingDefinitions() is overridden;
+-// the runtime lifecycle contract is covered by the settings integration tests.
+ rejectMatch(styles, /!important\b|stylelint-disable/, "CSS suppression remains");
+ rejectMatch(
+   styles,
+diff --git a/src/ui/settings-declarative.ts b/src/ui/settings-declarative.ts
+new file mode 100644
+index 0000000..a6d3c07
+--- /dev/null
++++ b/src/ui/settings-declarative.ts
+@@ -0,0 +1,45 @@
++import type {
++  SettingDefinition,
++  SettingDefinitionGroup,
++  SettingDefinitionItem,
++  SettingDefinitionPage,
++} from "obsidian";
++import type { SettingsPageDefinition } from "../app/settings-layout";
++
++export interface DeclarativeSettingsSection {
++  heading?: string;
++  description?: string;
++  definitions: SettingDefinition[];
++}
++
++function sectionHeadingDefinition(section: DeclarativeSettingsSection): SettingDefinition | null {
++  if (!section.heading) return null;
++  return {
++    name: section.heading,
++    desc: section.description,
++    searchable: false,
++    render: (setting) => {
++      setting.setHeading();
++    },
++  };
++}
++
++export function buildDeclarativeSettingsPage(
++  page: SettingsPageDefinition,
++  sections: readonly DeclarativeSettingsSection[],
++): SettingDefinitionPage {
++  const items: SettingDefinitionItem[] = sections.map((section): SettingDefinitionGroup => {
++    const heading = sectionHeadingDefinition(section);
++    return {
++      type: "group",
++      items: heading ? [heading, ...section.definitions] : [...section.definitions],
++    };
++  });
++
++  return {
++    type: "page",
++    name: page.label,
++    desc: page.description,
++    items,
++  };
++}
+diff --git a/src/ui/settings.ts b/src/ui/settings.ts
+index 1591757..6d15ccd 100644
+--- a/src/ui/settings.ts
++++ b/src/ui/settings.ts
+@@ -1,5 +1,5 @@
+-import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
+-import type { SettingDefinition } from "obsidian";
++import { App, Notice, PluginSettingTab, Setting, normalizePath, requireApiVersion } from "obsidian";
++import type { SettingDefinition, SettingDefinitionItem } from "obsidian";
+ import { DEFAULT_SEARCH_LANGUAGES } from "../app/search/multilingual-search";
+ import { withActiveLocale } from "../i18n/catalog";
+ import { searchFeatureText } from "../features/search/text";
+@@ -24,6 +24,7 @@ import type {
+ } from "../types";
+ export { DEFAULT_SETTINGS } from "../app/settings-model";
+ import { uiText } from "../ui-text";
++import { buildDeclarativeSettingsPage } from "./settings-declarative";
+ 
+ const DEFAULT_LIBRARY_FOLDER = "AnimeList";
+ const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
+@@ -54,8 +55,8 @@ function splitFolders(value: string): string[] {
+     .filter(Boolean);
+ }
+ 
+-// Obsidian 1.13 skips display() when this class overrides getSettingDefinitions().
+-// Keep the imperative lifecycle so the tabbed settings shell remains compatible with older Obsidian versions.
++// Obsidian 1.13+ renders/searches the declarative tree; older versions still call display().
++// Both paths are generated from getSettingSections() so settings behavior cannot drift.
+ export class AnimeListSettingTab extends PluginSettingTab {
+   plugin: AnimeListSettingsHost;
+   private activePage: SettingsPageId = "general";
+@@ -199,8 +200,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
+     });
+   }
+ 
+-  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
+-    const sections = this.getSettingSections().filter((section) => section.page === page);
++  private pageSectionsFrom(
++    allSections: readonly SettingsSection[],
++    page: SettingsPageId,
++  ): SettingsSection[] {
++    const sections = allSections.filter((section) => section.page === page);
+     if (page !== "general") return sections;
+     const core = sections.find((section) => !section.heading);
+     if (!core) return sections;
+@@ -212,6 +216,20 @@ export class AnimeListSettingTab extends PluginSettingTab {
+     ];
+   }
+ 
++  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
++    return this.pageSectionsFrom(this.getSettingSections(), page);
++  }
++
++  getSettingDefinitions(): SettingDefinitionItem[] {
++    return withActiveLocale("en", () => {
++      const allSections = this.getSettingSections();
++      return SETTINGS_PAGES.map((page) => buildDeclarativeSettingsPage(
++        page,
++        this.pageSectionsFrom(allSections, page.id),
++      ));
++    });
++  }
++
+   display(): void {
+     this.plugin.settings.timelineMaxStackDepth = normalizeTimelineMaxStackDepth(
+       this.plugin.settings.timelineMaxStackDepth,
+@@ -287,7 +305,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
+         const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });
+         let renderedDefinitions = 0;
+         for (const definition of section.definitions) {
+-          if (definition.visible && !definition.visible()) continue;
++          if (definition.visible === false
++            || (typeof definition.visible === "function" && !definition.visible())) continue;
+           const setting = new Setting(bodyEl).setName(definition.name);
+           if (definition.desc) setting.setDesc(definition.desc);
+           definition.render?.(setting);
+@@ -299,6 +318,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
+   }
+ 
+   private refreshSettingsTab(): void {
++    if (requireApiVersion("1.13.0")) {
++      this.update();
++      return;
++    }
+     this.renderImperativeSettings();
+   }
+ 
+diff --git a/tests/mocks/obsidian.ts b/tests/mocks/obsidian.ts
+index 61dea48..11f2fe9 100644
+--- a/tests/mocks/obsidian.ts
++++ b/tests/mocks/obsidian.ts
+@@ -115,6 +115,8 @@ export function normalizePath(path: string): string {
+   return path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\.\//, "");
+ }
+ 
++export function requireApiVersion(_version: string): boolean { return true; }
++
+ type RequestUrlHandler = (options: any) => any | Promise<any>;
+ let requestUrlHandler: RequestUrlHandler | null = null;
+ 
+diff --git a/tests/search-settings.test.ts b/tests/search-settings.test.ts
+index bcf3b9a..2951543 100644
+--- a/tests/search-settings.test.ts
++++ b/tests/search-settings.test.ts
+@@ -1,6 +1,7 @@
+ import assert from "node:assert/strict";
+ import { describe, it } from "node:test";
+-import { App, PluginSettingTab } from "obsidian";
++import { App } from "obsidian";
++import type { SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
+ import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
+ import {
+   SETTINGS_PAGES,
+@@ -13,6 +14,25 @@ import { EN_SEARCH_MESSAGES } from "../src/i18n/locales/en/search";
+ import { JA_CORE_MESSAGES } from "../src/i18n/locales/ja/core";
+ import { JA_SEARCH_MESSAGES } from "../src/i18n/locales/ja/search";
+ 
++
++function searchableSettingNames(items: readonly SettingDefinitionItem[]): string[] {
++  const names: string[] = [];
++  for (const item of items) {
++    if ("type" in item) {
++      if (item.type === "page") {
++        names.push(...searchableSettingNames(item.items ?? []));
++        continue;
++      }
++      if (item.type === "group" || item.type === "list") {
++        names.push(...searchableSettingNames(item.items ?? []));
++        continue;
++      }
++    }
++    if (item.searchable !== false) names.push(item.name);
++  }
++  return names;
++}
++
+ function createHost() {
+   return {
+     app: new App(),
+@@ -82,14 +102,33 @@ describe("search language settings", () => {
+     }
+   });
+ 
+-  it("keeps Obsidian 1.13 on the imperative settings lifecycle", () => {
+-    const tab = new AnimeListSettingTab(new App(), createHost());
++  it("exposes the complete settings model through Obsidian 1.13 declarative pages", () => {
++    const host = createHost();
++    Object.assign(host, {
++      getFeatureSettingsSections: () => [{
++        page: "features" as const,
++        heading: "Feature settings",
++        definitions: [{ name: "Feature option", desc: "Feature option description" }],
++      }],
++    });
++    const tab = new AnimeListSettingTab(new App(), host);
++    const definitions = tab.getSettingDefinitions();
++    const pages = definitions as SettingDefinitionPage[];
+ 
+-    assert.equal(
+-      tab.getSettingDefinitions,
+-      PluginSettingTab.prototype.getSettingDefinitions,
+-      "AnimeList must inherit the Obsidian declarative hook so display() remains the active renderer",
+-    );
++    assert.deepEqual(pages.map((page) => page.type), ["page", "page", "page", "page", "page"]);
++    assert.deepEqual(pages.map((page) => page.name), SETTINGS_PAGES.map((page) => page.label));
++    assert.deepEqual(pages.map((page) => page.desc), SETTINGS_PAGES.map((page) => page.description));
++
++    const searchableNames = searchableSettingNames(definitions);
++    assert.ok(searchableNames.includes("Display language"));
++    assert.ok(searchableNames.includes("Storage layout"));
++    assert.ok(searchableNames.includes("Chinese titles"));
++    assert.ok(searchableNames.includes("AniList"));
++    assert.ok(searchableNames.includes("Feature option"));
++
++    const expectedDefinitionCount = tab.getSettingSections()
++      .reduce((count, section) => count + section.definitions.length, 0);
++    assert.equal(searchableNames.length, expectedDefinitionCount);
+   });
+ 
+   it("organizes core settings into five top-level pages with titled sections", () => {
+diff --git a/types/obsidian.d.ts b/types/obsidian.d.ts
+index c39afb0..f27add9 100644
+--- a/types/obsidian.d.ts
++++ b/types/obsidian.d.ts
+@@ -280,18 +280,48 @@ declare module "obsidian" {
+     setMessage(message: string | DocumentFragment): this;
+   }
+ 
+-  export interface SettingDefinition {
++  export interface SettingDefinitionBase {
+     name: string;
+     desc?: string | DocumentFragment;
+     aliases?: string[];
+-    visible?: () => boolean;
+-    render?: (setting: Setting) => void;
++    searchable?: boolean | (() => boolean);
++    visible?: boolean | (() => boolean);
+   }
+ 
++  export interface SettingDefinitionRender extends SettingDefinitionBase {
++    render: (setting: Setting, group?: SettingGroup) => void | (() => void);
++  }
++
++  export interface SettingDefinitionEmpty extends SettingDefinitionBase {
++    render?: never;
++  }
++
++  export type SettingDefinition = SettingDefinitionRender | SettingDefinitionEmpty;
++
++  export interface SettingDefinitionGroup {
++    type: "group" | "list";
++    heading?: string;
++    cls?: string;
++    items?: (SettingDefinition | SettingDefinitionPage)[];
++    visible?: boolean | (() => boolean);
++  }
++
++  export interface SettingDefinitionPage {
++    type: "page";
++    name: string;
++    desc?: string | DocumentFragment;
++    items?: SettingDefinitionItem[];
++    visible?: boolean | (() => boolean);
++  }
++
++  export type SettingDefinitionItem = SettingDefinition | SettingDefinitionGroup | SettingDefinitionPage;
++
++  export class SettingGroup {}
++
+   export class PluginSettingTab {
+     containerEl: HTMLElement;
+     constructor(app: App, plugin: Plugin);
+-    getSettingDefinitions(): SettingDefinition[];
++    getSettingDefinitions(): SettingDefinitionItem[];
+     display(): void;
+     update(): void;
+     hide(): void;
+@@ -352,6 +382,7 @@ declare module "obsidian" {
+   }
+ 
+   export function normalizePath(path: string): string;
++  export function requireApiVersion(version: string): boolean;
+   export function requestUrl(request: RequestUrlParam | string): Promise<RequestUrlResponse>;
+   export function setIcon(parent: HTMLElement, iconId: string): void;
+ }
