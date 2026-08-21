@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - fix/settings-declarative-search
+  pull_request:
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -38,16 +41,3 @@ jobs:
           cmp manifest.json /tmp/animelist-release-1.5.0/manifest.json
           cmp main.js /tmp/animelist-release-1.5.0/main.js
           cmp styles.css /tmp/animelist-release-1.5.0/styles.css
-
-          {
-            echo "AnimeList 1.5.0 release verified"
-            echo "target=$TARGET_SHA"
-            echo "release=$(jq -r '.url' <<<\"$info\")"
-            sha256sum /tmp/animelist-release-1.5.0/main.js /tmp/animelist-release-1.5.0/manifest.json /tmp/animelist-release-1.5.0/styles.css
-          } > /tmp/release-verification.txt
-
-          content="$(base64 -w0 /tmp/release-verification.txt)"
-          gh api --method PUT repos/cwh555/AnimeList/contents/.release-1.5.0-verified.txt \
-            -f message='chore: record 1.5.0 release verification' \
-            -f content="$content" \
-            -f branch='fix/settings-declarative-search' >/dev/null
