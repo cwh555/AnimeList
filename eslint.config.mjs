@@ -19,12 +19,4 @@ export default defineConfig([
       },
     },
   },
-  {
-    // AnimeList keeps an imperative tabbed settings shell for Obsidian <1.13 compatibility.
-    // On 1.13+, overriding getSettingDefinitions() bypasses display() and removes that shell.
-    files: ["src/ui/settings.ts"],
-    rules: {
-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
-    },
-  },
 ]);

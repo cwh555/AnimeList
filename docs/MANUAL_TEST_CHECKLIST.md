@@ -110,6 +110,14 @@ Run this checklist before every public release and before any release-candidate 
 - [ ] Older notes remain readable before cleanup; cleanup backfills supported company/quarter metadata without losing source identity, progress, rating, custom frontmatter, or body content.
 - [ ] Legacy `user_tags` and supported `classification_*` fields consolidate into canonical metadata without losing the selected work tags.
 
+## Settings search and version compatibility
+
+- [ ] On Obsidian 1.13 or later, open Settings search and confirm AnimeList options such as **Display language**, **Storage layout**, **Chinese titles**, and at least one enabled feature setting are discoverable.
+- [ ] Select search results from General, Search & metadata, and Features; each result opens the correct AnimeList declarative settings page and exposes the same editable control as normal navigation.
+- [ ] Change a conditionally visible setting (for example storage layout) and confirm the declarative page updates without duplicate rows or stale controls.
+- [ ] Confirm the five settings pages remain English and retain their intended grouping on Obsidian 1.13+.
+- [ ] On an older supported Obsidian build when available, confirm the compatibility five-page tabbed renderer still opens and edits the same persisted settings without migration.
+
 ## Interface localization
 
 - [ ] Switch **Interface language** among Traditional Chinese, English, Japanese, and Korean; Library, dialogs, notices, Image Sections, Moments, release tracking, Score Dashboard, Timeline, and reusable-tag UI update to the selected locale.

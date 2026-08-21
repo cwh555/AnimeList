@@ -1,5 +1,5 @@
-import { App, Notice, PluginSettingTab, Setting, normalizePath } from "obsidian";
-import type { SettingDefinition } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, normalizePath, requireApiVersion } from "obsidian";
+import type { SettingDefinition, SettingDefinitionItem } from "obsidian";
 import { DEFAULT_SEARCH_LANGUAGES } from "../app/search/multilingual-search";
 import { withActiveLocale } from "../i18n/catalog";
 import { searchFeatureText } from "../features/search/text";
@@ -24,6 +24,7 @@ import type {
 } from "../types";
 export { DEFAULT_SETTINGS } from "../app/settings-model";
 import { uiText } from "../ui-text";
+import { buildDeclarativeSettingsPage } from "./settings-declarative";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
 const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
@@ -54,8 +55,8 @@ function splitFolders(value: string): string[] {
     .filter(Boolean);
 }
 
-// Obsidian 1.13 skips display() when this class overrides getSettingDefinitions().
-// Keep the imperative lifecycle so the tabbed settings shell remains compatible with older Obsidian versions.
+// Obsidian 1.13+ renders/searches the declarative tree; older versions still call display().
+// Both paths are generated from getSettingSections() so settings behavior cannot drift.
 export class AnimeListSettingTab extends PluginSettingTab {
   plugin: AnimeListSettingsHost;
   private activePage: SettingsPageId = "general";
@@ -199,8 +200,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
     });
   }
 
-  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
-    const sections = this.getSettingSections().filter((section) => section.page === page);
+  private pageSectionsFrom(
+    allSections: readonly SettingsSection[],
+    page: SettingsPageId,
+  ): SettingsSection[] {
+    const sections = allSections.filter((section) => section.page === page);
     if (page !== "general") return sections;
     const core = sections.find((section) => !section.heading);
     if (!core) return sections;
@@ -210,6 +214,20 @@ export class AnimeListSettingTab extends PluginSettingTab {
       { page: "general", heading: "File locations", definitions: core.definitions.slice(5) },
       ...sections.filter((section) => section !== core),
     ];
+  }
+
+  getSettingsPageSections(page: SettingsPageId): SettingsSection[] {
+    return this.pageSectionsFrom(this.getSettingSections(), page);
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return withActiveLocale("en", () => {
+      const allSections = this.getSettingSections();
+      return SETTINGS_PAGES.map((page) => buildDeclarativeSettingsPage(
+        page,
+        this.pageSectionsFrom(allSections, page.id),
+      ));
+    });
   }
 
   display(): void {
@@ -287,7 +305,8 @@ export class AnimeListSettingTab extends PluginSettingTab {
         const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });
         let renderedDefinitions = 0;
         for (const definition of section.definitions) {
-          if (definition.visible && !definition.visible()) continue;
+          if (definition.visible === false
+            || (typeof definition.visible === "function" && !definition.visible())) continue;
           const setting = new Setting(bodyEl).setName(definition.name);
           if (definition.desc) setting.setDesc(definition.desc);
           definition.render?.(setting);
@@ -299,6 +318,10 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   private refreshSettingsTab(): void {
+    if (requireApiVersion("1.13.0")) {
+      this.update();
+      return;
+    }
     this.renderImperativeSettings();
   }
 

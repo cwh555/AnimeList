@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { App, PluginSettingTab } from "obsidian";
+import { App } from "obsidian";
+import type { SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
 import { AnimeListSettingTab, DEFAULT_SETTINGS } from "../src/ui/settings";
 import {
   SETTINGS_PAGES,
@@ -12,6 +13,25 @@ import { EN_CORE_MESSAGES } from "../src/i18n/locales/en/core";
 import { EN_SEARCH_MESSAGES } from "../src/i18n/locales/en/search";
 import { JA_CORE_MESSAGES } from "../src/i18n/locales/ja/core";
 import { JA_SEARCH_MESSAGES } from "../src/i18n/locales/ja/search";
+
+
+function searchableSettingNames(items: readonly SettingDefinitionItem[]): string[] {
+  const names: string[] = [];
+  for (const item of items) {
+    if ("type" in item) {
+      if (item.type === "page") {
+        names.push(...searchableSettingNames(item.items ?? []));
+        continue;
+      }
+      if (item.type === "group" || item.type === "list") {
+        names.push(...searchableSettingNames(item.items ?? []));
+        continue;
+      }
+    }
+    if (item.searchable !== false) names.push(item.name);
+  }
+  return names;
+}
 
 function createHost() {
   return {
@@ -82,14 +102,33 @@ describe("search language settings", () => {
     }
   });
 
-  it("keeps Obsidian 1.13 on the imperative settings lifecycle", () => {
-    const tab = new AnimeListSettingTab(new App(), createHost());
+  it("exposes the complete settings model through Obsidian 1.13 declarative pages", () => {
+    const host = createHost();
+    Object.assign(host, {
+      getFeatureSettingsSections: () => [{
+        page: "features" as const,
+        heading: "Feature settings",
+        definitions: [{ name: "Feature option", desc: "Feature option description" }],
+      }],
+    });
+    const tab = new AnimeListSettingTab(new App(), host);
+    const definitions = tab.getSettingDefinitions();
+    const pages = definitions as SettingDefinitionPage[];
 
-    assert.equal(
-      tab.getSettingDefinitions,
-      PluginSettingTab.prototype.getSettingDefinitions,
-      "AnimeList must inherit the Obsidian declarative hook so display() remains the active renderer",
-    );
+    assert.deepEqual(pages.map((page) => page.type), ["page", "page", "page", "page", "page"]);
+    assert.deepEqual(pages.map((page) => page.name), SETTINGS_PAGES.map((page) => page.label));
+    assert.deepEqual(pages.map((page) => page.desc), SETTINGS_PAGES.map((page) => page.description));
+
+    const searchableNames = searchableSettingNames(definitions);
+    assert.ok(searchableNames.includes("Display language"));
+    assert.ok(searchableNames.includes("Storage layout"));
+    assert.ok(searchableNames.includes("Chinese titles"));
+    assert.ok(searchableNames.includes("AniList"));
+    assert.ok(searchableNames.includes("Feature option"));
+
+    const expectedDefinitionCount = tab.getSettingSections()
+      .reduce((count, section) => count + section.definitions.length, 0);
+    assert.equal(searchableNames.length, expectedDefinitionCount);
   });
 
   it("organizes core settings into five top-level pages with titled sections", () => {

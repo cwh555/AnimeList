@@ -343,7 +343,9 @@ Settings are organized into five top-level pages:
 4. **Maintenance** — recurring repair/setup operations such as serial-cover recovery and library setup.
 5. **Updates & cleanup** — explicit version/update cleanup operations that may rewrite recognized AnimeList content after review.
 
-The selected Settings page is UI state only; changing tabs does not change persisted user configuration.
+On Obsidian 1.13 and later, these five pages use Obsidian's declarative Settings API. AnimeList settings therefore participate in the native Settings search, and selecting a search result opens the page that owns that setting. The declarations and visible controls are generated from the same settings-section model, so search metadata and the editable settings cannot drift apart.
+
+Older supported Obsidian versions keep the compatibility five-page tabbed renderer. Both paths read and write the same AnimeList settings; switching Obsidian versions does not migrate or rewrite persisted configuration. The selected Settings page is presentation state only.
 
 ### Interface language
 
