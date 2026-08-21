@@ -194,6 +194,7 @@ export function renderTimelineWorkspace(
   }
 
   function syncControls(): void {
+    root.dataset.timelineMode = state.mode;
     scaleMode.classList.toggle("is-active", state.mode === "scale");
     historyMode.classList.toggle("is-active", state.mode === "history");
     scaleMode.setAttribute("aria-pressed", state.mode === "scale" ? "true" : "false");
@@ -453,8 +454,8 @@ export function renderTimelineWorkspace(
     viewport.appendChild(scene);
     wrap.appendChild(viewport);
     body.appendChild(wrap);
-    renderScaleGeometry();
     renderOverview();
+    renderScaleGeometry();
     state.focusTime = maximumTime;
     centerFocus(true);
 

@@ -55,6 +55,7 @@ export function renderAnimeListWorkspaceShell(
   const pages = orderedPages(options.pages);
   const activePage = pages.find((page) => page.id === options.activeSection) ?? pages[0];
   if (!activePage) throw new Error("AnimeList workspace requires at least one page");
+  container.classList.toggle("is-timeline-workspace", activePage.id === "timeline");
 
   const shell = makeEl("section", `al-workspace-shell is-${activePage.id}`);
   const header = makeEl("header", "al-workspace-header");

@@ -72,7 +72,7 @@ html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family
 button:not(.clickable-icon){height:32px;background:#292929;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 ${styles}
 </style></head><body class="is-mobile" data-result="pending"><div id="app" class="animelist-native-view"></div>
-<script>window.createEl=(tag)=>document.createElement(tag); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
+<script>window.createEl=(tag)=>document.createElement(tag); if(!Node.prototype.createSvg)Object.defineProperty(Node.prototype,"createSvg",{value:function(tag){const el=document.createElementNS("http://www.w3.org/2000/svg",tag);this.appendChild(el);return el;}}); for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.add(...n)},removeClass:function(...n){this.classList.remove(...n)},toggleClass:function(n,f){this.classList.toggle(n,f)}})){if(!HTMLElement.prototype[name])Object.defineProperty(HTMLElement.prototype,name,{value:fn});}</script>
 <script>${bundle}</script><script>
 const refs=(sourcePath,title,type,paths,sessions)=>({sourcePath,title,originalTitle:title+" original",mediaType:type,sessions:sessions.map((list,index)=>({index,images:list.map(p=>paths.find(x=>x.path===p))})),images:paths});
 const img=(sourcePath,title,type,path,key)=>({key,path,sourcePath,mediaTitle:title,originalTitle:title+" original",mediaType:type,references:[{sessionIndex:0,position:0}]});

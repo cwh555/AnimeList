@@ -74,6 +74,13 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.fullPageNoModalFrame=!!root&&!document.querySelector('.al-timeline-toolbar')&&!document.querySelector('.al-timeline-copy')&&parseFloat(getComputedStyle(root).borderRadius||'0')===0;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
  d.hasDensityCurve=!!document.querySelector('.al-timeline-density-line')&&!!document.querySelector('.al-timeline-density-area')&&!document.querySelector('.al-timeline-overview-bar')&&!!document.querySelector('.al-timeline-overview-window');
+ const overviewInitial=document.querySelector('.al-timeline-overview'); const overviewWindowInitial=document.querySelector('.al-timeline-overview-window'); const overviewInitialRect=overviewInitial.getBoundingClientRect(); const viewportInitialRect=viewport.getBoundingClientRect(); const appRect=app.getBoundingClientRect(); const overviewStyle=getComputedStyle(overviewInitial); const overviewWindowStyle=getComputedStyle(overviewWindowInitial);
+ d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
+ d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
+ d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
+ d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
+ d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
+ d.materialOverviewIndicator=parseFloat(overviewWindowStyle.borderTopWidth)<=0.1&&parseFloat(overviewWindowStyle.borderRadius)>=8&&overviewWindowStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewWindowStyle.backgroundColor!=='transparent';
  let cards=[...document.querySelectorAll('.al-timeline-card')]; let axis=document.querySelector('.al-timeline-axis');
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
  d.initialLatestCentered=Math.abs(latestCenterX()-viewportCenter().x)<=2;
@@ -94,6 +101,8 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:120,deltaY:0})); await frames();
  d.horizontalSwipePans=scene.style.transform!==transformBeforeSwipe;
  d.horizontalSwipeKeepsAxisY=Math.abs(axisScreenY()-axisBeforeSwipe)<=1;
+ const overviewBottomBeforeVerticalPan=overviewInitial.getBoundingClientRect().bottom; viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:0,deltaY:120})); await frames();
+ d.overviewStableWhileScenePans=Math.abs(overviewInitial.getBoundingClientRect().bottom-overviewBottomBeforeVerticalPan)<=1;
  const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; click(resetButton); await frames();
  viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=[...document.querySelectorAll('.al-timeline-card')];
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
@@ -107,7 +116,9 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  click(document.querySelectorAll('.al-timeline-view-mode')[1]); await frames(); d.historyMode=!!document.querySelector('.al-timeline-history')&&document.querySelectorAll('.al-timeline-history-item').length===1;
  d.filterPreserved=manga.getAttribute('aria-pressed')==='true';
  d.historyHasExternalDate=!!document.querySelector('.al-timeline-history-date')&&!document.querySelector('.al-timeline-history-item .al-timeline-card-copy small');
+ d.historyScrollContained=app.scrollHeight<=app.clientHeight+1&&document.querySelector('.al-timeline-workspace-body').scrollHeight>=document.querySelector('.al-timeline-workspace-body').clientHeight;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
+ d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
  document.body.dataset.details=JSON.stringify(d); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
 })().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result='fail'});
 </script></body></html>`;
@@ -115,7 +126,8 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
 try {
   for (const viewport of [
     { width: 2048, height: 900 },
-    { width: 1000, height: 900 },
+    { width: 1504, height: 1024 },
+    { width: 1000, height: 620 },
     { width: 820, height: 900 },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   ]) {

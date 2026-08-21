@@ -1602,17 +1602,43 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   background: var(--background-primary-alt, #202026);
 }
 
-/* Full-page Material 3 timeline. The workspace page is the surface; no nested modal frame. */
-.animelist-native-view .al-workspace-page.is-timeline .al-workspace-page-body {
+/* Full-page Material 3 timeline. Like Obsidian Graph view, the leaf owns a fixed
+ * viewport: page chrome stays in-flow, the interactive canvas takes the remaining
+ * height, and navigation happens inside that canvas instead of scrolling the leaf. */
+.animelist-native-view.is-timeline-workspace {
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.animelist-native-view.is-timeline-workspace > .al-workspace-shell.is-timeline {
+  height: 100%;
+  min-height: 0;
+  padding-bottom: 0;
+}
+.animelist-native-view.is-timeline-workspace > .al-workspace-shell.is-timeline > .al-workspace-page {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.animelist-native-view .al-workspace-page.is-timeline .al-workspace-page-header { flex: 0 0 auto; }
+.animelist-native-view .al-workspace-page.is-timeline .al-workspace-page-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 .animelist-native-view .al-timeline-workspace {
   display: flex;
   width: 100%;
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
   color: var(--al-m3-on-surface);
 }
 .animelist-native-view .al-timeline-workspace-summary {
@@ -1718,9 +1744,11 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
+  overflow: hidden;
 }
+.animelist-native-view .al-timeline-workspace[data-timeline-mode="history"] .al-timeline-workspace-body { overflow: auto; }
 .animelist-native-view .al-timeline-scale-wrap {
-  min-height: 420px;
+  min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
   border: 0;
@@ -1731,7 +1759,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  min-height: 0;
   overflow: hidden;
   cursor: grab;
   background: var(--al-m3-surface);
@@ -1776,20 +1804,35 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .animelist-native-view .al-timeline-overview {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  align-items: end;
-  gap: 12px;
+  min-width: 0;
   min-height: 54px;
-  margin-top: 8px;
-  padding: 8px 4px 2px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 7px 12px 9px;
+  border: 1px solid color-mix(in srgb, var(--al-m3-outline) 45%, transparent);
+  border-radius: 16px;
   color: var(--al-m3-on-surface-variant);
+  background: var(--al-m3-surface-container);
+  box-shadow: none;
   cursor: pointer;
 }
-.animelist-native-view .al-timeline-overview-label { padding-bottom: 7px; font-size: .66rem; font-weight: 650; }
+.animelist-native-view .al-timeline-overview:focus-visible {
+  outline: 2px solid var(--al-m3-primary);
+  outline-offset: 2px;
+}
+.animelist-native-view .al-timeline-overview-label {
+  font-size: .66rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
 .animelist-native-view .al-timeline-overview-chart {
   position: relative;
   height: 34px;
   overflow: hidden;
-  border-bottom: 1px solid var(--al-m3-outline-variant, var(--al-m3-outline));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--al-m3-on-surface) 4%, transparent);
 }
 .animelist-native-view .al-timeline-density-svg {
   display: block;
@@ -1798,7 +1841,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   overflow: visible;
 }
 .animelist-native-view .al-timeline-density-area {
-  fill: color-mix(in srgb, var(--al-m3-primary) 14%, transparent);
+  fill: color-mix(in srgb, var(--al-m3-primary) 12%, transparent);
 }
 .animelist-native-view .al-timeline-density-line {
   fill: none;
@@ -1810,14 +1853,27 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 }
 .animelist-native-view .al-timeline-overview-window {
   position: absolute;
-  top: 0;
-  bottom: -1px;
+  top: 3px;
+  bottom: 3px;
   min-width: 3%;
-  border: 2px solid var(--al-m3-primary);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--al-m3-primary-container) 22%, transparent);
+  border: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--al-m3-primary) 13%, transparent);
   pointer-events: none;
 }
+.animelist-native-view .al-timeline-overview-window::before,
+.animelist-native-view .al-timeline-overview-window::after {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--al-m3-primary);
+  transform: translateY(-50%);
+  content: "";
+}
+.animelist-native-view .al-timeline-overview-window::before { left: 3px; }
+.animelist-native-view .al-timeline-overview-window::after { right: 3px; }
 .animelist-native-view .al-timeline-history {
   display: flex;
   flex-direction: column;
@@ -1871,8 +1927,8 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-actions { width: 100%; margin-left: 0; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group { flex: 1 1 150px; justify-content: center; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap,
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-viewport { min-height: 360px; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview { grid-template-columns: 1fr; gap: 2px; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-viewport { min-height: 0; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview { grid-template-columns: 1fr; gap: 2px; margin-top: 6px; padding: 6px 10px 8px; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview-label { padding-bottom: 0; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month { grid-template-columns: 1fr; gap: 10px; }
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month-header { flex-direction: row; justify-content: space-between; padding-left: 8px; }
