@@ -111,6 +111,32 @@ This document preserves the product-level decisions introduced by each major dev
 - Managed image deletion remains reference-aware across covers, Image Sections, and Moments.
 - Version cleanup actions are explicit, review-first, and revalidate each candidate before mutation.
 
+## 1.5.0 — Unified workspace, visual browsing, export, and Timeline navigation
+
+**Release state:** Published.
+
+### Main outcomes
+
+- Unified Library, Timeline, Score Dashboard, and Images as peer destinations inside one shared Material 3-inspired AnimeList workspace.
+- Added Images as a derived, filterable browser over existing Image Sections without copying or moving source files.
+- Added versioned JSON and readable Text Library Export with safe templates, clipboard copy, save-to-file output, and a typed future-import contract.
+- Added persisted 1–6 Card/Thumbnail row-density controls for the Library.
+- Upgraded Image Sections to natural-height masonry with persisted per-section column counts and same-note drag ordering within/across sections.
+- Added optional whole-image Stacked Moments with persisted vertical gap geometry and transient clipboard-only flattened PNG generation.
+- Rebuilt Timeline as a bounded graph-view-style workspace with proportional time spacing, independent scene scaling, horizontal navigation, axis-stable zoom, centered reset/default view, newest-first History, and a smooth KDE density overview.
+- Restored the tabbed Settings shell on current Obsidian versions while preserving the same persisted settings model.
+- Centralized release version metadata on `package.json` and strengthened architecture checks so domain logic, UI wiring, and feature styles remain separated.
+
+### Data model
+
+- Keeps `schema_version: 6`; no automatic media-note migration is introduced.
+- Image Section per-section column metadata is additive and preserves existing image paths/order when untouched.
+- Moment `imageLayout: stacked` / `stackGapsY` metadata is optional. Carousel remains the legacy/default multi-image layout; no persistent composite image file is created.
+- Images workspace is derived from existing `animelist-images` blocks and maintains no second image database.
+- Library Export is an external versioned output contract and does not alter the Markdown source of truth.
+- Workspace/Timeline navigation and zoom state remain presentation state rather than Markdown schema.
+- Existing 1.4.0 notes, settings, Image Sections, Moments, release-tracking data, and unknown frontmatter/body content remain compatible.
+
 ## Future session template
 
 ```markdown

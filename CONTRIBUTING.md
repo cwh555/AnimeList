@@ -68,6 +68,7 @@ Browser-sensitive UI behavior has dedicated Chromium regressions:
 ```bash
 npm run test:browser:date
 npm run test:browser:mobile
+npm run test:browser:score-mobile
 npm run test:browser:tags
 npm run test:browser:tag-manager
 ```

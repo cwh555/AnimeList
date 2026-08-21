@@ -42,7 +42,7 @@ Edit a Moment and exercise `source`, `position`, `speaker`, `tags`, and `note`.
 - Multiple `animelist-moments` blocks, Image Sections, and unrelated Markdown remain untouched.
 - The reading view remains usable with the browser's native scrollbar behavior; no custom scrollbar-width dependency is required.
 
-## 1.4 release sign-off
+## 1.5 release sign-off
 
 This supplemental checklist is complete only when the related general checks also pass:
 

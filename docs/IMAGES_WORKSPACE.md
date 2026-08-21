@@ -15,10 +15,10 @@ These are primary destinations, not toolbar actions. Switching them reuses the s
 
 The primary navigation must remain visually distinct from page-local filters: icon + label, flat/underlined active treatment, and a persistent horizontal navigation row. On narrow/mobile layouts it may scroll horizontally but must not be hidden behind a hamburger menu.
 
-The shared workspace header shows the **AnimeList** product name only; do not restore the old Markdown-description subtitle. The primary navigation row contains page navigation plus optional low-frequency **More** actions only. It must never produce vertical overflow or a vertical scrollbar.
+The shared workspace header shows the **AnimeList** product name only; do not restore the old Markdown-description subtitle. Primary navigation contains only page destinations. Workspace-wide actions live in the header action area: when exactly one action is enabled it is shown directly (for example **Export**); when multiple actions are enabled they collapse into the native **More** menu. The navigation row itself must never produce vertical overflow or a vertical scrollbar.
 
 - **Collect** belongs to the Library page, on the same row as `All / Anime / Manga / Novel`, aligned at that row's far right. It is not a global workspace action. Opening Collect uses the currently selected media type; `All` falls back to Anime.
-- **More** contains enabled low-frequency tools such as Release Updates and may remain at the far right of the primary navigation row.
+- **Export** is a workspace-wide action and remains available from every page. If Release Updates is also enabled, both low-frequency actions are available through the header **More** menu.
 - Images, Timeline, and Score Dashboard must not be reintroduced as header action buttons.
 
 Workspace pages must also own a definite content height. Timeline in particular renders its existing flex viewport inside the shared page; the page must not collapse that viewport to zero height. Image-gallery buttons must explicitly preserve intrinsic image/card height so Obsidian's normal button sizing cannot crop gallery content into thin strips.

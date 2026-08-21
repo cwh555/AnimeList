@@ -24,6 +24,7 @@ Run this checklist before every public release and before any release-candidate 
 ## Library UI
 
 - [ ] Card view renders correct 2:3 covers.
+- [ ] Card and Thumbnail/poster views expose exact 1–6 items-per-row controls, remember independent values, persist after restart, and do not rebuild cards unnecessarily while the slider changes.
 - [ ] List view renders correct 2:3 covers without metadata wrapping over the poster.
 - [ ] Compact view shows the edit button, rating badge, and favorite button.
 - [ ] Compact rows never exceed the cover height; long titles and metadata end with an ellipsis instead of stretching the row.
@@ -160,7 +161,7 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] The native AnimeList ItemView shows one primary navigation row in this exact order: **Library → Timeline → Score Dashboard → Images**. Switching pages reuses the same ItemView instead of opening a modal or another Obsidian tab.
 - [ ] Primary navigation is visually different from page-local filters: the workspace row is flat/underlined with icon + label, while Library/Images filters remain smaller page-local controls. On mobile the workspace row remains visible and horizontally scrollable.
 - [ ] The AnimeList header shows only the product name; the old Markdown-description subtitle is absent.
-- [ ] The top-level workspace navigation has no vertical scrollbar. Optional **More** may remain at its far right; Timeline, Score Dashboard, and Images are not duplicated as header buttons. When Latest release tracking is enabled, **Release Updates** is available from **More** instead.
+- [ ] The top-level workspace navigation has no vertical scrollbar and contains page destinations only. Workspace actions live in the header: **Export** is direct when it is the only action; enabling Latest release tracking collapses Export + Release Updates into the native **More** menu. Timeline, Score Dashboard, and Images are not duplicated as header buttons.
 - [ ] In **Library**, **Collect** is on the same row as **All / Anime / Manga / Novel**, aligned to the far right; it is not shown as a global workspace action on Timeline, Score Dashboard, or Images.
 - [ ] Library retains its existing All/Anime/Manga/Novel, status, search, filter, sort, and Grid/List/Poster behavior inside the Library page. The standalone Markdown `animelist` block retains its existing self-contained header/actions.
 - [ ] Timeline opened from either the workspace tab or command uses the shared AnimeList page and preserves existing timeline filters/scale/navigation.
@@ -247,23 +248,31 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] A custom-template image, a body image at another location, an ambiguous path, or an image not exactly matching `cover` is skipped.
 - [ ] Cleanup preserves frontmatter, Image Sections, Moments, unrelated embeds, and note prose.
 
+## Library Export
+
+- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens without changing workspace data.
+- [ ] JSON output uses `animelist-library-export` version `1`, applies media/status scope correctly, and preserves portable status/progress/serial/source identity without exporting arbitrary frontmatter, note-body Markdown, Images, or Moments.
+- [ ] Text output uses the same Timeline completion semantics and keeps serial-entry unit labels. Editing the safe template updates preview without replacing the editor DOM or losing focus.
+- [ ] Remove a required variable or enter an unknown variable; Copy and Save remain disabled until the template is valid.
+- [ ] Copy uses the complete output even when preview is truncated. **Save export file** writes only a new `.animelist.json` / `.txt` under the displayed Library `Exports` folder.
+- [ ] Compare media notes, covers, Image Sections, Moments, and settings before/after export; none are changed.
+
 ## Timeline
 
-- [ ] Timeline opens as the top-level **Timeline** workspace page and its canvas has a non-zero usable viewport height.
-- [ ] Switch Library → Timeline → Images → Timeline; timeline cards and controls remain visible after every remount.
-- [ ] The All, Anime, Manga, and Novel buttons show only their matching completion records and update the summary count/date range.
-- [ ] A type with no matching records keeps the filter buttons visible so another type can be selected.
-- [ ] Completed anime/manga and legacy completed novels appear when they have a completion date.
-- [ ] Every saved dated chapter, season, or volume row appears on the timeline because missing completion dates default to today.
-- [ ] A dated-entry card uses its own cover when available and falls back to the normal series cover when the entry cover is absent or cannot be resolved.
-- [ ] Every dated-entry card visibly shows the work title and its chapter, season, or volume label.
-- [ ] Records on the same or nearby dates move into alternating vertical lanes and do not overlap at fit, zoomed-in, or zoomed-out scales.
-- [ ] Records completed on the same date are grouped by naturally sorted title, so related numbered works and serial entries appear in `1`, `2`, `3` order.
-- [ ] Dragging pans the timeline.
-- [ ] Date-spacing controls change horizontal time distance without resizing cards.
-- [ ] Visual-size controls independently shrink and enlarge the complete timeline scene.
-- [ ] Fit shows all completion dates at the selected visual size.
-- [ ] Selecting a poster opens the media note.
+- [ ] Timeline opens as the top-level **Timeline** workspace page and the AnimeList/Obsidian leaf has no outer vertical page scrollbar caused by Timeline content.
+- [ ] Switch Library → Timeline → Images → Timeline; timeline cards, controls, density overview, and current view state remain usable after remount.
+- [ ] The All, Anime, Manga, and Novel buttons show only their matching completion records and update the summary count/date range. A type with no matches keeps filters available.
+- [ ] **Actual time** keeps horizontal distance proportional to real completion time; **History** groups newest-first by year/month and scrolls inside its own bounded content area.
+- [ ] Completed anime/manga and legacy completed novels appear when they have a completion date. Every saved dated chapter, season, or volume completion appears separately and keeps its unit label.
+- [ ] A dated-entry card uses its own cover when available and falls back to the normal series cover when the entry cover is absent/unresolvable.
+- [ ] Same/nearby dates use alternating lanes without avoidable overlap. Same-day related titles/serial labels stay naturally ordered.
+- [ ] Horizontal trackpad movement and pointer dragging pan the scene without moving the density footer or creating outer page scroll.
+- [ ] **Time spacing** changes horizontal time distance without resizing the poster base; **View scale** independently scales the complete scene.
+- [ ] Time-spacing zoom and whole-scene zoom keep the main timeline axis at the same screen-space Y coordinate instead of jumping vertically.
+- [ ] First open and **Reset** center the newest work horizontally, center the timeline axis vertically, and restore default scene scale.
+- [ ] The smooth density overview is directly below the canvas, remains visible inside the leaf, uses a Material tonal current-range indicator rather than a heavy outline, and can navigate the timeline without changing its own vertical position.
+- [ ] Shrink the Obsidian leaf height substantially; the canvas becomes shorter while the workspace remains bounded and the density overview stays below the canvas rather than extending the page.
+- [ ] Selecting a poster opens the owning Markdown note.
 
 ## Score Dashboard
 
@@ -292,5 +301,5 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 
 - [ ] Compare representative notes before/after ordinary edit, release refresh, Image Section edit, Moment edit, legacy metadata cleanup, and duplicate-cover cleanup.
 - [ ] Each operation changes only its owned fields/block and preserves unrelated frontmatter/body content.
-- [ ] No optional 1.4 feature performs a vault-wide automatic rewrite on startup.
+- [ ] No optional feature introduced by the current release performs a vault-wide automatic rewrite on startup.
 - [ ] Disabling optional features leaves stored Markdown readable and does not delete user data.

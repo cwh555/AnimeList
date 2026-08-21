@@ -1,13 +1,13 @@
 # AnimeList
 
-AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a native library, metadata search, local covers, progress tracking, ratings, templates, release tracking, reusable note media sections, a Score Dashboard, and a completion timeline.
+AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a shared workspace for the Library, Timeline, Score Dashboard, and Images, plus metadata search, local covers, progress tracking, ratings, templates, release tracking, reusable note media, and portable Library export.
 
 Your Markdown notes remain the source of truth. Removing the plugin does not remove your records, notes, or images.
 
 > [!CAUTION]
 > **Existing libraries and update cleanup**
 >
-> Existing 1.3.1 libraries remain readable without an automatic startup migration. Older notes may still be missing classification metadata introduced in 1.3, and older generated note bodies may contain a redundant standalone cover below `animelist-detail`. Back up or sync the vault before using **Settings → Updates & cleanup**. The available cleanup tools are explicit, review-first operations and preserve unrelated frontmatter and Markdown body content.
+> Existing 1.4.0 and older libraries remain readable without an automatic startup migration. Older notes may still be missing classification metadata introduced in 1.3, and older generated note bodies may contain a redundant standalone cover below `animelist-detail`. Back up or sync the vault before using **Settings → Updates & cleanup**. The available cleanup tools are explicit, review-first operations and preserve unrelated frontmatter and Markdown body content.
 
 <table>
   <tr>
@@ -35,25 +35,29 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > [!NOTE]
 > **What's new**
 >
-> - Added interface localization for Traditional Chinese, English, Japanese, and Korean, with an option to follow Obsidian's interface language. Settings remain English.
-> - Added opt-in release tracking for manga chapters and already-published novel volumes. Manga can combine MangaDex with supported official public chapter sources discovered from preserved AniList identity; novels use NDL/JPRO publication data. Tracking never overwrites reading progress.
-> - Added reusable **Image Sections** inside media notes with file, drag-and-drop, clipboard, and URL import; lightbox navigation; copy; Set as cover; multi-select deletion; duplicate protection; and local thumbnail caching.
-> - Added reusable **Moments** for saving a quote or scene as text plus one or more images, with optional source, position, speaker, tags, and notes.
-> - Reorganized Settings into General, Search & metadata, Features, Maintenance, and Updates & cleanup pages with clearer same-page groups.
-> - Added review-first cleanup for redundant generated note covers and kept legacy metadata cleanup explicit rather than rewriting libraries on startup.
-> - Removed CSS multi-column and non-baseline scrollbar properties from note media layouts so Community compatibility checks do not rely on browser features only partially supported by older Obsidian releases.
+> - Unified Library, Timeline, Score Dashboard, and Images inside one Material 3-inspired AnimeList workspace with consistent desktop/mobile navigation.
+> - Rebuilt Timeline as a graph-view-style workspace with proportional time spacing, independent time-spacing and whole-scene zoom, horizontal pan, axis-stable scaling, History mode, and a smooth KDE density overview below the canvas.
+> - Added **Images** as a derived workspace over existing Image Sections, with All images / By work browsing, media/search filters, exact 1–6 columns, scoped lightbox navigation, and no copied gallery assets.
+> - Added versioned **Library Export** in JSON and readable Text formats, including safe text templates, Copy, and save-to-file output without rewriting media notes.
+> - Added exact Card and Thumbnail items-per-row controls with persisted 1–6 column choices.
+> - Upgraded Image Sections to natural-height masonry with persisted per-section columns and drag ordering within or between sections in the same note.
+> - Added optional **Stacked** Moment image layout using whole-image gap geometry. Copying a stack creates a transient flattened PNG only for the clipboard; editing or copying does not persist composite files.
+> - Restored the tabbed Settings shell on Obsidian 1.13+ and strengthened architecture/release metadata checks while keeping the Markdown/frontmatter schema compatible.
 
 ## Features
 
 - One Markdown-based library for anime, manga, and novels.
 - Metadata search through Bangumi, AniList, and Open Library, with structured classification metadata for supported works.
-- Card, list, and poster views with search, sorting, and combined company, quarter, and tag filters.
+- Card, list, and poster views with search, sorting, combined company/quarter/tag filters, and persisted Card/Thumbnail row-density controls.
 - Media-specific progress tracking and dated serial entries with optional per-entry covers.
 - Optional manga/novel latest-release tracking that is separate from personal reading progress.
-- Reusable Image Sections and Moments stored directly in ordinary Markdown notes.
+- Reusable Image Sections and Moments stored directly in ordinary Markdown notes, including masonry image ordering and optional whole-image stacked Moments.
+- A shared AnimeList workspace for Library, Timeline, Score Dashboard, and Images.
+- An Images browser derived from existing Image Sections without copying source assets.
 - A Score Dashboard for direct and batch rating changes.
 - Favorite mode or reusable Masterpiece categories.
-- A pannable and zoomable completion timeline.
+- A pannable, independently scalable completion timeline with History mode and a density overview.
+- Versioned JSON and readable Text Library export with safe templates.
 - Local series, serial-entry, Image Section, and Moment images with safe reference-aware cleanup.
 - Traditional Chinese, English, Japanese, and Korean interface support.
 - Desktop and mobile support without a Dataview dependency.
@@ -85,7 +89,7 @@ AnimeList can display its main interface in Traditional Chinese, English, Japane
 
 ## Documentation
 
-See the [User Guide](docs/USER_GUIDE.md) for status rules, progress units, serial-entry covers, metadata and filters, reusable tags, release tracking, Image Sections, Moments, cleanup tools, Masterpiece categories, the Score Dashboard, the timeline, Markdown data, and templates.
+See the [User Guide](docs/USER_GUIDE.md) for workspace navigation, Library layouts, status rules, progress units, serial-entry covers, metadata and filters, reusable tags, release tracking, Images, Image Sections, Moments, Library Export, cleanup tools, Masterpiece categories, the Score Dashboard, Timeline, Markdown data, and templates.
 
 ## Metadata, network access, and privacy
 

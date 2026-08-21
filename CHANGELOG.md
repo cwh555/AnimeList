@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.5.0 - 2026-08-21
+
+### Added
+
+- Added a shared AnimeList workspace with peer **Library**, **Timeline**, **Score Dashboard**, and **Images** destinations, consistent Material 3-inspired page chrome, and responsive desktop/mobile navigation.
+- Added an **Images** workspace derived from existing `animelist-images` Markdown references. It supports All images / By work browsing, media-type filtering, search, exact 1–6 columns, work/session drill-down, and filtered lightbox navigation without copying or moving source assets.
+- Added versioned **Library Export** with JSON and human-readable Text output, media/status scopes, a stable live preview, clipboard copy, save-to-file output under the Library export folder, and bounded safe Text templates.
+- Added persisted **Card items per row** and **Thumbnail items per row** controls from 1–6 columns.
+- Added optional **Stacked** Moment image layout using persisted whole-image vertical gaps. Stacked copy creates one flattened PNG on demand for the system clipboard without writing a composite file to the vault.
+- Added a smooth Gaussian KDE density overview and newest-first History mode to the Timeline workspace.
+
+### Changed
+
+- Rebuilt Timeline as a graph-view-style bounded workspace: the Obsidian leaf owns the available height, canvas pan/zoom stays internal, the density overview sits below the canvas, and History scrolls inside its own content area instead of extending the page.
+- Timeline now separates proportional date spacing from whole-scene scale, supports horizontal trackpad/drag navigation, keeps the timeline axis stable while scaling, and centers the latest work/axis on initial view and Reset.
+- Image Sections now use natural-height masonry columns, persist an exact per-section 1–6 column choice, and support drag ordering within one section or between sections in the same note while preserving unrelated Markdown.
+- The shared workspace header/navigation, Library controls, and Timeline presentation use dedicated feature stylesheets and typed modules rather than adding new domain logic to `src/main.ts` or `src/legacy.ts`.
+- The tabbed Settings shell remains available on Obsidian 1.13+ instead of being bypassed by the newer declarative settings lifecycle.
+
+### Improved
+
+- Library Export JSON has a versioned portable contract and source → AniList → title match-candidate order for future reviewed import work; export never edits media notes.
+- Stacked Moment rasterization is temporary and bounded: repeated edits/copies do not grow vault disk usage, and decoded image resources are released between copies.
+- Image aggregation reuses existing Image Section parsing/caching and known AnimeList media notes rather than introducing a second image database or an eager vault-wide gallery scan.
+- Release metadata now uses `package.json` as the single hand-edited plugin-version source, with derived manifest/lock/versions metadata synchronized by repository tooling and verified by release checks.
+- Architecture checks enforce typed feature/domain boundaries, keep `src/legacy.ts` thin, and prevent feature styles or domain logic from drifting back into shared conflict hotspots.
+
+### Compatibility and migration
+
+- The media schema remains version 6. AnimeList 1.4.0 and older supported notes remain readable; 1.5.0 introduces no automatic startup media migration.
+- Images workspace, Library Export, row-density settings, and Timeline workspace state do not rewrite Markdown/frontmatter.
+- Image Section column metadata and Moment stacked-layout metadata are additive. Legacy Image Sections and Carousel Moments remain valid, and earlier draft Moment stack metadata is read compatibly and normalized only when that Moment is saved.
+- Stacked Moment layout references the original image files; no persistent composite PNG is required. Reference-aware deletion behavior remains unchanged.
+- Existing settings values remain compatible. The Settings presentation fix changes the Obsidian UI lifecycle only, not persisted configuration semantics.
+
 ## 1.4.0 - 2026-08-16
 
 ### Added

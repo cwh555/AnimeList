@@ -131,7 +131,7 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 
 ## Data compatibility
 
-- Existing Markdown/frontmatter remains readable when optional 1.4 features are disabled.
+- Existing Markdown/frontmatter remains readable when optional features are disabled.
 - The media schema remains independent from Image Section and Moments fenced blocks.
 - Release-tracking metadata is additive and must preserve unrelated frontmatter/body content.
 - Interface localization is display-only for provider taxonomy and must not rewrite stored values when the locale changes.

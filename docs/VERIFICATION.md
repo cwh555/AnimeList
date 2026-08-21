@@ -28,6 +28,7 @@ For browser-sensitive changes, also run the relevant Chromium regressions:
 ```bash
 npm run test:browser:date
 npm run test:browser:mobile
+npm run test:browser:score-mobile
 npm run test:browser:tags
 npm run test:browser:tag-manager
 ```
@@ -42,6 +43,7 @@ TZ=UTC npm run check
 TZ=Asia/Taipei npm test
 segmented-date Chromium regression
 responsive mobile Chromium regression
+Score Dashboard mobile Chromium regression
 tag-chip Chromium regression
 Tag Manager Chromium regression
 npm run release:check
