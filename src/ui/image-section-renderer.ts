@@ -49,7 +49,7 @@ interface ActiveImagePointerDrag {
 
 const imageSectionRenderers = new WeakMap<HTMLElement, ImageSectionRenderChild>();
 let activeImageDrag: ActiveImagePointerDrag | null = null;
-interface ImageSectionEphemeralState { expanded: boolean; scrollTop: number; }
+interface ImageSectionEphemeralState { expanded: boolean; scrollTop: number; preferredColumns?: number; preserveUntil?: number; }
 const imageSectionEphemeralState = new Map<string, ImageSectionEphemeralState>();
 
 function clearImageDropIndicators(): void {
@@ -79,6 +79,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private galleryPaths: string[] = [];
   private readonly imageElements = new Map<string, HTMLElement>();
   private galleryViewport: HTMLElement | null = null;
+  private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -93,22 +94,52 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private ephemeralStateKey(): string {
     const section = this.context.getSectionInfo(this.containerEl);
-    return `${this.context.sourcePath}:${section?.lineStart ?? this.lineHint ?? -1}`;
+    const lineStart = this.lineHintAuthoritative ? this.lineHint : section?.lineStart ?? this.lineHint;
+    return `${this.context.sourcePath}:${lineStart ?? -1}`;
   }
 
   private saveEphemeralState(): void {
-    imageSectionEphemeralState.set(this.ephemeralStateKey(), {
+    const key = this.ephemeralStateKey();
+    const existing = imageSectionEphemeralState.get(key);
+    const now = Date.now();
+    const activePreservation = this.layoutPreservation?.preserveUntil && this.layoutPreservation.preserveUntil >= now
+      ? this.layoutPreservation
+      : existing?.preserveUntil && existing.preserveUntil >= now && existing.preferredColumns !== undefined
+        ? { preferredColumns: existing.preferredColumns, preserveUntil: existing.preserveUntil }
+        : null;
+    imageSectionEphemeralState.set(key, {
       expanded: this.expanded,
       scrollTop: this.galleryViewport?.scrollTop ?? 0,
+      preferredColumns: activePreservation?.preferredColumns,
+      preserveUntil: activePreservation?.preserveUntil,
     });
+  }
+
+  private preserveLayoutAcrossRefresh(): void {
+    this.layoutPreservation = {
+      preferredColumns: this.preferredColumns,
+      preserveUntil: Date.now() + 2500,
+    };
+    this.saveEphemeralState();
   }
 
   onload(): void {
     const section = this.context.getSectionInfo(this.containerEl);
     this.lineHint = section?.lineStart;
-    this.preferredColumns = parseImageSectionColumns(section?.text);
-    const ephemeral = imageSectionEphemeralState.get(this.ephemeralStateKey());
+    const parsedColumns = parseImageSectionColumns(section?.text);
+    const ephemeralKey = this.ephemeralStateKey();
+    const ephemeral = imageSectionEphemeralState.get(ephemeralKey);
+    const preservesLayout = Boolean(ephemeral?.preserveUntil && ephemeral.preserveUntil >= Date.now());
+    this.preferredColumns = preservesLayout && ephemeral?.preferredColumns !== undefined
+      ? normalizeImageSectionColumns(ephemeral.preferredColumns)
+      : parsedColumns;
     if (ephemeral) this.expanded = ephemeral.expanded;
+    if (preservesLayout && ephemeral?.preferredColumns !== undefined && ephemeral.preserveUntil !== undefined) {
+      this.layoutPreservation = {
+        preferredColumns: normalizeImageSectionColumns(ephemeral.preferredColumns),
+        preserveUntil: ephemeral.preserveUntil,
+      };
+    }
     imageSectionRenderers.set(this.containerEl, this);
     this.render();
     if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
@@ -426,6 +457,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       source.containerEl.removeClass("is-image-drag-source");
       return;
     }
+    const scrollPosition = captureScrollPosition(source.containerEl);
+    source.preserveLayoutAcrossRefresh();
+    if (source !== this) this.preserveLayoutAcrossRefresh();
+    scrollPosition.stabilize(12);
     try {
       const update = await this.service.moveAsset(
         this.context.sourcePath,
@@ -442,9 +477,13 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         source.applyOrderedSectionState(update.sourceSection);
         this.applyOrderedSectionState(update.targetSection);
       }
+      scrollPosition.restore();
+      scrollPosition.stabilize(12);
     } catch (error) {
       source.applyGalleryPaths(optimistic.sourceBefore);
       if (source !== this) this.applyGalleryPaths(optimistic.targetBefore);
+      scrollPosition.restore();
+      scrollPosition.stabilize(12);
       new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
     }
   }
@@ -768,6 +807,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         // throughout both directions of adjustment.
         const controlAnchor = captureViewportAnchor(range);
         this.preferredColumns = normalizeImageSectionColumns(range.value);
+        if (this.layoutPreservation) this.layoutPreservation.preferredColumns = this.preferredColumns;
         value.value = String(this.preferredColumns);
         value.textContent = String(this.preferredColumns);
         this.galleryRelayout?.();
@@ -776,6 +816,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       });
       range.addEventListener("change", () => {
         const nextColumns = normalizeImageSectionColumns(range.value);
+        this.preferredColumns = nextColumns;
+        this.preserveLayoutAcrossRefresh();
         // Persisting the fence metadata rewrites the note. Obsidian may replace
         // this Markdown render child as a result; keep the surrounding scroller
         // at the exact user-visible offset through that refresh.
