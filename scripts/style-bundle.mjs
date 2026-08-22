@@ -27,6 +27,9 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/user-tags.css",
   "styles/mobile.css",
   "styles/release-tracking.css",
+  "styles/workspace-responsive-shell.css",
+  "styles/workspace-responsive-library.css",
+  "styles/workspace-responsive-pages.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {

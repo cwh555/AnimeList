@@ -68,6 +68,7 @@ export const TEST_TARGETS = [
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-progressive-render.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-layout.test.ts", kind: "test", suite: "unit", features: ["library", "settings"] },
+  { path: "tests/workspace-responsive.test.ts", kind: "test", suite: "unit", features: ["library", "timeline", "score-dashboard", "image-gallery", "styles"] },
   { path: "tests/library-filters.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/studio-identity.test.ts", kind: "test", suite: "unit", features: ["library", "search"] },
   { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },

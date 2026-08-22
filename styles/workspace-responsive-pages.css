@@ -1,0 +1,247 @@
+/* Responsive geometry for Workspace pages other than Library. These rules are
+ * driven by the shared leaf-width class; feature renderers keep their own
+ * interaction and data logic. */
+
+/* Medium Timeline chrome reflows before controls become cramped. */
+.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-timeline-workspace-controls {
+  flex-wrap: wrap;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-timeline-scale-actions {
+  margin-left: 0;
+}
+
+/* Compact Score Dashboard: each score band becomes a vertical section and its
+ * posters remain a local horizontal rail instead of widening the page. */
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-controls {
+  position: static;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-tabs {
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-tab {
+  min-height: 42px;
+  flex: 0 0 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-action-group {
+  width: 100%;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-tool-button {
+  min-height: 44px;
+  flex: 1 1 0;
+  justify-content: center;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-zoom {
+  order: initial;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin-left: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard-zoom input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-toolbar,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-toolbar.is-visible {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-count,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-target {
+  grid-column: 1 / -1;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-toolbar button,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-batch-target {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-board {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-group,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard[data-label-layout="compact"] .al-score-group {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary-alt);
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-major,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard[data-label-layout="compact"] .al-score-major {
+  min-height: 0;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  text-align: left;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-lane,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard[data-label-layout="compact"] .al-score-lane {
+  display: block;
+  min-height: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-lane-label,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-dashboard[data-label-layout="compact"] .al-score-lane-label {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  font-size: .68rem;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-lane-posters {
+  flex-wrap: nowrap;
+  align-content: center;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 9px 10px 11px;
+  scroll-snap-type: x proximity;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-scores .al-score-poster {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+/* Compact Images. Gallery column count remains the user's exact 1–6 choice;
+ * only chrome and work-board geometry adapt. */
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-mode-tabs {
+  width: 100%;
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images button.al-gallery-mode-tab {
+  min-height: 44px;
+  flex: 1 0 auto;
+  justify-content: center;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-filters {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-type-filters {
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-search,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-columns {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-columns input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-work-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-work-detail-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images button.al-gallery-back {
+  grid-column: 1 / -1;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-images .al-gallery-session-filters {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  overscroll-behavior-inline: contain;
+}
+
+/* Compact Timeline. The canvas keeps its own pan/zoom coordinate system; only
+ * surrounding controls and history layout reflow. */
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-root {
+  min-height: 360px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-controls {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-view-modes,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-type-filters {
+  width: 100%;
+  overflow-x: auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-timeline-view-mode,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline button.al-timeline-type-filter {
+  min-height: 40px;
+  flex: 1 0 auto;
+  padding-inline: 9px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-actions {
+  width: 100%;
+  margin-left: 0;
+  flex-wrap: wrap;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group {
+  min-width: 0;
+  flex: 1 1 150px;
+  justify-content: center;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-viewport {
+  min-height: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin-top: 6px;
+  padding: 6px 10px 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview-label {
+  padding-bottom: 0;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month-header {
+  flex-direction: row;
+  justify-content: space-between;
+  padding-left: 8px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-grid {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  justify-items: center;
+}
+
+/* Legacy timeline root can still be mounted through compatibility paths. Keep
+ * its compact chrome coherent without relying on the browser viewport. */
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-controls {
+  width: 100%;
+  margin-left: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+}

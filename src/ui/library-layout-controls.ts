@@ -26,6 +26,7 @@ export function installLibraryLayoutControl(
   const views = container.querySelector<HTMLElement>(".al-toolbar .al-view-switch");
   const grid = container.querySelector<HTMLElement>(".al-grid");
   if (!views || !grid) return null;
+  const workspaceOwnedLayout = container.closest(".al-workspace-shell") !== null;
 
   const control = makeEl("label", "al-library-column-control");
   control.setCssStyles({
@@ -76,9 +77,19 @@ export function installLibraryLayoutControl(
     control.hidden = columns === null;
     if (columns === null) {
       grid.style.removeProperty("grid-template-columns");
+      grid.style.removeProperty("--al-library-preferred-columns");
+      delete grid.dataset.layoutColumns;
       return;
     }
-    grid.style.setProperty("grid-template-columns", `repeat(${columns}, minmax(0, 1fr))`);
+    if (workspaceOwnedLayout) {
+      grid.style.removeProperty("grid-template-columns");
+      grid.style.setProperty("--al-library-preferred-columns", String(columns));
+      grid.dataset.layoutColumns = String(columns);
+    } else {
+      grid.style.removeProperty("--al-library-preferred-columns");
+      delete grid.dataset.layoutColumns;
+      grid.style.setProperty("grid-template-columns", `repeat(${columns}, minmax(0, 1fr))`);
+    }
     range.value = String(columns);
     value.value = String(columns);
     value.textContent = String(columns);
