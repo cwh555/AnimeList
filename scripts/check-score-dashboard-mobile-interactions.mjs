@@ -116,7 +116,8 @@ const html = `<!doctype html>
         && applied[0][0].filePath === "Alpha.md"
         && applied[0][0].nextScore === 9;
       details.dragDoesNotOpenFile = opened.length === 0;
-      details.dragReRenderedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
+      details.dragMovedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
+      details.dragPreservesPosterNode = poster("Alpha.md") === alpha;
 
       const alphaAfterDrag = poster("Alpha.md");
       alphaAfterDrag.scrollIntoView({ block:"center" });

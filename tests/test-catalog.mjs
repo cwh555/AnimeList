@@ -35,6 +35,7 @@ export const TEST_TARGETS = [
   { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
+  { path: "tests/image-lightbox.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/contracts/image-section-service.test.ts", kind: "test", suite: "contract", features: ["image-sections", "markdown"] },
 
   { path: "tests/moments.test.ts", kind: "test", suite: "unit", features: ["moments", "markdown"] },
@@ -49,6 +50,9 @@ export const TEST_TARGETS = [
   { path: "tests/media-status.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/progress-display.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/progress-units.test.ts", kind: "test", suite: "unit", features: ["progress"] },
+  { path: "tests/completion-date.test.ts", kind: "test", suite: "unit", features: ["progress", "timeline", "library"] },
+  { path: "tests/manual-media.test.ts", kind: "test", suite: "unit", features: ["library"] },
+  { path: "tests/abort.test.ts", kind: "test", suite: "unit", features: ["release-tracking"] },
   { path: "tests/release-tracking.test.ts", kind: "test", suite: "unit", features: ["release-tracking"] },
   { path: "tests/rating.test.ts", kind: "test", suite: "unit", features: ["rating", "progress"] },
   { path: "tests/release-tracking-state-service.test.ts", kind: "test", suite: "integration", features: ["release-tracking", "markdown"] },

@@ -128,4 +128,74 @@ describe("media note service", () => {
     assert.match(createdContent, /title: "Example"/);
     assert.match(createdContent, /# Example/);
   });
+  it("stores a manually uploaded cover in the managed cover folder before writing the note", async () => {
+    const events: string[] = [];
+    let createdMarkdown = "";
+    let binaryPath = "";
+    let binaryBytes = 0;
+    const note = new TFile();
+    note.path = "AnimeList/Manga/Manual Work.md";
+    const coverFile = new TFile();
+    coverFile.path = "AnimeList/Covers/manga/manual-work-manual.png";
+    const app = {
+      vault: {
+        async createBinary(path: string, data: ArrayBuffer) {
+          binaryPath = path;
+          binaryBytes = data.byteLength;
+          events.push(`binary:${path}`);
+          return coverFile;
+        },
+        async create(path: string, content: string) {
+          events.push(`create:${path}`);
+          createdMarkdown = content;
+          return note;
+        },
+      },
+    } as unknown as App;
+    const repository = { findBySource() { throw new Error("manual media must not run source lookup without a source id"); } } as unknown as MediaRepository;
+    const storage = {
+      scanFolders() { return ["AnimeList"]; },
+      mediaFolder() { return "AnimeList/Manga"; },
+      async ensureFolder(path: string) { events.push(`folder:${path}`); },
+      async uniqueFilePath(folder: string, title: string, extension: string) {
+        if (extension === "png") return "AnimeList/Covers/manga/manual-work-manual.png";
+        return "AnimeList/Manga/Manual Work.md";
+      },
+      async readTemplate() { return ""; },
+    } as unknown as LibraryStorage;
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    const service = new MediaNoteService(
+      app,
+      () => settings,
+      repository,
+      storage,
+      { async optimizeFile(file) { events.push(`optimize:${file.path}`); } },
+      { async openMediaFile() {}, refreshViews() { events.push("refresh"); } },
+    );
+
+    const result: ExternalMediaResult = {
+      ...externalResult(),
+      provider: "manual",
+      sourceId: "",
+      sourceUrl: "",
+      mediaType: "manga",
+      format: "manga",
+      total: 0,
+      unit: "chapter",
+      coverUrl: "",
+      people: [],
+    };
+    const form = { ...noteForm("Manual Work"), unit: "chapter", total: 0, progress: "第 7 話", releaseStatus: "unknown" };
+    const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+    await service.create(result, form, { name: "cover.png", contentType: "image/png", data: bytes });
+
+    assert.equal(binaryPath, "AnimeList/Covers/manga/manual-work-manual.png");
+    assert.equal(binaryBytes, 4);
+    assert.ok(events.includes("optimize:AnimeList/Covers/manga/manual-work-manual.png"));
+    assert.match(createdMarkdown, /^source_provider: "manual"$/m);
+    assert.match(createdMarkdown, /^cover: "AnimeList\/Covers\/manga\/manual-work-manual\.png"$/m);
+    assert.match(createdMarkdown, /^progress: "第 7 話"$/m);
+  });
+
 });

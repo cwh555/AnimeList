@@ -756,7 +756,7 @@ const FIXTURES = [
     title: "輝夜姬想讓人告白～天才們的戀愛頭腦戰～", originalTitle: "かぐや様は告らせたい～天才たちの恋愛頭脳戦～",
     romajiTitle: "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen", mediaType: "anime", format: "tv",
     status: "completed", progress: 12, total: 12, unit: "episode", score: 8.5, year: 2019,
-    genres: ["戀愛", "喜劇", "校園"], people: ["A-1 Pictures"], startedAt: "2026-06-01", completedAt: "2026-06-12",
+    genres: ["戀愛", "喜劇", "校園"], people: ["A-1 Pictures"], startedAt: "2026-06-01", completedAt: "unknown",
     ...bangumiSource(248175, "https://lain.bgm.tv/pic/cover/l/2a/f7/248175_2w4zT.jpg"),
   },
   {
@@ -776,7 +776,7 @@ const FIXTURES = [
   {
     folder: "Manga", fixtureCase: "manga-on-hold",
     title: "入間同學入魔了", originalTitle: "魔入りました！入間くん", romajiTitle: "Mairimashita! Iruma-kun",
-    mediaType: "manga", format: "manga", status: "on_hold", releaseStatus: "releasing", progress: 120, unit: "chapter",
+    mediaType: "manga", format: "manga", status: "on_hold", releaseStatus: "releasing", progress: "第 120 話 / 單行本同步中", unit: "chapter",
     year: 2017, genres: ["奇幻", "喜劇", "校園"], people: ["西修"], startedAt: "2026-05-01",
     ...bangumiSource(210505, "https://lain.bgm.tv/pic/cover/l/41/4f/210505_1G4D9.jpg"),
   },
@@ -1036,6 +1036,18 @@ Switch **Special label mode = Masterpiece**.
 - Open [[AnimeList/Novel/不時以俄語遮羞的艾莉同學|不時以俄語遮羞的艾莉同學]], click **Edit**, add volume 9, and verify the row remains visible and uses the modal width.
 - Run \`npm run test-vault\` again: that edit must still be present because ordinary Test Vault startup is non-destructive.
 - Run \`npm run test-vault:fixtures\` only when you want to restore the baseline.
+
+## 4A. Component polish regression
+
+- **Custom collection:** Library → Collect → **Custom**. Create one work without search, switch its media type between Anime / Manga / Novel, enter your own metadata, choose a local cover, and collect it. The note must land in the chosen media folder, the local cover must be stored under the managed Covers folder, and no external source ID is required.
+- **Free-form reading progress:** open **入間同學入魔了**. Its baseline progress is \`第 120 話 / 單行本同步中\`. Edit it to another arbitrary text value, save, reopen, and confirm the exact text survives. Release Tracking must not overwrite or crash on this value.
+- **Date unknown:** **輝夜姬想讓人告白～天才們的戀愛頭腦戰～** (anime) is completed with **Date unknown**. It must appear in Timeline's separate undated dimension instead of being placed on the dated axis. Editing completion lets you toggle between a real date and Date unknown.
+- **Timeline density:** compare a dense cluster of nearby completion dates with isolated dates. The density curve should stay locally responsive rather than letting a far outlier flatten the nearby cluster.
+- **Completion sort:** Library → sort by completion date descending. Ongoing/in-progress works appear newer than every completed dated work; explicitly undated/missing completion dates stay after comparable dates instead of receiving a fake timestamp.
+- **Release Tracking cancellation:** start **Check updates**, then press **Stop and close** while providers are still running. The modal must close immediately; late provider responses from that cancelled run must not persist changes.
+- **Images reorder stability:** expand a populated Image Section, reorder several images repeatedly, and confirm it stays expanded, scroll position remains stable, and only image order changes. There should be no image reload/white flash.
+- **Image lightbox:** open one image, zoom with mouse wheel/trackpad, pan while zoomed, then navigate left/right. Navigation should reuse the same lightbox surface without a white flash; double-click or \`0\` resets zoom.
+- **Score Dashboard:** drag posters between score lanes repeatedly. The moved poster should relocate in-place without a whole-board flash or image reload.
 
 ## 5. Release Tracking live-provider check
 

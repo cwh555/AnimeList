@@ -17,6 +17,7 @@ await build({
       export { ImageSectionRenderChild } from "./src/ui/image-section-renderer";
       export { AddImageSectionModal } from "./src/ui/image-section-modal";
       export { reorderImageSectionPaths } from "./src/domain/image-section-order";
+      export { ImageLightboxModal, imageLightboxEntries } from "./src/ui/image-lightbox";
     `,
     resolveDir: root,
     loader: "ts",
@@ -80,6 +81,7 @@ const html = `<!doctype html><html><head><meta name="viewport" content="width=de
 :root{--background-primary:#111;--background-secondary:#222;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#7777dd;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-error:#e66;}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:#eee;font-family:sans-serif}${styles}
 #scroll-shell{height:100%;overflow-y:auto}.top-spacer{height:480px}#section{width:370px;margin:8px}.bottom-spacer{height:900px}.animelist-image-add-modal{position:relative!important;inset:auto!important;margin:8px;background:#181818;padding:8px}
+#section .al-image-gallery-viewport:not(.is-expanded){max-height:90px}
 </style></head><body data-result="pending"><div id="scroll-shell" class="cm-scroller"><div class="top-spacer"></div><section id="section"></section><div class="bottom-spacer"></div></div>
 <script>
 window.createEl=(tag)=>document.createElement(tag);
@@ -151,6 +153,11 @@ renderer.onload();
  slider.dispatchEvent(new Event("change",{bubbles:true}));
  await delay(260);
  details.columnDecreaseKeepsBarFixedAfterPersist=Math.abs(slider.getBoundingClientRect().top-barTopBeforeDecrease)<=1;
+ const expandButton=section.querySelector('.al-image-expand-button');
+ if(expandButton.hidden) throw new Error('fixture must expose expand control');
+ expandButton.click();
+ await delay(20);
+ details.galleryCanExpandBeforeReorder=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  const moving=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  const movingImage=moving.querySelector('img');
  const handle=moving.querySelector('.al-image-drag-handle');
@@ -171,10 +178,11 @@ renderer.onload();
    && (Math.abs(immediateRect.top-movingRectBeforeDrop.top)>1 || Math.abs(immediateRect.left-movingRectBeforeDrop.left)>1);
  await delay(120);
  details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
-   && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop+1;
+   && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  details.touchGalleryReorderPersisted=current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
+ details.reorderPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  details.dragGhostCleansUp=document.querySelectorAll('.al-image-drag-ghost').length===0;
  details.touchHandleIsAvailable=parseFloat(getComputedStyle(moved.querySelector('.al-image-drag-handle')).opacity)>0;
 
@@ -186,6 +194,7 @@ renderer.onload();
  section.replaceChildren();
  const replacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
  replacement.onload();
+ details.renderChildReplacementPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  const replacementTarget=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  replacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:end.x,clientY:end.y+10}));
  await delay(20);
@@ -208,6 +217,22 @@ renderer.onload();
  mouseReplacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:mouseEnd.x,clientY:mouseEnd.y+10}));
  await delay(20);
  details.mouseDragReleaseDoesNotOpenLightbox=(window.__modalOpenCount||0)===modalCountBeforeMouseDropClick;
+
+ const lightbox=new AnimeListImageSections.ImageLightboxModal(host.app,service,AnimeListImageSections.imageLightboxEntries(context.sourcePath,["a.jpg","b.jpg","c.jpg"]),0);
+ lightbox.open();
+ await delay(20);
+ const lightboxImage=document.querySelector('.al-image-lightbox-image');
+ const lightboxStage=document.querySelector('.al-image-lightbox-stage');
+ const initialLightboxSrc=lightboxImage.src;
+ lightboxStage.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:-300}));
+ await delay(20);
+ details.lightboxWheelZooms=/scale\((?!1(?:\.0+)?\))/.test(lightboxImage.style.transform);
+ document.querySelector('.al-image-lightbox-nav.is-next').click();
+ await delay(20);
+ details.lightboxNavigationPreservesImageNode=document.querySelector('.al-image-lightbox-image')===lightboxImage
+   && lightboxImage.src!==initialLightboxSrc
+   && document.querySelector('.al-image-lightbox-counter').textContent==='2 / 3';
+ lightbox.close();
 
  scrollShell.style.display="none";
 

@@ -195,4 +195,39 @@ describe("media note Markdown compatibility", () => {
     assert.match(yaml, /studios:\n  - "AniList Studio"/);
   });
 
+  it("round-trips free-form reading progress and an explicitly undated completion without numeric coercion", () => {
+    const markdown = buildMediaMarkdown({
+      ...baseResult,
+      provider: "manual",
+      sourceId: "",
+      sourceUrl: "",
+      mediaType: "manga",
+      format: "manga",
+      total: 0,
+      unit: "chapter",
+      releaseStatus: "finished",
+      coverUrl: "",
+    }, {
+      title: "自由進度漫畫",
+      score: 9,
+      status: "completed",
+      releaseStatus: "finished",
+      startedAt: "2026-01-01",
+      completedAt: "unknown",
+      progress: "第 12 話 / Web版",
+      total: 0,
+      unit: "chapter",
+      favorite: false,
+      genres: [],
+      templatePath: "",
+      volumeLog: [],
+    }, "", "");
+
+    const yaml = frontmatter(markdown);
+    assert.match(yaml, /^progress: "第 12 話 \/ Web版"$/m);
+    assert.match(yaml, /^completed_at: "unknown"$/m);
+    assert.match(yaml, /^source_provider: "manual"$/m);
+    assert.doesNotMatch(yaml, /^source_id:/m);
+  });
+
 });

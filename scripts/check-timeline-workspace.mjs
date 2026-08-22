@@ -53,6 +53,7 @@ const items = [
   item("B", "anime", "2026-01-01", "B.md"),
   item("C", "anime", "2026-01-30", "C.md"),
   item("M", "manga", "2026-02-15", "M.md"),
+  item("U", "novel", "unknown", "U.md"),
 ].join(",");
 
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
@@ -70,10 +71,14 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const shell=document.querySelector('.al-workspace-shell'); const root=document.querySelector('.al-timeline-workspace'); let viewport=document.querySelector('.al-timeline-workspace-viewport');
  const axisScreenY=()=>{const a=document.querySelector('.al-timeline-axis');const r=a.getBoundingClientRect();return r.top+r.height/2;};
  const viewportCenter=()=>{const r=viewport.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
- const latestCenterX=()=>{const c=[...document.querySelectorAll('.al-timeline-card')].at(-1).getBoundingClientRect();return c.left+c.width/2;};
+ const datedCards=()=>[...document.querySelectorAll('.al-timeline-scene .al-timeline-card')];
+ const latestCenterX=()=>{const c=datedCards().at(-1).getBoundingClientRect();return c.left+c.width/2;};
  d.fullPageNoModalFrame=!!root&&!document.querySelector('.al-timeline-toolbar')&&!document.querySelector('.al-timeline-copy')&&parseFloat(getComputedStyle(root).borderRadius||'0')===0;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
  d.hasDensityCurve=!!document.querySelector('.al-timeline-density-line')&&!!document.querySelector('.al-timeline-density-area')&&!document.querySelector('.al-timeline-overview-bar')&&!!document.querySelector('.al-timeline-overview-window');
+ d.undatedSeparateDimension=document.querySelectorAll('.al-timeline-card:not(.al-timeline-undated-card)').length===4
+   && document.querySelectorAll('.al-timeline-undated-card').length===1
+   && !!document.querySelector('.al-timeline-undated-dimension');
  const overviewInitial=document.querySelector('.al-timeline-overview'); const overviewWindowInitial=document.querySelector('.al-timeline-overview-window'); const overviewInitialRect=overviewInitial.getBoundingClientRect(); const viewportInitialRect=viewport.getBoundingClientRect(); const appRect=app.getBoundingClientRect(); const overviewStyle=getComputedStyle(overviewInitial); const overviewWindowStyle=getComputedStyle(overviewWindowInitial);
  d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
@@ -81,7 +86,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
  d.materialOverviewIndicator=parseFloat(overviewWindowStyle.borderTopWidth)<=0.1&&parseFloat(overviewWindowStyle.borderRadius)>=8&&overviewWindowStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewWindowStyle.backgroundColor!=='transparent';
- let cards=[...document.querySelectorAll('.al-timeline-card')]; let axis=document.querySelector('.al-timeline-axis');
+ let cards=datedCards(); let axis=document.querySelector('.al-timeline-axis');
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
  d.initialLatestCentered=Math.abs(latestCenterX()-viewportCenter().x)<=2;
  d.initialAxisCentered=Math.abs(axisScreenY()-viewportCenter().y)<=2;
@@ -89,12 +94,12 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.responsiveLane=shell.dataset.windowSize==='compact'?above===2&&below===0:above>=1&&below>=1;
  const beforeGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left)); const beforeHeight=cards[0].getBoundingClientRect().height; const axisBeforeTemporal=axisScreenY();
  click(document.querySelector('.al-timeline-spacing-controls button:last-child')); await frames();
- cards=[...document.querySelectorAll('.al-timeline-card')]; const afterGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
+ cards=datedCards(); const afterGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
  d.temporalZoomOnly=afterGap>beforeGap&&Math.abs(cards[0].getBoundingClientRect().height-beforeHeight)<=2;
  d.temporalZoomKeepsAxisY=Math.abs(axisScreenY()-axisBeforeTemporal)<=1;
  const rawGapBeforeScreenZoom=afterGap; const screenHeightBefore=cards[0].getBoundingClientRect().height; const axisBeforeScreenZoom=axisScreenY();
  click(document.querySelector('.al-timeline-view-scale-controls button:last-child')); await frames();
- cards=[...document.querySelectorAll('.al-timeline-card')]; const rawGapAfterScreenZoom=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
+ cards=datedCards(); const rawGapAfterScreenZoom=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left));
  d.screenZoomScalesScene=cards[0].getBoundingClientRect().height>screenHeightBefore*1.1&&Math.abs(rawGapAfterScreenZoom-rawGapBeforeScreenZoom)<=0.1;
  d.screenZoomKeepsAxisY=Math.abs(axisScreenY()-axisBeforeScreenZoom)<=1;
  const scene=document.querySelector('.al-timeline-scene'); const transformBeforeSwipe=scene.style.transform; const axisBeforeSwipe=axisScreenY();
@@ -104,7 +109,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const overviewBottomBeforeVerticalPan=overviewInitial.getBoundingClientRect().bottom; viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:0,deltaY:120})); await frames();
  d.overviewStableWhileScenePans=Math.abs(overviewInitial.getBoundingClientRect().bottom-overviewBottomBeforeVerticalPan)<=1;
  const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; click(resetButton); await frames();
- viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=[...document.querySelectorAll('.al-timeline-card')];
+ viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=datedCards();
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
  d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
  d.resetRestoresScale=Math.abs(cards[0].getBoundingClientRect().height-180)<=2;
@@ -114,6 +119,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const manga=[...document.querySelectorAll('.al-timeline-type-filter')].find(b=>b.textContent.includes('Manga')||b.textContent.includes('漫畫')); click(manga); await frames();
  d.filterApplied=document.querySelectorAll('.al-timeline-card').length===1;
  click(document.querySelectorAll('.al-timeline-view-mode')[1]); await frames(); d.historyMode=!!document.querySelector('.al-timeline-history')&&document.querySelectorAll('.al-timeline-history-item').length===1;
+ d.historyUndatedRespectsTypeFilter=!document.querySelector('.al-timeline-history .al-timeline-undated-card');
  d.filterPreserved=manga.getAttribute('aria-pressed')==='true';
  d.historyHasExternalDate=!!document.querySelector('.al-timeline-history-date')&&!document.querySelector('.al-timeline-history-item .al-timeline-card-copy small');
  d.historyScrollContained=app.scrollHeight<=app.clientHeight+1&&document.querySelector('.al-timeline-workspace-body').scrollHeight>=document.querySelector('.al-timeline-workspace-body').clientHeight;

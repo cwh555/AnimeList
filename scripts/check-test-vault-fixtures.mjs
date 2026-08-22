@@ -78,6 +78,11 @@ try {
   assert.match(checklist, /Favorite: \*\*3\*\*/);
   assert.match(checklist, /Completed: \*\*5\*\*/);
   assert.match(checklist, /Wishlist \/ Planned: \*\*5\*\*/);
+  assert.match(checklist, /Component polish regression/);
+  assert.match(checklist, /Custom collection/);
+  assert.match(checklist, /Free-form reading progress/);
+  assert.match(checklist, /Date unknown/);
+  assert.match(checklist, /Release Tracking cancellation/);
   assert.match(checklist, /Release Tracking live-provider check/);
   assert.match(checklist, /source_provider.*must not be MangaDex/i);
   assert.match(checklist, /Official-source coverage expectations/);
@@ -205,6 +210,10 @@ try {
     assert.equal(matches.length, 1, `Bangumi ${bangumiId} must identify exactly one controlled manga fixture`);
     assert.match(fs.readFileSync(matches[0], "utf8"), new RegExp(`anilist_id: "${anilistId}"`));
   }
+
+  const irumaPath = "AnimeList/Manga/入間同學入魔了.md";
+  assert.match(read(irumaPath), /progress: "第 120 話 \/ 單行本同步中"/);
+  assert.match(read(kaguyaAnimePath), /completed_at: "unknown"/);
 
   const alyaPath = "AnimeList/Novel/不時以俄語遮羞的艾莉同學.md";
   const alya = read(alyaPath);
