@@ -511,3 +511,13 @@
   .al-image-lightbox-stage,.al-image-lightbox-image { max-height:calc(100vh - 120px); }
   .al-image-lightbox-nav { width:34px; height:42px; }
 }
+
+.animelist-image-lightbox .al-image-lightbox-stage { overflow: hidden; touch-action: none; }
+.animelist-image-lightbox .al-image-lightbox-image {
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform 80ms linear;
+}
+.animelist-image-lightbox .al-image-lightbox-stage.is-zoomed { cursor: grab; }
+.animelist-image-lightbox .al-image-lightbox-stage.is-panning { cursor: grabbing; }
+.animelist-image-lightbox .al-image-lightbox-stage.is-panning .al-image-lightbox-image { transition: none; }

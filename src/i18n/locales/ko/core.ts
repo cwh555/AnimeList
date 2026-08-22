@@ -152,6 +152,7 @@ export const KO_CORE_MESSAGES = {
     "date.year": "년",
     "date.month": "월",
     "date.day": "일",
+    "date.undated": "날짜 미정",
     "volume.title": "권별 기록",
     "volume.description": "권수는 정수, .5, EX를 지원합니다. 새 권은 기본적으로 오늘 완료로 추가됩니다.",
     "volume.add": "권 추가",

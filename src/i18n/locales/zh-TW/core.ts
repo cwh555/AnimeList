@@ -158,6 +158,7 @@ export const CORE_MESSAGES = {
   "date.year": "年",
   "date.month": "月",
   "date.day": "日",
+  "date.undated": "日期未定",
 
   "volume.title": "分卷紀錄",
   "volume.description": "卷數支援整數、.5、EX；新增卷預設今天完成。",

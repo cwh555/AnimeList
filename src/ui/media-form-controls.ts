@@ -3,6 +3,7 @@ import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
 import { normalizeUserTags } from "../domain/user-tags";
 import { normalizeMediaStatus } from "../domain/media-status";
+import { UNKNOWN_COMPLETION_DATE, isUnknownCompletionDate } from "../domain/completion-date";
 import { normalizeReleaseStatus, progressDisplayValue } from "../domain/progress/novel-progress";
 import { completedStatusLabel, mediaStatusOptions, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
@@ -128,6 +129,55 @@ export function createDateInput(value = ""): MediaFormDateControl {
     if (!(event.relatedTarget instanceof Node) || !root.contains(event.relatedTarget)) emit("change");
   });
   setValue(value);
+  return root;
+}
+
+
+export function createCompletionDateInput(value = ""): MediaFormDateControl {
+  const root = createDiv() as MediaFormDateControl;
+  root.className = "al-completion-date-control";
+  const date = createDateInput(isUnknownCompletionDate(value) ? "" : value);
+  const undated = createEl("label");
+  undated.className = "al-completion-date-undated";
+  const checkbox = createEl("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = isUnknownCompletionDate(value);
+  const label = makeEl("span", "", uiText("date.undated"));
+  undated.append(checkbox, label);
+  root.append(date, undated);
+
+  let required = false;
+  const sync = (): void => {
+    date.classList.toggle("is-disabled", checkbox.checked);
+    for (const input of date.querySelectorAll<HTMLInputElement>("input")) input.disabled = checkbox.checked;
+    root.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  Object.defineProperty(root, "value", {
+    configurable: true,
+    get: () => checkbox.checked ? UNKNOWN_COMPLETION_DATE : date.value,
+    set: (nextValue: unknown) => {
+      checkbox.checked = isUnknownCompletionDate(nextValue);
+      date.value = checkbox.checked ? "" : String(formValue(nextValue));
+      sync();
+    },
+  });
+  Object.defineProperty(root, "required", {
+    configurable: true,
+    get: () => required,
+    set: (nextRequired: boolean) => {
+      required = Boolean(nextRequired);
+      date.required = required && !checkbox.checked;
+      root.setAttribute("aria-required", required ? "true" : "false");
+    },
+  });
+  date.addEventListener("input", () => root.dispatchEvent(new Event("input", { bubbles: true })));
+  date.addEventListener("change", () => root.dispatchEvent(new Event("change", { bubbles: true })));
+  checkbox.addEventListener("change", () => {
+    date.required = required && !checkbox.checked;
+    sync();
+    root.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  sync();
   return root;
 }
 
@@ -334,7 +384,7 @@ export function createMediaEditorFields({
   const completedAt = createLabeledField(
     parent,
     uiText("add.completedAt"),
-    createTextInput("date", String(formValue(values.completedAt))),
+    createCompletionDateInput(String(formValue(values.completedAt))),
     uiText("add.completedHint", { status: completedStatusLabel(mediaType) }),
   );
 

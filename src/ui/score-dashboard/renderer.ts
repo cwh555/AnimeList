@@ -25,6 +25,7 @@ import type { ScoreDashboardClampSummary } from "./operation-ui";
 import { scoreDashboardText as text } from "../../features/score-dashboard/text";
 import type { MediaItem } from "../../types";
 import type { ScoreDashboardMediaType } from "../../domain/score-dashboard/model";
+import { applyScoreDashboardDomChanges } from "./dom-move";
 
 export interface ScoreDashboardUiState {
   type: ScoreDashboardMediaType;
@@ -259,58 +260,24 @@ export function renderScoreDashboard(
     updateUnratedControl(data.unrated.length);
   };
 
-  const updateLanePlaceholder = (lane: HTMLElement): void => {
-    const posters = lane.querySelector<HTMLElement>(".al-score-lane-posters");
-    if (!posters) return;
-    const empty = posters.querySelector<HTMLElement>(".al-score-lane-empty");
-    if (posters.querySelector(".al-score-poster")) empty?.remove();
-    else if (!empty) posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
-  };
-
-  const updateGroupCount = (group: HTMLElement | null): void => {
-    if (!group) return;
-    const count = group.querySelectorAll(".al-score-poster").length;
-    const countElement = group.querySelector<HTMLElement>(".al-score-major-count");
-    if (countElement) countElement.textContent = `${count} ${text.works}`;
-  };
-
-  const insertPosterByTitle = (posters: HTMLElement, poster: HTMLButtonElement): void => {
-    const following = Array.from(posters.querySelectorAll<HTMLButtonElement>(".al-score-poster"))
-      .find((candidate) => poster.title.localeCompare(candidate.title, "zh-Hant", { numeric: true, sensitivity: "base" }) < 0);
-    posters.insertBefore(poster, following ?? null);
-  };
-
   const applyDroppedChange = (
     changes: readonly ScoreDashboardScoreChange[],
     poster: HTMLButtonElement,
     targetLane: HTMLElement,
   ): boolean => {
     const change = changes.length === 1 ? changes[0] : null;
-    const sourceLane = poster.closest<HTMLElement>(".al-score-lane");
-    const targetPosters = targetLane.querySelector<HTMLElement>(".al-score-lane-posters");
-    if (!change || change.filePath !== poster.dataset.filePath || !sourceLane || !targetPosters || sourceLane === targetLane) {
+    if (!change || change.filePath !== poster.dataset.filePath || poster.closest(".al-score-lane") === targetLane) {
       return false;
     }
-
-    const sourceGroup = sourceLane.closest<HTMLElement>(".al-score-group");
-    const targetGroup = targetLane.closest<HTMLElement>(".al-score-group");
     const targetTop = targetLane.getBoundingClientRect().top;
-    shell.classList.add("is-moving-poster");
-    targetPosters.querySelector(".al-score-lane-empty")?.remove();
-    insertPosterByTitle(targetPosters, poster);
-    poster.dataset.score = change.nextScore == null ? "unrated" : change.nextScore.toFixed(1);
-    poster.setAttribute("aria-label", text.posterAria(poster.title, change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)));
-    updateLanePlaceholder(sourceLane);
-    updateLanePlaceholder(targetLane);
-    updateGroupCount(sourceGroup);
-    if (targetGroup !== sourceGroup) updateGroupCount(targetGroup);
+    const result = applyScoreDashboardDomChanges(container, changes);
+    if (!result.applied) return false;
     updateSummary();
     container.scrollTop = preserveScoreDashboardAnchorScrollTop(
       container.scrollTop,
       targetTop,
       targetLane.getBoundingClientRect().top,
     );
-    window.requestAnimationFrame(() => shell.classList.remove("is-moving-poster"));
     return true;
   };
 

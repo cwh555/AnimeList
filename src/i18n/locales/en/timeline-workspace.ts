@@ -7,4 +7,7 @@ export const EN_TIMELINE_WORKSPACE_MESSAGES = {
   "timeline.overviewLabel": "Time overview",
   "timeline.historyCount": "{count} works",
   "timeline.monthLabel": "Month {month}",
+  "timeline.undatedTitle": "Date TBD",
+  "timeline.undatedDescription": "Completion date is not known yet; shown outside the chronological axis.",
+  "timeline.undatedCount": "Date TBD {count}",
 } as const;

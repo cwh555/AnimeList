@@ -5,11 +5,13 @@ import type { MediaItem } from "../domain/media-types";
 import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
 import type { ReleaseTrackingSnapshot, ReleaseTrackingStatus } from "../domain/release-tracking";
 import { releaseTrackingText } from "../features/release-tracking/text";
+import { isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 export interface ReleaseTrackingDashboardActions {
   refreshAll(onProgress: (progress: ReleaseRefreshProgress) => void): Promise<ReleaseRefreshSummary>;
-  refreshItem(item: MediaItem): Promise<ReleaseRefreshItemResult>;
+  cancelRefreshAll(): void;
+  refreshItem(item: MediaItem, signal?: AbortSignal): Promise<ReleaseRefreshItemResult>;
   reviewItem(item: MediaItem, onResolved: (result: ReleaseRefreshItemResult) => void): void;
   openMedia(path: string): Promise<void> | void;
   onChanged(): void;
@@ -101,6 +103,8 @@ export class ReleaseTrackingDashboardModal extends Modal {
   private progress: ReleaseRefreshProgress | null = null;
   private allBusy = false;
   private failure = "";
+  private closed = false;
+  private readonly itemControllers = new Map<string, AbortController>();
 
   constructor(
     app: App,
@@ -113,12 +117,21 @@ export class ReleaseTrackingDashboardModal extends Modal {
   }
 
   onOpen(): void {
+    this.closed = false;
     this.modalEl.classList.add("animelist-modal", "animelist-release-dashboard-modal");
     this.render();
   }
 
+  onClose(): void {
+    this.closed = true;
+    this.actions.cancelRefreshAll();
+    for (const controller of this.itemControllers.values()) controller.abort();
+    this.itemControllers.clear();
+  }
+
   close(): void {
-    if (this.allBusy || this.refreshing.size > 0) return;
+    if (this.allBusy) this.actions.cancelRefreshAll();
+    for (const controller of this.itemControllers.values()) controller.abort();
     super.close();
   }
 
@@ -189,7 +202,8 @@ export class ReleaseTrackingDashboardModal extends Modal {
     note.append(icon("shield-check"), el("span", "", releaseTrackingText("modal.note")));
     const close = el("button", "al-secondary-button", releaseTrackingText("modal.close"));
     close.type = "button";
-    close.disabled = this.allBusy || this.refreshing.size > 0;
+    close.disabled = false;
+    if (this.allBusy || this.refreshing.size > 0) close.textContent = releaseTrackingText("modal.stopAndClose");
     close.addEventListener("click", () => this.close());
     footer.append(note, close);
     this.contentEl.appendChild(footer);
@@ -358,16 +372,21 @@ export class ReleaseTrackingDashboardModal extends Modal {
     if (this.allBusy || this.refreshing.has(item.filePath)) return;
     this.failure = "";
     this.refreshing.add(item.filePath);
+    const controller = new AbortController();
+    this.itemControllers.set(item.filePath, controller);
     this.render();
     try {
-      const result = await this.actions.refreshItem(item);
-      this.results.set(item.filePath, result);
-      this.actions.onChanged();
+      const result = await this.actions.refreshItem(item, controller.signal);
+      if (!controller.signal.aborted) {
+        this.results.set(item.filePath, result);
+        this.actions.onChanged();
+      }
     } catch (error) {
-      this.failure = error instanceof Error ? error.message : String(error);
+      if (!isOperationCancelled(error)) this.failure = error instanceof Error ? error.message : String(error);
     } finally {
+      this.itemControllers.delete(item.filePath);
       this.refreshing.delete(item.filePath);
-      this.render();
+      if (!this.closed) this.render();
     }
   }
 
@@ -385,11 +404,11 @@ export class ReleaseTrackingDashboardModal extends Modal {
       for (const result of summary.results) this.results.set(result.item.filePath, result);
       this.actions.onChanged();
     } catch (error) {
-      this.failure = error instanceof Error ? error.message : String(error);
+      if (!isOperationCancelled(error)) this.failure = error instanceof Error ? error.message : String(error);
     } finally {
       this.allBusy = false;
       this.progress = null;
-      this.render();
+      if (!this.closed) this.render();
     }
   }
 }

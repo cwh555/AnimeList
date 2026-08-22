@@ -29,6 +29,7 @@ export const PROGRESS_UNIT_FEATURE_TEXT = {
   unitField: MESSAGES.unitField,
   progressHintInteger: MESSAGES.progressHintInteger,
   progressHintVolume: MESSAGES.progressHintVolume,
+  progressHintFreeform: MESSAGES.progressHintFreeform,
   timelineEntryTitle: MESSAGES.timelineEntryTitle,
   timelineEntryLabel: MESSAGES.timelineEntryLabel,
 } as const;

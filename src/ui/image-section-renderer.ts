@@ -49,6 +49,8 @@ interface ActiveImagePointerDrag {
 
 const imageSectionRenderers = new WeakMap<HTMLElement, ImageSectionRenderChild>();
 let activeImageDrag: ActiveImagePointerDrag | null = null;
+interface ImageSectionEphemeralState { expanded: boolean; scrollTop: number; }
+const imageSectionEphemeralState = new Map<string, ImageSectionEphemeralState>();
 
 function clearImageDropIndicators(): void {
   for (const item of document.querySelectorAll<HTMLElement>(
@@ -76,6 +78,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private galleryRelayout: (() => void) | null = null;
   private galleryPaths: string[] = [];
   private readonly imageElements = new Map<string, HTMLElement>();
+  private galleryViewport: HTMLElement | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -88,19 +91,36 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.source = source;
   }
 
+  private ephemeralStateKey(): string {
+    const section = this.context.getSectionInfo(this.containerEl);
+    return `${this.context.sourcePath}:${section?.lineStart ?? this.lineHint ?? -1}`;
+  }
+
+  private saveEphemeralState(): void {
+    imageSectionEphemeralState.set(this.ephemeralStateKey(), {
+      expanded: this.expanded,
+      scrollTop: this.galleryViewport?.scrollTop ?? 0,
+    });
+  }
+
   onload(): void {
     const section = this.context.getSectionInfo(this.containerEl);
     this.lineHint = section?.lineStart;
     this.preferredColumns = parseImageSectionColumns(section?.text);
+    const ephemeral = imageSectionEphemeralState.get(this.ephemeralStateKey());
+    if (ephemeral) this.expanded = ephemeral.expanded;
     imageSectionRenderers.set(this.containerEl, this);
     this.render();
+    if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
     this.registerDomEvent(document, "click", () => this.closeMenus());
   }
 
   onunload(): void {
+    this.saveEphemeralState();
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
     this.lineHintResetTimer = null;
     this.galleryRelayout = null;
+    this.galleryViewport = null;
     this.galleryPaths = [];
     this.imageElements.clear();
     imageSectionRenderers.delete(this.containerEl);
@@ -363,9 +383,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
     this.acceptSectionState(update);
-    this.selectionMode = false;
-    this.selectedPaths.clear();
     this.applyGalleryPaths(parseImageSectionSource(update.source));
+    this.saveEphemeralState();
   }
 
   private optimisticMovePaths(
@@ -567,22 +586,31 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private renderGallery(paths: readonly string[]): void {
     const viewport = makeEl("div", `al-image-gallery-viewport${this.expanded ? " is-expanded" : ""}`);
+    this.galleryViewport = viewport;
     const gallery = makeEl("div", "al-image-masonry");
     this.galleryPaths = [...paths];
     this.imageElements.clear();
     for (const path of paths) this.imageElements.set(path, this.createImage(path));
+    let renderedColumnCount = 0;
+    let columnElements: HTMLElement[] = [];
+    let updateToggle: () => void = () => {};
     const relayout = (): void => {
       const columns = normalizeImageSectionColumns(this.preferredColumns);
       gallery.style.setProperty("--al-image-columns", String(columns));
-      const columnElements = imageSectionColumnBuckets(this.galleryPaths, columns).map((bucket) => {
-        const column = makeEl("div", "al-image-masonry-column");
+      if (renderedColumnCount !== columns) {
+        renderedColumnCount = columns;
+        columnElements = Array.from({ length: columns }, () => makeEl("div", "al-image-masonry-column"));
+        gallery.replaceChildren(...columnElements);
+      }
+      const buckets = imageSectionColumnBuckets(this.galleryPaths, columns);
+      buckets.forEach((bucket, index) => {
+        const column = columnElements[index];
         for (const path of bucket) {
           const item = this.imageElements.get(path);
           if (item) column.appendChild(item);
         }
-        return column;
       });
-      gallery.replaceChildren(...columnElements);
+      window.requestAnimationFrame(updateToggle);
     };
     this.galleryRelayout = relayout;
     relayout();
@@ -590,7 +618,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
     const toggle = makeEl("button", "al-image-expand-button");
     toggle.type = "button";
-    const updateToggle = (): void => {
+    updateToggle = (): void => {
       if (!this.expanded) {
         this.galleryCollapsible = viewport.scrollHeight > viewport.clientHeight + 2;
       }
@@ -605,6 +633,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       toggle.blur();
       this.expanded = expanding;
       viewport.toggleClass("is-expanded", this.expanded);
+      this.saveEphemeralState();
       updateToggle();
       if (!this.expanded) viewport.scrollTop = 0;
       if (anchor) {
@@ -779,6 +808,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   render(): void {
     this.galleryRelayout = null;
+    this.galleryViewport = null;
     this.galleryPaths = [];
     this.imageElements.clear();
     this.containerEl.replaceChildren();

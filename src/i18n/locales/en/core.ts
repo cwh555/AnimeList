@@ -152,6 +152,7 @@ export const EN_CORE_MESSAGES = {
     "date.year": "Year",
     "date.month": "Month",
     "date.day": "Day",
+    "date.undated": "Date unknown",
     "volume.title": "Volume log",
     "volume.description": "Volume numbers support integers, .5, and EX. New volumes default to completed today.",
     "volume.add": "Add volume",

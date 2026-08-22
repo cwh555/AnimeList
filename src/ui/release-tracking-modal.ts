@@ -9,6 +9,7 @@ import type {
   ReleaseTrackingService,
 } from "../data/release-tracking-service";
 import { releaseTrackingText } from "../features/release-tracking/text";
+import { abortable, isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
 
 export interface ReleaseTrackingModalActions {
@@ -215,7 +216,6 @@ export class ReleaseTrackingResultsModal extends Modal {
   }
 
   close(): void {
-    if (this.busy) return;
     super.close();
   }
 
@@ -414,18 +414,27 @@ export class ReleaseTrackingMatchModal extends Modal {
   private busy = false;
   private candidates: ReleaseMatchCandidate[] = [];
   private failure = "";
+  private requestController: AbortController | null = null;
+  private opened = false;
 
   constructor(app: App, private readonly service: ReleaseTrackingService, private readonly item: MediaItem, private readonly options: ReleaseTrackingMatchModalOptions) {
     super(app);
   }
 
   onOpen(): void {
+    this.opened = true;
     this.modalEl.classList.add("animelist-modal", "animelist-release-match-modal");
     void this.loadCandidates();
   }
 
+  onClose(): void {
+    this.opened = false;
+    this.requestController?.abort();
+    this.requestController = null;
+  }
+
   close(): void {
-    if (this.busy) return;
+    this.requestController?.abort();
     super.close();
   }
 
@@ -442,21 +451,30 @@ export class ReleaseTrackingMatchModal extends Modal {
 
   private async loadCandidates(): Promise<void> {
     const requestId = ++this.requestId;
+    this.requestController?.abort();
+    const controller = new AbortController();
+    this.requestController = controller;
     this.contentEl.replaceChildren();
     this.renderHeading();
     this.contentEl.appendChild(makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
 
     let candidates: ReleaseMatchCandidate[] = [];
-    try { candidates = await this.service.matchCandidates(this.item); } catch { candidates = []; }
-    if (requestId !== this.requestId) return;
+    try {
+      candidates = await abortable(this.service.matchCandidates(this.item), controller.signal);
+    } catch (error) {
+      if (isOperationCancelled(error)) return;
+      candidates = [];
+    }
+    if (!this.opened || controller.signal.aborted || requestId !== this.requestId) return;
     this.candidates = candidates;
     this.failure = "";
 
     if (candidates.length === 1) {
       this.renderCandidates(candidates, true);
-      await this.resolveCandidate(candidates[0], true);
+      await this.resolveCandidate(candidates[0], true, controller);
       return;
     }
+    this.requestController = null;
     this.renderCandidates(candidates, false);
   }
 
@@ -508,16 +526,27 @@ export class ReleaseTrackingMatchModal extends Modal {
     this.contentEl.querySelectorAll<HTMLButtonElement>("button").forEach((button) => { button.disabled = disabled; });
   }
 
-  private async resolveCandidate(candidate: ReleaseMatchCandidate, automatic: boolean): Promise<void> {
+  private async resolveCandidate(
+    candidate: ReleaseMatchCandidate,
+    automatic: boolean,
+    existingController: AbortController | null = null,
+  ): Promise<void> {
     if (this.busy) return;
+    const controller = existingController ?? new AbortController();
+    if (!existingController) {
+      this.requestController?.abort();
+      this.requestController = controller;
+    }
     this.busy = true;
     this.failure = "";
     this.modalEl.classList.add("is-busy");
-    this.renderCandidates(this.candidates, automatic);
+    if (this.opened) this.renderCandidates(this.candidates, automatic);
     try {
-      const result = await this.service.refreshItem(this.item, candidate.binding);
+      const result = await this.service.refreshItem(this.item, candidate.binding, controller.signal);
+      if (!this.opened || controller.signal.aborted) return;
       if (result.status === "verified") {
         this.busy = false;
+        this.requestController = null;
         this.modalEl.classList.remove("is-busy");
         await this.options.onResolved(result);
         super.close();
@@ -525,12 +554,14 @@ export class ReleaseTrackingMatchModal extends Modal {
       }
       this.failure = result.message || statusLabel(result.status);
     } catch (error) {
+      if (isOperationCancelled(error)) return;
       this.failure = error instanceof Error ? error.message : String(error);
     } finally {
+      if (this.requestController === controller) this.requestController = null;
       if (this.busy) {
         this.busy = false;
         this.modalEl.classList.remove("is-busy");
-        this.renderCandidates(this.candidates, false);
+        if (this.opened && !controller.signal.aborted) this.renderCandidates(this.candidates, false);
       }
     }
   }

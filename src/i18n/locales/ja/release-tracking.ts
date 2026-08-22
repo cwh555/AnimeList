@@ -79,6 +79,7 @@ export const JA_RELEASE_TRACKING_MESSAGES = {
   "modal.open": "開く",
   "modal.review": "ソースを選択",
   "modal.close": "閉じる",
+  "modal.stopAndClose": "停止して閉じる",
   "modal.note": "検証済みの最新情報だけを書き込み、読書進捗は変更しません。",
   "match.title": "更新ソースを確認",
   "match.description": "安全な一意候補を自動判定できませんでした。正しいソースを選ぶか、この作品の追跡を無効にしてください。",

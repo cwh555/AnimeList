@@ -15,14 +15,16 @@ export const TIMELINE_CARD_GEOMETRY = Object.freeze({
 export function createTimelinePosterCard(
   item: TimelineMediaEntry,
   options: {
-    time: number;
+    time?: number;
+    dateLabel?: string;
     className?: string;
     openFile: (path: string) => void | Promise<void>;
   },
 ): HTMLButtonElement {
   const card = makeEl("button", options.className ?? "al-timeline-card");
   card.type = "button";
-  card.title = uiText("timeline.cardTitle", { title: item.title, date: formatTimelineDate(options.time) });
+  const dateLabel = options.dateLabel ?? (Number.isFinite(options.time) ? formatTimelineDate(Number(options.time)) : "");
+  card.title = dateLabel ? uiText("timeline.cardTitle", { title: item.title, date: dateLabel }) : item.title;
 
   if (item.cover) {
     const image = makeEl("img", "", "");

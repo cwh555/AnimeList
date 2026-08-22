@@ -21,6 +21,7 @@ import {
   TIMELINE_DAY_MS,
 } from "../domain/timeline/layout";
 import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
+import { isUnknownCompletionDate } from "../domain/completion-date";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 import { assignTimelineLanes, compareTimelineEntries, filterTimelineEntries, timelineStemGeometry, TIMELINE_MEDIA_FILTERS } from "./timeline-renderer";
 import { timelineWorkspaceText } from "../features/timeline/text";
@@ -76,10 +77,15 @@ export function renderTimelineWorkspace(
   options: TimelineWorkspaceOptions = {},
 ): TimelineWorkspaceResult {
   container.replaceChildren();
-  const allItems = expandTimelineEntries(inputItems)
+  const expandedItems = expandTimelineEntries(inputItems);
+  const allItems = expandedItems
+    .filter((item) => !isUnknownCompletionDate(item.completedAt))
     .map((item): TimedTimelineEntry => ({ ...item, completedTime: dayStart(item.completedAt) }))
     .filter((item) => item.completedTime)
     .sort((left, right) => left.completedTime - right.completedTime || compareTimelineEntries(left, right));
+  const allUndatedItems = expandedItems
+    .filter((item) => isUnknownCompletionDate(item.completedAt))
+    .sort(compareTimelineEntries);
 
   const openFile = options.openFile ?? (() => undefined);
   const state: {
@@ -162,6 +168,7 @@ export function renderTimelineWorkspace(
   container.appendChild(root);
 
   let currentItems: TimedTimelineEntry[] = [];
+  let currentUndatedItems: TimelineMediaEntry[] = [];
   let minimumTime = 0;
   let maximumTime = 0;
   let rangeDays = 1;
@@ -178,6 +185,7 @@ export function renderTimelineWorkspace(
 
   function refreshData(preserveSpacing = true): void {
     currentItems = filterTimelineEntries(allItems, state.type);
+    currentUndatedItems = filterTimelineEntries(allUndatedItems, state.type);
     minimumTime = currentItems[0]?.completedTime ?? 0;
     maximumTime = currentItems[currentItems.length - 1]?.completedTime ?? minimumTime;
     rangeDays = Math.max(1, (maximumTime - minimumTime) / TIMELINE_DAY_MS);
@@ -188,9 +196,12 @@ export function renderTimelineWorkspace(
     );
     if (!preserveSpacing || !state.daySpacing || state.daySpacing === 1) state.daySpacing = baseDaySpacing;
     if (!state.focusTime || state.focusTime < minimumTime || state.focusTime > maximumTime) state.focusTime = maximumTime;
-    summary.textContent = currentItems.length
+    const datedSummary = currentItems.length
       ? uiText("timeline.summary", { count: currentItems.length, start: formatTimelineDate(minimumTime), end: formatTimelineDate(maximumTime) })
       : uiText("timeline.summaryEmpty");
+    summary.textContent = currentUndatedItems.length
+      ? `${datedSummary} · ${timelineWorkspaceText("timeline.undatedCount", { count: currentUndatedItems.length })}`
+      : datedSummary;
   }
 
   function syncControls(): void {
@@ -212,17 +223,39 @@ export function renderTimelineWorkspace(
     scaleLabel.textContent = uiText("timeline.scaleLabel", { percent: Math.round(state.viewScale * 100) });
   }
 
+  function renderUndatedDimension(): HTMLElement | null {
+    if (!currentUndatedItems.length) return null;
+    const section = makeEl("section", "al-timeline-undated-dimension");
+    const header = makeEl("header", "al-timeline-undated-header");
+    header.append(
+      makeEl("strong", "", timelineWorkspaceText("timeline.undatedTitle")),
+      makeEl("span", "", timelineWorkspaceText("timeline.undatedDescription")),
+    );
+    const rail = makeEl("div", "al-timeline-undated-rail");
+    for (const item of currentUndatedItems) {
+      rail.appendChild(createTimelinePosterCard(item, {
+        dateLabel: timelineWorkspaceText("timeline.undatedTitle"),
+        className: "al-timeline-card al-timeline-undated-card",
+        openFile,
+      }));
+    }
+    section.append(header, rail);
+    return section;
+  }
+
   function renderHistory(): void {
     body.replaceChildren();
     viewport = null;
     scene = null;
     updateOverviewWindow = null;
     const history = makeEl("div", "al-timeline-history");
-    if (!currentItems.length) {
+    if (!currentItems.length && !currentUndatedItems.length) {
       history.appendChild(makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
       body.appendChild(history);
       return;
     }
+    const undated = renderUndatedDimension();
+    if (undated) history.appendChild(undated);
     for (const year of groupTimelineHistory(currentItems)) {
       const yearSection = makeEl("section", "al-timeline-history-year");
       yearSection.appendChild(makeEl("h2", "al-timeline-history-year-title", String(year.year)));
@@ -445,7 +478,8 @@ export function renderTimelineWorkspace(
   function renderScale(): void {
     body.replaceChildren();
     if (!currentItems.length) {
-      body.appendChild(makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
+      const undatedOnly = renderUndatedDimension();
+      body.appendChild(undatedOnly ?? makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
       return;
     }
     const wrap = makeEl("section", "al-timeline-scale-wrap");
@@ -455,6 +489,8 @@ export function renderTimelineWorkspace(
     wrap.appendChild(viewport);
     body.appendChild(wrap);
     renderOverview();
+    const undated = renderUndatedDimension();
+    if (undated) body.appendChild(undated);
     renderScaleGeometry();
     state.focusTime = maximumTime;
     centerFocus(true);
@@ -614,5 +650,5 @@ export function renderTimelineWorkspace(
     resizeObserver.observe(root);
   }
 
-  return { items: currentItems.length, totalItems: allItems.length, type: state.type, mode: state.mode };
+  return { items: currentItems.length + currentUndatedItems.length, totalItems: allItems.length + allUndatedItems.length, type: state.type, mode: state.mode };
 }

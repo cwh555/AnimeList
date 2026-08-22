@@ -152,6 +152,7 @@ export const JA_CORE_MESSAGES = {
     "date.year": "年",
     "date.month": "月",
     "date.day": "日",
+    "date.undated": "日付未定",
     "volume.title": "巻ごとの記録",
     "volume.description": "巻数は整数、.5、EX に対応します。新しい巻は既定で今日完了として追加されます。",
     "volume.add": "巻を追加",

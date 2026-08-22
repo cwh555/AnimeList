@@ -1,5 +1,7 @@
 import { Modal, Notice, TFile } from "obsidian";
-import type { ExternalMediaResult, MediaType } from "../types";
+import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
+import { manualMediaResult, type MediaCoverAssetInput } from "../domain/manual-media";
+import { manualMediaText } from "../features/manual-media/text";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeGenre } from "../domain/media-metadata";
@@ -9,7 +11,7 @@ import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-resu
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
-import { createMediaEditorFields, createMediaFormContext, createTextInput, mediaFormValues } from "./media-form-controls";
+import { createLabeledField, createMediaEditorFields, createMediaFormContext, createSelect, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 
 
@@ -24,12 +26,22 @@ function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string
   ]);
 }
 
+interface ManualMediaFormState {
+  values?: Partial<MediaNoteForm> & { title?: string; genres?: string[]; };
+  originalTitle?: string;
+  format?: string;
+  year?: string;
+  templatePath?: string;
+}
+
 export class AddMediaModal extends Modal {
   readonly plugin: AnimeListUiHost;
   mediaType: MediaType;
   query = "";
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
+  private manualCoverFile: File | null = null;
+  private manualCoverPreviewUrl: string | null = null;
 
   constructor(plugin: AnimeListUiHost, initialType: MediaType = "anime") {
     super(plugin.app);
@@ -40,6 +52,12 @@ export class AddMediaModal extends Modal {
   onOpen(): void {
     this.modalEl.classList.add("animelist-modal");
     this.renderSearch();
+  }
+
+  onClose(): void {
+    if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
+    this.manualCoverPreviewUrl = null;
+    this.manualCoverFile = null;
   }
 
   renderSearch(): void {
@@ -71,6 +89,12 @@ export class AddMediaModal extends Modal {
       });
       typeTabs.appendChild(button);
     });
+    const manual = createEl("button");
+    manual.type = "button";
+    manual.className = "al-modal-type";
+    manual.textContent = manualMediaText("tab");
+    manual.addEventListener("click", () => { void this.renderManualDetails(this.mediaType); });
+    typeTabs.appendChild(manual);
     this.contentEl.appendChild(typeTabs);
 
     const searchRow = createDiv();
@@ -165,6 +189,171 @@ export class AddMediaModal extends Modal {
     row.append(body, use);
     row.addEventListener("click", () => void this.renderDetails(result));
     return row;
+  }
+
+  private async renderManualDetails(mediaType: MediaType, state: ManualMediaFormState = {}): Promise<void> {
+    this.mediaType = mediaType;
+    this.contentEl.replaceChildren();
+    const back = createEl("button");
+    back.type = "button";
+    back.className = "al-modal-back";
+    back.textContent = uiText("action.back");
+    back.addEventListener("click", () => this.renderSearch());
+    this.contentEl.appendChild(back);
+
+    const heading = makeEl("div", "al-modal-heading");
+    const copy = makeEl("div");
+    copy.append(
+      makeEl("div", "al-kicker", manualMediaText("tab")),
+      makeEl("h2", "", manualMediaText("title")),
+      makeEl("p", "", manualMediaText("description")),
+    );
+    heading.appendChild(copy);
+    this.contentEl.appendChild(heading);
+
+    const typeFieldHost = makeEl("div", "al-media-form al-manual-media-meta");
+    const type = createLabeledField(typeFieldHost, manualMediaText("mediaType"), createSelect([
+      ["anime", MEDIA_UI_LABELS.type.anime],
+      ["manga", MEDIA_UI_LABELS.type.manga],
+      ["novel", MEDIA_UI_LABELS.type.novel],
+    ], mediaType));
+    const originalTitle = createLabeledField(
+      typeFieldHost,
+      manualMediaText("originalTitle"),
+      createTextInput("text", state.originalTitle ?? ""),
+    );
+    const format = createLabeledField(
+      typeFieldHost,
+      manualMediaText("format"),
+      createTextInput("text", state.format ?? ""),
+    );
+    const year = createLabeledField(
+      typeFieldHost,
+      manualMediaText("year"),
+      createTextInput("text", state.year ?? ""),
+    );
+    const coverInput = createEl("input");
+    coverInput.type = "file";
+    coverInput.accept = "image/*";
+    const coverField = createLabeledField(typeFieldHost, manualMediaText("cover"), coverInput, manualMediaText("coverHint"));
+    coverField.classList.add("al-manual-cover-input");
+    const coverPreview = makeEl("div", "al-manual-cover-preview");
+    const renderCoverPreview = (): void => {
+      coverPreview.replaceChildren();
+      if (!this.manualCoverFile) {
+        coverPreview.appendChild(makeEl("span", "", manualMediaText("noCover")));
+        return;
+      }
+      if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
+      this.manualCoverPreviewUrl = URL.createObjectURL(this.manualCoverFile);
+      const image = makeEl("img");
+      image.src = this.manualCoverPreviewUrl;
+      image.alt = "";
+      coverPreview.append(image, makeEl("span", "", this.manualCoverFile.name));
+    };
+    coverInput.addEventListener("change", () => {
+      this.manualCoverFile = coverInput.files?.[0] ?? null;
+      renderCoverPreview();
+    });
+    renderCoverPreview();
+    typeFieldHost.appendChild(coverPreview);
+    this.contentEl.appendChild(typeFieldHost);
+
+    const templates = await this.plugin.getTemplates(mediaType);
+    if (!this.contentEl.isConnected) return;
+    const form = createDiv();
+    form.className = "al-media-form";
+    const values = state.values ?? {};
+    const templateOptions: Array<[string, string]> = templates.length
+      ? templates.map((template): [string, string] => [template.path, template.name])
+      : [["", uiText("add.noTemplate")]];
+    const fields = createMediaEditorFields({
+      parent: form,
+      mediaType,
+      values: {
+        title: values.title ?? "",
+        status: values.status ?? "planned",
+        releaseStatus: values.releaseStatus ?? "unknown",
+        score: values.score ?? "",
+        startedAt: values.startedAt ?? "",
+        completedAt: values.completedAt ?? "",
+        progress: values.progress ?? 0,
+        total: values.total ?? "",
+        unit: values.unit ?? (mediaType === "anime" ? "episode" : mediaType === "manga" ? "chapter" : "volume"),
+        genres: values.genres ?? [],
+        userTags: values.userTags ?? [],
+        favorite: values.favorite === true,
+      },
+      templateOptions,
+      selectedTemplate: state.templatePath,
+      tagOptions: libraryTagOptions(this.plugin),
+    });
+    this.contentEl.appendChild(form);
+
+    const result = manualMediaResult({ title: String(values.title ?? ""), mediaType });
+    const context = createMediaFormContext({
+      mode: "create",
+      plugin: this.plugin,
+      modalEl: this.modalEl,
+      formEl: form,
+      mediaType,
+      result,
+      file: null,
+      frontmatter: {},
+      fields,
+    });
+    this.plugin.configureMediaForm(context);
+
+    type.addEventListener("change", () => {
+      const nextType = type.value === "manga" || type.value === "novel" ? type.value : "anime";
+      const current = mediaFormValues(context);
+      void this.renderManualDetails(nextType, {
+        values: current,
+        originalTitle: originalTitle.value,
+        format: format.value,
+        year: year.value,
+        templatePath: fields.template?.value ?? "",
+      });
+    });
+
+    const actions = createDiv();
+    actions.className = "al-modal-actions";
+    const createButton = createEl("button");
+    createButton.type = "button";
+    createButton.className = "mod-cta";
+    createButton.textContent = uiText("action.collect");
+    createButton.addEventListener("click", () => {
+      void (async () => {
+        createButton.disabled = true;
+        createButton.textContent = uiText("add.processing");
+        try {
+          const submitContext = { ...context, form: mediaFormValues(context) };
+          await this.plugin.prepareMediaSubmit(submitContext);
+          const manualResult = manualMediaResult({
+            title: submitContext.form.title,
+            mediaType,
+            originalTitle: originalTitle.value,
+            format: format.value,
+            year: year.value,
+            releaseStatus: submitContext.form.releaseStatus,
+          });
+          const coverAsset: MediaCoverAssetInput | null = this.manualCoverFile
+            ? { name: this.manualCoverFile.name, contentType: this.manualCoverFile.type, data: await this.manualCoverFile.arrayBuffer() }
+            : null;
+          const file = await this.plugin.createMediaNote(manualResult, submitContext.form, coverAsset);
+          this.close();
+          new Notice(uiText("notice.collected", { title: submitContext.form.title }));
+          await this.plugin.app.workspace.openLinkText(file.path, "", false);
+        } catch (error) {
+          console.error("AnimeList manual create note failed", error);
+          new Notice(uiText("notice.createFailed", { error: errorMessage(error) }));
+          createButton.disabled = false;
+          createButton.textContent = uiText("action.collect");
+        }
+      })();
+    });
+    actions.appendChild(createButton);
+    this.contentEl.appendChild(actions);
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {

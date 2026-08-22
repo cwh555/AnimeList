@@ -1,4 +1,6 @@
 import type { MediaItem } from "../types";
+import { compareLibraryCompletion } from "../domain/library-sort";
+import { isUnknownCompletionDate } from "../domain/completion-date";
 import { normalizeGenres } from "../domain/media-metadata";
 import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
 import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../domain/media-status";
@@ -417,7 +419,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       if (item.startedAt || item.completedAt) {
         const dates = makeEl("div", "al-date-row");
         if (item.startedAt) dates.appendChild(makeEl("span", "", uiText("library.startedAt", { date: item.startedAt })));
-        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: item.completedAt })));
+        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: isUnknownCompletionDate(item.completedAt) ? uiText("date.undated") : item.completedAt })));
         body.appendChild(dates);
       }
       if (item.genres.length) {
@@ -484,8 +486,8 @@ export const AnimeListUI: LibraryRenderer = (() => {
         "score-asc": (a, b) => (a.score ?? Number.MAX_SAFE_INTEGER) - (b.score ?? Number.MAX_SAFE_INTEGER),
         "started-desc": (a, b) => missingLast(parseDateValue(b.startedAt), -1) - missingLast(parseDateValue(a.startedAt), -1),
         "started-asc": (a, b) => missingLast(parseDateValue(a.startedAt), 1) - missingLast(parseDateValue(b.startedAt), 1),
-        "completed-desc": (a, b) => missingLast(parseDateValue(b.completedAt), -1) - missingLast(parseDateValue(a.completedAt), -1),
-        "completed-asc": (a, b) => missingLast(parseDateValue(a.completedAt), 1) - missingLast(parseDateValue(b.completedAt), 1),
+        "completed-desc": (a, b) => compareLibraryCompletion(a, b, "desc"),
+        "completed-asc": (a, b) => compareLibraryCompletion(a, b, "asc"),
         "year-desc": (a, b) => numeric(b.year) - numeric(a.year),
         "year-asc": (a, b) => numeric(a.year) - numeric(b.year),
         "title-asc": (a, b) => a.title.localeCompare(b.title, "zh-Hant"),

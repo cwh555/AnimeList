@@ -21,6 +21,7 @@ export const KO_PROGRESS_UNIT_MESSAGES = {
     unitField: "진행 단위",
     progressHintInteger: "0 이상의 정수를 지원합니다.",
     progressHintVolume: "정수, .5, EX를 지원합니다.",
+  progressHintFreeform: "진행도는 “12화 / Web판”처럼 자유로운 텍스트로 입력할 수 있습니다.",
     timelineEntryTitle: "{title} — {label}{unit}",
     timelineEntryLabel: "{label}{unit}",
   } as const;
