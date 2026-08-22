@@ -419,7 +419,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       if (item.startedAt || item.completedAt) {
         const dates = makeEl("div", "al-date-row");
         if (item.startedAt) dates.appendChild(makeEl("span", "", uiText("library.startedAt", { date: item.startedAt })));
-        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: isUnknownCompletionDate(item.completedAt) ? uiText("date.undated") : item.completedAt })));
+        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: isUnknownCompletionDate(item.completedAt) ? uiText("date.unknown") : item.completedAt })));
         body.appendChild(dates);
       }
       if (item.genres.length) {

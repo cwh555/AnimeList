@@ -74,7 +74,7 @@ export class AddMediaModal extends Modal {
     this.contentEl.appendChild(heading);
 
     const typeTabs = createDiv();
-    typeTabs.className = "al-modal-type-tabs";
+    typeTabs.className = "al-modal-type-tabs al-collect-type-tabs";
     const mediaTypes: Array<[MediaType, string]> = [["anime", MEDIA_UI_LABELS.type.anime], ["manga", MEDIA_UI_LABELS.type.manga], ["novel", MEDIA_UI_LABELS.type.novel]];
     mediaTypes.forEach(([value, text]) => {
       const button = createEl("button");

@@ -137,28 +137,55 @@ export function createCompletionDateInput(value = ""): MediaFormDateControl {
   const root = createDiv() as MediaFormDateControl;
   root.className = "al-completion-date-control";
   const date = createDateInput(isUnknownCompletionDate(value) ? "" : value);
-  const undated = createEl("label");
-  undated.className = "al-completion-date-undated";
-  const checkbox = createEl("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = isUnknownCompletionDate(value);
-  const label = makeEl("span", "", uiText("date.undated"));
-  undated.append(checkbox, label);
-  root.append(date, undated);
+  const mode = makeEl("div", "al-completion-date-mode");
+  mode.setAttribute("role", "radiogroup");
+  mode.setAttribute("aria-label", uiText("add.completedAt"));
+  const known = makeEl("button", "al-completion-date-mode-button", uiText("date.known"));
+  const unknown = makeEl("button", "al-completion-date-mode-button", uiText("date.unknown"));
+  for (const button of [known, unknown]) {
+    button.type = "button";
+    button.setAttribute("role", "radio");
+  }
+  mode.append(known, unknown);
+  const supporting = makeEl("small", "al-completion-date-support", uiText("date.unknownSupporting"));
+  root.append(mode, date, supporting);
 
+  let unknownSelected = isUnknownCompletionDate(value);
   let required = false;
-  const sync = (): void => {
-    date.classList.toggle("is-disabled", checkbox.checked);
-    for (const input of date.querySelectorAll<HTMLInputElement>("input")) input.disabled = checkbox.checked;
-    root.dispatchEvent(new Event("input", { bubbles: true }));
+  const sync = (emitInput = true): void => {
+    root.toggleClass("is-unknown", unknownSelected);
+    known.toggleClass("is-selected", !unknownSelected);
+    unknown.toggleClass("is-selected", unknownSelected);
+    known.setAttribute("aria-checked", String(!unknownSelected));
+    unknown.setAttribute("aria-checked", String(unknownSelected));
+    date.hidden = unknownSelected;
+    supporting.hidden = !unknownSelected;
+    date.required = required && !unknownSelected;
+    if (emitInput) root.dispatchEvent(new Event("input", { bubbles: true }));
   };
+  const selectMode = (nextUnknown: boolean): void => {
+    if (unknownSelected === nextUnknown) return;
+    unknownSelected = nextUnknown;
+    sync();
+    root.dispatchEvent(new Event("change", { bubbles: true }));
+    if (!nextUnknown) date.querySelector<HTMLInputElement>("input")?.focus();
+  };
+  known.addEventListener("click", () => selectMode(false));
+  unknown.addEventListener("click", () => selectMode(true));
+  mode.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    selectMode(event.key === "ArrowRight");
+    (event.key === "ArrowRight" ? unknown : known).focus();
+  });
+
   Object.defineProperty(root, "value", {
     configurable: true,
-    get: () => checkbox.checked ? UNKNOWN_COMPLETION_DATE : date.value,
+    get: () => unknownSelected ? UNKNOWN_COMPLETION_DATE : date.value,
     set: (nextValue: unknown) => {
-      checkbox.checked = isUnknownCompletionDate(nextValue);
-      date.value = checkbox.checked ? "" : String(formValue(nextValue));
-      sync();
+      unknownSelected = isUnknownCompletionDate(nextValue);
+      date.value = unknownSelected ? "" : String(formValue(nextValue));
+      sync(false);
     },
   });
   Object.defineProperty(root, "required", {
@@ -166,18 +193,13 @@ export function createCompletionDateInput(value = ""): MediaFormDateControl {
     get: () => required,
     set: (nextRequired: boolean) => {
       required = Boolean(nextRequired);
-      date.required = required && !checkbox.checked;
+      date.required = required && !unknownSelected;
       root.setAttribute("aria-required", required ? "true" : "false");
     },
   });
   date.addEventListener("input", () => root.dispatchEvent(new Event("input", { bubbles: true })));
   date.addEventListener("change", () => root.dispatchEvent(new Event("change", { bubbles: true })));
-  checkbox.addEventListener("change", () => {
-    date.required = required && !checkbox.checked;
-    sync();
-    root.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  sync();
+  sync(false);
   return root;
 }
 

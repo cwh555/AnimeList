@@ -7,7 +7,7 @@ export const TIMELINE_WORKSPACE_MESSAGES = {
   "timeline.overviewLabel": "時間概覽",
   "timeline.historyCount": "{count} 部",
   "timeline.monthLabel": "{month} 月",
-  "timeline.undatedTitle": "日期未定",
-  "timeline.undatedDescription": "完成日期尚未確定，獨立於實際時間軸顯示。",
-  "timeline.undatedCount": "日期未定 {count} 部",
+  "timeline.undatedTitle": "完成日期未知",
+  "timeline.undatedDescription": "作品已完成，但實際完成日期無法確定，因此獨立於時間軸顯示。",
+  "timeline.undatedCount": "完成日期未知 · {count} 部",
 } as const;
