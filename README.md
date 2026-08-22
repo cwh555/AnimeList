@@ -12,11 +12,11 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/library-card.webp" alt="AnimeList library in card view" width="100%"><br>
+      <img src="docs/images/library-card.png" alt="AnimeList library in card view" width="100%"><br>
       <sub><b>Library</b></sub>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/score-dashboard.svg" alt="AnimeList Score Dashboard"><br>
+      <img src="docs/images/score-dashboard.png" alt="AnimeList Score Dashboard"><br>
       <sub><b>Score Dashboard</b></sub>
     </td>
   </tr>
@@ -28,6 +28,16 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
     <td width="50%" align="center">
       <img src="docs/images/timeline.png" alt="AnimeList completion timeline"><br>
       <sub><b>Timeline</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/image-library.png" alt="AnimeList image library"><br>
+      <sub><b>Image Library</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/tracking.png" alt="AnimeList latest tracking"><br>
+      <sub><b>Tracking</b></sub>
     </td>
   </tr>
 </table>
