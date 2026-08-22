@@ -105,6 +105,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
   private failure = "";
   private closed = false;
   private readonly itemControllers = new Map<string, AbortController>();
+  private readonly coverCache = new Map<string, HTMLElement>();
 
   constructor(
     app: App,
@@ -133,6 +134,16 @@ export class ReleaseTrackingDashboardModal extends Modal {
     if (this.allBusy) this.actions.cancelRefreshAll();
     for (const controller of this.itemControllers.values()) controller.abort();
     super.close();
+  }
+
+  private cover(item: MediaItem): HTMLElement {
+    const source = item.coverSources?.src || item.cover || "";
+    const cached = this.coverCache.get(item.filePath);
+    if (cached?.dataset.coverSource === source) return cached;
+    const frame = cover(item);
+    frame.dataset.coverSource = source;
+    this.coverCache.set(item.filePath, frame);
+    return frame;
   }
 
   private entry(item: MediaItem): DashboardEntry {
@@ -336,7 +347,7 @@ export class ReleaseTrackingDashboardModal extends Modal {
       actions.appendChild(refresh);
     }
 
-    row.append(cover(item), identity, progress, latestCell, source, state, actions);
+    row.append(this.cover(item), identity, progress, latestCell, source, state, actions);
     if (busy) {
       const activity = el("div", "al-release-dashboard-row-progress");
       activity.appendChild(el("div", "al-release-dashboard-row-progress-fill"));

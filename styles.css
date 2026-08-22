@@ -4308,6 +4308,16 @@ button.al-moment-stack-strip:focus-visible {
   display:none;
 }
 
+/* Interaction motion is intentionally transform-only so image/poster decode state stays intact. */
+[data-layout-motion="active"] {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+[data-surface-motion="active"] {
+  will-change: opacity;
+}
+
 /* Library company / quarter / tag filtering. */
 .al-filter-button {
   display: inline-flex;

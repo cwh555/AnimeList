@@ -12,6 +12,7 @@ import type { ResolvedImageSectionAsset } from "../data/image-section-service";
 import { imageGalleryText } from "../features/image-gallery/text";
 import { uiText } from "../ui-text";
 import { makeEl, setAnimeListIcon } from "./ui-helpers";
+import { animateLayoutChange, transitionSurface } from "./layout-motion";
 
 export interface ImageGalleryUiState {
   mode: "all" | "works";
@@ -61,6 +62,7 @@ function createImageTile(
   adapters: ImageGalleryUiAdapters,
 ): HTMLElement {
   const tile = makeEl("article", "al-gallery-image-tile");
+  tile.dataset.galleryKey = image.key;
   const open = makeEl("button", "al-gallery-image-open");
   open.type = "button";
   open.title = image.mediaTitle;
@@ -127,7 +129,9 @@ function renderProgressiveMasonry(
   const appendBatch = (): void => {
     const end = Math.min(images.length, rendered + GALLERY_BATCH_SIZE);
     for (let index = rendered; index < end; index += 1) {
-      columnElements[index % columns].appendChild(createImageTile(images[index], images, adapters));
+      const tile = createImageTile(images[index], images, adapters);
+      tile.dataset.galleryIndex = String(index);
+      columnElements[index % columns].appendChild(tile);
     }
     rendered = end;
   };
@@ -153,6 +157,21 @@ function renderProgressiveMasonry(
   }, { rootMargin: "500px 0px" });
   activeObservers.set(container, observer);
   observer.observe(sentinel);
+}
+
+function relayoutExistingMasonry(container: HTMLElement, columnsValue: number): boolean {
+  const masonry = container.querySelector<HTMLElement>(".al-gallery-masonry");
+  if (!masonry) return false;
+  const columns = normalizeImageSectionColumns(columnsValue);
+  const tiles = Array.from(masonry.querySelectorAll<HTMLElement>(".al-gallery-image-tile"))
+    .sort((left, right) => Number(left.dataset.galleryIndex ?? 0) - Number(right.dataset.galleryIndex ?? 0));
+  const columnElements = Array.from({ length: columns }, () => makeEl("div", "al-gallery-masonry-column"));
+  void animateLayoutChange(tiles, () => {
+    masonry.style.setProperty("--al-gallery-columns", String(columns));
+    masonry.replaceChildren(...columnElements);
+    tiles.forEach((tile, index) => columnElements[index % columns].appendChild(tile));
+  });
+  return true;
 }
 
 function renderWorkBoard(
@@ -279,7 +298,7 @@ export function renderImageGallery(
   const emit = (): void => adapters.onStateChange?.({ ...state });
 
   const refresh = (): void => {
-    content.replaceChildren();
+    transitionSurface(content, () => content.replaceChildren());
     const filteredWorks = filterImageGalleryWorks(works, state.type, state.query);
     const filteredImages = flattenImageGalleryImages(filteredWorks);
     summary.textContent = imageGalleryText("summary", { images: filteredImages.length, works: filteredWorks.length });
@@ -398,7 +417,7 @@ export function renderImageGallery(
     state.columns = normalizeImageSectionColumns(columnsInput.value);
     columnsOutput.value = String(state.columns);
     emit();
-    refresh();
+    if (!relayoutExistingMasonry(content, state.columns)) refresh();
   });
 
   refresh();

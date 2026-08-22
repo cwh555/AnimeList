@@ -5,6 +5,7 @@ import { imageExtensionFor } from "../domain/image-section";
 import { imageSectionText } from "../features/image-sections/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
+import { animateLayoutChange, transitionSurface } from "./layout-motion";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 
 interface QueuedImage {
@@ -140,7 +141,8 @@ export class AddImageSectionModal extends Modal {
       const key = Number(item.dataset.queueKey);
       if (Number.isFinite(key)) elements.set(key, item);
     }
-    queue.replaceChildren(...this.queue.map((entry) => elements.get(entry.key)).filter((item): item is HTMLElement => Boolean(item)));
+    const ordered = this.queue.map((entry) => elements.get(entry.key)).filter((item): item is HTMLElement => Boolean(item));
+    void animateLayoutChange(ordered, () => queue.replaceChildren(...ordered));
   }
 
   private bindQueuedPointerDrag(item: HTMLElement, queue: HTMLElement, key: number): void {
@@ -185,7 +187,8 @@ export class AddImageSectionModal extends Modal {
   }
 
   private render(): void {
-    this.contentEl.replaceChildren();
+    if (this.contentEl.childElementCount) transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
+    else this.contentEl.replaceChildren();
 
     const picker = makeEl("div", "al-image-picker");
     picker.tabIndex = 0;

@@ -2,6 +2,7 @@ import { buildScoreDashboardData, type ScoreDashboardMediaType } from "../../dom
 import type { ScoreDashboardScoreChange } from "../../domain/score-dashboard/move";
 import { scoreDashboardText as text } from "../../features/score-dashboard/text";
 import type { MediaItem } from "../../types";
+import { animateLayoutChange } from "../layout-motion";
 
 function laneScoreValue(score: number | null): string {
   return score == null ? "unrated" : score.toFixed(1);
@@ -73,26 +74,29 @@ export function applyScoreDashboardDomChanges(
   const shell = container.querySelector<HTMLElement>(".al-score-dashboard");
   shell?.classList.add("is-moving-poster");
 
-  for (const { change, poster, sourceLane, targetLane, targetPosters } of moves) {
-    if (!poster || !sourceLane || !targetLane || !targetPosters) continue;
-    touchedLanes.add(sourceLane);
-    touchedLanes.add(targetLane);
-    const sourceGroup = sourceLane.closest<HTMLElement>(".al-score-group");
-    const targetGroup = targetLane.closest<HTMLElement>(".al-score-group");
-    if (sourceGroup) touchedGroups.add(sourceGroup);
-    if (targetGroup) touchedGroups.add(targetGroup);
+  const movingPosters = moves.flatMap(({ poster }) => poster ? [poster] : []);
+  void animateLayoutChange(movingPosters, () => {
+    for (const { change, poster, sourceLane, targetLane, targetPosters } of moves) {
+      if (!poster || !sourceLane || !targetLane || !targetPosters) continue;
+      touchedLanes.add(sourceLane);
+      touchedLanes.add(targetLane);
+      const sourceGroup = sourceLane.closest<HTMLElement>(".al-score-group");
+      const targetGroup = targetLane.closest<HTMLElement>(".al-score-group");
+      if (sourceGroup) touchedGroups.add(sourceGroup);
+      if (targetGroup) touchedGroups.add(targetGroup);
 
-    targetPosters.querySelector(".al-score-lane-empty")?.remove();
-    insertPosterByTitle(targetPosters, poster);
-    poster.dataset.score = laneScoreValue(change.nextScore);
-    poster.setAttribute(
-      "aria-label",
-      text.posterAria(poster.title, change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)),
-    );
-  }
+      targetPosters.querySelector(".al-score-lane-empty")?.remove();
+      insertPosterByTitle(targetPosters, poster);
+      poster.dataset.score = laneScoreValue(change.nextScore);
+      poster.setAttribute(
+        "aria-label",
+        text.posterAria(poster.title, change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)),
+      );
+    }
 
-  touchedLanes.forEach(updateLanePlaceholder);
-  touchedGroups.forEach(updateGroupCount);
+    touchedLanes.forEach(updateLanePlaceholder);
+    touchedGroups.forEach(updateGroupCount);
+  });
   container.ownerDocument.defaultView?.requestAnimationFrame(() => shell?.classList.remove("is-moving-poster"));
   return { applied: true, touchedLanes: [...touchedLanes] };
 }

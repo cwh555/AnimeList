@@ -9,6 +9,7 @@ import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
 import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryViewMode } from "./library-contracts";
 import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
+import { animateLayoutChange } from "./layout-motion";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
   if (view === "list") return "116px";
@@ -499,13 +500,16 @@ export const AnimeListUI: LibraryRenderer = (() => {
       const filterSuffix = activeFilterCount ? ` · ${uiText("library.filterActiveCount", { count: activeFilterCount })}` : "";
       resultMeta.textContent = uiText("library.resultMeta", { shown: filtered.length, total: items.length, genre: filterSuffix });
       grid.className = `al-grid is-${state.view}`;
-      grid.replaceChildren();
+      const previousCards = Array.from(grid.querySelectorAll<HTMLElement>(".al-card"));
       if (!filtered.length) {
-        const empty = makeEl("div", "al-empty");
-        const icon = makeEl("span", "al-empty-icon");
-        setAnimeListIcon(icon, "book");
-        empty.append(icon, makeEl("strong", "", uiText("library.emptyTitle")), makeEl("span", "", uiText("library.emptyDescription")));
-        grid.appendChild(empty);
+        void animateLayoutChange(previousCards, () => {
+          grid.replaceChildren();
+          const empty = makeEl("div", "al-empty");
+          const icon = makeEl("span", "al-empty-icon");
+          setAnimeListIcon(icon, "book");
+          empty.append(icon, makeEl("strong", "", uiText("library.emptyTitle")), makeEl("span", "", uiText("library.emptyDescription")));
+          grid.appendChild(empty);
+        });
         adapters.afterRender?.({ ...state });
         return;
       }
@@ -523,7 +527,14 @@ export const AnimeListUI: LibraryRenderer = (() => {
         adapters.afterRender?.({ ...state });
       };
       const initialBatch = renderWindow.reset();
-      appendBatch(initialBatch);
+      const initialPaths = new Set(filtered.slice(initialBatch.start, initialBatch.end).map((item) => item.filePath));
+      void animateLayoutChange(previousCards, () => {
+        for (const child of Array.from(grid.children)) {
+          const card = child as HTMLElement;
+          if (!card.classList?.contains("al-card") || !initialPaths.has(card.dataset.path ?? "")) card.remove();
+        }
+        appendBatch(initialBatch);
+      });
       if (adapters.onStateChange) adapters.onStateChange({ ...state });
       if (initialBatch.done) return;
 

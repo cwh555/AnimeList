@@ -24,6 +24,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/library-list.css",
   "styles/media-metadata.css",
   "styles/media-form-polish.css",
+  "styles/interaction-motion.css",
   "styles/library-filters.css",
   "styles/user-tags.css",
   "styles/mobile.css",

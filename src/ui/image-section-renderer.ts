@@ -22,6 +22,7 @@ import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
+import { animateLayoutChange } from "./layout-motion";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
@@ -76,6 +77,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private selectionDeleteButton: HTMLButtonElement | null = null;
   private preferredColumns = DEFAULT_IMAGE_SECTION_COLUMNS;
   private galleryRelayout: (() => void) | null = null;
+  private lastLayoutMotion: Promise<void> = Promise.resolve();
   private galleryPaths: string[] = [];
   private readonly imageElements = new Map<string, HTMLElement>();
   private galleryViewport: HTMLElement | null = null;
@@ -461,6 +463,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     source.preserveLayoutAcrossRefresh();
     if (source !== this) this.preserveLayoutAcrossRefresh();
     scrollPosition.stabilize(12);
+    await Promise.all([source.lastLayoutMotion, source === this ? Promise.resolve() : this.lastLayoutMotion]);
     try {
       const update = await this.service.moveAsset(
         this.context.sourcePath,
@@ -634,20 +637,23 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     let columnElements: HTMLElement[] = [];
     let updateToggle: () => void = () => {};
     const relayout = (): void => {
-      const columns = normalizeImageSectionColumns(this.preferredColumns);
-      gallery.style.setProperty("--al-image-columns", String(columns));
-      if (renderedColumnCount !== columns) {
-        renderedColumnCount = columns;
-        columnElements = Array.from({ length: columns }, () => makeEl("div", "al-image-masonry-column"));
-        gallery.replaceChildren(...columnElements);
-      }
-      const buckets = imageSectionColumnBuckets(this.galleryPaths, columns);
-      buckets.forEach((bucket, index) => {
-        const column = columnElements[index];
-        for (const path of bucket) {
-          const item = this.imageElements.get(path);
-          if (item) column.appendChild(item);
+      const movingItems = [...this.imageElements.values()].filter((item) => item.isConnected);
+      this.lastLayoutMotion = animateLayoutChange(movingItems, () => {
+        const columns = normalizeImageSectionColumns(this.preferredColumns);
+        gallery.style.setProperty("--al-image-columns", String(columns));
+        if (renderedColumnCount !== columns) {
+          renderedColumnCount = columns;
+          columnElements = Array.from({ length: columns }, () => makeEl("div", "al-image-masonry-column"));
+          gallery.replaceChildren(...columnElements);
         }
+        const buckets = imageSectionColumnBuckets(this.galleryPaths, columns);
+        buckets.forEach((bucket, index) => {
+          const column = columnElements[index];
+          for (const path of bucket) {
+            const item = this.imageElements.get(path);
+            if (item) column.appendChild(item);
+          }
+        });
       });
       window.requestAnimationFrame(updateToggle);
     };

@@ -26,6 +26,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   private lineHint: number | undefined;
   private scrollerObservers: ResizeObserver[] = [];
   private readonly expandedTextIds = new Set<string>();
+  private readonly momentMediaCache = new Map<string, { signature: string; media: HTMLElement }>();
 
   constructor(
     containerEl: HTMLElement,
@@ -424,9 +425,21 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     });
 
     const stacked = moment.imageLayout === "stacked" && moment.images.length > 1;
-    const carousel = stacked ? null : this.renderCarouselMedia(moment);
-    const media = stacked ? this.renderStackedMedia(moment) : carousel.media;
-    const scroller = carousel?.scroller ?? null;
+    const mediaSignature = JSON.stringify({ layout: stacked ? "stacked" : "carousel", images: moment.images, gaps: stacked ? normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length) : [] });
+    const cachedMedia = this.momentMediaCache.get(moment.id);
+    let media: HTMLElement;
+    let scroller: { row: HTMLElement; previous: HTMLButtonElement; next: HTMLButtonElement } | null = null;
+    if (cachedMedia?.signature === mediaSignature) {
+      media = cachedMedia.media;
+    } else if (stacked) {
+      media = this.renderStackedMedia(moment);
+      this.momentMediaCache.set(moment.id, { signature: mediaSignature, media });
+    } else {
+      const carousel = this.renderCarouselMedia(moment);
+      media = carousel.media;
+      scroller = carousel.scroller;
+      this.momentMediaCache.set(moment.id, { signature: mediaSignature, media });
+    }
 
     const content = makeEl("div", "al-moment-content");
     const metadata = this.renderMeta(moment);
@@ -476,11 +489,12 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   }
 
   private render(): void {
-    this.clearScrollerObservers();
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-moments-section");
 
     const moments = parseMomentsSource(this.source);
+    const activeMomentIds = new Set(moments.map((moment) => moment.id));
+    for (const key of this.momentMediaCache.keys()) if (!activeMomentIds.has(key)) this.momentMediaCache.delete(key);
     const toolbar = makeEl("div", "al-moments-toolbar");
     const identity = makeEl("div", "al-moments-identity");
     const identityIcon = makeEl("span", "al-moments-icon");
