@@ -108,8 +108,9 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.horizontalSwipeKeepsAxisY=Math.abs(axisScreenY()-axisBeforeSwipe)<=1;
  const overviewBottomBeforeVerticalPan=overviewInitial.getBoundingClientRect().bottom; viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:0,deltaY:120})); await frames();
  d.overviewStableWhileScenePans=Math.abs(overviewInitial.getBoundingClientRect().bottom-overviewBottomBeforeVerticalPan)<=1;
- const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; click(resetButton); await frames();
+ const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; const resetCardBefore=datedCards()[0]; const resetImageBefore=resetCardBefore?.querySelector('img'); click(resetButton); await frames(); d.resetUsesLayoutMotion=datedCards().some(c=>c.dataset.layoutMotion==='active'||c.getAnimations().length>0); await new Promise(r=>setTimeout(r,240)); await frames();
  viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=datedCards();
+ d.resetPreservesPosterNode=cards[0]===resetCardBefore&&cards[0]?.querySelector('img')===resetImageBefore;
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
  d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
  d.resetRestoresScale=Math.abs(cards[0].getBoundingClientRect().height-180)<=2;

@@ -173,11 +173,11 @@ renderer.onload();
  touch(moving,"pointerup",end.x,end.y+10,21);
  const masonryRelayoutsAfterOptimisticDrop=window.__masonryReplaceCalls;
  const immediateMoved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
- const immediateRect=immediateMoved.getBoundingClientRect();
- details.dragMovesBeforePersistence=window.__movePersisted===false
+ details.dragMovesBeforePersistence=window.__movePersisted!==true
    && immediateMoved===moving
-   && (Math.abs(immediateRect.top-movingRectBeforeDrop.top)>1 || Math.abs(immediateRect.left-movingRectBeforeDrop.left)>1);
- await delay(120);
+   && (immediateMoved.dataset.layoutMotion==='active' || immediateMoved.getAnimations().length>0);
+ details.galleryReorderUsesLayoutMotion=immediateMoved.getAnimations().length>0 || immediateMoved.dataset.layoutMotion==='active';
+ await delay(340);
  details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
    && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');

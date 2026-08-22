@@ -141,7 +141,7 @@ render();
  details.secondaryNavDistinct=!!modeTabs && !modeButton.classList.contains('al-workspace-tab') && parseFloat(getComputedStyle(modeTabs).borderRadius)>=8;
 
  const slider=document.querySelector('.al-gallery-columns input');
- slider.value='2'; slider.dispatchEvent(new Event('input',{bubbles:true})); await frames();
+ slider.value='2'; const tileBeforeColumns=document.querySelector('.al-gallery-image-tile'); const imageBeforeColumns=tileBeforeColumns?.querySelector('img'); slider.dispatchEvent(new Event('input',{bubbles:true})); await frames(); details.galleryColumnChangeUsesLayoutMotion=[...document.querySelectorAll('.al-gallery-image-tile')].some(tile=>tile.dataset.layoutMotion==='active'||tile.getAnimations().length>0); details.galleryColumnChangePreservesImageNode=document.querySelector('.al-gallery-image-tile')===tileBeforeColumns&&document.querySelector('.al-gallery-image-tile img')===imageBeforeColumns; await new Promise(r=>setTimeout(r,230)); await frames();
  const imageButton=document.querySelector('.al-gallery-image-open');
  const imageElement=document.querySelector('.al-gallery-image');
  const imageButtonRect=imageButton.getBoundingClientRect(); const imageRect=imageElement.getBoundingClientRect();
