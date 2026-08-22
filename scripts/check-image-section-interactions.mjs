@@ -104,6 +104,7 @@ const center=(el)=>{const r=el.getBoundingClientRect();return{x:r.left+r.width/2
 const paths=["a.jpg","b.jpg","c.jpg","d.jpg","e.jpg","f.jpg"];
 let current=[...paths];
 let columns=4;
+let staleColumnsMetadata=false;
 const source=()=>current.map(p=>"- "+p).join("\\n");
 const state=()=>({source:source(),lineStart:0,lineEnd:current.length+1});
 const service={
@@ -183,6 +184,8 @@ renderer.onload();
  details.touchGalleryReorderPersisted=current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
  details.reorderPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
+ details.reorderPreservesPreferredColumns=section.querySelectorAll('.al-image-masonry-column').length===2
+   && section.querySelector('.al-image-column-control input[type="range"]').value==='2';
  details.dragGhostCleansUp=document.querySelectorAll('.al-image-drag-ghost').length===0;
  details.touchHandleIsAvailable=parseFloat(getComputedStyle(moved.querySelector('.al-image-drag-handle')).opacity)>0;
 
@@ -192,9 +195,17 @@ renderer.onload();
  const modalCountBeforeDropClick=window.__modalOpenCount||0;
  renderer.onunload();
  section.replaceChildren();
+ // Simulate Obsidian recreating the Markdown child before getSectionInfo() has
+ // caught up with the just-persisted fence metadata. The renderer must keep the
+ // user's presentation state from the internal reorder instead of falling back
+ // to the legacy default of four columns.
+ staleColumnsMetadata=true;
  const replacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
  replacement.onload();
  details.renderChildReplacementPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
+ details.renderChildReplacementPreservesColumns=section.querySelectorAll('.al-image-masonry-column').length===2
+   && section.querySelector('.al-image-column-control input[type="range"]').value==='2';
+ staleColumnsMetadata=false;
  const replacementTarget=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  replacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:end.x,clientY:end.y+10}));
  await delay(20);

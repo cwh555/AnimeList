@@ -36,16 +36,29 @@ await build({
     },
   }],
 });
-const bundle = await readFile(path.join(output, "tag-chip-interactions.js"), "utf8");
+const [bundle, styles] = await Promise.all([
+  readFile(path.join(output, "tag-chip-interactions.js"), "utf8"),
+  readFile(path.join(root, "styles.css"), "utf8"),
+]);
 
 const html = `<!doctype html>
 <html>
+<head><style>${styles}</style></head>
 <body data-result="pending">
-  <main id="form"></main>
+  <nav id="collect-tabs" class="al-modal-type-tabs al-collect-type-tabs">
+    <button class="al-modal-type is-active">Anime</button>
+    <button class="al-modal-type">Manga</button>
+    <button class="al-modal-type">Novel</button>
+    <button class="al-modal-type">Custom</button>
+  </nav>
+  <main id="form" class="al-media-form"></main>
   <script>
     window.createDiv = () => document.createElement("div");
     window.createSpan = () => document.createElement("span");
     window.createEl = (tag) => document.createElement(tag);
+    if (!HTMLElement.prototype.toggleClass) HTMLElement.prototype.toggleClass = function(name, force) { this.classList.toggle(name, force); };
+    if (!HTMLElement.prototype.addClass) HTMLElement.prototype.addClass = function(...names) { this.classList.add(...names); };
+    if (!HTMLElement.prototype.removeClass) HTMLElement.prototype.removeClass = function(...names) { this.classList.remove(...names); };
   </script>
   <script>${bundle}</script>
   <script>
@@ -74,6 +87,28 @@ const html = `<!doctype html>
     });
 
     const details = {};
+    const collectButtons = [...document.querySelectorAll("#collect-tabs .al-modal-type")];
+    const collectTops = collectButtons.map((button) => Math.round(button.getBoundingClientRect().top));
+    details.collectTabsStayOnOneRow = new Set(collectTops).size === 1
+      && getComputedStyle(document.querySelector("#collect-tabs")).gridTemplateColumns.split(" ").filter(Boolean).length === 4;
+
+    const completion = fields.completedAt;
+    const completionButtons = [...completion.querySelectorAll(".al-completion-date-mode-button")];
+    const completionTops = completionButtons.map((button) => Math.round(button.getBoundingClientRect().top));
+    details.completionDateUsesSingleRowSegmentedMode = completionButtons.length === 2
+      && new Set(completionTops).size === 1
+      && completionButtons[0].getAttribute("aria-checked") === "true"
+      && completion.querySelector(".al-date-input").hidden === false;
+    completionButtons[1].click();
+    details.completionDateUnknownIsCompactMode = completion.value === "unknown"
+      && completionButtons[1].getAttribute("aria-checked") === "true"
+      && completion.querySelector(".al-date-input").hidden === true
+      && completion.querySelector(".al-completion-date-support").hidden === false;
+    completionButtons[0].click();
+    details.completionDateKnownRestoresDateField = completion.value === ""
+      && completion.querySelector(".al-date-input").hidden === false
+      && completion.querySelector(".al-completion-date-support").hidden === true;
+
     const tagField = fields.genres.closest(".al-form-field");
 
     const firstLabel = fields.genres.querySelector(".al-tag-chip-label");

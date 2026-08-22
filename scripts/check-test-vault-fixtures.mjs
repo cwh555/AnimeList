@@ -81,7 +81,9 @@ try {
   assert.match(checklist, /Component polish regression/);
   assert.match(checklist, /Custom collection/);
   assert.match(checklist, /Free-form reading progress/);
-  assert.match(checklist, /Date unknown/);
+  assert.match(checklist, /Completion date unknown/);
+  assert.match(checklist, /remain on one segmented row/);
+  assert.match(checklist, /exact column count/);
   assert.match(checklist, /Release Tracking cancellation/);
   assert.match(checklist, /Release Tracking live-provider check/);
   assert.match(checklist, /source_provider.*must not be MangaDex/i);
