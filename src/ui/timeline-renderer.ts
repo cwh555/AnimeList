@@ -4,7 +4,9 @@ import { compareVolumeLabels, normalizeVolumeLabel } from "../domain/progress/no
 import { expandTimelineEntries } from "./timeline-entry-expansion";
 import { MAX_TIMELINE_DAY_SPACING, MAX_TIMELINE_VIEW_SCALE, MIN_TIMELINE_DAY_SPACING, MIN_TIMELINE_VIEW_SCALE, calculateDefaultTimelineView, preserveTimelineAxisScreenY } from "../domain/timeline/scale";
 import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
+import { isUnknownCompletionDate } from "../domain/completion-date";
 import { uiText } from "../ui-text";
+import { timelineWorkspaceText } from "../features/timeline/text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 
@@ -126,20 +128,13 @@ export const TimelineUI = (() => {
     adapters: TimelineRenderAdapters = {},
   ): TimelineRenderResult {
     container.replaceChildren();
-    const allItems: TimedTimelineEntry[] = expandTimelineEntries(inputItems)
+    const expandedItems = expandTimelineEntries(inputItems);
+    const allUnknownItems = expandedItems.filter((item) => isUnknownCompletionDate(item.completedAt)).sort(compareTimelineEntries);
+    const allItems: TimedTimelineEntry[] = expandedItems
+      .filter((item) => !isUnknownCompletionDate(item.completedAt))
       .map((item): TimedTimelineEntry => ({ ...item, completedTime: dayStart(item.completedAt) }))
       .filter((item) => item.completedTime)
       .sort((a, b) => a.completedTime - b.completedTime || compareTimelineEntries(a, b));
-    if (!allItems.length) {
-      const empty = makeEl("div", "al-timeline-empty");
-      setAnimeListIcon(empty, "timeline");
-      empty.append(
-        makeEl("strong", "", uiText("timeline.emptyTitle")),
-        makeEl("span", "", uiText("timeline.emptyDescription")),
-      );
-      container.appendChild(empty);
-      return { items: 0 };
-    }
 
     const selectedType = adapters.typeFilter === "anime"
       || adapters.typeFilter === "manga"
@@ -147,6 +142,14 @@ export const TimelineUI = (() => {
       ? adapters.typeFilter
       : "all";
     const items = filterTimelineEntries(allItems, selectedType);
+    const unknownItems = filterTimelineEntries(allUnknownItems, selectedType);
+    if (!items.length && !unknownItems.length) {
+      const empty = makeEl("div", "al-timeline-empty");
+      setAnimeListIcon(empty, "timeline");
+      empty.append(makeEl("strong", "", uiText("timeline.emptyTitle")), makeEl("span", "", uiText("timeline.emptyDescription")));
+      container.appendChild(empty);
+      return { items: 0, totalItems: allItems.length + allUnknownItems.length + allUnknownItems.length, type: selectedType };
+    }
 
     const sidePadding = 170;
     const grouped = new Map<number, TimelineMediaEntry[]>();
@@ -235,22 +238,29 @@ export const TimelineUI = (() => {
     toolbar.append(copy, typeFilters, controls);
     root.appendChild(toolbar);
 
+    const appendUnknownDimension = (): void => {
+      if (!unknownItems.length) return;
+      const section = makeEl("section", "al-timeline-undated-dimension al-timeline-temporal-dimension");
+      section.dataset.temporalDimension = "unknown";
+      const header = makeEl("header", "al-timeline-undated-header");
+      header.append(makeEl("strong", "", timelineWorkspaceText("timeline.undatedTitle")), makeEl("span", "", timelineWorkspaceText("timeline.undatedDescription")));
+      const rail = makeEl("div", "al-timeline-undated-rail");
+      for (const item of unknownItems) rail.appendChild(createTimelinePosterCard(item, { dateLabel: timelineWorkspaceText("timeline.undatedTitle"), openFile: adapters.openFile ?? (() => {}) }));
+      section.append(header, rail);
+      root.appendChild(section);
+    };
+
     if (!items.length) {
-      const empty = makeEl("div", "al-timeline-empty");
-      setAnimeListIcon(empty, "timeline");
-      empty.append(
-        makeEl("strong", "", uiText("timeline.emptyTitle")),
-        makeEl("span", "", uiText("timeline.emptyDescription")),
-      );
-      root.appendChild(empty);
+      appendUnknownDimension();
       container.appendChild(root);
-      return { items: 0, totalItems: allItems.length, type: selectedType };
+      return { items: unknownItems.length, totalItems: allItems.length + allUnknownItems.length + allUnknownItems.length, type: selectedType };
     }
 
     const viewport = makeEl("div", "al-timeline-viewport");
     const scene = makeEl("div", "al-timeline-scene");
     viewport.appendChild(scene);
     root.appendChild(viewport);
+    appendUnknownDimension();
     container.appendChild(root);
     const openFile = adapters.openFile ?? (() => {});
 
@@ -456,7 +466,7 @@ export const TimelineUI = (() => {
     window.setTimeout(resetView, 0);
     return {
       items: items.length,
-      totalItems: allItems.length,
+      totalItems: allItems.length + allUnknownItems.length,
       type: selectedType,
       fitScene,
       resetView,
