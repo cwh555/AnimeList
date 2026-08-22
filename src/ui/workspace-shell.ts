@@ -3,6 +3,7 @@ import type { LibrarySection } from "../domain/settings-types";
 import { uiText } from "../ui-text";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { appendIconLabel, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { disconnectWorkspaceWindowSize, observeWorkspaceWindowSize } from "./workspace-responsive";
 
 export interface WorkspaceShellOptions {
   pages: readonly WorkspacePageDefinition[];
@@ -16,8 +17,6 @@ export interface WorkspaceShellResult {
   activePage: WorkspacePageDefinition;
 }
 
-const activeResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
-
 function orderedPages(pages: readonly WorkspacePageDefinition[]): WorkspacePageDefinition[] {
   return [...pages].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
 }
@@ -26,30 +25,11 @@ function orderedActions(actions: readonly WorkspaceMenuAction[]): WorkspaceMenuA
   return [...actions].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
 }
 
-function syncWindowSize(shell: HTMLElement): void {
-  const measuredWidth = typeof shell.getBoundingClientRect === "function"
-    ? shell.getBoundingClientRect().width
-    : 0;
-  const width = measuredWidth || shell.clientWidth || 840;
-  shell.dataset.windowSize = width < 600 ? "compact" : width < 840 ? "medium" : "expanded";
-}
-
-function observeWindowSize(container: HTMLElement, shell: HTMLElement): void {
-  activeResizeObservers.get(container)?.disconnect();
-  activeResizeObservers.delete(container);
-  syncWindowSize(shell);
-  if (typeof ResizeObserver !== "function") return;
-  const observer = new ResizeObserver(() => syncWindowSize(shell));
-  observer.observe(shell);
-  activeResizeObservers.set(container, observer);
-}
-
 export function renderAnimeListWorkspaceShell(
   container: HTMLElement,
   options: WorkspaceShellOptions,
 ): WorkspaceShellResult {
-  activeResizeObservers.get(container)?.disconnect();
-  activeResizeObservers.delete(container);
+  disconnectWorkspaceWindowSize(container);
   container.replaceChildren();
 
   const pages = orderedPages(options.pages);
@@ -127,6 +107,6 @@ export function renderAnimeListWorkspaceShell(
 
   shell.append(header, navRow, page);
   container.appendChild(shell);
-  observeWindowSize(container, shell);
+  observeWorkspaceWindowSize(container, shell);
   return { page: pageBody, activePage };
 }

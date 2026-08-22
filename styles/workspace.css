@@ -160,17 +160,3 @@ button.al-library-workspace-collect {
   margin:0 0 0 auto;
   padding-inline:14px;
 }
-
-@media (max-width:700px) {
-  .al-workspace-shell { padding-bottom:max(30px,env(safe-area-inset-bottom)); }
-  .al-workspace-header { min-height:48px; padding:11px 2px 6px; }
-  .al-workspace-title { font-size:1.18rem; }
-  .al-workspace-nav-row { gap:8px; }
-  button.al-workspace-tab { height:42px; min-height:42px; padding-inline:11px; font-size:.72rem; }
-  .al-workspace-header-actions { min-height:42px; }
-  button.al-library-workspace-collect { min-height:40px; padding-inline:12px; }
-  button.al-workspace-more { width:42px; height:42px; min-height:42px; }
-  .al-workspace-page { padding-top:10px; }
-  .al-library-workspace-summary { padding-top:6px; }
-  .al-workspace-page.is-timeline > .al-timeline-root { min-height:360px; }
-}
