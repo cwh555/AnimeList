@@ -9,6 +9,7 @@ import type {
   MediaNoteForm,
   MediaType,
 } from "../types";
+import type { MediaCoverAssetInput } from "../domain/manual-media";
 import type {
   LibraryRenderAdapters,
   LibraryRenderContext,
@@ -44,7 +45,7 @@ export interface AnimeListFeatureHost extends Pick<
   openMediaFile(path: string): Promise<void>;
   openLibrarySection(section: LibrarySection): Promise<void>;
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
-  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
+  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
   searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage>;
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;

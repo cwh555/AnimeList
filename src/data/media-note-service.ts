@@ -2,6 +2,7 @@ import { App, Notice, TFile, requestUrl, normalizePath } from "obsidian";
 import { USER_AGENT } from "../app-metadata";
 import type { AnimeListSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, MediaNoteForm } from "../domain/media-types";
+import type { MediaCoverAssetInput } from "../domain/manual-media";
 import { slugify, stringValue } from "../domain/value-normalization";
 import { normalizeMediaStatus } from "../domain/media-status";
 import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../domain/progress-units";
@@ -62,13 +63,31 @@ export class MediaNoteService {
     return path;
   }
 
-  async create(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
+  private async storeCoverAsset(result: ExternalMediaResult, asset: MediaCoverAssetInput): Promise<string> {
+    const contentType = asset.contentType ?? "";
+    const sourceExtension = asset.name.split(".").pop()?.toLocaleLowerCase() ?? "";
+    const extension = ["jpg", "jpeg", "png", "webp", "avif"].includes(sourceExtension)
+      ? sourceExtension === "jpeg" ? "jpg" : sourceExtension
+      : /png/i.test(contentType) ? "png"
+        : /webp/i.test(contentType) ? "webp"
+          : /avif/i.test(contentType) ? "avif" : "jpg";
+    const folder = normalizePath(`${this.settings().coverFolder}/${result.mediaType}`);
+    await this.storage.ensureFolder(folder);
+    const path = await this.storage.uniqueFilePath(folder, `${slugify(result.title)}-manual`, extension);
+    const file = await this.app.vault.createBinary(path, asset.data);
+    try {
+      await this.coverOptimizer.optimizeFile(file);
+    } catch (error) {
+      console.warn("AnimeList manual cover thumbnail generation failed", error);
+    }
+    return path;
+  }
+
+  async create(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
     validateMediaNoteForm(result, form);
-    const existing = this.repository.findBySource(
-      this.storage.scanFolders(),
-      result.provider,
-      String(result.sourceId),
-    );
+    const existing = result.sourceId
+      ? this.repository.findBySource(this.storage.scanFolders(), result.provider, String(result.sourceId))
+      : undefined;
     if (existing) {
       new Notice(uiText("notice.existingSource"));
       await this.callbacks.openMediaFile(existing.path);
@@ -76,7 +95,9 @@ export class MediaNoteService {
     }
 
     let coverPath = "";
-    if (result.coverUrl) {
+    if (coverAsset) {
+      coverPath = await this.storeCoverAsset(result, coverAsset);
+    } else if (result.coverUrl) {
       try {
         coverPath = await this.downloadCover(result);
       } catch (error) {

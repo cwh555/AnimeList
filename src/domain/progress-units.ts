@@ -56,6 +56,14 @@ export function compareSerialLabels(
   return primitiveText(left).localeCompare(primitiveText(right), "en", { numeric: true });
 }
 
+
+export function normalizeReadingProgressValue(value: unknown): ProgressValue {
+  const text = primitiveText(value).normalize("NFKC").trim();
+  if (!text) return 0;
+  const number = Number(text);
+  return Number.isFinite(number) && String(number) === text ? number : text;
+}
+
 export function normalizeSerialProgress(
   value: unknown,
   unit: ReadingProgressUnit,
