@@ -24,6 +24,8 @@ const joined = sources.map(({ path: file, content }) => `// ${file}\n${content}`
 const main = fs.readFileSync(path.join(root, "src/main.ts"), "utf8");
 const entry = fs.readFileSync(path.join(root, "src/plugin-entry.ts"), "utf8");
 const legacy = fs.readFileSync(path.join(root, "src/legacy.ts"), "utf8");
+const libraryRenderer = fs.readFileSync(path.join(root, "src/ui/library-renderer.ts"), "utf8");
+const libraryWorkspaceLayout = fs.readFileSync(path.join(root, "src/ui/library-workspace-layout.ts"), "utf8");
 const featureAndUiSources = sources
   .filter(({ path: file }) => (
     !file.startsWith("src/data/")
@@ -52,6 +54,16 @@ reject(/new\s+MutationObserver\b/, "feature integration must not discover forms 
 reject(/^import\s+["'][^"']+["'];?\s*$/m, "side-effect-only feature imports are forbidden", entry);
 reject(/from\s+["'][^"']*(?:compat\/legacy-ui|\/legacy|\.\/legacy)["']/, "active source must not import the compatibility UI barrel", sources.filter(({ path: file }) => file !== "src/legacy.ts").map(({ content }) => content).join("\n"));
 reject(/eslint-disable/, "active source must not require eslint suppression");
+reject(
+  /workspaceActionHost|al-workspace-page-actions/,
+  "generic Library renderer must not own or mutate Workspace header actions",
+  libraryRenderer,
+);
+reject(
+  /\.closest(?:<[^>]+>)?\([^)]*al-workspace|querySelector(?:<[^>]+>)?\([^)]*al-workspace-page-actions/,
+  "Library workspace layout must receive Workspace-owned action slots explicitly instead of discovering ancestors",
+  libraryWorkspaceLayout,
+);
 require(/class\s+AnimeListPlugin\s+extends\s+Plugin\b/, "main plugin must extend Obsidian Plugin directly", main);
 reject(/extends\s+LegacyAnimeListPlugin\b/, "main plugin must not inherit the legacy plugin", main);
 reject(/from\s+["\']\.\/data\//, "main.ts must delegate data services through the application service", main);

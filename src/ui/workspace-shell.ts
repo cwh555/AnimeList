@@ -14,6 +14,7 @@ export interface WorkspaceShellOptions {
 
 export interface WorkspaceShellResult {
   page: HTMLElement;
+  pageActions: HTMLElement;
   activePage: WorkspacePageDefinition;
 }
 
@@ -29,6 +30,7 @@ interface WorkspaceShellCacheEntry {
   signature: string;
   shell: HTMLElement;
   page: HTMLElement;
+  pageActions: HTMLElement;
   state: { options: WorkspaceShellOptions };
 }
 
@@ -59,7 +61,7 @@ export function renderAnimeListWorkspaceShell(
   if (cached?.signature === signature && cached.shell.isConnected && cached.page.isConnected) {
     cached.state.options = options;
     container.classList.toggle("is-timeline-workspace", activePage.id === "timeline");
-    return { page: cached.page, activePage };
+    return { page: cached.page, pageActions: cached.pageActions, activePage };
   }
 
   disconnectWorkspaceWindowSize(container);
@@ -143,6 +145,6 @@ export function renderAnimeListWorkspaceShell(
   shell.append(header, navRow, page);
   container.appendChild(shell);
   observeWorkspaceWindowSize(container, shell);
-  workspaceShellCache.set(container, { signature, shell, page: pageBody, state });
-  return { page: pageBody, activePage };
+  workspaceShellCache.set(container, { signature, shell, page: pageBody, pageActions, state });
+  return { page: pageBody, pageActions, activePage };
 }

@@ -18,7 +18,7 @@ await build({
       export { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "./src/ui/image-gallery-renderer";
       export { renderTimelineWorkspace } from "./src/ui/timeline-workspace-renderer";
       export { AnimeListUI } from "./src/ui/library-renderer";
-      export { installLibraryWorkspaceLayout } from "./src/ui/library-workspace-layout";
+      export { installLibraryWorkspaceLayout, renderLibraryWorkspaceActions } from "./src/ui/library-workspace-layout";
     `,
     resolveDir: root,
     loader: "ts",
@@ -84,13 +84,13 @@ const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"${images.c}",
 const timelineItem={title:"Frieren",originalTitle:"Frieren",mediaType:"anime",format:"TV",status:"completed",releaseStatus:"finished",progress:28,total:28,unit:"ep",score:9,favorite:false,year:2024,genres:[],people:[],platforms:[],sourceUrls:[],cover:"${images.a}",filePath:"Anime/Frieren.md",updated:0,updatedLabel:"",startedAt:"2023-09-29",completedAt:"2024-03-22",volumeLog:[]};
 let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[]; let collectType="";
 const pages=[
- {id:"library",label:"Library",icon:"library",order:10,render(el){AnimeListWorkspaceImages.AnimeListUI.renderLibrary(el,[timelineItem],{presentation:"workspace",addItem:(type)=>{collectType=type}});AnimeListWorkspaceImages.installLibraryWorkspaceLayout(el)}},
+ {id:"library",label:"Library",icon:"library",order:10,render(el,context){AnimeListWorkspaceImages.renderLibraryWorkspaceActions(context.pageActions,{currentType:()=>"all",addItem:(type)=>{collectType=type}});AnimeListWorkspaceImages.AnimeListUI.renderLibrary(el,[timelineItem],{presentation:"workspace",addItem:(type)=>{collectType=type}});AnimeListWorkspaceImages.installLibraryWorkspaceLayout(el)}},
  {id:"timeline",label:"Timeline",icon:"clock-3",order:20,render(el){AnimeListWorkspaceImages.renderTimelineWorkspace(el,[timelineItem],{})}},
  {id:"scores",label:"Score Dashboard",icon:"table-properties",order:30,render(el){el.textContent="SCORES PAGE"}},
  {id:"images",label:"Images",icon:"images",order:40,render(el){AnimeListWorkspaceImages.renderImageGallery(el,works,galleryState,{resolve:(image)=>({resourcePath:urlMap[image.path]}),openLightbox:(imgs,start)=>{lightboxKeys=imgs.map(i=>i.key).slice(start)},openSource:(path)=>{sourceOpened=path},onStateChange:(state)=>{galleryState={...state}}})}},
 ];
 const app=document.querySelector("#app");
-const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){window.__workspaceActionRuns=(window.__workspaceActionRuns||0)+1}}],onSelect:(section)=>{active=section;render()}}); result.activePage.render(result.page);};
+let previousSection=null; const render=()=>{const result=AnimeListWorkspaceImages.renderAnimeListWorkspaceShell(app,{pages,activeSection:active,actions:[{id:"updates",label:"Release updates",icon:"refresh-cw",order:10,run(){window.__workspaceActionRuns=(window.__workspaceActionRuns||0)+1}}],onSelect:(section)=>{active=section;render()}}); const samePageRefresh=previousSection===result.activePage.id; result.activePage.render(result.page,{pageActions:result.pageActions,samePageRefresh,signal:new AbortController().signal}); previousSection=result.activePage.id;};
 const tab=(section)=>document.querySelector('.al-workspace-tab[data-section="'+section+'"]');
 const click=(el)=>el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true}));
 const frames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
