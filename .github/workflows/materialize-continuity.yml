@@ -24,14 +24,18 @@ jobs:
           set -euo pipefail
           base64 --decode .continuity/patch.gz.b64 > /tmp/continuity.patch.gz
           gzip -dc /tmp/continuity.patch.gz > /tmp/continuity.patch
-          test "$(wc -c < /tmp/continuity.patch)" -eq 27842
-          test "$(sha256sum /tmp/continuity.patch | awk '{print $1}')" = "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b"
+          bytes="$(wc -c < /tmp/continuity.patch)"
+          sha="$(sha256sum /tmp/continuity.patch | awk '{print $1}')"
+          printf 'patch bytes=%s\npatch sha256=%s\n' "$bytes" "$sha"
+          test "$bytes" -eq 27842
+          test "$sha" = "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b"
           git apply --check /tmp/continuity.patch
           git apply /tmp/continuity.patch
-          test "$(git diff --name-only | sed '/^$/d' | wc -l)" -eq 5
-          git diff --check
+          git add -N .
           printf '%s\n' 'Materialized files:'
           git diff --name-only
+          test "$(git diff --name-only | sed '/^$/d' | wc -l)" -eq 5
+          git diff --check
 
       - name: Commit materialized tree without transport files
         shell: bash
