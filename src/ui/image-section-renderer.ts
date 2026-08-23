@@ -24,6 +24,7 @@ import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { claimImageSectionHostContinuity, withImageSectionHostContinuity } from "./image-section-continuity";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
@@ -167,6 +168,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     }
     imageSectionRenderers.set(this.containerEl, this);
     this.render();
+    claimImageSectionHostContinuity(
+      this.containerEl,
+      this.context.sourcePath,
+      parseImageSectionSource(this.source),
+      section?.lineStart,
+    );
     if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
     document.addEventListener("click", () => this.closeMenus(), { signal: this.lifecycleEvents.signal });
   }
@@ -455,7 +462,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     path: string,
     targetPath: string | null,
     placement: ImageSectionDropPlacement,
-  ): { sourceBefore: string[]; targetBefore: string[]; changed: boolean } {
+  ): { sourceBefore: string[]; targetBefore: string[]; sourceAfter: string[]; targetAfter: string[]; changed: boolean } {
     const sourceBefore = [...source.galleryPaths];
     const targetBefore = source === this ? sourceBefore : [...this.galleryPaths];
     const plan = planImageSectionPathMove(
@@ -470,7 +477,13 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       source.applyGalleryPaths(plan.sourcePaths, source === this);
       if (source !== this) this.applyGalleryPaths(plan.targetPaths, false);
     }
-    return { sourceBefore, targetBefore, changed: plan.changed };
+    return {
+      sourceBefore,
+      targetBefore,
+      sourceAfter: [...plan.sourcePaths],
+      targetAfter: [...plan.targetPaths],
+      changed: plan.changed,
+    };
   }
 
   private async handleInternalImageDrop(
@@ -495,14 +508,35 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     scrollPosition.stabilize(12);
     await Promise.all([source.lastLayoutMotion, source === this ? Promise.resolve() : this.lastLayoutMotion]);
     try {
-      const update = await this.service.moveAsset(
+      const continuitySlots = source === this
+        ? [{
+          container: source.containerEl,
+          sourcePath: source.context.sourcePath,
+          expectedPaths: optimistic.sourceAfter,
+          lineStart: source.locator().lineStart,
+        }]
+        : [
+          {
+            container: source.containerEl,
+            sourcePath: source.context.sourcePath,
+            expectedPaths: optimistic.sourceAfter,
+            lineStart: source.locator().lineStart,
+          },
+          {
+            container: this.containerEl,
+            sourcePath: this.context.sourcePath,
+            expectedPaths: optimistic.targetAfter,
+            lineStart: this.locator().lineStart,
+          },
+        ];
+      const update = await withImageSectionHostContinuity(continuitySlots, () => this.service.moveAsset(
         this.context.sourcePath,
         source.locator(),
         this.locator(),
         path,
         targetPath ?? "",
         placement,
-      );
+      ));
       if (source.ownsContainer()) source.containerEl.removeClass("is-image-drag-source");
       if (source === this) {
         if (this.ownsContainer()) this.applyOrderedSectionState(update.sourceSection);

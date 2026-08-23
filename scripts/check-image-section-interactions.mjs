@@ -84,6 +84,9 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:
 #section .al-image-gallery-viewport:not(.is-expanded){max-height:90px}
 </style></head><body data-result="pending"><div id="scroll-shell" class="cm-scroller"><div class="top-spacer"></div><section id="section"></section><div class="bottom-spacer"></div></div>
 <script>
+// This fixture isolates the renderer/pointer lifecycle. Host-level Markdown
+// replacement continuity is covered separately in check-image-section-host-continuity.mjs.
+Object.defineProperty(document,"startViewTransition",{value:undefined,configurable:true});
 window.createEl=(tag)=>document.createElement(tag);
 for(const [name,fn] of Object.entries({
  addClass:function(...names){this.classList.add(...names)},
