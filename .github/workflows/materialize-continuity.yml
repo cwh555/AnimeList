@@ -25,7 +25,7 @@ jobs:
           base64 --decode .continuity/patch.gz.b64 > /tmp/continuity.patch.gz
           gzip -dc /tmp/continuity.patch.gz > /tmp/continuity.patch
           test "$(wc -c < /tmp/continuity.patch)" -eq 27842
-          echo "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b  /tmp/continuity.patch" | sha256sum -c -
+          test "$(sha256sum /tmp/continuity.patch | awk '{print $1}')" = "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b"
           git apply --check /tmp/continuity.patch
           git apply /tmp/continuity.patch
           test "$(git diff --name-only | sed '/^$/d' | wc -l)" -eq 5
@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .continuity/patch.gz.b64 .continuity/trigger .continuity/pr-trigger-note .continuity/pr-ready .github/workflows/materialize-continuity.yml
+          rm -f .continuity/patch.gz.b64 .continuity/trigger .continuity/pr-trigger-note .continuity/pr-ready .continuity/do-not-keep .github/workflows/materialize-continuity.yml
           rmdir .continuity 2>/dev/null || true
           git add -A
           git diff --cached --check
