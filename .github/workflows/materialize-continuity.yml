@@ -28,7 +28,7 @@ jobs:
           sha="$(sha256sum /tmp/continuity.patch | awk '{print $1}')"
           printf 'patch bytes=%s\npatch sha256=%s\n' "$bytes" "$sha"
           test "$bytes" -eq 27842
-          test "$sha" = "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b"
+          test "$sha" = "1e8a18d08a6ee0d45ddd68ce791f14d5ce24d4bf92dded3a02c24752143c06b3"
           git apply --check /tmp/continuity.patch
           git apply /tmp/continuity.patch
           git add -N .
