@@ -238,6 +238,13 @@ renderer.onload();
  const editorLayers=()=>[...modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-layer')];
  details.editorStartsInStackedMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active')?.textContent?.length>0
    && editorLayers().length===3;
+ const editorTileBeforeRerender=modal.contentEl.querySelector('.al-moment-editor-image');
+ const editorImageBeforeRerender=editorTileBeforeRerender?.querySelector('img');
+ const activeLayoutMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active');
+ activeLayoutMode?.click(); await nextLayout();
+ details.editorRerenderPreservesImageNode=!!editorTileBeforeRerender && !!editorImageBeforeRerender
+   && modal.contentEl.querySelector('.al-moment-editor-image')===editorTileBeforeRerender
+   && modal.contentEl.querySelector('.al-moment-editor-image img')===editorImageBeforeRerender;
  const reveal=modal.contentEl.querySelector('.al-moment-editor-reveal input[type="range"]');
  reveal.value="68"; reveal.dispatchEvent(new Event("input",{bubbles:true}));
  await nextLayout();

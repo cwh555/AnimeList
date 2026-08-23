@@ -116,6 +116,13 @@ render();
  details.singleWorkspaceActionIsDirect=!!directAction && directAction.textContent.includes('Release updates') && !document.querySelector('.al-workspace-more');
  click(directAction);
  details.directWorkspaceActionRuns=window.__workspaceActionRuns===1;
+ const shellBeforeRefresh=document.querySelector('.al-workspace-shell');
+ const navBeforeRefresh=document.querySelector('.al-workspace-nav');
+ const pageBodyBeforeRefresh=document.querySelector('.al-workspace-page-body');
+ render(); await frames();
+ details.samePageRefreshPreservesWorkspaceShell=document.querySelector('.al-workspace-shell')===shellBeforeRefresh
+   && document.querySelector('.al-workspace-nav')===navBeforeRefresh
+   && document.querySelector('.al-workspace-page-body')===pageBodyBeforeRefresh;
 
  click(tab('timeline')); await new Promise(r=>setTimeout(r,25)); await frames();
  const timelineViewport=document.querySelector('.al-timeline-viewport');
@@ -151,7 +158,10 @@ render();
  details.exactFiveColumns=document.querySelectorAll('.al-gallery-masonry-column').length===5 && getComputedStyle(document.querySelector('.al-gallery-masonry')).gridTemplateColumns.split(' ').filter(Boolean).length===5;
  const typeButtons=[...document.querySelectorAll('.al-gallery-type-filter')]; click(typeButtons[1]); await new Promise(r=>setTimeout(r,10));
  details.typeFilterReducesGallery=document.querySelectorAll('.al-gallery-image-tile').length===3;
+ const imageBeforeModeSwitch=document.querySelector('.al-gallery-image-tile[data-gallery-key="f-a"] img');
  click(document.querySelectorAll('.al-gallery-mode-tab')[1]); await new Promise(r=>setTimeout(r,10)); await frames();
+ details.galleryModeSwitchPreservesImageNode=!!imageBeforeModeSwitch
+   && [...document.querySelectorAll('.al-gallery-work-card img')].includes(imageBeforeModeSwitch);
  details.byWorkShowsOneFilteredBoard=document.querySelectorAll('.al-gallery-work-card').length===1;
  details.workBoardsAreExpanded=document.querySelector('.al-gallery-work-card').getBoundingClientRect().height>120;
  click(document.querySelector('.al-gallery-work-card')); await new Promise(r=>setTimeout(r,10));
