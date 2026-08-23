@@ -1,9 +1,6 @@
 name: Materialize continuity patch
 
 on:
-  push:
-    branches:
-      - tmp/continuity-materialize
   pull_request:
     branches:
       - feature/component-polish
@@ -40,7 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .continuity/patch.gz.b64 .continuity/trigger .github/workflows/materialize-continuity.yml
+          rm -f .continuity/patch.gz.b64 .continuity/trigger .continuity/pr-trigger-note .github/workflows/materialize-continuity.yml
           rmdir .continuity 2>/dev/null || true
           git add -A
           git diff --cached --check
