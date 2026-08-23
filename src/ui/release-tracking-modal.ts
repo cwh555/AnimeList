@@ -11,6 +11,7 @@ import type {
 import { releaseTrackingText } from "../features/release-tracking/text";
 import { abortable, isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
+import { transitionSurface } from "./layout-motion";
 
 export interface ReleaseTrackingModalActions {
   openMedia(path: string): Promise<void> | void;
@@ -221,7 +222,7 @@ export class ReleaseTrackingResultsModal extends Modal {
 
   showProgress(progress: ReleaseRefreshProgress): void {
     this.progress = progress;
-    if (this.opened && this.busy) this.renderRunning();
+    if (this.opened && this.busy && !this.updateRunningProgress()) this.renderRunning();
   }
 
   showResults(summary: ReleaseRefreshSummary): void {
@@ -253,8 +254,51 @@ export class ReleaseTrackingResultsModal extends Modal {
     this.contentEl.appendChild(header);
   }
 
+  private updateRunningProgress(): boolean {
+    const body = this.contentEl.querySelector<HTMLElement>(".al-release-running");
+    if (!body) return false;
+    const progress = this.progress;
+    const completed = progress?.completed ?? 0;
+    const total = progress?.total ?? 0;
+    const count = body.querySelector<HTMLElement>(".al-release-running-head span");
+    const fill = body.querySelector<HTMLElement>(".al-release-running-fill");
+    if (count) count.textContent = releaseTrackingText("modal.runningProgress", { completed, total });
+    if (fill) fill.style.width = total > 0 ? `${Math.min(100, Math.max(0, completed / total * 100))}%` : "0%";
+
+    const current = body.querySelector<HTMLElement>(".al-release-running-item, .al-release-running-preparing");
+    const nextPath = progress?.item.filePath ?? "";
+    if (current?.dataset.filePath === nextPath || (!progress && current?.classList.contains("al-release-running-preparing"))) {
+      return true;
+    }
+    const replacement = progress
+      ? (() => {
+        const item = makeElement("div", "al-release-running-item");
+        item.dataset.filePath = progress.item.filePath;
+        const copy = makeElement("div", "al-release-running-item-copy");
+        copy.append(
+          makeElement("strong", "", progress.item.title),
+          makeElement("span", "al-release-media-chip", mediaTypeLabel(progress.item)),
+        );
+        item.append(
+          resultCover(progress.item, "al-release-running-cover"),
+          copy,
+          makeElement("span", "al-release-running-provider", providerLabel(progress.provider)),
+        );
+        return item;
+      })()
+      : (() => {
+        const preparing = makeElement("div", "al-release-running-preparing");
+        preparing.dataset.filePath = "";
+        preparing.append(icon("loader-circle"), makeElement("span", "", releaseTrackingText("modal.runningPreparing")));
+        return preparing;
+      })();
+    if (current) current.replaceWith(replacement);
+    else body.appendChild(replacement);
+    return true;
+  }
+
   private renderRunning(): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(
       releaseTrackingText("modal.runningTitle"),
       releaseTrackingText("modal.runningDescription"),
@@ -277,6 +321,7 @@ export class ReleaseTrackingResultsModal extends Modal {
 
     if (progress) {
       const current = makeElement("div", "al-release-running-item");
+      current.dataset.filePath = progress.item.filePath;
       const copy = makeElement("div", "al-release-running-item-copy");
       copy.append(
         makeElement("strong", "", progress.item.title),
@@ -305,7 +350,7 @@ export class ReleaseTrackingResultsModal extends Modal {
   private renderResults(): void {
     const summary = this.summary;
     if (!summary) return;
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(releaseTrackingText("modal.title"), "");
 
     const stats = makeElement("div", "al-release-summary-grid");
@@ -371,7 +416,7 @@ export class ReleaseTrackingResultsModal extends Modal {
   }
 
   private renderFailure(message: string): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(releaseTrackingText("modal.failedTitle"), releaseTrackingText("modal.failedDescription", { message }));
     const failure = makeElement("div", "al-release-failure");
     failure.append(icon("triangle-alert"), makeElement("span", "", message));
@@ -454,7 +499,7 @@ export class ReleaseTrackingMatchModal extends Modal {
     this.requestController?.abort();
     const controller = new AbortController();
     this.requestController = controller;
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.renderHeading();
     this.contentEl.appendChild(makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
 
@@ -479,7 +524,7 @@ export class ReleaseTrackingMatchModal extends Modal {
   }
 
   private renderCandidates(candidates: ReleaseMatchCandidate[], autoResolving: boolean): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.renderHeading();
 
     if (autoResolving) {

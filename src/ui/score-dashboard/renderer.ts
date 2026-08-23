@@ -26,6 +26,7 @@ import { scoreDashboardText as text } from "../../features/score-dashboard/text"
 import type { MediaItem } from "../../types";
 import type { ScoreDashboardMediaType } from "../../domain/score-dashboard/model";
 import { applyScoreDashboardDomChanges } from "./dom-move";
+import { animateLayoutChange } from "../layout-motion";
 
 export interface ScoreDashboardUiState {
   type: ScoreDashboardMediaType;
@@ -183,6 +184,7 @@ export function renderScoreDashboard(
   batchBar.append(selectedCount, selectVisibleButton, clearButton, targetSelect, shiftDown, shiftUp);
 
   const board = create("div", "al-score-board");
+  const posterCache = new Map<string, HTMLButtonElement>();
   shell.append(header, controls, batchBar, board);
 
   const emitState = () => adapters.onStateChange({ ...state });
@@ -320,6 +322,17 @@ export function renderScoreDashboard(
   };
 
   const renderCover = (item: MediaItem): HTMLElement => {
+    const cached = posterCache.get(item.filePath);
+    if (cached) {
+      cached.title = item.title;
+      cached.dataset.mediaType = item.mediaType;
+      cached.dataset.score = item.score == null ? "unrated" : item.score.toFixed(1);
+      cached.draggable = !batchMode;
+      cached.setAttribute("aria-label", text.posterAria(item.title, item.score == null ? text.unrated : item.score.toFixed(1)));
+      updatePosterSelection(cached, selectedPaths.has(item.filePath));
+      return cached;
+    }
+
     const button = create("button", "al-score-poster");
     button.type = "button";
     button.title = item.title;
@@ -375,10 +388,15 @@ export function renderScoreDashboard(
       setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
       button.appendChild(missing);
     }
+    posterCache.set(item.filePath, button);
     return button;
   };
 
-  const renderLane = (score: number | null, laneItems: readonly MediaItem[]): HTMLElement => {
+  const renderLane = (
+    score: number | null,
+    laneItems: readonly MediaItem[],
+    mountPosters = true,
+  ): HTMLElement => {
     const lane = create("div", "al-score-lane");
     lane.dataset.score = score == null ? "unrated" : score.toFixed(1);
     lane.setAttribute("role", "listbox");
@@ -410,8 +428,10 @@ export function renderScoreDashboard(
     const label = create("div", "al-score-lane-label", score == null ? "—" : score.toFixed(1));
     if (score != null) label.style.setProperty("--al-score-color", scoreColor(score));
     const posters = create("div", "al-score-lane-posters");
-    if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
-    else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+    if (mountPosters) {
+      if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
+      else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+    }
     lane.append(label, posters);
     return lane;
   };
@@ -435,6 +455,7 @@ export function renderScoreDashboard(
     updateUnratedControl(data.unrated.length);
     updateBatchControls();
 
+    const laneMounts: Array<{ lane: HTMLElement; items: readonly MediaItem[] }> = [];
     const groupElements = data.groups.map((group) => {
       const groupElement = create("section", "al-score-group");
       groupElement.dataset.majorScore = String(group.major);
@@ -445,7 +466,11 @@ export function renderScoreDashboard(
         create("span", "al-score-major-count", `${group.itemCount} ${text.works}`),
       );
       const lanes = create("div", "al-score-group-lanes");
-      group.lanes.forEach((scoreLane) => lanes.appendChild(renderLane(scoreLane.score, scoreLane.items)));
+      group.lanes.forEach((scoreLane) => {
+        const lane = renderLane(scoreLane.score, [], false);
+        laneMounts.push({ lane, items: scoreLane.items });
+        lanes.appendChild(lane);
+      });
       groupElement.append(major, lanes);
       return groupElement;
     });
@@ -454,11 +479,23 @@ export function renderScoreDashboard(
       const major = create("div", "al-score-major");
       major.append(create("strong", "al-score-major-number", "—"), create("span", "al-score-major-count", `${data.unrated.length} ${text.works}`));
       const lanes = create("div", "al-score-group-lanes");
-      lanes.appendChild(renderLane(null, data.unrated));
+      const lane = renderLane(null, [], false);
+      laneMounts.push({ lane, items: data.unrated });
+      lanes.appendChild(lane);
       groupElement.append(major, lanes);
       groupElements.push(groupElement);
     }
-    board.replaceChildren(...groupElements);
+
+    const movingPosters = [...posterCache.values()].filter((poster) => poster.isConnected);
+    void animateLayoutChange(movingPosters, () => {
+      board.replaceChildren(...groupElements);
+      for (const { lane, items: laneItems } of laneMounts) {
+        const posters = lane.querySelector<HTMLElement>(".al-score-lane-posters");
+        if (!posters) continue;
+        if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
+        else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+      }
+    });
     container.scrollTop = scrollTop;
   };
 

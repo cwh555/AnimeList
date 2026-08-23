@@ -22,6 +22,8 @@ export function libraryEagerCoverCount(view: LibraryViewMode): number {
 }
 
 const activeProgressiveRenders = new WeakMap<HTMLElement, () => void>();
+interface LibraryCoverCacheEntry { signature: string; image: HTMLImageElement; }
+const libraryCoverCaches = new WeakMap<HTMLElement, Map<string, LibraryCoverCacheEntry>>();
 
 export const AnimeListUI: LibraryRenderer = (() => {
   const normalize = (item: MediaItem): MediaItem => ({
@@ -80,6 +82,13 @@ export const AnimeListUI: LibraryRenderer = (() => {
     activeProgressiveRenders.delete(container);
     container.replaceChildren();
     const items = inputItems.map(normalize);
+    let coverCache = libraryCoverCaches.get(container);
+    if (!coverCache) {
+      coverCache = new Map<string, LibraryCoverCacheEntry>();
+      libraryCoverCaches.set(container, coverCache);
+    }
+    const activePaths = new Set(items.map((item) => item.filePath));
+    for (const path of coverCache.keys()) if (!activePaths.has(path)) coverCache.delete(path);
     const workspacePresentation = adapters.presentation === "workspace";
     const filterOptions = collectLibraryFilterOptions(items);
     const initialState = adapters.initialState ?? {};
@@ -334,8 +343,14 @@ export const AnimeListUI: LibraryRenderer = (() => {
 
       const media = makeEl("div", "al-cover-wrap");
       if (item.cover) {
-        const image = makeEl("img", "al-cover");
         const sources = item.coverSources;
+        const source = sources?.src || item.cover;
+        const srcset = sources?.srcset || "";
+        const signature = `${source}::${srcset}`;
+        const cached = coverCache.get(item.filePath);
+        const image = cached?.signature === signature ? cached.image : makeEl("img", "al-cover");
+        if (cached?.signature !== signature) coverCache.set(item.filePath, { signature, image });
+        image.className = "al-cover";
         image.alt = uiText("library.coverAlt", { title: item.title });
         image.loading = "lazy";
         image.decoding = "async";
@@ -344,23 +359,28 @@ export const AnimeListUI: LibraryRenderer = (() => {
           media.classList.add("has-cover-placeholder");
           media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;
         }
-        if (sources?.srcset) image.srcset = sources.srcset;
-        image.src = sources?.src || item.cover;
-        const reveal = (): void => image.classList.add("is-loaded");
-        image.addEventListener("load", reveal, { once: true });
-        image.addEventListener("error", () => {
-          image.remove();
-          media.classList.remove("has-cover-placeholder");
-          media.style.removeProperty("background-image");
-          const missing = makeEl("div", "al-cover-missing");
-          const icon = makeEl("span", "al-icon-large");
-          setAnimeListIcon(icon, "book");
-          missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
-          media.prepend(missing);
-        }, { once: true });
-        if (image.complete && image.naturalWidth > 0) reveal();
+        if (srcset) image.srcset = srcset;
+        else image.removeAttribute("srcset");
+        image.src = source;
+        if (cached?.signature !== signature) {
+          const reveal = (): void => image.classList.add("is-loaded");
+          image.addEventListener("load", reveal, { once: true });
+          image.addEventListener("error", () => {
+            coverCache.delete(item.filePath);
+            image.remove();
+            media.classList.remove("has-cover-placeholder");
+            media.style.removeProperty("background-image");
+            const missing = makeEl("div", "al-cover-missing");
+            const icon = makeEl("span", "al-icon-large");
+            setAnimeListIcon(icon, "book");
+            missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
+            media.prepend(missing);
+          }, { once: true });
+          if (image.complete && image.naturalWidth > 0) reveal();
+        }
         media.appendChild(image);
       } else {
+        coverCache.delete(item.filePath);
         const missing = makeEl("div", "al-cover-missing");
         const icon = makeEl("span", "al-icon-large");
         setAnimeListIcon(icon, "book");

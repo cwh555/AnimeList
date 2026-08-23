@@ -42,6 +42,11 @@ export const DEFAULT_IMAGE_GALLERY_STATE: ImageGalleryUiState = {
 const activeObservers = new WeakMap<HTMLElement, IntersectionObserver>();
 const GALLERY_BATCH_SIZE = 80;
 
+interface GalleryImageCacheEntry {
+  signature: string;
+  image: HTMLImageElement;
+}
+
 function typeLabel(type: ImageGalleryMediaFilter): string {
   const labels = {
     all: uiText("media.type.all"),
@@ -56,10 +61,46 @@ function workSummary(work: ImageGalleryWork): string {
   return imageGalleryText("workSummary", { images: work.images.length, sessions: work.sessions.length });
 }
 
+
+function galleryImageElement(
+  image: ImageGalleryImage,
+  adapters: ImageGalleryUiAdapters,
+  cache: Map<string, GalleryImageCacheEntry>,
+  className: string,
+  alt: string,
+  sizes = "",
+): HTMLImageElement | null {
+  const resolved = adapters.resolve(image);
+  if (!resolved.resourcePath) {
+    cache.delete(image.key);
+    return null;
+  }
+  const source = resolved.thumbnailSources?.src || resolved.resourcePath;
+  const srcset = resolved.thumbnailSources?.srcset || "";
+  const signature = `${source}::${srcset}`;
+  let element = cache.get(image.key)?.signature === signature ? cache.get(image.key)?.image ?? null : null;
+  if (!element) {
+    element = makeEl("img");
+    cache.set(image.key, { signature, image: element });
+  }
+  element.className = className;
+  element.src = source;
+  element.alt = alt;
+  element.loading = "lazy";
+  element.decoding = "async";
+  element.draggable = false;
+  if (srcset) element.srcset = srcset;
+  else element.removeAttribute("srcset");
+  if (sizes) element.sizes = sizes;
+  else element.removeAttribute("sizes");
+  return element;
+}
+
 function createImageTile(
   image: ImageGalleryImage,
   allImages: readonly ImageGalleryImage[],
   adapters: ImageGalleryUiAdapters,
+  imageCache: Map<string, GalleryImageCacheEntry>,
 ): HTMLElement {
   const tile = makeEl("article", "al-gallery-image-tile");
   tile.dataset.galleryKey = image.key;
@@ -67,18 +108,15 @@ function createImageTile(
   open.type = "button";
   open.title = image.mediaTitle;
   open.setAttribute("aria-label", image.mediaTitle);
-  const resolved = adapters.resolve(image);
-  if (resolved.resourcePath) {
-    const element = makeEl("img", "al-gallery-image");
-    element.src = resolved.thumbnailSources?.src || resolved.resourcePath;
-    if (resolved.thumbnailSources?.srcset) {
-      element.srcset = resolved.thumbnailSources.srcset;
-      element.sizes = "(max-width: 700px) 50vw, 25vw";
-    }
-    element.alt = image.mediaTitle;
-    element.loading = "lazy";
-    element.decoding = "async";
-    element.draggable = false;
+  const element = galleryImageElement(
+    image,
+    adapters,
+    imageCache,
+    "al-gallery-image",
+    image.mediaTitle,
+    "(max-width: 700px) 50vw, 25vw",
+  );
+  if (element) {
     open.appendChild(element);
   } else {
     const missing = makeEl("div", "al-gallery-image-missing");
@@ -112,6 +150,7 @@ function renderProgressiveMasonry(
   images: readonly ImageGalleryImage[],
   columnsValue: number,
   adapters: ImageGalleryUiAdapters,
+  imageCache: Map<string, GalleryImageCacheEntry>,
 ): void {
   activeObservers.get(container)?.disconnect();
   activeObservers.delete(container);
@@ -129,7 +168,7 @@ function renderProgressiveMasonry(
   const appendBatch = (): void => {
     const end = Math.min(images.length, rendered + GALLERY_BATCH_SIZE);
     for (let index = rendered; index < end; index += 1) {
-      const tile = createImageTile(images[index], images, adapters);
+      const tile = createImageTile(images[index], images, adapters, imageCache);
       tile.dataset.galleryIndex = String(index);
       columnElements[index % columns].appendChild(tile);
     }
@@ -178,6 +217,7 @@ function renderWorkBoard(
   container: HTMLElement,
   works: readonly ImageGalleryWork[],
   adapters: ImageGalleryUiAdapters,
+  imageCache: Map<string, GalleryImageCacheEntry>,
   onOpen: (work: ImageGalleryWork) => void,
 ): void {
   const board = makeEl("div", "al-gallery-work-board");
@@ -189,14 +229,8 @@ function renderWorkBoard(
     const preview = imageGalleryBoardPreview(work, 4);
     for (const image of preview) {
       const cell = makeEl("div", "al-gallery-work-mosaic-cell");
-      const resolved = adapters.resolve(image);
-      if (resolved.resourcePath) {
-        const img = makeEl("img");
-        img.src = resolved.thumbnailSources?.src || resolved.resourcePath;
-        img.alt = "";
-        img.loading = "lazy";
-        img.decoding = "async";
-        img.draggable = false;
+      const img = galleryImageElement(image, adapters, imageCache, "", "");
+      if (img) {
         cell.appendChild(img);
       } else {
         setAnimeListIcon(cell, "image-off");
@@ -240,6 +274,7 @@ export function renderImageGallery(
     ...initialState,
     columns: normalizeImageSectionColumns(initialState.columns),
   };
+  const imageCache = new Map<string, GalleryImageCacheEntry>();
 
   const root = makeEl("section", "al-image-gallery-page");
   const header = makeEl("header", "al-gallery-page-header");
@@ -362,13 +397,13 @@ export function renderImageGallery(
       });
       content.appendChild(sessions);
       const images = imageGallerySessionImages(selectedWork, state.sessionIndex);
-      if (images.length) renderProgressiveMasonry(content, images, state.columns, adapters);
+      if (images.length) renderProgressiveMasonry(content, images, state.columns, adapters, imageCache);
       else renderEmpty(content);
       return;
     }
 
     if (state.mode === "all") {
-      if (filteredImages.length) renderProgressiveMasonry(content, filteredImages, state.columns, adapters);
+      if (filteredImages.length) renderProgressiveMasonry(content, filteredImages, state.columns, adapters, imageCache);
       else renderEmpty(content);
       return;
     }
@@ -377,7 +412,7 @@ export function renderImageGallery(
       renderEmpty(content);
       return;
     }
-    renderWorkBoard(content, filteredWorks, adapters, (work) => {
+    renderWorkBoard(content, filteredWorks, adapters, imageCache, (work) => {
       state.workPath = work.sourcePath;
       state.sessionIndex = null;
       emit();

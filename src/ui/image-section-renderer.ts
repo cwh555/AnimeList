@@ -80,6 +80,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private lastLayoutMotion: Promise<void> = Promise.resolve();
   private galleryPaths: string[] = [];
   private readonly imageElements = new Map<string, HTMLElement>();
+  private readonly imageNodeCache = new Map<string, { signature: string; image: HTMLImageElement }>();
   private galleryViewport: HTMLElement | null = null;
   private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
 
@@ -156,6 +157,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryViewport = null;
     this.galleryPaths = [];
     this.imageElements.clear();
+    this.imageNodeCache.clear();
     imageSectionRenderers.delete(this.containerEl);
     if (activeImageDrag?.source === this) activeImageDrag = null;
     clearImageDropIndicators();
@@ -406,6 +408,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       if (nextSet.has(path)) continue;
       element.remove();
       this.imageElements.delete(path);
+      this.imageNodeCache.delete(path);
     }
     for (const path of nextPaths) {
       if (!this.imageElements.has(path)) this.imageElements.set(path, this.createImage(path));
@@ -540,11 +543,23 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     item.dataset.imagePath = path;
     const resolved = this.service.resolve(path, this.context.sourcePath);
     if (resolved.resourcePath) {
-      const image = makeEl("img");
-      image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
-      if (resolved.thumbnailSources?.srcset) {
-        image.srcset = resolved.thumbnailSources.srcset;
+      const source = resolved.thumbnailSources?.src || resolved.resourcePath;
+      const srcset = resolved.thumbnailSources?.srcset || "";
+      const signature = `${source}::${srcset}`;
+      let image = this.imageNodeCache.get(path)?.signature === signature
+        ? this.imageNodeCache.get(path)?.image ?? null
+        : null;
+      if (!image) {
+        image = makeEl("img");
+        this.imageNodeCache.set(path, { signature, image });
+      }
+      image.src = source;
+      if (srcset) {
+        image.srcset = srcset;
         image.sizes = "(max-width: 620px) 50vw, 25vw";
+      } else {
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
       }
       image.alt = "";
       image.loading = "lazy";
@@ -552,6 +567,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       image.draggable = false;
       item.appendChild(image);
     } else {
+      this.imageNodeCache.delete(path);
       const missing = makeEl("div", "al-image-missing");
       const icon = makeEl("div", "al-image-missing-icon");
       setAnimeListIcon(icon, "image-off");
@@ -865,6 +881,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.containerEl.tabIndex = 0;
 
     const paths = parseImageSectionSource(this.source);
+    const activePaths = new Set(paths);
+    for (const path of this.imageNodeCache.keys()) if (!activePaths.has(path)) this.imageNodeCache.delete(path);
     this.renderToolbar(paths);
     if (!paths.length) {
       const empty = makeEl("button", "al-image-empty");

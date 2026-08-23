@@ -98,7 +98,6 @@ export class AnimeListView extends ItemView {
   }
 
   private async render(): Promise<void> {
-    this.contentEl.empty();
     this.contentEl.addClass("animelist-native-view");
     const items = this.host.collectMediaItems();
     const pages = [...this.corePages(items), ...this.host.workspacePages()];

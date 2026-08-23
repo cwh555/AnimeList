@@ -13,6 +13,7 @@ import type { AnimeListUiHost } from "./plugin-host";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
 import { createLabeledField, createMediaEditorFields, createMediaFormContext, createSelect, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
+import { transitionSurface } from "./layout-motion";
 
 
 function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
@@ -61,7 +62,7 @@ export class AddMediaModal extends Modal {
   }
 
   renderSearch(): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
     heading.className = "al-modal-heading";
     const headingCopy = makeEl("div");
@@ -193,7 +194,7 @@ export class AddMediaModal extends Modal {
 
   private async renderManualDetails(mediaType: MediaType, state: ManualMediaFormState = {}): Promise<void> {
     this.mediaType = mediaType;
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
     back.type = "button";
     back.className = "al-modal-back";
@@ -357,7 +358,7 @@ export class AddMediaModal extends Modal {
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
     back.type = "button";
     back.className = "al-modal-back";
@@ -527,7 +528,7 @@ export class EditMediaModal extends Modal {
 
   private render(): void {
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
     heading.className = "al-modal-heading";
     const titleHeading = createEl("h2");
@@ -552,7 +553,7 @@ export class EditMediaModal extends Modal {
       metadataHost.appendChild(loading);
       void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
         if (!this.contentEl.isConnected) return;
-        metadataHost.replaceChildren();
+        transitionSurface(metadataHost, () => metadataHost.replaceChildren());
         renderMediaClassificationFields(metadataHost, enriched, true);
       }).catch((error) => {
         console.warn("AnimeList edit metadata refresh failed", error);

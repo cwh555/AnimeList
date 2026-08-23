@@ -48,6 +48,8 @@ export class MomentEditorModal extends Modal {
   private nextKey = 1;
   private urlValue = "";
   private busy = false;
+  private readonly retainedImageTiles = new Map<string, HTMLElement>();
+  private readonly pendingImageTiles = new Map<number, HTMLElement>();
 
   constructor(
     app: ConstructorParameters<typeof Modal>[0],
@@ -82,6 +84,8 @@ export class MomentEditorModal extends Modal {
     this.modalEl.removeEventListener("paste", this.handlePaste);
     for (const pending of this.pending) URL.revokeObjectURL(pending.previewUrl);
     this.pending = [];
+    this.retainedImageTiles.clear();
+    this.pendingImageTiles.clear();
     this.contentEl.replaceChildren();
   }
 
@@ -385,35 +389,50 @@ export class MomentEditorModal extends Modal {
       if (files.length) void this.addFiles(files);
     });
 
+    const retainedSet = new Set(this.retainedImages);
+    for (const key of this.retainedImageTiles.keys()) if (!retainedSet.has(key)) this.retainedImageTiles.delete(key);
     for (const path of this.retainedImages) {
-      const item = makeEl("div", "al-moment-editor-image");
+      let item = this.retainedImageTiles.get(path);
       const resolved = this.imageService.resolve(path, this.sourcePath);
-      if (resolved.resourcePath) {
-        const image = makeEl("img");
-        image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
-        image.alt = "";
-        item.appendChild(image);
-      } else item.appendChild(makeEl("div", "al-moment-editor-image-missing", momentsText("missingImage")));
-      const remove = makeEl("button", "al-moment-editor-image-remove");
-      remove.type = "button";
-      remove.setAttribute("aria-label", momentsText("removeImage"));
-      setAnimeListIcon(remove, "x");
-      remove.addEventListener("click", () => this.removeRetained(path));
-      item.appendChild(remove);
+      if (!item) {
+        item = makeEl("div", "al-moment-editor-image");
+        if (resolved.resourcePath) {
+          const image = makeEl("img");
+          image.alt = "";
+          item.appendChild(image);
+        } else {
+          item.appendChild(makeEl("div", "al-moment-editor-image-missing", momentsText("missingImage")));
+        }
+        const remove = makeEl("button", "al-moment-editor-image-remove");
+        remove.type = "button";
+        remove.setAttribute("aria-label", momentsText("removeImage"));
+        setAnimeListIcon(remove, "x");
+        remove.addEventListener("click", () => this.removeRetained(path));
+        item.appendChild(remove);
+        this.retainedImageTiles.set(path, item);
+      }
+      const image = item.querySelector<HTMLImageElement>("img");
+      if (image && resolved.resourcePath) image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
       row.appendChild(item);
     }
 
+    const pendingKeys = new Set(this.pending.map((entry) => entry.key));
+    for (const key of this.pendingImageTiles.keys()) if (!pendingKeys.has(key)) this.pendingImageTiles.delete(key);
     for (const pending of this.pending) {
-      const item = makeEl("div", "al-moment-editor-image is-pending");
-      const image = makeEl("img");
-      image.src = pending.previewUrl;
-      image.alt = "";
-      const remove = makeEl("button", "al-moment-editor-image-remove");
-      remove.type = "button";
-      remove.setAttribute("aria-label", momentsText("removeImage"));
-      setAnimeListIcon(remove, "x");
-      remove.addEventListener("click", () => this.removePending(pending.key));
-      item.append(image, remove);
+      let item = this.pendingImageTiles.get(pending.key);
+      if (!item) {
+        item = makeEl("div", "al-moment-editor-image is-pending");
+        const image = makeEl("img");
+        image.src = pending.previewUrl;
+        image.alt = "";
+        const remove = makeEl("button", "al-moment-editor-image-remove");
+        remove.type = "button";
+        remove.setAttribute("aria-label", momentsText("removeImage"));
+        setAnimeListIcon(remove, "x");
+        remove.addEventListener("click", () => this.removePending(pending.key));
+        item.append(image, remove);
+        this.pendingImageTiles.set(pending.key, item);
+      }
       row.appendChild(item);
     }
 

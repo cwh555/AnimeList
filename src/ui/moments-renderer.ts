@@ -27,6 +27,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   private scrollerObservers: ResizeObserver[] = [];
   private readonly expandedTextIds = new Set<string>();
   private readonly momentMediaCache = new Map<string, { signature: string; media: HTMLElement }>();
+  private readonly momentCardCache = new Map<string, { signature: string; card: HTMLElement }>();
 
   constructor(
     containerEl: HTMLElement,
@@ -495,6 +496,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     const moments = parseMomentsSource(this.source);
     const activeMomentIds = new Set(moments.map((moment) => moment.id));
     for (const key of this.momentMediaCache.keys()) if (!activeMomentIds.has(key)) this.momentMediaCache.delete(key);
+    for (const key of this.momentCardCache.keys()) if (!activeMomentIds.has(key)) this.momentCardCache.delete(key);
     const toolbar = makeEl("div", "al-moments-toolbar");
     const identity = makeEl("div", "al-moments-identity");
     const identityIcon = makeEl("span", "al-moments-icon");
@@ -516,7 +518,13 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       return;
     }
     const list = makeEl("div", "al-moments-list");
-    moments.forEach((moment) => list.appendChild(this.renderMoment(moment)));
+    moments.forEach((moment) => {
+      const signature = JSON.stringify(moment);
+      const cached = this.momentCardCache.get(moment.id);
+      const card = cached?.signature === signature ? cached.card : this.renderMoment(moment);
+      this.momentCardCache.set(moment.id, { signature, card });
+      list.appendChild(card);
+    });
     this.containerEl.appendChild(list);
   }
 }

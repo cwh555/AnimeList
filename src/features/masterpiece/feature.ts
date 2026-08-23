@@ -17,6 +17,7 @@ import { MasterpieceDecorationCache } from "../../app/masterpiece-decoration-cac
 import { masterpieceActionText, masterpieceFeatureText, specialLabelName } from "./text";
 import type { LibraryRenderAdapters, LibraryRenderContext } from "../../ui/library-contracts";
 import type { MediaFormContext } from "../../ui/media-form-contracts";
+import { animateLayoutChange } from "../../ui/layout-motion";
 
 interface MediaItemWithMasterpiece extends MediaItem {
   masterpieceLabels?: string[];
@@ -189,31 +190,33 @@ function renderGroups(context: LibraryRenderContext<AnimeListFeatureHost>): void
   const groups = groupMasterpieceItems(entries);
   if (!groups.length) return;
 
-  root.className = "al-masterpiece-groups";
-  root.replaceChildren();
-  const used = new Set<string>();
-  for (const group of groups) {
-    const section = root.createEl("section", { cls: "al-masterpiece-group" });
-    section.dataset.groupKey = group.key;
-    const heading = section.createDiv({ cls: "al-masterpiece-group-heading" });
-    heading.createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
-    heading.createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
-    const grid = section.createDiv({
-      cls: `al-grid is-${context.state?.view ?? "grid"} al-masterpiece-group-grid`,
-    });
-    for (const entry of group.items) {
-      let card = entry.card;
-      if (used.has(entry.filePath)) {
-        const cloned = entry.card.cloneNode(true);
-        if (cloned.nodeType !== Node.ELEMENT_NODE) continue;
-        card = cloned as HTMLElement;
-        bindClonedCard(card, entry, context.adapters);
-      } else {
-        used.add(entry.filePath);
+  void animateLayoutChange(cards, () => {
+    root.className = "al-masterpiece-groups";
+    root.replaceChildren();
+    const used = new Set<string>();
+    for (const group of groups) {
+      const section = root.createEl("section", { cls: "al-masterpiece-group" });
+      section.dataset.groupKey = group.key;
+      const heading = section.createDiv({ cls: "al-masterpiece-group-heading" });
+      heading.createEl("h2", { cls: "al-masterpiece-group-title", text: group.label });
+      heading.createSpan({ cls: "al-masterpiece-group-count", text: String(group.items.length) });
+      const grid = section.createDiv({
+        cls: `al-grid is-${context.state?.view ?? "grid"} al-masterpiece-group-grid`,
+      });
+      for (const entry of group.items) {
+        let card = entry.card;
+        if (used.has(entry.filePath)) {
+          const cloned = entry.card.cloneNode(true);
+          if (cloned.nodeType !== Node.ELEMENT_NODE) continue;
+          card = cloned as HTMLElement;
+          bindClonedCard(card, entry, context.adapters);
+        } else {
+          used.add(entry.filePath);
+        }
+        grid.appendChild(card);
       }
-      grid.appendChild(card);
     }
-  }
+  });
 }
 
 function configureEditControl(context: MediaFormContext<AnimeListFeatureHost>): void {
