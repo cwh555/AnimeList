@@ -24,6 +24,8 @@ export class AddImageSectionModal extends Modal {
   private nextKey = 1;
   private urlValue = "";
   private busy = false;
+  private mounted = false;
+  private dragController: AbortController | null = null;
 
   constructor(
     app: ConstructorParameters<typeof Modal>[0],
@@ -34,6 +36,8 @@ export class AddImageSectionModal extends Modal {
   }
 
   onOpen(): void {
+    this.mounted = true;
+    this.dragController = new AbortController();
     this.modalEl.addClass("animelist-image-add-modal");
     this.setTitle(imageSectionText("addImages"));
     this.render();
@@ -41,6 +45,9 @@ export class AddImageSectionModal extends Modal {
   }
 
   onClose(): void {
+    this.mounted = false;
+    this.dragController?.abort();
+    this.dragController = null;
     this.modalEl.removeEventListener("paste", this.handlePaste);
     for (const queued of this.queue) URL.revokeObjectURL(queued.previewUrl);
     this.queue = [];
@@ -53,6 +60,7 @@ export class AddImageSectionModal extends Modal {
     if (!files.length && !/data:image\/(?:png|jpeg|webp|gif|avif);base64,/i.test(html)) return;
     event.preventDefault();
     void imageAssetsFromClipboard(event).then((assets) => {
+      if (!this.mounted) return;
       const accepted = assets.filter((asset) => imageExtensionFor(asset.name, asset.contentType));
       if (!accepted.length) return;
       for (const asset of accepted) {
@@ -66,6 +74,7 @@ export class AddImageSectionModal extends Modal {
     const accepted = files.filter((file) => imageExtensionFor(file.name, file.type));
     if (!accepted.length) return;
     const assets = await Promise.all(accepted.map((file) => imageAssetFromFile(file)));
+    if (!this.mounted) return;
     for (const asset of assets) {
       this.queue.push({ asset, previewUrl: previewUrl(asset), key: this.nextKey++ });
     }
@@ -79,13 +88,14 @@ export class AddImageSectionModal extends Modal {
     this.render();
     try {
       const asset = await this.service.fetchRemoteAsset(url);
+      if (!this.mounted) return;
       this.queue.push({ asset, previewUrl: previewUrl(asset), key: this.nextKey++ });
       this.urlValue = "";
     } catch (error) {
       new Notice(imageSectionText("urlFailed", { error: errorMessage(error) }));
     } finally {
       this.busy = false;
-      this.render();
+      if (this.mounted) this.render();
     }
   }
 
@@ -157,7 +167,7 @@ export class AddImageSectionModal extends Modal {
         event,
         captureElement: item,
         dragElement: item,
-        ghostClass: "al-image-queue-drag-ghost",
+        signal: this.dragController?.signal,
         onMove: (point) => {
           dropTarget = this.queueDropTarget(queue, point);
           this.markQueueDropTarget(queue, dropTarget);
@@ -179,15 +189,16 @@ export class AddImageSectionModal extends Modal {
     this.render();
     try {
       await this.onAdd(this.queue.map((entry) => entry.asset));
-      this.close();
+      if (this.mounted) this.close();
     } catch (error) {
       this.busy = false;
       new Notice(imageSectionText("addFailed", { error: errorMessage(error) }));
-      this.render();
+      if (this.mounted) this.render();
     }
   }
 
   private render(): void {
+    if (!this.mounted) return;
     if (this.contentEl.childElementCount) transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     else this.contentEl.replaceChildren();
 

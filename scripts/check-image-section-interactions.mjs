@@ -105,6 +105,9 @@ const paths=["a.jpg","b.jpg","c.jpg","d.jpg","e.jpg","f.jpg"];
 let current=[...paths];
 let columns=4;
 let staleColumnsMetadata=false;
+let moveDelay=90;
+let moveCalls=0;
+let addCalls=0;
 const source=()=>current.map(p=>"- "+p).join("\\n");
 const state=()=>({source:source(),lineStart:0,lineEnd:current.length+1});
 const service={
@@ -116,14 +119,15 @@ const service={
  },
  moveAsset:async(_note,_sourceLoc,_targetLoc,moving,target,placement)=>{
   window.__movePersisted=false;
-  await delay(90);
+  await delay(moveDelay);
   current=AnimeListImageSections.reorderImageSectionPaths(current,moving,target,placement);
+  moveCalls+=1;
   window.__movePersisted=true;
   return{sourceSection:state(),targetSection:state(),markdown:""}
  },
  setAsCover:async()=>{},
  removeMany:async()=>source(),
- addAssets:async()=>({source:source(),duplicatesSkipped:0}),
+ addAssets:async()=>{addCalls+=1;return{source:source(),duplicatesSkipped:0}},
  fetchRemoteAsset:async()=>{throw new Error("unused")},
 };
 const context={sourcePath:"Demo.md",getSectionInfo:()=>({lineStart:0,lineEnd:current.length+1,text:String.fromCharCode(96).repeat(3)+"animelist-images"+(columns===4?"":" columns="+columns)+"\\n"+source()+"\\n"+String.fromCharCode(96).repeat(3)})};
@@ -165,9 +169,31 @@ renderer.onload();
  const target=section.querySelector('.al-image-item[data-image-path="c.jpg"]');
  const start=center(handle), end=center(target);
  const movingRectBeforeDrop=moving.getBoundingClientRect();
+ const galleryImagesBeforeDrag=[...section.querySelectorAll('.al-image-item img')];
+ const bodyImageCountBeforeDrag=document.body.querySelectorAll('img').length;
+ const modalCountAtDragStart=window.__modalOpenCount||0;
+ let transientMediaSurface=false;
+ let transientLightbox=false;
+ let movingImageSourceMutations=0;
+ const movingImageObserver=new MutationObserver((records)=>{
+   movingImageSourceMutations+=records.filter((record)=>record.type==='attributes' && (record.attributeName==='src' || record.attributeName==='srcset')).length;
+ });
+ movingImageObserver.observe(movingImage,{attributes:true,attributeFilter:['src','srcset']});
+ const dragSurfaceObserver=new MutationObserver((records)=>{
+   for(const record of records){
+     for(const node of record.addedNodes){
+       if(!(node instanceof Element)) continue;
+       if(node.matches('.al-image-drag-ghost,.animelist-image-lightbox') || node.querySelector('.al-image-drag-ghost,.animelist-image-lightbox')) transientMediaSurface=true;
+       if(node.matches('.animelist-image-lightbox') || node.querySelector('.animelist-image-lightbox')) transientLightbox=true;
+     }
+   }
+ });
+ dragSurfaceObserver.observe(document.body,{childList:true,subtree:true});
  touch(handle,"pointerdown",start.x,start.y,21); touch(moving,"pointermove",end.x,end.y+10,21);
  await delay(10);
- details.touchDragUsesGhost=document.querySelectorAll('.al-image-drag-ghost').length===1;
+ details.touchDragUsesOriginalCardOnly=document.querySelectorAll('.al-image-drag-ghost,.al-pointer-drag-ghost').length===0
+   && document.body.querySelectorAll('img').length===bodyImageCountBeforeDrag
+   && moving.classList.contains('is-pointer-dragging');
  details.dragSourceDoesNotFade=getComputedStyle(moving).opacity==="1";
  const masonryRelayoutsBeforeDrop=window.__masonryReplaceCalls;
  touch(moving,"pointerup",end.x,end.y+10,21);
@@ -177,7 +203,21 @@ renderer.onload();
    && immediateMoved===moving
    && (immediateMoved.dataset.layoutMotion==='active' || immediateMoved.getAnimations().length>0);
  details.galleryReorderUsesLayoutMotion=immediateMoved.getAnimations().length>0 || immediateMoved.dataset.layoutMotion==='active';
- await delay(340);
+ let framePipelineStable=true;
+ for(let frame=0;frame<24;frame+=1){
+   await new Promise((resolve)=>requestAnimationFrame(resolve));
+   const liveImages=[...section.querySelectorAll('.al-image-item img')];
+   if(document.querySelector('.al-image-drag-ghost,.al-pointer-drag-ghost,.animelist-image-lightbox')) framePipelineStable=false;
+   if((window.__modalOpenCount||0)!==modalCountAtDragStart) framePipelineStable=false;
+   if(document.body.querySelectorAll('img').length!==bodyImageCountBeforeDrag) framePipelineStable=false;
+   if(liveImages.length!==galleryImagesBeforeDrag.length || liveImages.some((image,index)=>image!==galleryImagesBeforeDrag[index] && !galleryImagesBeforeDrag.includes(image))) framePipelineStable=false;
+   if(section.querySelector('.al-image-item[data-image-path="a.jpg"]')!==moving || moving.querySelector('img')!==movingImage) framePipelineStable=false;
+ }
+ dragSurfaceObserver.disconnect();
+ movingImageObserver.disconnect();
+ details.dragPipelineHasNoTransientMediaSurface=framePipelineStable && !transientMediaSurface && !transientLightbox
+   && movingImageSourceMutations===0 && (window.__modalOpenCount||0)===modalCountAtDragStart;
+ await delay(30);
  details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
    && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
@@ -186,7 +226,7 @@ renderer.onload();
  details.reorderPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  details.reorderPreservesPreferredColumns=section.querySelectorAll('.al-image-masonry-column').length===2
    && section.querySelector('.al-image-column-control input[type="range"]').value==='2';
- details.dragGhostCleansUp=document.querySelectorAll('.al-image-drag-ghost').length===0;
+ details.dragLeavesNoFloatingPreview=document.querySelectorAll('.al-image-drag-ghost,.al-pointer-drag-ghost').length===0;
  details.touchHandleIsAvailable=parseFloat(getComputedStyle(moved.querySelector('.al-image-drag-handle')).opacity)>0;
 
  // Obsidian can replace a Markdown render child after the note write completes,
@@ -228,6 +268,61 @@ renderer.onload();
  mouseReplacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:mouseEnd.x,clientY:mouseEnd.y+10}));
  await delay(20);
  details.mouseDragReleaseDoesNotOpenLightbox=(window.__modalOpenCount||0)===modalCountBeforeMouseDropClick;
+ const replacementCardBeforeStaleCompletion=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
+ const replacementImageBeforeStaleCompletion=replacementCardBeforeStaleCompletion?.querySelector('img');
+ await delay(330);
+ details.unloadedRendererCannotRepaintReplacement=section.querySelector('.al-image-item[data-image-path="a.jpg"]')===replacementCardBeforeStaleCompletion
+   && replacementCardBeforeStaleCompletion?.querySelector('img')===replacementImageBeforeStaleCompletion;
+ const stressRenderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
+ stressRenderer.onload();
+ const stressCardAfterOwnershipTransfer=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
+ const stressImageAfterOwnershipTransfer=stressCardAfterOwnershipTransfer?.querySelector('img');
+ mouseReplacement.onunload();
+ details.newRendererSurvivesOldUnload=section.querySelector('.al-image-item[data-image-path="a.jpg"]')===stressCardAfterOwnershipTransfer
+   && stressCardAfterOwnershipTransfer?.querySelector('img')===stressImageAfterOwnershipTransfer;
+
+ // Stress the complete reorder gesture without media clones. Reduced motion is
+ // used only for this 100-cycle lifecycle test so it measures pointer/drop/DOM
+ // correctness instead of spending ~19 seconds waiting for FLIP animations.
+ const originalMatchMedia=window.matchMedia;
+ window.matchMedia=()=>({matches:true,media:'(prefers-reduced-motion: reduce)',addEventListener(){},removeEventListener(){}});
+ moveDelay=0;
+ const stressModalCount=window.__modalOpenCount||0;
+ const stressImages=new Map([...section.querySelectorAll('.al-image-item')].map((item)=>[item.dataset.imagePath,item.querySelector('img')]));
+ let stressStable=true;
+ for(let iteration=0;iteration<100;iteration+=1){
+   const liveMoving=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
+   const otherPaths=current.filter((path)=>path!=="a.jpg");
+   const moveToEnd=iteration%2===0;
+   const targetPath=moveToEnd?otherPaths[otherPaths.length-1]:otherPaths[0];
+   const liveTarget=section.querySelector('.al-image-item[data-image-path="'+targetPath+'"]');
+   const liveHandle=liveMoving?.querySelector('.al-image-drag-handle');
+   if(!liveMoving||!liveTarget||!liveHandle){stressStable=false;break;}
+   const from=center(liveHandle), targetRect=liveTarget.getBoundingClientRect();
+   const to={x:targetRect.left+targetRect.width/2,y:moveToEnd?targetRect.top+targetRect.height*0.75:targetRect.top+targetRect.height*0.25};
+   const beforeCalls=moveCalls;
+   touch(liveHandle,'pointerdown',from.x,from.y,1000+iteration);
+   touch(liveMoving,'pointermove',to.x,to.y,1000+iteration);
+   touch(liveMoving,'pointerup',to.x,to.y,1000+iteration);
+   for(let wait=0;wait<50 && moveCalls===beforeCalls;wait+=1) await delay(1);
+   if(moveCalls!==beforeCalls+1) stressStable=false;
+   if(document.querySelector('.al-image-drag-ghost,.al-pointer-drag-ghost,.animelist-image-lightbox')) stressStable=false;
+   if((window.__modalOpenCount||0)!==stressModalCount) stressStable=false;
+   for(const [path,image] of stressImages){
+     if(section.querySelector('.al-image-item[data-image-path="'+path+'"] img')!==image) stressStable=false;
+   }
+ }
+ window.matchMedia=originalMatchMedia;
+ moveDelay=90;
+ details.hundredReordersKeepSingleMediaSurface=stressStable && moveCalls>=102;
+ details.hundredReorderMoveCalls=moveCalls>=102;
+
+ const addCallsBeforeRootDrop=addCalls;
+ const rootDrop=new Event('drop',{bubbles:true,cancelable:true});
+ Object.defineProperty(rootDrop,'dataTransfer',{value:{files:[new File([new Uint8Array([1,2,3])],'late.png',{type:'image/png'})]}});
+ section.dispatchEvent(rootDrop);
+ await delay(40);
+ details.replacedRenderersDoNotDuplicateRootDropHandlers=addCalls===addCallsBeforeRootDrop+1;
 
  const lightbox=new AnimeListImageSections.ImageLightboxModal(host.app,service,AnimeListImageSections.imageLightboxEntries(context.sourcePath,["a.jpg","b.jpg","c.jpg"]),0);
  lightbox.open();
@@ -286,18 +381,57 @@ renderer.onload();
  await delay(80);
  const queue=modal.contentEl.querySelector('.al-image-queue');
  details.imageQueueDecodeFailureFallsBack=queue.querySelector('[data-queue-key="1"] .al-image-queue-preview-missing')!==null;
- const first=queue.querySelector('.al-image-queue-item[data-queue-key="1"]');
- const firstHandle=first.querySelector('.al-image-queue-drag-handle');
+ const second=queue.querySelector('.al-image-queue-item[data-queue-key="2"]');
+ const secondImage=second.querySelector('img');
+ const secondHandle=second.querySelector('.al-image-queue-drag-handle');
  const third=queue.querySelector('.al-image-queue-item[data-queue-key="3"]');
- const qs=center(firstHandle), qe=center(third);
- touch(firstHandle,"pointerdown",qs.x,qs.y,31); touch(first,"pointermove",qe.x+20,qe.y,31); await delay(10);
- details.previewTouchDragUsesGhost=document.querySelectorAll('.al-image-queue-drag-ghost').length===1;
- touch(first,"pointerup",qe.x+20,qe.y,31); await delay(20);
- details.previewDomNodesArePreserved=queue.querySelector('.al-image-queue-item[data-queue-key="1"]')===first;
- details.previewQueueReordered=modal.queue.map(x=>x.asset.name).join(",")==="two.png,three.png,one.png";
+ const qs=center(secondHandle), qe=center(third);
+ const queueImageCountBeforeDrag=document.body.querySelectorAll('img').length;
+ touch(secondHandle,"pointerdown",qs.x,qs.y,31); touch(second,"pointermove",qe.x+20,qe.y,31); await delay(10);
+ details.previewTouchDragUsesOriginalCardOnly=document.querySelectorAll('.al-image-queue-drag-ghost,.al-pointer-drag-ghost').length===0
+   && document.body.querySelectorAll('img').length===queueImageCountBeforeDrag
+   && second.classList.contains('is-pointer-dragging');
+ touch(second,"pointerup",qe.x+20,qe.y,31); await delay(20);
+ details.previewDomNodesArePreserved=queue.querySelector('.al-image-queue-item[data-queue-key="2"]')===second && second.querySelector('img')===secondImage;
+ details.previewQueueReordered=modal.queue.map(x=>x.asset.name).join(",")==="one.png,three.png,two.png";
  await modal.submit(); await delay(10);
- details.previewSubmitUsesDraggedOrder=submitted.join(",")==="two.png,three.png,one.png";
- details.previewGhostCleansUp=document.querySelectorAll('.al-image-queue-drag-ghost').length===0;
+ details.previewSubmitUsesDraggedOrder=submitted.join(",")==="one.png,three.png,two.png";
+ details.previewLeavesNoFloatingPreview=document.querySelectorAll('.al-image-queue-drag-ghost,.al-pointer-drag-ghost').length===0;
+
+ let lateRemoteResolved=false;
+ const raceService={...service,fetchRemoteAsset:async()=>{await delay(50);lateRemoteResolved=true;return{name:'late.png',contentType:'image/png',data:new Uint8Array([4,5,6])}}};
+ const raceModal=new AnimeListImageSections.AddImageSectionModal({},raceService,async()=>{});
+ raceModal.open();
+ const raceInput=raceModal.contentEl.querySelector('.al-image-url-group input');
+ raceInput.value='https://example.invalid/late.png';
+ raceInput.dispatchEvent(new Event('input',{bubbles:true}));
+ raceModal.contentEl.querySelector('.al-image-url-row button').click();
+ await delay(5);
+ raceModal.close();
+ await delay(80);
+ details.closedAddModalIgnoresLateRemoteImage=lateRemoteResolved && raceModal.contentEl.childElementCount===0 && !raceModal.modalEl.isConnected;
+
+ const cancelModal=new AnimeListImageSections.AddImageSectionModal({},service,async()=>{});
+ cancelModal.queue=[
+  {asset:{name:'x.png',contentType:'image/png',data:new Uint8Array([1])},previewUrl:"${pixel}",key:51},
+  {asset:{name:'y.png',contentType:'image/png',data:new Uint8Array([2])},previewUrl:"${pixel}",key:52},
+ ];
+ cancelModal.nextKey=53; cancelModal.open();
+ const cancelQueue=cancelModal.contentEl.querySelector('.al-image-queue');
+ const cancelMoving=cancelQueue.querySelector('[data-queue-key="51"]');
+ const cancelHandle=cancelMoving.querySelector('.al-image-queue-drag-handle');
+ const cancelTarget=cancelQueue.querySelector('[data-queue-key="52"]');
+ const cancelFrom=center(cancelHandle),cancelTo=center(cancelTarget);
+ touch(cancelHandle,'pointerdown',cancelFrom.x,cancelFrom.y,77);
+ touch(cancelMoving,'pointermove',cancelTo.x+10,cancelTo.y,77);
+ await delay(5);
+ const cancelDragStarted=cancelMoving.classList.contains('is-pointer-dragging');
+ cancelModal.close();
+ touch(cancelMoving,'pointerup',cancelTo.x+10,cancelTo.y,77);
+ await delay(10);
+ details.closingAddModalCancelsActivePointerDrag=cancelDragStarted && !cancelMoving.classList.contains('is-pointer-dragging')
+   && !document.querySelector('.al-image-queue-drag-ghost,.al-pointer-drag-ghost');
+
  document.body.dataset.details=JSON.stringify(details);
  document.body.dataset.result=Object.values(details).every(Boolean)?"pass":"fail";
 })().catch(error=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result="fail"});
@@ -310,6 +444,7 @@ try {
     testName: "Image Sections exact columns and touch drag interactions",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    resultTimeoutMs: 30000,
   });
 } finally {
   await rm(output, { recursive: true, force: true });

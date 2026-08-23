@@ -26,6 +26,7 @@ const entry = fs.readFileSync(path.join(root, "src/plugin-entry.ts"), "utf8");
 const legacy = fs.readFileSync(path.join(root, "src/legacy.ts"), "utf8");
 const libraryRenderer = fs.readFileSync(path.join(root, "src/ui/library-renderer.ts"), "utf8");
 const libraryWorkspaceLayout = fs.readFileSync(path.join(root, "src/ui/library-workspace-layout.ts"), "utf8");
+const pointerDrag = fs.readFileSync(path.join(root, "src/ui/pointer-drag.ts"), "utf8");
 const featureAndUiSources = sources
   .filter(({ path: file }) => (
     !file.startsWith("src/data/")
@@ -63,6 +64,11 @@ reject(
   /\.closest(?:<[^>]+>)?\([^)]*al-workspace|querySelector(?:<[^>]+>)?\([^)]*al-workspace-page-actions/,
   "Library workspace layout must receive Workspace-owned action slots explicitly instead of discovering ancestors",
   libraryWorkspaceLayout,
+);
+reject(
+  /cloneNode\s*\(/,
+  "pointer drag must not clone whole media/card DOM surfaces; keep the original node and use explicit drop indicators",
+  pointerDrag,
 );
 
 // Every user-facing image element needs an explicit load-failure contract. This

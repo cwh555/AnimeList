@@ -92,6 +92,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private readonly imageNodeCache = new Map<string, { signature: string; image: HTMLImageElement }>();
   private galleryViewport: HTMLElement | null = null;
   private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
+  private mounted = false;
+  private readonly lifecycleEvents = new AbortController();
+
+  private ownsContainer(): boolean {
+    return this.mounted && imageSectionRenderers.get(this.containerEl) === this;
+  }
 
   constructor(
     containerEl: HTMLElement,
@@ -136,6 +142,13 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   onload(): void {
+    const previous = imageSectionRenderers.get(this.containerEl);
+    if (previous && previous !== this) {
+      previous.saveEphemeralState();
+      previous.lifecycleEvents.abort();
+      previous.mounted = false;
+    }
+    this.mounted = true;
     const section = this.context.getSectionInfo(this.containerEl);
     this.lineHint = section?.lineStart;
     const parsedColumns = parseImageSectionColumns(section?.text);
@@ -155,11 +168,13 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     imageSectionRenderers.set(this.containerEl, this);
     this.render();
     if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
-    this.registerDomEvent(document, "click", () => this.closeMenus());
+    document.addEventListener("click", () => this.closeMenus(), { signal: this.lifecycleEvents.signal });
   }
 
   onunload(): void {
-    this.saveEphemeralState();
+    if (this.ownsContainer()) this.saveEphemeralState();
+    this.lifecycleEvents.abort();
+    this.mounted = false;
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
     this.lineHintResetTimer = null;
     this.galleryRelayout = null;
@@ -167,7 +182,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryPaths = [];
     this.imageElements.clear();
     this.imageNodeCache.clear();
-    imageSectionRenderers.delete(this.containerEl);
+    if (imageSectionRenderers.get(this.containerEl) === this) imageSectionRenderers.delete(this.containerEl);
     if (activeImageDrag?.source === this) activeImageDrag = null;
     clearImageDropIndicators();
   }
@@ -181,6 +196,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private setSource(source: string): void {
+    if (!this.ownsContainer()) return;
     this.source = source;
     this.selectionMode = false;
     this.selectedPaths.clear();
@@ -208,7 +224,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private openAddModal(): void {
     new AddImageSectionModal(this.host.app, this.service, async (assets) => {
       const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
-      this.applyAddResult(result);
+      if (this.ownsContainer()) this.applyAddResult(result);
     }).open();
   }
 
@@ -218,7 +234,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     try {
       const assets: ImageSectionAssetInput[] = await Promise.all(accepted.map((file) => imageAssetFromFile(file)));
       const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
-      this.applyAddResult(result);
+      if (this.ownsContainer()) this.applyAddResult(result);
     } catch (error) {
       new Notice(imageSectionText("addFailed", { error: errorMessage(error) }));
     }
@@ -234,7 +250,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     if (!paths.length) return;
     new DeleteImageSectionModal(this.host.app, async () => {
       const next = await this.service.removeMany(this.context.sourcePath, this.locator(), paths);
-      this.setSource(next);
+      if (this.ownsContainer()) this.setSource(next);
     }, paths.length).open();
   }
 
@@ -403,6 +419,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private applyGalleryPaths(nextPaths: readonly string[], renderEmpty = true): void {
+    if (!this.ownsContainer()) return;
     const alreadyApplied = Boolean(this.galleryRelayout)
       && nextPaths.length === this.galleryPaths.length
       && nextPaths.every((path, index) => path === this.galleryPaths[index] && this.imageElements.has(path));
@@ -427,6 +444,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
+    if (!this.ownsContainer()) return;
     this.acceptSectionState(update);
     this.applyGalleryPaths(parseImageSectionSource(update.source));
     this.saveEphemeralState();
@@ -485,20 +503,24 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         targetPath ?? "",
         placement,
       );
-      source.containerEl.removeClass("is-image-drag-source");
+      if (source.ownsContainer()) source.containerEl.removeClass("is-image-drag-source");
       if (source === this) {
-        this.applyOrderedSectionState(update.sourceSection);
+        if (this.ownsContainer()) this.applyOrderedSectionState(update.sourceSection);
       } else {
-        source.applyOrderedSectionState(update.sourceSection);
-        this.applyOrderedSectionState(update.targetSection);
+        if (source.ownsContainer()) source.applyOrderedSectionState(update.sourceSection);
+        if (this.ownsContainer()) this.applyOrderedSectionState(update.targetSection);
       }
-      scrollPosition.restore();
-      scrollPosition.stabilize(12);
+      if (source.ownsContainer()) {
+        scrollPosition.restore();
+        scrollPosition.stabilize(12);
+      }
     } catch (error) {
-      source.applyGalleryPaths(optimistic.sourceBefore);
-      if (source !== this) this.applyGalleryPaths(optimistic.targetBefore);
-      scrollPosition.restore();
-      scrollPosition.stabilize(12);
+      if (source.ownsContainer()) source.applyGalleryPaths(optimistic.sourceBefore);
+      if (source !== this && this.ownsContainer()) this.applyGalleryPaths(optimistic.targetBefore);
+      if (source.ownsContainer()) {
+        scrollPosition.restore();
+        scrollPosition.stabilize(12);
+      }
       new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
     }
   }
@@ -520,7 +542,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       event,
       captureElement: item,
       dragElement: item,
-      ghostClass: "al-image-drag-ghost",
+      signal: this.lifecycleEvents.signal,
       onStart: () => {
         this.containerEl.addClass("is-image-drag-source");
         this.closeMenus();
@@ -713,7 +735,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         for (const image of gallery.querySelectorAll<HTMLImageElement>("img")) {
           if (image.complete) continue;
           image.addEventListener("load", () => {
-            window.requestAnimationFrame(() => anchor.restore());
+            if (!this.ownsContainer()) return;
+            window.requestAnimationFrame(() => {
+              if (this.ownsContainer()) anchor.restore();
+            });
           }, { once: true });
         }
       }
@@ -731,7 +756,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.interactionsBound = true;
     this.containerEl.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("mousedown", (event) => {
       const target = eventTargetElement(event);
       if (!isInteractiveTarget(target)) return;
@@ -741,34 +766,34 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       }
       event.preventDefault();
       event.stopPropagation();
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("click", (event) => {
       if (event.defaultPrevented || isInteractiveTarget(eventTargetElement(event))) return;
       this.containerEl.focus({ preventScroll: true });
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("dragover", (event) => {
       if (![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === "file")) return;
       event.preventDefault();
       this.containerEl.addClass("is-dragging");
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("dragleave", (event) => {
       if (!this.containerEl.contains(event.relatedTarget as Node | null)) {
         this.containerEl.removeClass("is-dragging");
       }
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("drop", (event) => {
       const files = [...(event.dataTransfer?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
       this.containerEl.removeClass("is-dragging");
       void this.addFiles(files);
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("paste", (event) => {
       const files = [...(event.clipboardData?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
       void this.addFiles(files);
-    });
+    }, { signal: this.lifecycleEvents.signal });
   }
 
   private renderToolbar(paths: readonly string[]): void {
@@ -858,6 +883,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         scrollPosition.stabilize(12);
         void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
           .then((update) => {
+            if (!this.ownsContainer()) return;
             this.acceptSectionState(update);
             this.preferredColumns = nextColumns;
             persistedColumns = nextColumns;
@@ -865,12 +891,14 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
             scrollPosition.stabilize(12);
           })
           .catch((error) => {
-            this.preferredColumns = persistedColumns;
-            range.value = String(persistedColumns);
-            value.value = String(persistedColumns);
-            value.textContent = String(persistedColumns);
-            this.galleryRelayout?.();
-            scrollPosition.restore();
+            if (this.ownsContainer()) {
+              this.preferredColumns = persistedColumns;
+              range.value = String(persistedColumns);
+              value.value = String(persistedColumns);
+              value.textContent = String(persistedColumns);
+              this.galleryRelayout?.();
+              scrollPosition.restore();
+            }
             new Notice(imageSectionText("layoutFailed", { error: errorMessage(error) }));
           });
       });
@@ -881,6 +909,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
+    if (!this.ownsContainer()) return;
     this.galleryRelayout = null;
     this.galleryViewport = null;
     this.galleryPaths = [];

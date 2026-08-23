@@ -13,7 +13,7 @@ export interface PointerDragOptions {
   onCancel?: () => void;
   onStart?: () => void;
   threshold?: number;
-  ghostClass?: string;
+  signal?: AbortSignal;
 }
 
 function point(event: PointerEvent): PointerDragPoint {
@@ -54,22 +54,6 @@ function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, r
   timeout = view.setTimeout(cleanup, timeoutMs);
 }
 
-function createGhost(element: HTMLElement, className: string): HTMLElement {
-  const rect = element.getBoundingClientRect();
-  const ghost = element.cloneNode(true) as HTMLElement;
-  ghost.removeAttribute("id");
-  ghost.classList.add(className);
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.style.width = `${rect.width}px`;
-  ghost.style.height = `${rect.height}px`;
-  document.body.appendChild(ghost);
-  return ghost;
-}
-
-function positionGhost(ghost: HTMLElement, pointValue: PointerDragPoint): void {
-  ghost.style.transform = `translate3d(${Math.round(pointValue.clientX + 12)}px,${Math.round(pointValue.clientY + 12)}px,0)`;
-}
-
 export function armPointerDrag(options: PointerDragOptions): void {
   const {
     event,
@@ -80,33 +64,35 @@ export function armPointerDrag(options: PointerDragOptions): void {
     onCancel,
     onStart,
     threshold = 5,
-    ghostClass = "al-pointer-drag-ghost",
+    signal,
   } = options;
   if (event.button !== 0 && event.pointerType === "mouse") return;
+  if (signal?.aborted) return;
 
   const pointerId = event.pointerId;
   const start = point(event);
   let started = false;
-  let ghost: HTMLElement | null = null;
 
   const cleanup = (): void => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", cancel);
+    signal?.removeEventListener("abort", abort);
     try {
       if (captureElement.hasPointerCapture(pointerId)) captureElement.releasePointerCapture(pointerId);
     } catch {
       // The browser may already have released pointer capture.
     }
-    ghost?.remove();
-    ghost = null;
     dragElement.removeClass("is-pointer-dragging");
   };
 
-  const startDrag = (current: PointerDragPoint): void => {
+  const abort = (): void => {
+    if (started) onCancel?.();
+    cleanup();
+  };
+
+  const startDrag = (): void => {
     started = true;
-    ghost = createGhost(dragElement, ghostClass);
-    positionGhost(ghost, current);
     dragElement.addClass("is-pointer-dragging");
     onStart?.();
   };
@@ -115,10 +101,9 @@ export function armPointerDrag(options: PointerDragOptions): void {
     if (moveEvent.pointerId !== pointerId) return;
     const current = point(moveEvent);
     if (!started && distanceSquared(start, current) < threshold * threshold) return;
-    if (!started) startDrag(current);
+    if (!started) startDrag();
     moveEvent.preventDefault();
     moveEvent.stopPropagation();
-    if (ghost) positionGhost(ghost, current);
     onMove(current);
   };
 
@@ -143,6 +128,7 @@ export function armPointerDrag(options: PointerDragOptions): void {
     cleanup();
   };
 
+  signal?.addEventListener("abort", abort, { once: true });
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", cancel);
