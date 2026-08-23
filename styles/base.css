@@ -1,4 +1,13 @@
 /* AnimeList Dashboard v0.6.2 — loaded by the bundled plugin. */
+/* AnimeList-owned elements must respect the HTML hidden contract even when
+   component CSS assigns flex/grid display for the visible state. The :not()
+   guard deliberately gives this contract ID-level specificity without using
+   priority overrides, which are forbidden by the community/release preflight. */
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"])[hidden]:not(#animelist-allow-hidden-display),
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"]):not(#animelist-allow-hidden-display) [hidden] {
+  display: none;
+}
+
 .animelist-dashboard.animelist-dashboard .markdown-preview-sizer,
 .animelist-dashboard.animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100%; width: 100%; }
 .animelist-dashboard .markdown-preview-view,

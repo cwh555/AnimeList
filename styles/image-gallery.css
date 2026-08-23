@@ -272,3 +272,13 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   .al-gallery-work-detail-head .al-secondary-button { width:40px; min-height:40px; padding:0; }
   button.al-gallery-session-filter { height:36px; min-height:36px; }
 }
+
+.al-gallery-work-mosaic-missing {
+  display:grid;
+  width:100%;
+  height:100%;
+  place-items:center;
+  color:var(--text-faint);
+  background:var(--background-secondary-alt);
+}
+.al-gallery-work-mosaic-missing svg { width:24px; height:24px; }

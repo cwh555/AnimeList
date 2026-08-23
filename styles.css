@@ -1,4 +1,13 @@
 /* AnimeList Dashboard v0.6.2 — loaded by the bundled plugin. */
+/* AnimeList-owned elements must respect the HTML hidden contract even when
+   component CSS assigns flex/grid display for the visible state. The :not()
+   guard deliberately gives this contract ID-level specificity without using
+   priority overrides, which are forbidden by the community/release preflight. */
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"])[hidden]:not(#animelist-allow-hidden-display),
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"]):not(#animelist-allow-hidden-display) [hidden] {
+  display: none;
+}
+
 .animelist-dashboard.animelist-dashboard .markdown-preview-sizer,
 .animelist-dashboard.animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100%; width: 100%; }
 .animelist-dashboard .markdown-preview-view,
@@ -1505,6 +1514,16 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   button.al-gallery-session-filter { height:36px; min-height:36px; }
 }
 
+.al-gallery-work-mosaic-missing {
+  display:grid;
+  width:100%;
+  height:100%;
+  place-items:center;
+  color:var(--text-faint);
+  background:var(--background-secondary-alt);
+}
+.al-gallery-work-mosaic-missing svg { width:24px; height:24px; }
+
 /* Timeline poster cards share one compact 2:3 footprint in modal and workspace presentations. */
 .al-timeline-card {
   height: 180px;
@@ -1518,6 +1537,16 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   object-position: center;
   background: var(--background-primary-alt, #202026);
 }
+
+.al-timeline-cover-missing {
+  display:grid;
+  width:100%;
+  height:100%;
+  place-items:center;
+  color:var(--text-faint);
+  background:var(--background-primary-alt,#202026);
+}
+.al-timeline-cover-missing svg { width:34%; height:34%; }
 
 /* Full-page Material 3 timeline. Like Obsidian Graph view, the leaf owns a fixed
  * viewport: page chrome stays in-flow, the interactive canvas takes the remaining
@@ -2128,6 +2157,14 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   .al-detail-cover { width:min(180px,58vw); }
 }
 
+.al-detail-cover-missing {
+  display:grid;
+  min-height:180px;
+  place-items:center;
+  color:var(--text-faint);
+}
+.al-detail-cover-missing svg { width:38px; height:38px; }
+
 /* Reusable media-note image sections. The block is intentionally a gallery, not an editor. */
 .block-language-animelist-images { overflow:visible; }
 .animelist-image-section {
@@ -2582,7 +2619,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .al-image-lightbox-stage {
   position:relative;
   display:flex;
-  min-height:0;
+  min-height:min(240px,calc(100vh - 150px));
   max-height:calc(100vh - 150px);
   align-items:center;
   justify-content:center;
@@ -2630,8 +2667,9 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   font-variant-numeric:tabular-nums;
 }
 .al-image-lightbox-missing {
+  position:absolute;
+  inset:0;
   display:grid;
-  min-height:240px;
   place-items:center;
   color:var(--text-muted);
 }
@@ -2651,6 +2689,15 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .animelist-image-lightbox .al-image-lightbox-stage.is-zoomed { cursor: grab; }
 .animelist-image-lightbox .al-image-lightbox-stage.is-panning { cursor: grabbing; }
 .animelist-image-lightbox .al-image-lightbox-stage.is-panning .al-image-lightbox-image { transition: none; }
+
+.al-image-queue-preview-missing {
+  display:grid;
+  width:100%;
+  height:100%;
+  place-items:center;
+  color:var(--text-faint);
+}
+.al-image-queue-preview-missing svg { width:28px; height:28px; }
 
 /* Moments reading view: editorial quote cards with featured single-image stages and single-row filmstrips. */
 .block-language-animelist-moments { overflow: visible; }
@@ -4337,6 +4384,46 @@ button.al-moment-stack-strip:focus-visible {
 .al-completion-date-support[hidden],
 .al-completion-date-control .al-date-input[hidden] {
   display:none;
+}
+
+/* Keep local/manual cover previews geometrically stable when decode fails. */
+.al-manual-cover-preview {
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:112px;
+  padding:8px;
+  border:1px solid var(--background-modifier-border);
+  border-radius:10px;
+  background:var(--background-secondary);
+}
+.al-manual-cover-preview img,
+.al-manual-cover-preview-missing {
+  display:grid;
+  width:72px;
+  height:108px;
+  flex:0 0 72px;
+  place-items:center;
+  border-radius:8px;
+  object-fit:cover;
+  color:var(--text-faint);
+  background:var(--background-primary-alt);
+  text-align:center;
+  font-size:var(--font-ui-smaller);
+}
+.al-selected-preview > .al-search-result-placeholder {
+  width:92px;
+  height:138px;
+  flex:0 0 92px;
+  border-radius:10px;
+}
+@media (max-width:780px) {
+  .al-selected-preview > .al-search-result-placeholder {
+    width:72px;
+    height:108px;
+    flex-basis:72px;
+  }
 }
 
 /* Interaction motion is intentionally transform-only so image/poster decode state stays intact. */

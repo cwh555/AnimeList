@@ -1,3 +1,4 @@
+import { bindImageFallback } from "../image-fallback";
 import type { RankedSerialCoverCandidate } from "../../domain/serial-covers/ranking";
 
 export interface SerialCoverCandidateRowOptions {
@@ -21,9 +22,15 @@ export function renderSerialCoverCandidateRow(
   row.setAttribute("aria-busy", options.applying ? "true" : "false");
 
   const image = row.createEl("img");
-  image.src = candidate.coverUrl;
   image.alt = "";
   image.loading = "lazy";
+  bindImageFallback(image, () => {
+    const missing = createDiv();
+    missing.className = "al-search-result-placeholder";
+    missing.textContent = "—";
+    return missing;
+  });
+  image.src = candidate.coverUrl;
 
   const body = row.createDiv({ cls: "al-search-result-body" });
   body.createEl("strong", { text: candidate.title });

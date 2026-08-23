@@ -8,7 +8,8 @@ import type { AnimeListUiHost } from "./plugin-host";
 import { shouldRefreshAnimeListBlockPath, shouldRefreshAnimeListBlockRename } from "./markdown-refresh-scope";
 import { detailMediaQuarterLabel } from "./media-quarter-label";
 import { ConfirmDeleteModal } from "./media-modals";
-import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel } from "./ui-helpers";
+import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
@@ -263,12 +264,20 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
       const image = this.detailCoverCache?.resource === coverResource
         ? this.detailCoverCache.image
         : makeEl("img");
-      image.src = coverResource;
       image.alt = uiText("library.coverAlt", { title: detailString(fm.title) || file.basename });
       image.loading = "lazy";
       image.decoding = "async";
+      if (this.detailCoverCache?.image !== image) {
+        bindImageFallback(image, () => {
+          this.detailCoverCache = null;
+          const missing = makeEl("div", "al-detail-cover-missing");
+          setAnimeListIcon(missing, "book");
+          return missing;
+        });
+      }
       this.detailCoverCache = { resource: coverResource, image };
       cover.appendChild(image);
+      if (image.getAttribute("src") !== coverResource) image.src = coverResource;
       body.appendChild(cover);
     } else {
       this.detailCoverCache = null;

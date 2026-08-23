@@ -11,6 +11,7 @@ import type {
 import { releaseTrackingText } from "../features/release-tracking/text";
 import { abortable, isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
 
 export interface ReleaseTrackingModalActions {
@@ -72,16 +73,13 @@ function resultCover(item: MediaItem, className = "al-release-result-cover"): HT
     return cover;
   }
   const image = makeElement("img");
-  image.src = source;
   image.alt = item.title;
   image.loading = "lazy";
   image.decoding = "async";
+  bindImageFallback(image, () => icon("book-open", "al-release-cover-fallback"));
   if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-  image.addEventListener("error", () => {
-    image.remove();
-    cover.appendChild(icon("book-open", "al-release-cover-fallback"));
-  }, { once: true });
   cover.appendChild(image);
+  image.src = source;
   return cover;
 }
 

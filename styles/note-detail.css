@@ -202,3 +202,11 @@
   .al-detail-body { grid-template-columns:1fr; }
   .al-detail-cover { width:min(180px,58vw); }
 }
+
+.al-detail-cover-missing {
+  display:grid;
+  min-height:180px;
+  place-items:center;
+  color:var(--text-faint);
+}
+.al-detail-cover-missing svg { width:38px; height:38px; }

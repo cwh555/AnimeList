@@ -80,7 +80,7 @@ const frieren=[img("Anime/Frieren.md","Frieren","anime","a.jpg","f-a"),img("Anim
 const kaguya=[img("Manga/Kaguya.md","Kaguya","manga","d.jpg","k-d"),img("Manga/Kaguya.md","Kaguya","manga","e.jpg","k-e"),img("Manga/Kaguya.md","Kaguya","manga","f.jpg","k-f")];
 frieren[1].references.push({sessionIndex:1,position:0});
 const works=[refs("Anime/Frieren.md","Frieren","anime",frieren,[["a.jpg","b.jpg"],["b.jpg","c.jpg"]]),refs("Manga/Kaguya.md","Kaguya","manga",kaguya,[["d.jpg","e.jpg","f.jpg"]])];
-const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"${images.c}","d.jpg":"${images.d}","e.jpg":"${images.e}","f.jpg":"${images.f}"};
+const urlMap={"a.jpg":"${images.a}","b.jpg":"${images.b}","c.jpg":"data:image/png;base64,not-valid","d.jpg":"${images.d}","e.jpg":"${images.e}","f.jpg":"${images.f}"};
 const timelineItem={title:"Frieren",originalTitle:"Frieren",mediaType:"anime",format:"TV",status:"completed",releaseStatus:"finished",progress:28,total:28,unit:"ep",score:9,favorite:false,year:2024,genres:[],people:[],platforms:[],sourceUrls:[],cover:"${images.a}",filePath:"Anime/Frieren.md",updated:0,updatedLabel:"",startedAt:"2023-09-29",completedAt:"2024-03-22",volumeLog:[]};
 let active="library"; let galleryState={...AnimeListWorkspaceImages.DEFAULT_IMAGE_GALLERY_STATE}; let sourceOpened=""; let lightboxKeys=[]; let collectType="";
 const pages=[
@@ -141,6 +141,15 @@ render();
    && Math.abs(timelineCopyRect.bottom-timelineCardRect.bottom)<=12
    && !timelineCopy.querySelector('small');
 
+ timelineImage.dispatchEvent(new Event('error'));
+ await frames();
+ const timelineMissing=timelineCard.querySelector('.al-timeline-cover-missing');
+ details.timelineBrokenCoverFallsBack=!!timelineMissing
+   && !timelineCard.querySelector('img')
+   && Math.abs(timelineMissing.getBoundingClientRect().height-timelineCard.getBoundingClientRect().height)<=2
+   && timelineCard.querySelector('.al-timeline-card-copy')===timelineCopy
+   && timelineCard.querySelector('.al-cover-shade')===timelineShade;
+
  click(tab('images')); await new Promise(r=>setTimeout(r,20)); await frames();
  details.sameWorkspaceSwitch=active==='images' && !!document.querySelector('.al-workspace-shell .al-image-gallery-page');
  const modeTabs=document.querySelector('.al-gallery-mode-tabs');
@@ -149,6 +158,8 @@ render();
 
  const slider=document.querySelector('.al-gallery-columns input');
  slider.value='2'; const tileBeforeColumns=document.querySelector('.al-gallery-image-tile'); const imageBeforeColumns=tileBeforeColumns?.querySelector('img'); slider.dispatchEvent(new Event('input',{bubbles:true})); await frames(); details.galleryColumnChangeUsesLayoutMotion=[...document.querySelectorAll('.al-gallery-image-tile')].some(tile=>tile.dataset.layoutMotion==='active'||tile.getAnimations().length>0); details.galleryColumnChangePreservesImageNode=document.querySelector('.al-gallery-image-tile')===tileBeforeColumns&&document.querySelector('.al-gallery-image-tile img')===imageBeforeColumns; await new Promise(r=>setTimeout(r,230)); await frames();
+ await new Promise(r=>setTimeout(r,80));
+ details.galleryDecodeFailureFallsBack=!!document.querySelector('.al-gallery-image-tile[data-gallery-key="f-c"] .al-gallery-image-missing') && !document.querySelector('.al-gallery-image-tile[data-gallery-key="f-c"] img');
  const imageButton=document.querySelector('.al-gallery-image-open');
  const imageElement=document.querySelector('.al-gallery-image');
  const imageButtonRect=imageButton.getBoundingClientRect(); const imageRect=imageElement.getBoundingClientRect();
@@ -163,9 +174,12 @@ render();
  details.galleryModeSwitchPreservesImageNode=!!imageBeforeModeSwitch
    && [...document.querySelectorAll('.al-gallery-work-card img')].includes(imageBeforeModeSwitch);
  details.byWorkShowsOneFilteredBoard=document.querySelectorAll('.al-gallery-work-card').length===1;
+ details.workBoardHidesColumnsByComputedStyle=getComputedStyle(document.querySelector('.al-gallery-columns')).display==='none';
+ details.workBoardBrokenPreviewFallsBack=!!document.querySelector('.al-gallery-work-mosaic-missing');
  details.workBoardsAreExpanded=document.querySelector('.al-gallery-work-card').getBoundingClientRect().height>120;
  click(document.querySelector('.al-gallery-work-card')); await new Promise(r=>setTimeout(r,10));
  details.workDetailHasSessions=document.querySelectorAll('.al-gallery-session-filter').length===3;
+ details.workDetailHidesSearchAndTypesByComputedStyle=getComputedStyle(document.querySelector('.al-gallery-search')).display==='none' && getComputedStyle(document.querySelector('.al-gallery-type-filters')).display==='none' && getComputedStyle(document.querySelector('.al-gallery-columns')).display!=='none';
  const sessionButtons=[...document.querySelectorAll('.al-gallery-session-filter')]; click(sessionButtons[2]); await new Promise(r=>setTimeout(r,10));
  details.sessionFilterUsesSessionImages=document.querySelectorAll('.al-gallery-image-tile').length===2;
  click(document.querySelector('.al-gallery-source-button'));

@@ -108,7 +108,7 @@ let staleColumnsMetadata=false;
 const source=()=>current.map(p=>"- "+p).join("\\n");
 const state=()=>({source:source(),lineStart:0,lineEnd:current.length+1});
 const service={
- resolve:(path)=>({resourcePath:"${pixel}#"+path}),
+ resolve:(path)=>path==="missing.jpg"?{resourcePath:""}:path==="broken.jpg"?{resourcePath:"data:image/png;base64,not-valid"}:{resourcePath:"${pixel}#"+path},
  setColumns:async(_note,_loc,value)=>{
   columns=value;
   requestAnimationFrame(()=>{ document.querySelector("#scroll-shell").scrollTop = 24; });
@@ -243,19 +243,49 @@ renderer.onload();
  details.lightboxNavigationPreservesImageNode=document.querySelector('.al-image-lightbox-image')===lightboxImage
    && lightboxImage.src!==initialLightboxSrc
    && document.querySelector('.al-image-lightbox-counter').textContent==='2 / 3';
+ details.lightboxValidDoesNotLeakMissingText=getComputedStyle(document.querySelector('.al-image-lightbox-missing')).display==='none';
  lightbox.close();
+
+ const resilienceBox=new AnimeListImageSections.ImageLightboxModal(host.app,service,AnimeListImageSections.imageLightboxEntries(context.sourcePath,["a.jpg","missing.jpg","broken.jpg","c.jpg"]),0);
+ resilienceBox.open();
+ await delay(40);
+ const resilientImage=document.querySelector('.al-image-lightbox-image');
+ const resilientMissing=document.querySelector('.al-image-lightbox-missing');
+ document.querySelector('.al-image-lightbox-nav.is-next').click();
+ await delay(30);
+ details.lightboxMissingUsesExclusiveFallback=resilientImage.hidden===true && getComputedStyle(resilientMissing).display!=='none' && resilientMissing.textContent.includes('找不到圖片');
+ document.querySelector('.al-image-lightbox-nav.is-next').click();
+ await delay(80);
+ details.lightboxDecodeFailureUsesExclusiveFallback=resilientImage.hidden===true && getComputedStyle(resilientMissing).display!=='none';
+ document.querySelector('.al-image-lightbox-nav.is-next').click();
+ await delay(60);
+ details.lightboxRecoversAfterFailure=document.querySelector('.al-image-lightbox-image')===resilientImage && resilientImage.hidden===false && getComputedStyle(resilientMissing).display==='none' && document.querySelector('.al-image-lightbox-counter').textContent==='4 / 4';
+ document.querySelector('.al-image-lightbox-nav.is-previous').click();
+ document.querySelector('.al-image-lightbox-nav.is-next').click();
+ await delay(60);
+ details.lightboxRapidNavigationIgnoresStaleFailure=resilientImage.hidden===false && getComputedStyle(resilientMissing).display==='none' && document.querySelector('.al-image-lightbox-counter').textContent==='4 / 4';
+ resilienceBox.close();
+
+ const brokenSection=document.createElement('section'); document.body.appendChild(brokenSection);
+ const brokenRenderer=new AnimeListImageSections.ImageSectionRenderChild(brokenSection,host,service,'- broken.jpg', {sourcePath:context.sourcePath,getSectionInfo:()=>({lineStart:0,lineEnd:2,text:'broken'})});
+ brokenRenderer.onload();
+ await delay(80);
+ details.imageSectionDecodeFailureFallsBack=brokenSection.querySelector('.al-image-missing')!==null && brokenSection.querySelector('.al-image-item img')===null;
+ brokenRenderer.onunload(); brokenSection.remove();
 
  scrollShell.style.display="none";
 
  let submitted=[];
  const modal=new AnimeListImageSections.AddImageSectionModal({},service,async assets=>{submitted=assets.map(a=>a.name)});
  modal.queue=[
-  {asset:{name:"one.png",contentType:"image/png",data:new Uint8Array([1])},previewUrl:"${pixel}",key:1},
+  {asset:{name:"one.png",contentType:"image/png",data:new Uint8Array([1])},previewUrl:"data:image/png;base64,not-valid",key:1},
   {asset:{name:"two.png",contentType:"image/png",data:new Uint8Array([2])},previewUrl:"${pixel}",key:2},
   {asset:{name:"three.png",contentType:"image/png",data:new Uint8Array([3])},previewUrl:"${pixel}",key:3},
  ];
  modal.nextKey=4; modal.onOpen(); modal.render();
+ await delay(80);
  const queue=modal.contentEl.querySelector('.al-image-queue');
+ details.imageQueueDecodeFailureFallsBack=queue.querySelector('[data-queue-key="1"] .al-image-queue-preview-missing')!==null;
  const first=queue.querySelector('.al-image-queue-item[data-queue-key="1"]');
  const firstHandle=first.querySelector('.al-image-queue-drag-handle');
  const third=queue.querySelector('.al-image-queue-item[data-queue-key="3"]');

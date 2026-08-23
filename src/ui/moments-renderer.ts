@@ -11,6 +11,14 @@ import { createMomentStackVisual } from "./moment-stack";
 import { rasterizeMomentStackToPng } from "./moment-stack-raster";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
+
+function momentMissingImageNode(): HTMLElement {
+  const missing = makeEl("div", "al-moment-image-missing");
+  setAnimeListIcon(missing, "image-off");
+  missing.appendChild(makeEl("span", "", momentsText("missingImage")));
+  return missing;
+}
 
 function targetElement(event: Event): Element | null {
   const target = event.target as { closest?: (selector: string) => Element | null } | null;
@@ -334,7 +342,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       const resolved = this.imageService.resolve(path, this.context.sourcePath);
       if (resolved.resourcePath) {
         const image = makeEl("img");
-        image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
+        bindImageFallback(image, momentMissingImageNode);
         if (resolved.thumbnailSources?.srcset) {
           image.srcset = resolved.thumbnailSources.srcset;
           image.sizes = moment.images.length === 1 ? "720px" : "360px";
@@ -351,11 +359,9 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         image.addEventListener("load", updateRatio, { once: true });
         if (image.complete) updateRatio();
         frame.appendChild(image);
+        image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
       } else {
-        const missing = makeEl("div", "al-moment-image-missing");
-        setAnimeListIcon(missing, "image-off");
-        missing.appendChild(makeEl("span", "", momentsText("missingImage")));
-        frame.appendChild(missing);
+        frame.appendChild(momentMissingImageNode());
       }
       frame.addEventListener("click", (event) => {
         event.stopPropagation();

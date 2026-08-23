@@ -30,6 +30,8 @@ export class ImageLightboxModal extends Modal {
   private panX = 0;
   private panY = 0;
   private pan: { id: number; x: number; y: number; startX: number; startY: number } | null = null;
+  private syncToken = 0;
+  private readonly preloadResults = new Map<string, Promise<boolean>>();
 
   constructor(
     app: ConstructorParameters<typeof Modal>[0],
@@ -49,6 +51,8 @@ export class ImageLightboxModal extends Modal {
   }
 
   onClose(): void {
+    this.syncToken += 1;
+    this.preloadResults.clear();
     this.modalEl.removeEventListener("keydown", this.handleKeydown);
     this.contentEl.replaceChildren();
   }
@@ -96,6 +100,13 @@ export class ImageLightboxModal extends Modal {
     this.image = makeEl("img", "al-image-lightbox-image");
     this.image.alt = "";
     this.image.draggable = false;
+    this.image.hidden = true;
+    this.image.addEventListener("error", () => {
+      if (!this.image || !this.missing) return;
+      this.image.hidden = true;
+      this.missing.hidden = false;
+      this.stage?.removeAttribute("aria-busy");
+    });
     this.image.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -165,6 +176,20 @@ export class ImageLightboxModal extends Modal {
     this.applyTransform();
   }
 
+  private loadResource(resourcePath: string): Promise<boolean> {
+    const cached = this.preloadResults.get(resourcePath);
+    if (cached !== undefined) return cached;
+    const request = new Promise<boolean>((resolve) => {
+      const preload = createEl("img");
+      preload.decoding = "async";
+      preload.addEventListener("load", () => resolve(preload.naturalWidth > 0), { once: true });
+      preload.addEventListener("error", () => resolve(false), { once: true });
+      preload.src = resourcePath;
+    });
+    this.preloadResults.set(resourcePath, request);
+    return request;
+  }
+
   private preloadAdjacent(): void {
     if (this.entries.length < 2) return;
     for (const offset of [-1, 1]) {
@@ -172,20 +197,45 @@ export class ImageLightboxModal extends Modal {
       if (!entry) continue;
       const resolved = this.service.resolve(entry.path, entry.sourcePath);
       if (!resolved.resourcePath) continue;
-      const preload = createEl("img");
-      preload.src = resolved.resourcePath;
+      void this.loadResource(resolved.resourcePath);
     }
   }
 
   private syncEntry(): void {
     const entry = this.entries[this.index];
     if (!entry || !this.image || !this.missing || !this.counter) return;
+    const targetIndex = this.index;
+    const token = ++this.syncToken;
     const resolved = this.service.resolve(entry.path, entry.sourcePath);
-    this.image.hidden = !resolved.resourcePath;
-    this.missing.hidden = Boolean(resolved.resourcePath);
-    if (resolved.resourcePath && this.image.src !== resolved.resourcePath) this.image.src = resolved.resourcePath;
-    this.counter.textContent = `${this.index + 1} / ${this.entries.length}`;
+    this.counter.textContent = `${targetIndex + 1} / ${this.entries.length}`;
     this.applyTransform();
+
+    if (!resolved.resourcePath) {
+      this.stage?.removeAttribute("aria-busy");
+      this.image.removeAttribute("src");
+      this.image.hidden = true;
+      this.missing.hidden = false;
+      this.preloadAdjacent();
+      return;
+    }
+
+    this.stage?.setAttribute("aria-busy", "true");
+    this.missing.hidden = true;
+    const resourcePath = resolved.resourcePath;
+    void this.loadResource(resourcePath).then((loaded) => {
+      if (token !== this.syncToken || targetIndex !== this.index || !this.image || !this.missing) return;
+      this.stage?.removeAttribute("aria-busy");
+      if (!loaded) {
+        this.image.removeAttribute("src");
+        this.image.hidden = true;
+        this.missing.hidden = false;
+        return;
+      }
+      this.image.src = resourcePath;
+      this.image.hidden = false;
+      this.missing.hidden = true;
+    });
     this.preloadAdjacent();
   }
+
 }

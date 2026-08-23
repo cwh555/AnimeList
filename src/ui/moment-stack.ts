@@ -1,5 +1,6 @@
 import { momentStackOffsetsY, normalizeMomentStackGapsY } from "../domain/moment-image-layout";
 import { makeEl } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 
 export interface MomentStackVisualItem {
   src?: string;
@@ -49,7 +50,7 @@ function frame(
       "img",
       `al-moment-stack-image ${top ? "al-moment-stack-top-image" : "al-moment-stack-strip-image"}`,
     );
-    image.src = item.src;
+    bindImageFallback(image, () => makeEl("div", "al-moment-stack-missing", item.missingLabel));
     if (item.srcset) image.srcset = item.srcset;
     if (item.sizes) image.sizes = item.sizes;
     image.alt = "";
@@ -67,6 +68,7 @@ function frame(
       objectPosition: "50% 50%",
     });
     element.appendChild(image);
+    image.src = item.src;
   } else {
     element.appendChild(makeEl("div", "al-moment-stack-missing", item.missingLabel));
   }

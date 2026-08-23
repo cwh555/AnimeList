@@ -270,7 +270,7 @@ export const TimelineUI = (() => {
     const openFile = adapters.openFile ?? (() => {});
     const timelinePosterCache = new Map<string, HTMLButtonElement>();
     const timelineEntryKey = (item: TimelineMediaEntry): string =>
-      `${item.filePath}::${item.volumeLabel ?? ""}::${item.completedAt}::${item.title}`;
+      `${item.filePath}::${item.volumeLabel ?? ""}::${item.completedAt}::${item.title}::${item.cover ?? ""}`;
 
     const applyPan = (): void => {
       scene.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.viewScale})`;

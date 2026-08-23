@@ -10,6 +10,7 @@ import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, Librar
 import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { animateLayoutChange } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
   if (view === "list") return "116px";
@@ -349,26 +350,26 @@ export const AnimeListUI: LibraryRenderer = (() => {
           media.classList.add("has-cover-placeholder");
           media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;
         }
-        if (srcset) image.srcset = srcset;
-        else image.removeAttribute("srcset");
-        image.src = source;
         if (cached?.signature !== signature) {
           const reveal = (): void => image.classList.add("is-loaded");
           image.addEventListener("load", reveal, { once: true });
-          image.addEventListener("error", () => {
+          bindImageFallback(image, () => {
             coverCache.delete(item.filePath);
-            image.remove();
             media.classList.remove("has-cover-placeholder");
             media.style.removeProperty("background-image");
             const missing = makeEl("div", "al-cover-missing");
             const icon = makeEl("span", "al-icon-large");
             setAnimeListIcon(icon, "book");
             missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
-            media.prepend(missing);
-          }, { once: true });
-          if (image.complete && image.naturalWidth > 0) reveal();
+            return missing;
+          });
         }
+        if (srcset) {
+          if (image.getAttribute("srcset") !== srcset) image.srcset = srcset;
+        } else if (image.hasAttribute("srcset")) image.removeAttribute("srcset");
+        if (image.getAttribute("src") !== source) image.src = source;
         media.appendChild(image);
+        if (cached?.signature !== signature && image.complete && image.naturalWidth > 0) image.classList.add("is-loaded");
       } else {
         coverCache.delete(item.filePath);
         const missing = makeEl("div", "al-cover-missing");

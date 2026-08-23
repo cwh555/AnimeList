@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { bindImageFallback } from "../image-fallback";
 import {
   SCORE_DASHBOARD_MAX_SCALE,
   SCORE_DASHBOARD_MIN_SCALE,
@@ -321,6 +322,42 @@ export function renderScoreDashboard(
     }
   };
 
+  const reconcilePosterVisual = (button: HTMLButtonElement, item: MediaItem): void => {
+    const source = item.cover ? item.coverSources?.src || item.cover : "";
+    const srcset = item.coverSources?.srcset || "";
+    const signature = `${source}::${srcset}`;
+    const current = button.querySelector<HTMLElement>(".al-score-poster-image, .al-score-poster-missing");
+
+    if (button.dataset.coverSignature === signature && current) {
+      if (current.tagName === "IMG") (current as HTMLImageElement).alt = text.coverAlt(item.title);
+      else setIcon(current, item.mediaType === "anime" ? "clapperboard" : "book-open");
+      return;
+    }
+
+    current?.remove();
+    button.dataset.coverSignature = signature;
+    if (source) {
+      const image = create("img", "al-score-poster-image");
+      image.alt = text.coverAlt(item.title);
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.draggable = false;
+      bindImageFallback(image, () => {
+        const missing = create("span", "al-score-poster-missing");
+        setIcon(missing, button.dataset.mediaType === "anime" ? "clapperboard" : "book-open");
+        return missing;
+      });
+      if (srcset) image.srcset = srcset;
+      button.appendChild(image);
+      image.src = source;
+      return;
+    }
+
+    const missing = create("span", "al-score-poster-missing");
+    setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
+    button.appendChild(missing);
+  };
+
   const renderCover = (item: MediaItem): HTMLElement => {
     const cached = posterCache.get(item.filePath);
     if (cached) {
@@ -330,6 +367,7 @@ export function renderScoreDashboard(
       cached.draggable = !batchMode;
       cached.setAttribute("aria-label", text.posterAria(item.title, item.score == null ? text.unrated : item.score.toFixed(1)));
       updatePosterSelection(cached, selectedPaths.has(item.filePath));
+      reconcilePosterVisual(cached, item);
       return cached;
     }
 
@@ -368,26 +406,7 @@ export function renderScoreDashboard(
     });
     button.addEventListener("dragend", () => button.classList.remove("is-dragging"));
 
-    if (item.cover) {
-      const image = create("img", "al-score-poster-image");
-      image.alt = text.coverAlt(item.title);
-      image.loading = "lazy";
-      image.decoding = "async";
-      image.draggable = false;
-      image.src = item.coverSources?.src || item.cover;
-      if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-      image.addEventListener("error", () => {
-        image.remove();
-        const missing = create("span", "al-score-poster-missing");
-        setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
-        button.appendChild(missing);
-      }, { once: true });
-      button.appendChild(image);
-    } else {
-      const missing = create("span", "al-score-poster-missing");
-      setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
-      button.appendChild(missing);
-    }
+    reconcilePosterVisual(button, item);
     posterCache.set(item.filePath, button);
     return button;
   };

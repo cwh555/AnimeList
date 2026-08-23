@@ -13,6 +13,7 @@ import { imageGalleryText } from "../features/image-gallery/text";
 import { uiText } from "../ui-text";
 import { makeEl, setAnimeListIcon } from "./ui-helpers";
 import { animateLayoutChange, transitionSurface } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
 
 export interface ImageGalleryUiState {
   mode: "all" | "works";
@@ -81,18 +82,33 @@ function galleryImageElement(
   let element = cache.get(image.key)?.signature === signature ? cache.get(image.key)?.image ?? null : null;
   if (!element) {
     element = makeEl("img");
+    const created = element;
+    bindImageFallback(created, () => {
+      cache.delete(image.key);
+      const parent = created.parentElement;
+      if (parent?.classList.contains("al-gallery-image-open")) {
+        const missing = makeEl("div", "al-gallery-image-missing");
+        setAnimeListIcon(missing, "image-off");
+        return missing;
+      }
+      const missing = makeEl("span", "al-gallery-work-mosaic-missing");
+      setAnimeListIcon(missing, "image-off");
+      return missing;
+    });
     cache.set(image.key, { signature, image: element });
   }
   element.className = className;
-  element.src = source;
   element.alt = alt;
   element.loading = "lazy";
   element.decoding = "async";
   element.draggable = false;
-  if (srcset) element.srcset = srcset;
-  else element.removeAttribute("srcset");
-  if (sizes) element.sizes = sizes;
-  else element.removeAttribute("sizes");
+  if (srcset) {
+    if (element.getAttribute("srcset") !== srcset) element.srcset = srcset;
+  } else if (element.hasAttribute("srcset")) element.removeAttribute("srcset");
+  if (sizes) {
+    if (element.getAttribute("sizes") !== sizes) element.sizes = sizes;
+  } else if (element.hasAttribute("sizes")) element.removeAttribute("sizes");
+  if (element.getAttribute("src") !== source) element.src = source;
   return element;
 }
 

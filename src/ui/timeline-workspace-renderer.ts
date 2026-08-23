@@ -184,7 +184,7 @@ export function renderTimelineWorkspace(
   let resizeObserver: ResizeObserver | null = null;
   let lastWindowSize = windowSize(root);
   const timelinePosterCache = new Map<string, HTMLButtonElement>();
-  const timelineEntryKey = (item: TimelineMediaEntry): string => `${item.filePath}::${item.volumeLabel ?? ""}::${item.completedAt}::${item.title}`;
+  const timelineEntryKey = (item: TimelineMediaEntry): string => `${item.filePath}::${item.volumeLabel ?? ""}::${item.completedAt}::${item.title}::${item.cover ?? ""}`;
 
   function refreshData(preserveSpacing = true): void {
     currentItems = filterTimelineEntries(allItems, state.type);

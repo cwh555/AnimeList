@@ -23,9 +23,18 @@ import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-m
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
+
+function imageSectionMissingNode(): HTMLElement {
+  const missing = makeEl("div", "al-image-missing");
+  const icon = makeEl("div", "al-image-missing-icon");
+  setAnimeListIcon(icon, "image-off");
+  missing.append(icon, makeEl("span", "", imageSectionText("missing")));
+  return missing;
+}
 
 function eventTargetElement(event: Event): Element | null {
   const target = event.target as { closest?: (selector: string) => Element | null } | null;
@@ -551,28 +560,29 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         : null;
       if (!image) {
         image = makeEl("img");
+        const created = image;
+        bindImageFallback(created, imageSectionMissingNode, {
+          onError: () => this.imageNodeCache.delete(path),
+        });
         this.imageNodeCache.set(path, { signature, image });
       }
-      image.src = source;
       if (srcset) {
-        image.srcset = srcset;
-        image.sizes = "(max-width: 620px) 50vw, 25vw";
+        if (image.getAttribute("srcset") !== srcset) image.srcset = srcset;
+        const sizes = "(max-width: 620px) 50vw, 25vw";
+        if (image.getAttribute("sizes") !== sizes) image.sizes = sizes;
       } else {
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
+        if (image.hasAttribute("srcset")) image.removeAttribute("srcset");
+        if (image.hasAttribute("sizes")) image.removeAttribute("sizes");
       }
       image.alt = "";
       image.loading = "lazy";
       image.decoding = "async";
       image.draggable = false;
       item.appendChild(image);
+      if (image.getAttribute("src") !== source) image.src = source;
     } else {
       this.imageNodeCache.delete(path);
-      const missing = makeEl("div", "al-image-missing");
-      const icon = makeEl("div", "al-image-missing-icon");
-      setAnimeListIcon(icon, "image-off");
-      missing.append(icon, makeEl("span", "", imageSectionText("missing")));
-      item.appendChild(missing);
+      item.appendChild(imageSectionMissingNode());
     }
 
     if (this.selectionMode) {

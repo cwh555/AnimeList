@@ -65,3 +65,43 @@
 .al-completion-date-control .al-date-input[hidden] {
   display:none;
 }
+
+/* Keep local/manual cover previews geometrically stable when decode fails. */
+.al-manual-cover-preview {
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:112px;
+  padding:8px;
+  border:1px solid var(--background-modifier-border);
+  border-radius:10px;
+  background:var(--background-secondary);
+}
+.al-manual-cover-preview img,
+.al-manual-cover-preview-missing {
+  display:grid;
+  width:72px;
+  height:108px;
+  flex:0 0 72px;
+  place-items:center;
+  border-radius:8px;
+  object-fit:cover;
+  color:var(--text-faint);
+  background:var(--background-primary-alt);
+  text-align:center;
+  font-size:var(--font-ui-smaller);
+}
+.al-selected-preview > .al-search-result-placeholder {
+  width:92px;
+  height:138px;
+  flex:0 0 92px;
+  border-radius:10px;
+}
+@media (max-width:780px) {
+  .al-selected-preview > .al-search-result-placeholder {
+    width:72px;
+    height:108px;
+    flex-basis:72px;
+  }
+}

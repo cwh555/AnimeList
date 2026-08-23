@@ -64,6 +64,21 @@ reject(
   "Library workspace layout must receive Workspace-owned action slots explicitly instead of discovering ancestors",
   libraryWorkspaceLayout,
 );
+
+// Every user-facing image element needs an explicit load-failure contract. This
+// prevents one component from leaking browser broken-image UI while another
+// silently removes the image. Internal raster decoding is intentionally excluded.
+const imageCreationPattern = /(?:\b(?:makeEl|createEl|makeElement|create|el)\(\s*["']img["']|\.createEl\(\s*["']img["']|document\.createElement\(\s*["']img["']|new\s+Image\s*\()/g;
+const imageFailurePattern = /(?:\bbindImageFallback\s*\(|addEventListener\(\s*["']error["']|\.onerror\s*=)/g;
+for (const source of sources) {
+  if (!(source.path.startsWith("src/ui/") || source.path.startsWith("src/features/"))) continue;
+  const imageCreations = source.content.match(imageCreationPattern)?.length ?? 0;
+  if (!imageCreations) continue;
+  const failureContracts = source.content.match(imageFailurePattern)?.length ?? 0;
+  if (failureContracts < imageCreations) {
+    failures.push(`every user-facing image creation needs its own explicit failure contract (${source.path}: ${imageCreations} image creation(s), ${failureContracts} failure contract(s))`);
+  }
+}
 require(/class\s+AnimeListPlugin\s+extends\s+Plugin\b/, "main plugin must extend Obsidian Plugin directly", main);
 reject(/extends\s+LegacyAnimeListPlugin\b/, "main plugin must not inherit the legacy plugin", main);
 reject(/from\s+["\']\.\/data\//, "main.ts must delegate data services through the application service", main);

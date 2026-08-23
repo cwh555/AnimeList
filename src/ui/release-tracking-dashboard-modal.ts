@@ -7,6 +7,7 @@ import type { ReleaseTrackingSnapshot, ReleaseTrackingStatus } from "../domain/r
 import { releaseTrackingText } from "../features/release-tracking/text";
 import { isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 
 export interface ReleaseTrackingDashboardActions {
   refreshAll(onProgress: (progress: ReleaseRefreshProgress) => void): Promise<ReleaseRefreshSummary>;
@@ -83,16 +84,13 @@ function cover(item: MediaItem): HTMLElement {
     return frame;
   }
   const image = el("img");
-  image.src = source;
   image.alt = item.title;
   image.loading = "lazy";
   image.decoding = "async";
+  bindImageFallback(image, () => icon("book-open"));
   if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-  image.addEventListener("error", () => {
-    image.remove();
-    frame.appendChild(icon("book-open"));
-  }, { once: true });
   frame.appendChild(image);
+  image.src = source;
   return frame;
 }
 

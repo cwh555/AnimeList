@@ -1,7 +1,8 @@
 import type { TimelineMediaEntry } from "../types";
 import { formatTimelineDate } from "../domain/timeline/layout";
 import { uiText } from "../ui-text";
-import { makeEl } from "./ui-helpers";
+import { makeEl, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 
 export const TIMELINE_CARD_GEOMETRY = Object.freeze({
   width: 120,
@@ -28,9 +29,14 @@ export function createTimelinePosterCard(
 
   if (item.cover) {
     const image = makeEl("img", "", "");
-    image.src = item.cover;
     image.alt = uiText("timeline.coverAlt", { title: item.title });
+    bindImageFallback(image, () => {
+      const missing = makeEl("span", "al-timeline-cover-missing");
+      setAnimeListIcon(missing, "image-off");
+      return missing;
+    });
     card.appendChild(image);
+    image.src = item.cover;
   }
 
   card.appendChild(makeEl("span", "al-cover-shade"));

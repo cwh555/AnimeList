@@ -92,11 +92,12 @@ try {
   const app=document.querySelector('#app');
   const frames=(count=2)=>new Promise(resolve=>{let left=count;const step=()=>{left-=1;if(left<=0)resolve();else requestAnimationFrame(step)};requestAnimationFrame(step)});
   const sleep=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
+  const cover='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22180%22%3E%3Crect width=%22120%22 height=%22180%22 fill=%22%23555%22/%3E%3C/svg%3E';
   const items=Array.from({length:19},(_,index)=>({
     title:'Stress Work '+String(index+1).padStart(2,'0'), originalTitle:'', mediaType:index%3===0?'manga':index%3===1?'novel':'anime',
     format:index%3===2?'tv':'', status:'completed', releaseStatus:'finished', progress:index+1, total:index%3===2?24:0,
     unit:index%3===2?'episode':'volume', score:8+(index%3)*0.5, favorite:false, year:2026, genres:[], people:[], platforms:[], sourceUrls:[],
-    cover:'', filePath:'AnimeList/work-'+index+'.md', updated:index, updatedLabel:'', startedAt:'2025-01-01',
+    cover, filePath:'AnimeList/work-'+index+'.md', updated:index, updatedLabel:'', startedAt:'2025-01-01',
     completedAt:'2026-08-'+String((index%19)+1).padStart(2,'0'), volumeLog:[],
   }));
   const settings={
@@ -149,6 +150,16 @@ try {
   const initialCollect=app.querySelector('.al-library-workspace-collect');
   details.initialSingleCollect=app.querySelectorAll('.al-library-workspace-collect').length===1 && pageActions?.childElementCount===1;
   details.longListActuallyScrollable=app.scrollHeight>app.clientHeight*2;
+  const firstCover=app.querySelector('.al-card img.al-cover');
+  firstCover?.dispatchEvent(new Event('error'));
+  await frames();
+  details.libraryBrokenCoverFallsBack=!!app.querySelector('.al-card .al-cover-missing') && app.querySelectorAll('.al-card img.al-cover').length===18;
+  const stableCover=app.querySelector('.al-card[data-path="AnimeList/work-2.md"] img.al-cover');
+  let stableCoverSrcMutations=0;
+  const stableCoverObserver=new MutationObserver((records)=>{
+    stableCoverSrcMutations+=records.filter((record)=>record.type==='attributes' && (record.attributeName==='src' || record.attributeName==='srcset')).length;
+  });
+  if(stableCover) stableCoverObserver.observe(stableCover,{attributes:true,attributeFilter:['src','srcset']});
 
   app.scrollTop=Math.min(app.scrollHeight-app.clientHeight-40,1250);
   let maxScrollDrift=0;
@@ -175,6 +186,9 @@ try {
   details.collectNodeIdentitySurvivesRefresh=sameCollect;
   details.noLiveDomGrowth=maxDomDelta<=4;
   details.maxScrollDrift=maxScrollDrift;
+  stableCoverObserver.disconnect();
+  details.stableCoverIdentitySurvivesRefresh=app.querySelector('.al-card[data-path="AnimeList/work-2.md"] img.al-cover')===stableCover;
+  details.sameCoverSourceIsNotReassigned=stableCoverSrcMutations===0;
   details.maxDomDelta=maxDomDelta;
 
   // A refresh may land while the user is still scrolling. Once reconciliation

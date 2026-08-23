@@ -14,6 +14,7 @@ import { renderMediaClassificationFields, renderStoredMediaClassificationFields 
 import { createLabeledField, createMediaEditorFields, createMediaFormContext, createSelect, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 import { transitionSurface } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
 
 
 function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
@@ -165,15 +166,13 @@ export class AddMediaModal extends Modal {
     row.className = "al-search-result";
     if (result.coverUrl) {
       const image = createEl("img");
-      image.src = result.coverUrl;
       image.alt = "";
       image.loading = "lazy";
+      bindImageFallback(image, () => makeEl("div", "al-search-result-placeholder", uiText("add.noCover")));
       row.appendChild(image);
+      image.src = result.coverUrl;
     } else {
-      const placeholder = createDiv();
-      placeholder.className = "al-search-result-placeholder";
-      placeholder.textContent = uiText("add.noCover");
-      row.appendChild(placeholder);
+      row.appendChild(makeEl("div", "al-search-result-placeholder", uiText("add.noCover")));
     }
     const body = createDiv();
     body.className = "al-search-result-body";
@@ -248,9 +247,10 @@ export class AddMediaModal extends Modal {
       if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
       this.manualCoverPreviewUrl = URL.createObjectURL(this.manualCoverFile);
       const image = makeEl("img");
-      image.src = this.manualCoverPreviewUrl;
       image.alt = "";
+      bindImageFallback(image, () => makeEl("span", "al-manual-cover-preview-missing", manualMediaText("noCover")));
       coverPreview.append(image, makeEl("span", "", this.manualCoverFile.name));
+      image.src = this.manualCoverPreviewUrl;
     };
     coverInput.addEventListener("change", () => {
       this.manualCoverFile = coverInput.files?.[0] ?? null;
@@ -370,9 +370,10 @@ export class AddMediaModal extends Modal {
     preview.className = "al-selected-preview";
     if (result.coverUrl) {
       const image = createEl("img");
-      image.src = result.coverUrl;
       image.alt = uiText("library.coverAlt", { title: result.title });
+      bindImageFallback(image, () => makeEl("div", "al-search-result-placeholder", uiText("add.noCover")));
       preview.appendChild(image);
+      image.src = result.coverUrl;
     }
     const copy = createDiv();
     copy.append(

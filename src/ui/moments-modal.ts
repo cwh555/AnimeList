@@ -20,12 +20,17 @@ import { momentsText } from "../features/moments/text";
 import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { createMomentStackVisual, type MomentStackVisual } from "./moment-stack";
+import { bindImageFallback } from "./image-fallback";
 
 interface PendingAsset {
   key: number;
   asset: ImageSectionAssetInput;
   previewUrl: string;
   stackGapY: number;
+}
+
+function momentEditorMissingNode(): HTMLElement {
+  return makeEl("div", "al-moment-editor-image-missing", momentsText("missingImage"));
 }
 
 function assetPreview(asset: ImageSectionAssetInput): string {
@@ -396,13 +401,6 @@ export class MomentEditorModal extends Modal {
       const resolved = this.imageService.resolve(path, this.sourcePath);
       if (!item) {
         item = makeEl("div", "al-moment-editor-image");
-        if (resolved.resourcePath) {
-          const image = makeEl("img");
-          image.alt = "";
-          item.appendChild(image);
-        } else {
-          item.appendChild(makeEl("div", "al-moment-editor-image-missing", momentsText("missingImage")));
-        }
         const remove = makeEl("button", "al-moment-editor-image-remove");
         remove.type = "button";
         remove.setAttribute("aria-label", momentsText("removeImage"));
@@ -411,8 +409,26 @@ export class MomentEditorModal extends Modal {
         item.appendChild(remove);
         this.retainedImageTiles.set(path, item);
       }
-      const image = item.querySelector<HTMLImageElement>("img");
-      if (image && resolved.resourcePath) image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
+      let image = item.querySelector<HTMLImageElement>("img");
+      let missing = item.querySelector<HTMLElement>(".al-moment-editor-image-missing");
+      if (resolved.resourcePath) {
+        missing?.remove();
+        if (!image) {
+          image = makeEl("img");
+          image.alt = "";
+          bindImageFallback(image, momentEditorMissingNode);
+          item.insertBefore(image, item.firstChild);
+        }
+        const source = resolved.thumbnailSources?.src || resolved.resourcePath;
+        if (image.getAttribute("src") !== source) image.src = source;
+      } else {
+        image?.remove();
+        image = null;
+        if (!missing) {
+          missing = momentEditorMissingNode();
+          item.insertBefore(missing, item.firstChild);
+        }
+      }
       row.appendChild(item);
     }
 
@@ -423,14 +439,15 @@ export class MomentEditorModal extends Modal {
       if (!item) {
         item = makeEl("div", "al-moment-editor-image is-pending");
         const image = makeEl("img");
-        image.src = pending.previewUrl;
         image.alt = "";
+        bindImageFallback(image, momentEditorMissingNode);
         const remove = makeEl("button", "al-moment-editor-image-remove");
         remove.type = "button";
         remove.setAttribute("aria-label", momentsText("removeImage"));
         setAnimeListIcon(remove, "x");
         remove.addEventListener("click", () => this.removePending(pending.key));
         item.append(image, remove);
+        image.src = pending.previewUrl;
         this.pendingImageTiles.set(pending.key, item);
       }
       row.appendChild(item);

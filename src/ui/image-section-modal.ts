@@ -7,6 +7,7 @@ import { imageAssetsFromClipboard } from "./image-clipboard";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import { animateLayoutChange, transitionSurface } from "./layout-motion";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 
 interface QueuedImage {
   asset: ImageSectionAssetInput;
@@ -258,9 +259,13 @@ export class AddImageSectionModal extends Modal {
         const item = makeEl("div", "al-image-queue-item");
         item.dataset.queueKey = String(entry.key);
         const image = makeEl("img");
-        image.src = entry.previewUrl;
         image.alt = "";
         image.draggable = false;
+        bindImageFallback(image, () => {
+          const missing = makeEl("div", "al-image-queue-preview-missing");
+          setAnimeListIcon(missing, "image-off");
+          return missing;
+        });
         const remove = makeEl("button", "al-image-queue-remove", "×");
         remove.type = "button";
         remove.setAttribute("aria-label", imageSectionText("delete"));
@@ -275,6 +280,7 @@ export class AddImageSectionModal extends Modal {
           event.stopPropagation();
         });
         item.append(image, remove, dragHandle);
+        image.src = entry.previewUrl;
         this.bindQueuedPointerDrag(item, queue, entry.key);
         queue.appendChild(item);
       }

@@ -117,7 +117,7 @@ const waitForImages=async(root)=>{
 };
 const matchesIntrinsicRatio=(rect,width,height)=>Boolean(rect) && rect.width>1 && rect.height>1
  && Math.abs(rect.height-(rect.width*height/width))<=2;
-const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}"};
+const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}","broken.png":"data:image/png;base64,not-valid"};
 const readAssetPaths=[];
 let storeCalls=0;
 const service={
@@ -271,6 +271,18 @@ renderer.onload();
    && saved.stackGapsY?.[0]===0 && saved.stackGapsY?.[1]===28 && saved.stackGapsY?.[2]===72
    && saved.stackReveal===undefined && saved.stackFocusY===undefined;
 
+ const brokenReading=document.createElement("section"); document.body.appendChild(brokenReading);
+ const brokenSource=["moments:",'  - id: "m_broken123"',"    text: broken","    images:",'      - "broken.png"'].join("\\n");
+ const brokenRenderer=new AnimeListMomentsStacked.MomentsRenderChild(brokenReading,host,{},service,brokenSource,context);
+ brokenRenderer.onload(); await delay(100);
+ details.momentDecodeFailureFallsBack=!!brokenReading.querySelector('.al-moment-image-missing') && !brokenReading.querySelector('.al-moment-image img');
+ brokenRenderer.onunload(); brokenReading.remove();
+
+ const brokenEditor=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",{id:"m_brokeneditor",text:"broken",images:["broken.png"]},async()=>{});
+ brokenEditor.open(); await delay(100);
+ details.momentEditorDecodeFailureFallsBack=!!brokenEditor.contentEl.querySelector('.al-moment-editor-image-missing') && !brokenEditor.contentEl.querySelector('.al-moment-editor-image img');
+ brokenEditor.close();
+
  const legacyInitial={id:"m_legacy123",text:"legacy",images:["a.png","b.png"]};
  const legacy=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",legacyInitial,async()=>{});
  legacy.open(); await delay(20);
@@ -289,6 +301,7 @@ try {
     testName: "Moments whole-image stacked subtitle layout and touch adjustment",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    resultTimeoutMs: 8000,
   });
 } finally {
   await rm(output, { recursive: true, force: true });
