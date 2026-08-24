@@ -104,6 +104,13 @@ Element.prototype.replaceChildren=function(...nodes){
 const touch=(target,type,x,y,pointerId=7)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId,pointerType:"touch",isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==="pointerup"?0:1}));
 const mousePointer=(target,type,x,y,pointerId=8)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId,pointerType:"mouse",isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==="pointerup"?0:1}));
 const center=(el)=>{const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}};
+const logicalOrder=(root)=>{
+ const columns=[...root.querySelectorAll('.al-image-masonry-column')].map((column)=>[...column.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath));
+ const order=[];
+ const rows=Math.max(0,...columns.map((column)=>column.length));
+ for(let row=0;row<rows;row+=1) for(const column of columns) if(column[row]) order.push(column[row]);
+ return order;
+};
 const paths=["a.jpg","b.jpg","c.jpg","d.jpg","e.jpg","f.jpg"];
 let current=[...paths];
 let columns=4;
@@ -120,13 +127,14 @@ const service={
   requestAnimationFrame(()=>{ document.querySelector("#scroll-shell").scrollTop = 24; });
   return state();
  },
- moveAsset:async(_note,_sourceLoc,_targetLoc,moving,target,placement)=>{
+ setSectionOrders:async(_note,replacements)=>{
   window.__movePersisted=false;
   await delay(moveDelay);
-  current=AnimeListImageSections.reorderImageSectionPaths(current,moving,target,placement);
+  const replacement=replacements[0];
+  current=[...replacement.paths];
   moveCalls+=1;
   window.__movePersisted=true;
-  return{sourceSection:state(),targetSection:state(),markdown:""}
+  return replacements.map((entry)=>({source:entry.paths.map((path)=>"- "+path).join("\\n"),lineStart:0,lineEnd:entry.paths.length+1}));
  },
  setAsCover:async()=>{},
  removeMany:async()=>source(),
@@ -224,7 +232,7 @@ renderer.onload();
  details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
    && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
- details.touchGalleryReorderPersisted=current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
+ details.touchGalleryReorderOptimistic=logicalOrder(section).join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
  details.reorderPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  details.reorderPreservesPreferredColumns=section.querySelectorAll('.al-image-masonry-column').length===2
@@ -253,6 +261,8 @@ renderer.onload();
  replacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:end.x,clientY:end.y+10}));
  await delay(20);
  details.dragReleaseDoesNotOpenLightbox=(window.__modalOpenCount||0)===modalCountBeforeDropClick;
+ for(let wait=0;wait<120 && moveCalls===0;wait+=1) await delay(10);
+ details.touchGalleryReorderPersisted=moveCalls===1 && current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
 
  const mouseMoving=section.querySelector('.al-image-item[data-image-path="b.jpg"]');
  const mouseTarget=section.querySelector('.al-image-item[data-image-path="d.jpg"]');
@@ -276,6 +286,7 @@ renderer.onload();
  await delay(330);
  details.unloadedRendererCannotRepaintReplacement=section.querySelector('.al-image-item[data-image-path="a.jpg"]')===replacementCardBeforeStaleCompletion
    && replacementCardBeforeStaleCompletion?.querySelector('img')===replacementImageBeforeStaleCompletion;
+ for(let wait=0;wait<120 && moveCalls<2;wait+=1) await delay(10);
  const stressRenderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
  stressRenderer.onload();
  const stressCardAfterOwnershipTransfer=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
@@ -292,10 +303,12 @@ renderer.onload();
  moveDelay=0;
  const stressModalCount=window.__modalOpenCount||0;
  const stressImages=new Map([...section.querySelectorAll('.al-image-item')].map((item)=>[item.dataset.imagePath,item.querySelector('img')]));
+ const stressCallsBefore=moveCalls;
  let stressStable=true;
  for(let iteration=0;iteration<100;iteration+=1){
    const liveMoving=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
-   const otherPaths=current.filter((path)=>path!=="a.jpg");
+   const liveOrder=logicalOrder(section);
+   const otherPaths=liveOrder.filter((path)=>path!=="a.jpg");
    const moveToEnd=iteration%2===0;
    const targetPath=moveToEnd?otherPaths[otherPaths.length-1]:otherPaths[0];
    const liveTarget=section.querySelector('.al-image-item[data-image-path="'+targetPath+'"]');
@@ -303,22 +316,23 @@ renderer.onload();
    if(!liveMoving||!liveTarget||!liveHandle){stressStable=false;break;}
    const from=center(liveHandle), targetRect=liveTarget.getBoundingClientRect();
    const to={x:targetRect.left+targetRect.width/2,y:moveToEnd?targetRect.top+targetRect.height*0.75:targetRect.top+targetRect.height*0.25};
-   const beforeCalls=moveCalls;
    touch(liveHandle,'pointerdown',from.x,from.y,1000+iteration);
    touch(liveMoving,'pointermove',to.x,to.y,1000+iteration);
    touch(liveMoving,'pointerup',to.x,to.y,1000+iteration);
-   for(let wait=0;wait<50 && moveCalls===beforeCalls;wait+=1) await delay(1);
-   if(moveCalls!==beforeCalls+1) stressStable=false;
+   if(moveCalls!==stressCallsBefore) stressStable=false;
    if(document.querySelector('.al-image-drag-ghost,.al-pointer-drag-ghost,.animelist-image-lightbox')) stressStable=false;
    if((window.__modalOpenCount||0)!==stressModalCount) stressStable=false;
    for(const [path,image] of stressImages){
      if(section.querySelector('.al-image-item[data-image-path="'+path+'"] img')!==image) stressStable=false;
    }
  }
+ const stressFinalOrder=logicalOrder(section).join(',');
+ await delay(340);
+ for(let wait=0;wait<250 && moveCalls===stressCallsBefore;wait+=1) await delay(1);
  window.matchMedia=originalMatchMedia;
  moveDelay=90;
- details.hundredReordersKeepSingleMediaSurface=stressStable && moveCalls>=102;
- details.hundredReorderMoveCalls=moveCalls>=102;
+ details.hundredReordersKeepSingleMediaSurface=stressStable;
+ details.hundredReordersCoalescePersistence=moveCalls===stressCallsBefore+1 && current.join(',')===stressFinalOrder;
 
  const addCallsBeforeRootDrop=addCalls;
  const rootDrop=new Event('drop',{bubbles:true,cancelable:true});
