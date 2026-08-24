@@ -13,19 +13,23 @@ import {
   normalizeImageSectionColumns,
   parseImageSectionColumns,
 } from "../domain/image-section-layout";
-import {
-  planImageSectionPathMove,
-  type ImageSectionDropPlacement,
-  type ImageSectionStateUpdate,
-} from "../domain/image-section-order";
+import type { ImageSectionDropPlacement, ImageSectionStateUpdate } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
-import { claimImageSectionHostContinuity, withImageSectionHostContinuity } from "./image-section-continuity";
-import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
+import { claimImageSectionHostContinuity } from "./image-section-continuity";
+import {
+  beginImageSectionPointerDrag,
+  registerImageSectionDragSurface,
+  type ImageSectionDragSurface,
+} from "./image-section-drag-controller";
+import {
+  moveImageSectionAsset,
+  type ImageSectionMoveParticipant,
+} from "./image-section-move-coordinator";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
 
@@ -46,33 +50,9 @@ function isInteractiveTarget(target: Element | null): boolean {
   return Boolean(target?.closest("button, a, input, textarea, select, [role='button']"));
 }
 
-interface ImagePointerDropTarget {
-  renderer: ImageSectionRenderChild;
-  path: string | null;
-  placement: ImageSectionDropPlacement;
-}
-
-interface ActiveImagePointerDrag {
-  source: ImageSectionRenderChild;
-  path: string;
-  target: ImagePointerDropTarget | null;
-}
-
 const imageSectionRenderers = new WeakMap<HTMLElement, ImageSectionRenderChild>();
-let activeImageDrag: ActiveImagePointerDrag | null = null;
 interface ImageSectionEphemeralState { expanded: boolean; scrollTop: number; preferredColumns?: number; preserveUntil?: number; }
 const imageSectionEphemeralState = new Map<string, ImageSectionEphemeralState>();
-
-function clearImageDropIndicators(): void {
-  for (const item of document.querySelectorAll<HTMLElement>(
-    ".al-image-item.is-drop-before, .al-image-item.is-drop-after",
-  )) {
-    item.removeClass("is-drop-before", "is-drop-after");
-  }
-  for (const section of document.querySelectorAll<HTMLElement>(".animelist-image-section.is-image-drag-target")) {
-    section.removeClass("is-image-drag-target");
-  }
-}
 
 export class ImageSectionRenderChild extends MarkdownRenderChild {
   private source: string;
@@ -95,6 +75,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
   private mounted = false;
   private readonly lifecycleEvents = new AbortController();
+  private readonly moveParticipant: ImageSectionMoveParticipant;
+  private readonly dragSurface: ImageSectionDragSurface;
 
   private ownsContainer(): boolean {
     return this.mounted && imageSectionRenderers.get(this.containerEl) === this;
@@ -109,6 +91,28 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   ) {
     super(containerEl);
     this.source = source;
+    this.moveParticipant = {
+      containerEl,
+      sourcePath: context.sourcePath,
+      paths: () => this.galleryPaths,
+      locator: () => this.locator(),
+      ownsContainer: () => this.ownsContainer(),
+      applyPaths: (paths, renderEmpty) => this.applyGalleryPaths(paths, renderEmpty),
+      applyState: (update) => this.applyOrderedSectionState(update),
+      preserveLayoutAcrossRefresh: () => this.preserveLayoutAcrossRefresh(),
+      layoutMotion: () => this.lastLayoutMotion,
+      setDragSource: (active) => this.containerEl.toggleClass("is-image-drag-source", active),
+    };
+    this.dragSurface = {
+      containerEl,
+      participant: this.moveParticipant,
+      signal: this.lifecycleEvents.signal,
+      canStart: (item, event) => this.canStartImagePointerDrag(item, event),
+      closeMenus: () => this.closeMenus(),
+      drop: (sourceParticipant, path, targetPath, placement) => {
+        void this.handleInternalImageDrop(sourceParticipant, path, targetPath, placement);
+      },
+    };
   }
 
   private ephemeralStateKey(): string {
@@ -167,6 +171,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       };
     }
     imageSectionRenderers.set(this.containerEl, this);
+    registerImageSectionDragSurface(this.dragSurface);
     this.render();
     claimImageSectionHostContinuity(
       this.containerEl,
@@ -190,8 +195,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.imageElements.clear();
     this.imageNodeCache.clear();
     if (imageSectionRenderers.get(this.containerEl) === this) imageSectionRenderers.delete(this.containerEl);
-    if (activeImageDrag?.source === this) activeImageDrag = null;
-    clearImageDropIndicators();
   }
 
   private locator(): ImageSectionLocator {
@@ -377,54 +380,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.render();
   }
 
-  private dropPlacement(item: HTMLElement, clientY: number): ImageSectionDropPlacement {
-    const rect = item.getBoundingClientRect();
-    return clientY < rect.top + rect.height / 2 ? "before" : "after";
-  }
-
-  private markDropTarget(item: HTMLElement | null, placement: ImageSectionDropPlacement): void {
-    clearImageDropIndicators();
-    this.containerEl.addClass("is-image-drag-target");
-    if (!item) return;
-    item.addClass(placement === "before" ? "is-drop-before" : "is-drop-after");
-  }
-
-  private pointerDropTarget(point: PointerDragPoint): ImagePointerDropTarget | null {
-    const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
-    const section = hit?.closest<HTMLElement>(".animelist-image-section") ?? null;
-    if (!section) return null;
-    const renderer = imageSectionRenderers.get(section);
-    if (!renderer) return null;
-    const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
-    if (item && section.contains(item)) {
-      const path = item.dataset.imagePath ?? "";
-      if (!path) return null;
-      return { renderer, path, placement: renderer.dropPlacement(item, point.clientY) };
-    }
-    const galleryTarget = hit?.closest(
-      ".al-image-gallery-viewport, .al-image-masonry, .al-image-masonry-column, .al-image-empty",
-    );
-    return galleryTarget && section.contains(galleryTarget)
-      ? { renderer, path: null, placement: "append" }
-      : null;
-  }
-
-  private updatePointerDropTarget(point: PointerDragPoint): void {
-    if (!activeImageDrag) return;
-    const target = this.pointerDropTarget(point);
-    activeImageDrag.target = target;
-    if (!target) {
-      clearImageDropIndicators();
-      return;
-    }
-    const item = target.path
-      ? target.renderer.containerEl.querySelector<HTMLElement>(
-        `.al-image-item[data-image-path="${CSS.escape(target.path)}"]`,
-      )
-      : null;
-    target.renderer.markDropTarget(item, target.placement);
-  }
-
   private applyGalleryPaths(nextPaths: readonly string[], renderEmpty = true): void {
     if (!this.ownsContainer()) return;
     const alreadyApplied = Boolean(this.galleryRelayout)
@@ -457,105 +412,24 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.saveEphemeralState();
   }
 
-  private optimisticMovePaths(
-    source: ImageSectionRenderChild,
-    path: string,
-    targetPath: string | null,
-    placement: ImageSectionDropPlacement,
-  ): { sourceBefore: string[]; targetBefore: string[]; sourceAfter: string[]; targetAfter: string[]; changed: boolean } {
-    const sourceBefore = [...source.galleryPaths];
-    const targetBefore = source === this ? sourceBefore : [...this.galleryPaths];
-    const plan = planImageSectionPathMove(
-      sourceBefore,
-      targetBefore,
-      path,
-      targetPath ?? "",
-      placement,
-      source === this,
-    );
-    if (plan.changed) {
-      source.applyGalleryPaths(plan.sourcePaths, source === this);
-      if (source !== this) this.applyGalleryPaths(plan.targetPaths, false);
-    }
-    return {
-      sourceBefore,
-      targetBefore,
-      sourceAfter: [...plan.sourcePaths],
-      targetAfter: [...plan.targetPaths],
-      changed: plan.changed,
-    };
-  }
-
   private async handleInternalImageDrop(
-    source: ImageSectionRenderChild,
+    source: ImageSectionMoveParticipant,
     path: string,
     targetPath: string | null,
     placement: ImageSectionDropPlacement,
   ): Promise<void> {
-    clearImageDropIndicators();
-    if (source.context.sourcePath !== this.context.sourcePath) {
+    const outcome = await moveImageSectionAsset({
+      service: this.service,
+      source,
+      target: this.moveParticipant,
+      path,
+      targetPath,
+      placement,
+    });
+    if (outcome.status === "unsupported") {
       new Notice(imageSectionText("crossNoteMoveUnsupported"));
-      return;
-    }
-    const optimistic = this.optimisticMovePaths(source, path, targetPath, placement);
-    if (!optimistic.changed) {
-      source.containerEl.removeClass("is-image-drag-source");
-      return;
-    }
-    const scrollPosition = captureScrollPosition(source.containerEl);
-    source.preserveLayoutAcrossRefresh();
-    if (source !== this) this.preserveLayoutAcrossRefresh();
-    scrollPosition.stabilize(12);
-    await Promise.all([source.lastLayoutMotion, source === this ? Promise.resolve() : this.lastLayoutMotion]);
-    try {
-      const continuitySlots = source === this
-        ? [{
-          container: source.containerEl,
-          sourcePath: source.context.sourcePath,
-          expectedPaths: optimistic.sourceAfter,
-          lineStart: source.locator().lineStart,
-        }]
-        : [
-          {
-            container: source.containerEl,
-            sourcePath: source.context.sourcePath,
-            expectedPaths: optimistic.sourceAfter,
-            lineStart: source.locator().lineStart,
-          },
-          {
-            container: this.containerEl,
-            sourcePath: this.context.sourcePath,
-            expectedPaths: optimistic.targetAfter,
-            lineStart: this.locator().lineStart,
-          },
-        ];
-      const update = await withImageSectionHostContinuity(continuitySlots, () => this.service.moveAsset(
-        this.context.sourcePath,
-        source.locator(),
-        this.locator(),
-        path,
-        targetPath ?? "",
-        placement,
-      ));
-      if (source.ownsContainer()) source.containerEl.removeClass("is-image-drag-source");
-      if (source === this) {
-        if (this.ownsContainer()) this.applyOrderedSectionState(update.sourceSection);
-      } else {
-        if (source.ownsContainer()) source.applyOrderedSectionState(update.sourceSection);
-        if (this.ownsContainer()) this.applyOrderedSectionState(update.targetSection);
-      }
-      if (source.ownsContainer()) {
-        scrollPosition.restore();
-        scrollPosition.stabilize(12);
-      }
-    } catch (error) {
-      if (source.ownsContainer()) source.applyGalleryPaths(optimistic.sourceBefore);
-      if (source !== this && this.ownsContainer()) this.applyGalleryPaths(optimistic.targetBefore);
-      if (source.ownsContainer()) {
-        scrollPosition.restore();
-        scrollPosition.stabilize(12);
-      }
-      new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
+    } else if (outcome.status === "failed") {
+      new Notice(imageSectionText("moveFailed", { error: errorMessage(outcome.error) }));
     }
   }
 
@@ -570,37 +444,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private beginImagePointerDrag(item: HTMLElement, path: string, event: PointerEvent): void {
-    if (!this.canStartImagePointerDrag(item, event)) return;
-    activeImageDrag = { source: this, path, target: null };
-    armPointerDrag({
-      event,
-      captureElement: item,
-      dragElement: item,
-      signal: this.lifecycleEvents.signal,
-      onStart: () => {
-        this.containerEl.addClass("is-image-drag-source");
-        this.closeMenus();
-      },
-      onMove: (point) => this.updatePointerDropTarget(point),
-      onDrop: () => {
-        const drag = activeImageDrag;
-        activeImageDrag = null;
-        this.containerEl.removeClass("is-image-drag-source");
-        clearImageDropIndicators();
-        if (!drag?.target) return;
-        void drag.target.renderer.handleInternalImageDrop(
-          drag.source,
-          drag.path,
-          drag.target.path,
-          drag.target.placement,
-        );
-      },
-      onCancel: () => {
-        if (activeImageDrag?.source === this && activeImageDrag.path === path) activeImageDrag = null;
-        this.containerEl.removeClass("is-image-drag-source");
-        clearImageDropIndicators();
-      },
-    });
+    beginImageSectionPointerDrag(this.dragSurface, item, path, event);
   }
 
   private createImage(path: string): HTMLElement {
