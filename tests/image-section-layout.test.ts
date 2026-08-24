@@ -11,6 +11,7 @@ import {
   moveImageSectionPath,
   planImageSectionPathMove,
   reorderImageSectionPaths,
+  replaceImageSectionOrders,
 } from "../src/domain/image-section-order";
 
 describe("image section layout model", () => {
@@ -87,6 +88,91 @@ describe("image section ordering model", () => {
       targetPaths: ["c.jpg", "b.jpg", "d.jpg"],
       changed: true,
     });
+  });
+
+  it("persists final orders for multiple sections atomically without overwriting unrelated note content", () => {
+    const markdown = [
+      "# Demo",
+      "## One",
+      "```animelist-images columns=3 custom=keep",
+      "- a.jpg",
+      "- b.jpg",
+      "```",
+      "Do not touch this paragraph.",
+      "## Two",
+      "```animelist-images columns=5",
+      "- c.jpg",
+      "- d.jpg",
+      "```",
+      "",
+    ].join("\n");
+    const [first, second] = findImageSectionBlocks(markdown);
+    const result = replaceImageSectionOrders(markdown, [
+      { locator: first, expectedPaths: ["a.jpg", "b.jpg"], paths: ["b.jpg", "a.jpg"] },
+      { locator: second, expectedPaths: ["c.jpg", "d.jpg"], paths: ["d.jpg", "c.jpg"] },
+    ]);
+
+    assert.match(result.markdown, /```animelist-images columns=3 custom=keep\n- b\.jpg\n- a\.jpg\n```/);
+    assert.match(result.markdown, /Do not touch this paragraph\./);
+    assert.match(result.markdown, /```animelist-images columns=5\n- d\.jpg\n- c\.jpg\n```/);
+    assert.deepEqual(result.sections.map((section) => section.source), [
+      "- b.jpg\n- a.jpg",
+      "- d.jpg\n- c.jpg",
+    ]);
+  });
+
+  it("relocates a delayed absolute-order commit after unrelated Markdown shifts its old line hint", () => {
+    const original = [
+      "# Demo",
+      "```animelist-images",
+      "- first.jpg",
+      "```",
+      "```animelist-images columns=3 custom=keep",
+      "- a.jpg",
+      "- b.jpg",
+      "```",
+      "Tail.",
+    ].join("\n");
+    const target = findImageSectionBlocks(original)[1];
+    const shifted = [
+      "# Demo",
+      "```animelist-images",
+      "- first.jpg",
+      "- inserted-into-other-section.jpg",
+      "- another-line.jpg",
+      "```",
+      "```animelist-images columns=3 custom=keep",
+      "- a.jpg",
+      "- b.jpg",
+      "```",
+      "Tail.",
+    ].join("\n");
+    const result = replaceImageSectionOrders(shifted, [{
+      locator: target,
+      expectedPaths: ["a.jpg", "b.jpg"],
+      paths: ["b.jpg", "a.jpg"],
+    }]);
+    assert.match(result.markdown, /- inserted-into-other-section\.jpg\n- another-line\.jpg/);
+    assert.match(result.markdown, /```animelist-images columns=3 custom=keep\n- b\.jpg\n- a\.jpg/);
+    assert.match(result.markdown, /Tail\./);
+  });
+
+  it("rejects a delayed absolute-order commit when the target section changed underneath it", () => {
+    const original = [
+      "# Demo",
+      "```animelist-images",
+      "- a.jpg",
+      "- b.jpg",
+      "```",
+      "",
+    ].join("\n");
+    const block = findImageSectionBlocks(original)[0];
+    const changed = original.replace("- b.jpg", "- externally-added.jpg\n- b.jpg");
+    assert.throws(() => replaceImageSectionOrders(changed, [{
+      locator: block,
+      expectedPaths: ["a.jpg", "b.jpg"],
+      paths: ["b.jpg", "a.jpg"],
+    }]), /changed before the pending order/);
   });
 
   it("moves an image between sections atomically without changing fence metadata or unrelated Markdown", () => {

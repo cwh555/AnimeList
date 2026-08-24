@@ -238,6 +238,25 @@ describe("image section storage service", () => {
     assert.match(h.data.get(h.note.path) ?? "", /## Two\n```animelist-images\n- c\.jpg/);
   });
 
+  it("persists coalesced absolute section orders in one note update", async () => {
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images columns=2", "- a.jpg", "- b.jpg", "```",
+      "Keep this paragraph.",
+      "## Two", "```animelist-images columns=5", "- c.jpg", "- d.jpg", "```", "",
+    ].join("\n"));
+    const [first, second] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
+    const states = await h.service.setSectionOrders(h.note.path, [
+      { locator: first, expectedPaths: ["a.jpg", "b.jpg"], paths: ["b.jpg", "a.jpg"] },
+      { locator: second, expectedPaths: ["c.jpg", "d.jpg"], paths: ["d.jpg", "c.jpg"] },
+    ]);
+    const updated = h.data.get(h.note.path) ?? "";
+    assert.deepEqual(states.map((state) => state.source), ["- b.jpg\n- a.jpg", "- d.jpg\n- c.jpg"]);
+    assert.match(updated, /```animelist-images columns=2\n- b\.jpg\n- a\.jpg/);
+    assert.match(updated, /```animelist-images columns=5\n- d\.jpg\n- c\.jpg/);
+    assert.match(updated, /Keep this paragraph\./);
+  });
+
   it("reorders an image inside one section without trashing or rewriting other content", async () => {
     const h = harness([
       "# Demo", "```animelist-images columns=3",

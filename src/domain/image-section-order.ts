@@ -21,6 +21,17 @@ export interface ImageSectionMoveUpdate {
   targetSection: ImageSectionStateUpdate;
 }
 
+export interface ImageSectionOrderReplacement {
+  locator: ImageSectionLocator;
+  expectedPaths: readonly string[];
+  paths: readonly string[];
+}
+
+export interface ImageSectionOrderBatchUpdate {
+  markdown: string;
+  sections: ImageSectionStateUpdate[];
+}
+
 export interface ImageSectionPathMovePlan {
   sourcePaths: string[];
   targetPaths: string[];
@@ -97,6 +108,28 @@ function blockIndex(blocks: readonly ImageSectionBlock[], block: ImageSectionBlo
   return index;
 }
 
+function locateExpectedOrderBlock(
+  markdown: string,
+  locator: ImageSectionLocator,
+  expectedPaths: readonly string[],
+): ImageSectionBlock {
+  const blocks = findImageSectionBlocks(markdown);
+  const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
+  const containing = hint === null
+    ? null
+    : blocks.find((block) => hint >= block.lineStart && hint <= block.lineEnd) ?? null;
+  if (containing && samePathOrder(containing.paths, expectedPaths)) return containing;
+
+  const matches = blocks.filter((block) => samePathOrder(block.paths, expectedPaths));
+  if (matches.length === 1) return matches[0];
+  if (hint !== null && matches.length > 1) {
+    return [...matches].sort((left, right) => (
+      Math.abs(left.lineStart - hint) - Math.abs(right.lineStart - hint)
+    ))[0];
+  }
+  throw new Error("Image section changed before the pending order could be saved");
+}
+
 function replaceBlockPaths(lines: string[], block: ImageSectionBlock, paths: readonly string[]): void {
   const source = serializeImageSectionPaths(paths);
   const replacement = [lines[block.lineStart], ...(source ? source.split("\n") : []), lines[block.lineEnd]];
@@ -105,6 +138,44 @@ function replaceBlockPaths(lines: string[], block: ImageSectionBlock, paths: rea
 
 function stateFor(block: ImageSectionBlock): ImageSectionStateUpdate {
   return { source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd };
+}
+
+export function replaceImageSectionOrders(
+  markdown: unknown,
+  replacements: readonly ImageSectionOrderReplacement[],
+): ImageSectionOrderBatchUpdate {
+  const text = typeof markdown === "string" ? markdown : "";
+  if (replacements.length === 0) return { markdown: text, sections: [] };
+
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const blocks = findImageSectionBlocks(text);
+  const indexed = replacements.map((replacement) => {
+    const block = locateExpectedOrderBlock(text, replacement.locator, replacement.expectedPaths);
+    return {
+      index: blockIndex(blocks, block),
+      block,
+      paths: [...replacement.paths],
+    };
+  });
+  const seen = new Set<number>();
+  for (const entry of indexed) {
+    if (seen.has(entry.index)) throw new Error("Image section order batch contains the same section twice");
+    seen.add(entry.index);
+  }
+
+  const lines = text.split(/\r?\n/u);
+  for (const entry of [...indexed].sort((left, right) => right.block.lineStart - left.block.lineStart)) {
+    replaceBlockPaths(lines, entry.block, entry.paths);
+  }
+
+  const updatedMarkdown = lines.join(newline);
+  const updatedBlocks = findImageSectionBlocks(updatedMarkdown);
+  const sections = indexed.map(({ index }) => {
+    const block = updatedBlocks[index];
+    if (!block) throw new Error("Could not verify the updated image section order");
+    return stateFor(block);
+  });
+  return { markdown: updatedMarkdown, sections };
 }
 
 export function moveImageSectionPath(
