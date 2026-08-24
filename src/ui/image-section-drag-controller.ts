@@ -18,6 +18,7 @@ export interface ImageSectionDragSurface {
 
 interface ImageSectionDropTarget {
   surface: ImageSectionDragSurface;
+  item: HTMLElement | null;
   path: string | null;
   placement: ImageSectionDropPlacement;
 }
@@ -30,16 +31,22 @@ interface ActiveImageDrag {
 
 const dragSurfaces = new WeakMap<HTMLElement, ImageSectionDragSurface>();
 let activeDrag: ActiveImageDrag | null = null;
+let markedTarget: ImageSectionDropTarget | null = null;
 
-function clearDropIndicators(document: Document): void {
-  for (const item of document.querySelectorAll<HTMLElement>(
-    ".al-image-item.is-drop-before, .al-image-item.is-drop-after",
-  )) {
-    item.removeClass("is-drop-before", "is-drop-after");
-  }
-  for (const section of document.querySelectorAll<HTMLElement>(".animelist-image-section.is-image-drag-target")) {
-    section.removeClass("is-image-drag-target");
-  }
+function sameDropTarget(left: ImageSectionDropTarget | null, right: ImageSectionDropTarget | null): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.surface === right.surface
+    && left.item === right.item
+    && left.path === right.path
+    && left.placement === right.placement;
+}
+
+function clearDropIndicator(): void {
+  if (!markedTarget) return;
+  markedTarget.item?.removeClass("is-drop-before", "is-drop-after");
+  markedTarget.surface.containerEl.removeClass("is-image-drag-target");
+  markedTarget = null;
 }
 
 function placementFor(item: HTMLElement, clientY: number): ImageSectionDropPlacement {
@@ -61,6 +68,7 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
     if (!path) return null;
     return {
       surface: targetSurface,
+      item,
       path,
       placement: placementFor(item, point.clientY),
     };
@@ -70,44 +78,42 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
     ".al-image-gallery-viewport, .al-image-masonry, .al-image-masonry-column, .al-image-empty",
   );
   return galleryTarget && section.contains(galleryTarget)
-    ? { surface: targetSurface, path: null, placement: "append" }
+    ? { surface: targetSurface, item: null, path: null, placement: "append" }
     : null;
 }
 
 function markDropTarget(target: ImageSectionDropTarget): void {
-  const document = target.surface.containerEl.ownerDocument;
-  clearDropIndicators(document);
+  if (sameDropTarget(markedTarget, target)) return;
+  clearDropIndicator();
   target.surface.containerEl.addClass("is-image-drag-target");
-  if (!target.path) return;
-  const item = target.surface.containerEl.querySelector<HTMLElement>(
-    `.al-image-item[data-image-path="${CSS.escape(target.path)}"]`,
-  );
-  if (!item) return;
-  item.addClass(target.placement === "before" ? "is-drop-before" : "is-drop-after");
+  target.item?.addClass(target.placement === "before" ? "is-drop-before" : "is-drop-after");
+  markedTarget = target;
 }
 
 function updateDropTarget(surface: ImageSectionDragSurface, point: PointerDragPoint): void {
   if (!activeDrag || activeDrag.source !== surface) return;
   const target = dropTargetFor(surface, point);
+  if (sameDropTarget(activeDrag.target, target)) return;
   activeDrag.target = target;
   if (!target) {
-    clearDropIndicators(surface.containerEl.ownerDocument);
+    clearDropIndicator();
     return;
   }
   markDropTarget(target);
 }
 
-function cancelActiveDrag(surface: ImageSectionDragSurface): void {
-  if (activeDrag?.source === surface) activeDrag = null;
+function cancelSurfaceDrag(surface: ImageSectionDragSurface): void {
+  const sourceWasActive = activeDrag?.source === surface;
+  if (sourceWasActive) activeDrag = null;
   surface.containerEl.removeClass("is-image-drag-source");
-  clearDropIndicators(surface.containerEl.ownerDocument);
+  if (sourceWasActive || markedTarget?.surface === surface) clearDropIndicator();
 }
 
 export function registerImageSectionDragSurface(surface: ImageSectionDragSurface): void {
   dragSurfaces.set(surface.containerEl, surface);
   surface.signal.addEventListener("abort", () => {
     if (dragSurfaces.get(surface.containerEl) === surface) dragSurfaces.delete(surface.containerEl);
-    cancelActiveDrag(surface);
+    cancelSurfaceDrag(surface);
   }, { once: true });
 }
 
@@ -133,7 +139,7 @@ export function beginImageSectionPointerDrag(
       const drag = activeDrag?.source === surface ? activeDrag : null;
       activeDrag = null;
       surface.containerEl.removeClass("is-image-drag-source");
-      clearDropIndicators(surface.containerEl.ownerDocument);
+      clearDropIndicator();
       if (!drag?.target) return;
       drag.target.surface.drop(
         drag.source.participant,
@@ -142,6 +148,6 @@ export function beginImageSectionPointerDrag(
         drag.target.placement,
       );
     },
-    onCancel: () => cancelActiveDrag(surface),
+    onCancel: () => cancelSurfaceDrag(surface),
   });
 }
