@@ -47,19 +47,21 @@ const [bundle, styles] = await Promise.all([
 ]);
 const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
-function fixture({ disableViewTransition, replacementDelays }) {
+function fixture({ disableViewTransition = false, disableWaitUntil = false, replacementDelays }) {
   return `<!doctype html><html><head><style>
     :root{--background-primary:#111;--background-secondary:#222;--background-modifier-border:#444;--interactive-accent:#8b5cf6;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777}
     ${styles}
     body{margin:0;background:#111;color:#eee}#preview{width:390px;margin:30px}
     .host-raw{display:block;min-height:260px;padding:12px;background:#ff00ff;color:#000;font:700 20px sans-serif}
-  </style></head><body data-result="pending"><div id="preview"><section id="section"></section></div>
+    #outside-probe{position:fixed;z-index:1;top:4px;left:4px;width:20px;height:20px;padding:0;border:0;background:#0f0}
+  </style></head><body data-result="pending"><button id="outside-probe" type="button" aria-label="outside probe"></button><div id="preview"><section id="section"></section></div>
   <script>
     window.createEl=(tag)=>document.createElement(tag);
     for(const [name,fn] of Object.entries({addClass:function(...x){this.classList.add(...x)},removeClass:function(...x){this.classList.remove(...x)},toggleClass:function(n,v){this.classList.toggle(n,v)}})){
       if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn});
     }
     ${disableViewTransition ? `Object.defineProperty(document,"startViewTransition",{value:undefined,configurable:true});` : ""}
+    ${disableWaitUntil ? `Object.defineProperty(ViewTransition.prototype,"waitUntil",{value:undefined,configurable:true});` : ""}
   </script><script>${bundle}</script><script>
     const delay=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
     let current=["a.jpg","b.jpg","c.jpg","d.jpg","e.jpg","f.jpg"];
@@ -75,6 +77,9 @@ function fixture({ disableViewTransition, replacementDelays }) {
     const replacementDelays=${JSON.stringify(replacementDelays)};
     let rawDomObserved=false;
     let rawRafSamples=0;
+    let coveredRawRafSamples=0;
+    let outsideHitSamples=0;
+    let continuityClassSamples=0;
     let lightboxSamples=0;
     let tracing=true;
 
@@ -122,7 +127,21 @@ function fixture({ disableViewTransition, replacementDelays }) {
 
     function sample(){
       if(!tracing) return;
-      if(document.querySelector('[data-host-surface="raw-code-block"]')) rawRafSamples+=1;
+      const raw=document.querySelector('[data-host-surface="raw-code-block"]');
+      if(raw){
+        rawRafSamples+=1;
+        const probe=document.querySelector('#outside-probe');
+        const probeRect=probe.getBoundingClientRect();
+        if(document.elementFromPoint(probeRect.left+probeRect.width/2,probeRect.top+probeRect.height/2)===probe) outsideHitSamples+=1;
+        if(document.documentElement.classList.contains('al-image-continuity-active')) continuityClassSamples+=1;
+        try {
+          const oldStyle=getComputedStyle(document.documentElement,'::view-transition-old(al-image-section-0)');
+          const newStyle=getComputedStyle(document.documentElement,'::view-transition-new(al-image-section-0)');
+          const oldOpacity=Number.parseFloat(oldStyle.opacity);
+          const newOpacity=Number.parseFloat(newStyle.opacity);
+          if(oldOpacity>=0.99 && newOpacity<=0.01) coveredRawRafSamples+=1;
+        } catch {}
+      }
       if(document.querySelector('.animelist-image-lightbox')) lightboxSamples+=1;
       requestAnimationFrame(sample);
     }
@@ -131,6 +150,7 @@ function fixture({ disableViewTransition, replacementDelays }) {
     (async()=>{
       await delay(100);
       const control=${disableViewTransition ? "true" : "false"};
+      const legacyBlocking=${disableWaitUntil ? "true" : "false"};
       const iterations=replacementDelays.length;
       const pointer=(element,type,x,y,pointerId)=>element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId,pointerType:"touch",isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==="pointerup"?0:1}));
       for(let iteration=0;iteration<iterations;iteration+=1){
@@ -156,8 +176,12 @@ function fixture({ disableViewTransition, replacementDelays }) {
       const gallery=document.querySelector('.animelist-image-section');
       const details={
         viewTransitionSupported:typeof Document.prototype.startViewTransition==="function",
+        waitUntilSupported:typeof ViewTransition!=="undefined" && typeof ViewTransition.prototype.waitUntil==="function",
         rawDomObserved,
         rawRafSamples,
+        coveredRawRafSamples,
+        outsideHitSamples,
+        continuityClassSamples,
         lightboxSamples,
         replacementMounted:Boolean(gallery),
         replacementCount,
@@ -165,8 +189,15 @@ function fixture({ disableViewTransition, replacementDelays }) {
         iterations,
         replacementDelays,
       };
+      const common=details.rawDomObserved && details.replacementMounted && details.replacementCount===iterations && details.freshReplacementCount===iterations && details.lightboxSamples===0;
+      const controlResult=details.rawRafSamples>0 && details.coveredRawRafSamples===0 && details.continuityClassSamples===0;
+      const legacyBlockingResult=!details.waitUntilSupported && details.rawRafSamples===0 && details.continuityClassSamples===0;
+      const continuityResult=details.waitUntilSupported && details.rawRafSamples>0
+        && details.coveredRawRafSamples===details.rawRafSamples
+        && details.outsideHitSamples===details.rawRafSamples
+        && details.continuityClassSamples===details.rawRafSamples;
       document.body.dataset.details=JSON.stringify(details);
-      document.body.dataset.result=(details.rawDomObserved && details.replacementMounted && details.replacementCount===iterations && details.freshReplacementCount===iterations && details.lightboxSamples===0 && (control ? details.rawRafSamples>0 : details.rawRafSamples===0))?"pass":"fail";
+      document.body.dataset.result=(common && (control ? controlResult : legacyBlocking ? legacyBlockingResult : continuityResult))?"pass":"fail";
     })().catch((error)=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result="fail"});
   </script></body></html>`;
 }
@@ -181,7 +212,15 @@ try {
     resultTimeoutMs: 20000,
   });
   await runChromiumDatasetTest({
-    html: fixture({ disableViewTransition: false, replacementDelays: [80, 150, 300, 600, 1200, 300, 600, 80] }),
+    html: fixture({ disableWaitUntil: true, replacementDelays: [120] }),
+    profile: profile("legacy-blocking"),
+    testName: "Image Section host-rerender legacy blocking fallback",
+    requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
+    viewport: { width: 480, height: 820 },
+    resultTimeoutMs: 20000,
+  });
+  await runChromiumDatasetTest({
+    html: fixture({ replacementDelays: [80, 150, 300, 600, 1200, 300, 600, 80] }),
     profile: profile("continuity"),
     testName: "Image Section host-rerender compositor continuity",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
