@@ -5,197 +5,215 @@ export interface ImageSectionContinuitySlot {
   lineStart?: number;
 }
 
-type ContinuityMode = "blocking" | "snapshot-hold";
-
-type HoldableViewTransition = ViewTransition & {
-  waitUntil?: (promise: Promise<unknown>) => void;
-};
+interface ContinuityOverlay {
+  element: HTMLElement;
+  anchor: HTMLElement;
+  cancelFrame: () => void;
+}
 
 interface PendingSlot extends ImageSectionContinuitySlot {
-  name: string;
   expectedKey: string;
   claimedContainer: HTMLElement | null;
-  resolveReady: () => void;
-  readyPromise: Promise<void>;
+  overlay: ContinuityOverlay | null;
 }
 
 interface PendingTransaction {
-  mode: ContinuityMode;
+  document: Document;
+  sourcePath: string;
   slots: PendingSlot[];
-  claimed: Promise<void>;
-  markClaimed: () => void;
-  replacementClaimed: boolean;
   done: Promise<void>;
   resolveDone: () => void;
+  deadlineTimer: number | null;
+  finishScheduled: boolean;
+  finished: boolean;
 }
 
-const activeTransactions = new WeakMap<Document, PendingTransaction>();
+const activeTransactions = new WeakMap<Document, Map<string, PendingTransaction>>();
 const HOST_REPLACEMENT_DEADLINE_MS = 3000;
-const IMAGE_READINESS_DEADLINE_MS = 1500;
-const SNAPSHOT_READY_DEADLINE_MS = 700;
-const MAX_CONTINUITY_SLOTS = 2;
+const OVERLAY_Z_INDEX = "1000";
 
 function pathsKey(paths: readonly string[]): string {
   return JSON.stringify(paths);
 }
 
-function slotName(index: number): string {
-  return `al-image-section-${index}`;
+function documentTransactions(document: Document): Map<string, PendingTransaction> {
+  let transactions = activeTransactions.get(document);
+  if (!transactions) {
+    transactions = new Map();
+    activeTransactions.set(document, transactions);
+  }
+  return transactions;
 }
 
-function setInlineViewTransitionName(element: HTMLElement, value: string): () => void {
-  const previous = element.style.getPropertyValue("view-transition-name");
-  const priority = element.style.getPropertyPriority("view-transition-name");
-  element.style.setProperty("view-transition-name", value);
-  return () => {
-    if (previous) element.style.setProperty("view-transition-name", previous, priority);
-    else element.style.removeProperty("view-transition-name");
-  };
-}
-
-const CONTINUITY_ACTIVE_CLASS = "al-image-continuity-active";
-const SNAPSHOT_HOLD_STYLES = `
-html.al-image-continuity-active::view-transition-group(al-image-section-0),
-html.al-image-continuity-active::view-transition-group(al-image-section-1),
-html.al-image-continuity-active::view-transition-old(al-image-section-0),
-html.al-image-continuity-active::view-transition-old(al-image-section-1),
-html.al-image-continuity-active::view-transition-new(al-image-section-0),
-html.al-image-continuity-active::view-transition-new(al-image-section-1) {
-  animation: none;
-}
-html.al-image-continuity-active::view-transition-old(al-image-section-0),
-html.al-image-continuity-active::view-transition-old(al-image-section-1) {
-  opacity: 1;
-}
-html.al-image-continuity-active::view-transition-new(al-image-section-0),
-html.al-image-continuity-active::view-transition-new(al-image-section-1) {
-  opacity: 0;
-}
-`;
-
-function prepareSnapshotHold(document: Document): (() => void) | null {
-  if (typeof ViewTransition === "undefined"
-    || typeof (ViewTransition.prototype as HoldableViewTransition).waitUntil !== "function"
-    || typeof CSSStyleSheet === "undefined"
-    || typeof CSSStyleSheet.prototype.replaceSync !== "function"
-    || !("adoptedStyleSheets" in document)) return null;
-
-  try {
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(SNAPSHOT_HOLD_STYLES);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-    const root = document.documentElement;
-    const alreadyActive = root.classList.contains(CONTINUITY_ACTIVE_CLASS);
-    root.classList.add(CONTINUITY_ACTIVE_CLASS);
-    return () => {
-      if (!alreadyActive) root.classList.remove(CONTINUITY_ACTIVE_CLASS);
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((candidate) => candidate !== sheet);
-    };
-  } catch {
-    return null;
+function copyScrollState(source: HTMLElement, clone: HTMLElement): void {
+  const sources = [source, ...source.querySelectorAll<HTMLElement>("*")];
+  const clones = [clone, ...clone.querySelectorAll<HTMLElement>("*")];
+  const count = Math.min(sources.length, clones.length);
+  for (let index = 0; index < count; index += 1) {
+    clones[index].scrollTop = sources[index].scrollTop;
+    clones[index].scrollLeft = sources[index].scrollLeft;
   }
 }
 
-function timeout(view: Window, milliseconds: number): Promise<void> {
-  return new Promise((resolve) => view.setTimeout(resolve, milliseconds));
+function sanitizeOverlayClone(clone: HTMLElement): void {
+  clone.removeAttribute("id");
+  clone.style.removeProperty("view-transition-name");
+  clone.setAttribute("aria-hidden", "true");
+  clone.dataset.imageContinuityOverlay = "true";
+  clone.inert = true;
+  for (const element of clone.querySelectorAll<HTMLElement>("[id], [tabindex]")) {
+    element.removeAttribute("id");
+    element.removeAttribute("tabindex");
+  }
 }
 
-function waitForReplacementClaim(
-  transaction: PendingTransaction,
-  view: Window,
-  milliseconds: number,
-): Promise<boolean> {
-  if (transaction.replacementClaimed) return Promise.resolve(true);
-  return Promise.race([
-    transaction.claimed.then(() => true),
-    timeout(view, milliseconds).then(() => false),
-  ]);
-}
+function createContinuityOverlay(container: HTMLElement): ContinuityOverlay | null {
+  const document = container.ownerDocument;
+  const view = document.defaultView;
+  const parent = container.parentElement;
+  if (!view || !parent || !container.isConnected) return null;
+  const rect = container.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
 
-async function waitForImageReadiness(container: HTMLElement): Promise<void> {
-  const images = [...container.querySelectorAll<HTMLImageElement>("img")];
-  await Promise.all(images.map(async (image) => {
-    if (!image.complete) {
-      await new Promise<void>((resolve) => {
-        const settle = (): void => resolve();
-        image.addEventListener("load", settle, { once: true });
-        image.addEventListener("error", settle, { once: true });
+  const anchor = parent.createSpan({ cls: "al-image-continuity-anchor" });
+  anchor.setAttribute("aria-hidden", "true");
+  anchor.setCssStyles({
+    display: "block",
+    width: "0",
+    height: "0",
+    margin: "0",
+    padding: "0",
+    pointerEvents: "none",
+  });
+  parent.insertBefore(anchor, container);
+  const anchorRect = anchor.getBoundingClientRect();
+  const offsetLeft = rect.left - anchorRect.left;
+  const offsetTop = rect.top - anchorRect.top;
+
+  const clone = container.cloneNode(true) as HTMLElement;
+  sanitizeOverlayClone(clone);
+  clone.setCssStyles({
+    position: "fixed",
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    margin: "0",
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: OVERLAY_Z_INDEX,
+    boxSizing: "border-box",
+  });
+  copyScrollState(container, clone);
+  document.body.appendChild(clone);
+
+  let frame = 0;
+  let stopped = false;
+  const syncPosition = (): void => {
+    if (stopped) return;
+    if (anchor.isConnected) {
+      const current = anchor.getBoundingClientRect();
+      clone.setCssStyles({
+        left: `${current.left + offsetLeft}px`,
+        top: `${current.top + offsetTop}px`,
       });
     }
-    try {
-      await image.decode?.();
-    } catch {
-      // A failed image is replaced by the renderer's explicit fallback. It is
-      // still a settled visual state for continuity purposes.
-    }
-  }));
-}
-
-async function waitForReplacementReadiness(transaction: PendingTransaction, view: Window): Promise<void> {
-  if (!await waitForReplacementClaim(transaction, view, HOST_REPLACEMENT_DEADLINE_MS)) return;
-  await Promise.race([
-    Promise.all(transaction.slots.map((slot) => slot.readyPromise)).then(() => undefined),
-    timeout(view, IMAGE_READINESS_DEADLINE_MS),
-  ]);
-}
-
-function createTransaction(
-  slots: readonly ImageSectionContinuitySlot[],
-  mode: ContinuityMode,
-): PendingTransaction {
-  const pendingSlots: PendingSlot[] = slots.map((slot, index) => {
-    let resolveReady = (): void => {};
-    const readyPromise = new Promise<void>((resolve) => { resolveReady = resolve; });
-    return {
-      ...slot,
-      name: slotName(index),
-      expectedKey: pathsKey(slot.expectedPaths),
-      claimedContainer: null,
-      resolveReady,
-      readyPromise,
-    };
-  });
-  let resolveClaimed = (): void => {};
-  const claimed = new Promise<void>((resolve) => { resolveClaimed = resolve; });
-  let replacementClaimed = false;
-  const markClaimed = (): void => {
-    if (replacementClaimed) return;
-    replacementClaimed = true;
-    resolveClaimed();
+    frame = view.requestAnimationFrame(syncPosition);
   };
+  syncPosition();
+
+  return {
+    element: clone,
+    anchor,
+    cancelFrame: () => {
+      stopped = true;
+      if (frame) view.cancelAnimationFrame(frame);
+    },
+  };
+}
+
+function removeContinuityOverlay(overlay: ContinuityOverlay | null): void {
+  if (!overlay) return;
+  overlay.cancelFrame();
+  overlay.element.remove();
+  overlay.anchor.remove();
+}
+
+function finishTransaction(transaction: PendingTransaction): void {
+  if (transaction.finished) return;
+  transaction.finished = true;
+  const view = transaction.document.defaultView;
+  if (transaction.deadlineTimer !== null) view?.clearTimeout(transaction.deadlineTimer);
+  transaction.deadlineTimer = null;
+  const transactions = activeTransactions.get(transaction.document);
+  if (transactions?.get(transaction.sourcePath) === transaction) {
+    transactions.delete(transaction.sourcePath);
+    if (transactions.size === 0) activeTransactions.delete(transaction.document);
+  }
+  for (const slot of transaction.slots) removeContinuityOverlay(slot.overlay);
+  transaction.resolveDone();
+}
+
+function createTransaction(slots: readonly ImageSectionContinuitySlot[], document: Document): PendingTransaction {
   let resolveDone = (): void => {};
   const done = new Promise<void>((resolve) => { resolveDone = resolve; });
-  return {
-    mode,
-    slots: pendingSlots,
-    claimed,
-    markClaimed,
-    get replacementClaimed() { return replacementClaimed; },
+  const transaction: PendingTransaction = {
+    document,
+    sourcePath: slots[0].sourcePath,
+    slots: slots.map((slot) => ({
+      ...slot,
+      expectedKey: pathsKey(slot.expectedPaths),
+      claimedContainer: null,
+      overlay: null,
+    })),
     done,
     resolveDone,
+    deadlineTimer: null,
+    finishScheduled: false,
+    finished: false,
   };
+  const view = document.defaultView;
+  if (view) {
+    transaction.deadlineTimer = view.setTimeout(
+      () => finishTransaction(transaction),
+      HOST_REPLACEMENT_DEADLINE_MS,
+    );
+  }
+  return transaction;
 }
 
-/**
- * Claims a pending continuity slot for a newly-created Markdown render child.
- * Snapshot-hold transitions keep showing the old compositor snapshot while the
- * replacement renders normally underneath it, so the replacement does not join
- * the already-captured transition. The legacy blocking fallback still assigns
- * the matching transition name before the browser captures its new snapshot.
- */
+function scheduleFinishAfterReplacement(transaction: PendingTransaction): void {
+  if (transaction.finished || transaction.finishScheduled) return;
+  if (!transaction.slots.every((slot) => slot.claimedContainer !== null)) return;
+  transaction.finishScheduled = true;
+  const view = transaction.document.defaultView;
+  if (!view) {
+    finishTransaction(transaction);
+    return;
+  }
+  view.requestAnimationFrame(() => finishTransaction(transaction));
+}
+
+export function prepareImageSectionHostUnload(container: HTMLElement): void {
+  const transactions = activeTransactions.get(container.ownerDocument);
+  if (!transactions) return;
+  for (const transaction of transactions.values()) {
+    const slot = transaction.slots.find((candidate) => candidate.container === container);
+    if (!slot || slot.overlay || slot.claimedContainer) continue;
+    slot.overlay = createContinuityOverlay(container);
+    return;
+  }
+}
+
 export function claimImageSectionHostContinuity(
   container: HTMLElement,
   sourcePath: string,
   paths: readonly string[],
   lineStart?: number,
 ): void {
-  const transaction = activeTransactions.get(container.ownerDocument);
-  if (!transaction) return;
+  const transaction = activeTransactions.get(container.ownerDocument)?.get(sourcePath);
+  if (!transaction || transaction.finished) return;
   const expectedKey = pathsKey(paths);
   const candidates = transaction.slots.filter((slot) => (
-    slot.claimedContainer === null
-    && slot.sourcePath === sourcePath
-    && slot.expectedKey === expectedKey
+    slot.claimedContainer === null && slot.expectedKey === expectedKey
   ));
   if (!candidates.length) return;
 
@@ -212,148 +230,40 @@ export function claimImageSectionHostContinuity(
     })[0];
 
   selected.claimedContainer = container;
-  transaction.markClaimed();
-  if (transaction.mode === "blocking") container.style.setProperty("view-transition-name", selected.name);
-  const view = container.ownerDocument.defaultView;
-  const readiness = waitForImageReadiness(container);
-  void (view
-    ? Promise.race([readiness, timeout(view, SNAPSHOT_READY_DEADLINE_MS)])
-    : readiness
-  ).finally(selected.resolveReady);
+  scheduleFinishAfterReplacement(transaction);
 }
 
-async function runBlockingContinuity<T>(
-  transaction: PendingTransaction,
-  document: Document,
-  view: Window,
-  update: () => Promise<T>,
-): Promise<T> {
-  let result!: T;
-  let transition: ViewTransition | null = null;
-  let updateStarted = false;
-  try {
-    transition = document.startViewTransition(async () => {
-      updateStarted = true;
-      result = await update();
-      await waitForReplacementReadiness(transaction, view);
-    });
-  } catch (error) {
-    if (!updateStarted) return update();
-    throw error;
-  }
-  try {
-    await transition.updateCallbackDone;
-  } catch (error) {
-    if (!updateStarted) return update();
-    throw error;
-  }
-  try {
-    await transition.ready;
-    transition.skipTransition();
-  } catch {
-    // Duplicate names or browser cancellation must never turn a successful
-    // Markdown persistence operation into a functional error.
-  }
-  await transition.finished.catch(() => undefined);
-  return result;
-}
-
-/**
- * Captures the already-reordered Image Section, immediately ends the view
- * transition update callback so document rendering resumes, and then performs
- * Markdown persistence while the old section snapshot remains in the compositor
- * overlay. The replacement renderer is allowed to mount and decode underneath
- * that snapshot; the pseudo-element tree is released only after the replacement
- * is ready. This avoids both the raw-host flash and the document-wide rendering
- * suppression caused by waiting inside an async startViewTransition callback.
- */
-async function runSnapshotHoldContinuity<T>(
-  transaction: PendingTransaction,
-  document: Document,
-  view: Window,
-  update: () => Promise<T>,
-): Promise<T> {
-  let transition: HoldableViewTransition;
-  try {
-    transition = document.startViewTransition(() => undefined) as HoldableViewTransition;
-  } catch {
-    return update();
-  }
-  if (typeof transition.waitUntil !== "function") {
-    transition.skipTransition();
-    await transition.finished.catch(() => undefined);
-    return update();
-  }
-
-  let releaseSnapshot = (): void => {};
-  const snapshotLifetime = new Promise<void>((resolve) => { releaseSnapshot = resolve; });
-  transition.waitUntil(snapshotLifetime);
-
-  try {
-    await transition.ready;
-  } catch {
-    releaseSnapshot();
-    await transition.finished.catch(() => undefined);
-    return update();
-  }
-
-  try {
-    const result = await update();
-    await waitForReplacementReadiness(transaction, view);
-    return result;
-  } finally {
-    releaseSnapshot();
-    await transition.finished.catch(() => undefined);
-  }
-}
-
-/**
- * Runs Markdown persistence as an Image Section compositor continuity
- * transaction. Modern Chromium keeps only the section snapshot alive while the
- * rest of the document continues rendering. Browsers without ViewTransition
- * waitUntil() keep the previous blocking behavior rather than regressing to a
- * visible raw Markdown host.
- */
 export async function withImageSectionHostContinuity<T>(
   slots: readonly ImageSectionContinuitySlot[],
   update: () => Promise<T>,
+  onUpdated?: (result: T) => void,
 ): Promise<T> {
   const first = slots[0]?.container;
   const document = first?.ownerDocument;
-  const view = document?.defaultView;
-  const supportsViewTransition = Boolean(document && typeof document.startViewTransition === "function");
-  if (!first || !document || !view || !supportsViewTransition
-    || slots.length > MAX_CONTINUITY_SLOTS
-    || slots.some((slot) => slot.container.ownerDocument !== document)) {
-    return update();
+  if (!first || !document || !document.defaultView
+    || slots.some((slot) => slot.container.ownerDocument !== document || slot.sourcePath !== slots[0].sourcePath)) {
+    const result = await update();
+    onUpdated?.(result);
+    return result;
   }
 
-  const active = activeTransactions.get(document);
-  if (active) {
-    await active.done.catch(() => undefined);
-    return withImageSectionHostContinuity(slots, update);
+  const transactions = documentTransactions(document);
+  const existing = transactions.get(slots[0].sourcePath);
+  if (existing) {
+    const replacementStarted = existing.slots.some((slot) => slot.overlay || slot.claimedContainer);
+    if (replacementStarted) await existing.done;
+    else finishTransaction(existing);
   }
 
-  const restoreSnapshotHold = prepareSnapshotHold(document);
-  const mode: ContinuityMode = restoreSnapshotHold ? "snapshot-hold" : "blocking";
-  const transaction = createTransaction(slots, mode);
-  const restoreRoot = setInlineViewTransitionName(document.documentElement, "none");
-  const restoreOldNames = transaction.slots.map((slot) => setInlineViewTransitionName(slot.container, slot.name));
-  activeTransactions.set(document, transaction);
-
+  const transaction = createTransaction(slots, document);
+  documentTransactions(document).set(transaction.sourcePath, transaction);
   try {
-    return mode === "snapshot-hold"
-      ? await runSnapshotHoldContinuity(transaction, document, view, update)
-      : await runBlockingContinuity(transaction, document, view, update);
-  } finally {
-    if (activeTransactions.get(document) === transaction) activeTransactions.delete(document);
-    transaction.resolveDone();
-    restoreOldNames.forEach((restore) => restore());
-    for (const slot of transaction.slots) {
-      const replacement = slot.claimedContainer;
-      if (replacement && replacement !== slot.container) replacement.style.removeProperty("view-transition-name");
-    }
-    restoreSnapshotHold?.();
-    restoreRoot();
+    const result = await update();
+    onUpdated?.(result);
+    scheduleFinishAfterReplacement(transaction);
+    return result;
+  } catch (error) {
+    finishTransaction(transaction);
+    throw error;
   }
 }

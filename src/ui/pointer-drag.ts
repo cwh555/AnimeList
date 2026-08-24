@@ -12,6 +12,8 @@ export interface PointerDragOptions {
   onDrop: (point: PointerDragPoint) => void;
   onCancel?: () => void;
   onStart?: () => void;
+  onArm?: () => void;
+  onFinish?: () => void;
   threshold?: number;
   signal?: AbortSignal;
 }
@@ -26,7 +28,6 @@ function distanceSquared(left: PointerDragPoint, right: PointerDragPoint): numbe
   return dx * dx + dy * dy;
 }
 
-
 function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, radius = 32): void {
   const view = window;
   const deadline = performance.now() + timeoutMs;
@@ -35,8 +36,10 @@ function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, r
 
   const cleanup = (): void => {
     view.removeEventListener("click", block, true);
+    view.removeEventListener("pointerdown", releaseForNextPointer, true);
     if (timeout) view.clearTimeout(timeout);
   };
+  const releaseForNextPointer = (): void => cleanup();
   const block = (event: MouseEvent): void => {
     if (performance.now() > deadline) {
       cleanup();
@@ -51,6 +54,7 @@ function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, r
   };
 
   view.addEventListener("click", block, true);
+  view.addEventListener("pointerdown", releaseForNextPointer, true);
   timeout = view.setTimeout(cleanup, timeoutMs);
 }
 
@@ -63,6 +67,8 @@ export function armPointerDrag(options: PointerDragOptions): void {
     onDrop,
     onCancel,
     onStart,
+    onArm,
+    onFinish,
     threshold = 5,
     signal,
   } = options;
@@ -71,7 +77,15 @@ export function armPointerDrag(options: PointerDragOptions): void {
 
   const pointerId = event.pointerId;
   const start = point(event);
+  onArm?.();
   let started = false;
+  let finished = false;
+
+  const finish = (): void => {
+    if (finished) return;
+    finished = true;
+    onFinish?.();
+  };
 
   const cleanup = (): void => {
     window.removeEventListener("pointermove", move);
@@ -84,6 +98,7 @@ export function armPointerDrag(options: PointerDragOptions): void {
       // The browser may already have released pointer capture.
     }
     dragElement.removeClass("is-pointer-dragging");
+    finish();
   };
 
   const abort = (): void => {
@@ -113,9 +128,6 @@ export function armPointerDrag(options: PointerDragOptions): void {
     if (started) {
       upEvent.preventDefault();
       upEvent.stopPropagation();
-      // Browsers may emit a click after pointerup even when the drag changed
-      // the underlying Markdown and replaced the render child. Suppress that
-      // one click at the drop point independently of renderer lifetime.
       suppressSyntheticClick(current);
       onDrop(current);
     }

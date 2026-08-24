@@ -5,10 +5,24 @@ import {
   type ImageSectionDropPlacement,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
-import { withImageSectionHostContinuity } from "./image-section-continuity";
-import { captureScrollPosition } from "./viewport-anchor";
+import {
+  queueImageSectionMoveCommit,
+  type ImageSectionCommitParticipant,
+  type ImageSectionMoveOutcome,
+} from "./image-section-move-commit-queue";
 
-export interface ImageSectionMoveParticipant {
+export {
+  flushImageSectionMoveCommitOnUnload,
+  type ImageSectionMoveOutcome,
+} from "./image-section-move-commit-queue";
+export {
+  adoptImageSectionMoveParticipant,
+  beginImageSectionMoveInteraction,
+  endImageSectionMoveInteraction,
+  scheduleImageSectionMoveParticipantAdoption,
+} from "./image-section-move-lifecycle";
+
+export interface ImageSectionMoveParticipant extends ImageSectionCommitParticipant {
   readonly containerEl: HTMLElement;
   readonly sourcePath: string;
   paths(): readonly string[];
@@ -18,14 +32,8 @@ export interface ImageSectionMoveParticipant {
   applyState(update: ImageSectionStateUpdate): void;
   preserveLayoutAcrossRefresh(): void;
   layoutMotion(): Promise<void>;
-  setDragSource(active: boolean): void;
+  setDragSource?(active: boolean): void;
 }
-
-export type ImageSectionMoveOutcome =
-  | { status: "moved" }
-  | { status: "unchanged" }
-  | { status: "unsupported" }
-  | { status: "failed"; error: unknown };
 
 export interface ImageSectionMoveRequest {
   service: ImageSectionService;
@@ -52,73 +60,26 @@ export async function moveImageSectionAsset(request: ImageSectionMoveRequest): P
     sameSection,
   );
 
-  if (!plan.changed) {
-    source.setDragSource(false);
-    return { status: "unchanged" };
-  }
+  if (!plan.changed) return { status: "unchanged" };
 
   source.applyPaths(plan.sourcePaths, sameSection);
   if (!sameSection) target.applyPaths(plan.targetPaths, false);
-
-  const scrollPosition = captureScrollPosition(source.containerEl);
   source.preserveLayoutAcrossRefresh();
   if (!sameSection) target.preserveLayoutAcrossRefresh();
-  scrollPosition.stabilize(12);
-  await Promise.all([source.layoutMotion(), sameSection ? Promise.resolve() : target.layoutMotion()]);
+  const layout: Promise<void> = (async () => {
+    await source.layoutMotion();
+    if (!sameSection) await target.layoutMotion();
+  })();
 
-  const sourceLocator = source.locator();
-  const targetLocator = target.locator();
-  const continuitySlots = sameSection
-    ? [{
-      container: source.containerEl,
-      sourcePath: source.sourcePath,
-      expectedPaths: plan.sourcePaths,
-      lineStart: sourceLocator.lineStart,
-    }]
-    : [
-      {
-        container: source.containerEl,
-        sourcePath: source.sourcePath,
-        expectedPaths: plan.sourcePaths,
-        lineStart: sourceLocator.lineStart,
-      },
-      {
-        container: target.containerEl,
-        sourcePath: target.sourcePath,
-        expectedPaths: plan.targetPaths,
-        lineStart: targetLocator.lineStart,
-      },
-    ];
-
-  try {
-    const update = await withImageSectionHostContinuity(continuitySlots, () => service.moveAsset(
-      target.sourcePath,
-      sourceLocator,
-      targetLocator,
-      path,
-      targetPath ?? "",
-      placement,
-    ));
-
-    if (source.ownsContainer()) source.setDragSource(false);
-    if (sameSection) {
-      if (target.ownsContainer()) target.applyState(update.sourceSection);
-    } else {
-      if (source.ownsContainer()) source.applyState(update.sourceSection);
-      if (target.ownsContainer()) target.applyState(update.targetSection);
-    }
-    if (source.ownsContainer()) {
-      scrollPosition.restore();
-      scrollPosition.stabilize(12);
-    }
-    return { status: "moved" };
-  } catch (error) {
-    if (source.ownsContainer()) source.applyPaths(sourceBefore);
-    if (!sameSection && target.ownsContainer()) target.applyPaths(targetBefore);
-    if (source.ownsContainer()) {
-      scrollPosition.restore();
-      scrollPosition.stabilize(12);
-    }
-    return { status: "failed", error };
-  }
+  return queueImageSectionMoveCommit({
+    service,
+    source,
+    target,
+    sourceBefore,
+    targetBefore,
+    sourceAfter: plan.sourcePaths,
+    targetAfter: plan.targetPaths,
+    sameSection,
+    layout,
+  });
 }
