@@ -41,3 +41,28 @@ jobs:
       - name: Run tag manager interactions in Chromium
         run: npm run test:browser:tag-manager
       - run: npm run release:check
+      - name: Build fresh production Test Vault
+        env:
+          ANIMELIST_TEST_VAULT: /tmp/AnimeListTestVault-1362
+          ANIMELIST_TEST_VAULT_NO_OPEN: "1"
+        run: |
+          npm run build
+          node scripts/test-vault.mjs production --no-open
+          test "$(find /tmp/AnimeListTestVault-1362/.obsidian/plugins/animelist -maxdepth 1 -type f | wc -l)" -eq 3
+          test "$(find /tmp/AnimeListTestVault-1362/AnimeList/Covers -type f -name '*.jpg' | wc -l)" -eq 18
+          test "$(find /tmp/AnimeListTestVault-1362/AnimeList/Images/test-vault/anime-scenes -type f -name '*.jpg' | wc -l)" -eq 20
+          sha256sum main.js manifest.json styles.css > /tmp/release-hashes.txt
+          sha256sum /tmp/AnimeListTestVault-1362/.obsidian/plugins/animelist/main.js /tmp/AnimeListTestVault-1362/.obsidian/plugins/animelist/manifest.json /tmp/AnimeListTestVault-1362/.obsidian/plugins/animelist/styles.css > /tmp/installed-hashes.txt
+          diff <(awk '{print $1}' /tmp/release-hashes.txt) <(awk '{print $1}' /tmp/installed-hashes.txt)
+          printf 'source_head=73d578db295eed395477e459026ae0fcb3cac632\n' > /tmp/AnimeListTestVault-1362/_AnimeList_BUILD_INFO.txt
+          cat /tmp/release-hashes.txt >> /tmp/AnimeListTestVault-1362/_AnimeList_BUILD_INFO.txt
+          cd /tmp
+          zip -qr AnimeListTestVault-1362.zip AnimeListTestVault-1362
+          unzip -t AnimeListTestVault-1362.zip
+          sha256sum AnimeListTestVault-1362.zip
+      - name: Upload production Test Vault
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-vault-1362
+          path: /tmp/AnimeListTestVault-1362.zip
+          retention-days: 1
