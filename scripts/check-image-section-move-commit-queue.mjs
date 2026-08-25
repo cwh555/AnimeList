@@ -12,8 +12,7 @@ await build({
   stdin: {
     contents: `
       export { moveImageSectionAsset } from "./src/ui/image-section-move-coordinator";
-      export { scheduleImageSectionMoveParticipantAdoption, unloadImageSectionMoveParticipant } from "./src/ui/image-section-move-lifecycle";
-      export { claimImageSectionHostContinuity } from "./src/ui/image-section-continuity";
+      export { scheduleImageSectionMoveParticipantAdoption } from "./src/ui/image-section-move-lifecycle";
       export { armPointerDrag } from "./src/ui/pointer-drag";
     `,
     resolveDir: process.cwd(),
@@ -97,7 +96,6 @@ for(const [name,fn] of Object.entries({
        firstWriteResolveStart();
        await delay(90);
        persisted=desired;
-       api.unloadImageSectionMoveParticipant(oldParticipant);
        oldParticipant.loseOwnership();
        const raw=document.createElement('pre');raw.className='raw';raw.textContent='RAW';oldContainer.replaceWith(raw);
        const freshContainer=renderContainer(persisted);raw.replaceWith(freshContainer);
@@ -106,7 +104,6 @@ for(const [name,fn] of Object.entries({
        api.scheduleImageSectionMoveParticipantAdoption(freshParticipant);
        await Promise.resolve();
        freshAdoptedOrder=freshParticipant.paths().join(',');
-       api.claimImageSectionHostContinuity(freshContainer,'Demo.md',persisted,10);
        await nextFrame();
        freshFirstPaintOrder=freshParticipant.paths().join(',');
        await delay(350);

@@ -177,6 +177,67 @@ for (const source of sources) {
   }
 }
 
+function forbidDependency(importer, dependency, message) {
+  if (dependencyGraph.get(importer)?.has(dependency)) failures.push(message);
+}
+function requireDependency(importer, dependency, message) {
+  if (!dependencyGraph.get(importer)?.has(dependency)) failures.push(message);
+}
+
+// Image Section move persistence and visual continuity are intentionally
+// independent state machines. Persistence may adopt replacement participants,
+// but it must never own DOM snapshots or renderer visual readiness.
+forbidDependency(
+  "src/ui/image-section-move-commit-queue.ts",
+  "src/ui/image-section-continuity.ts",
+  "Image Section move commit queue must not depend on visual continuity",
+);
+for (const dependency of [
+  "src/ui/image-section-move-commit-queue.ts",
+  "src/ui/image-section-move-lifecycle.ts",
+  "src/ui/image-section-drag-controller.ts",
+  "src/data/image-section-service.ts",
+]) {
+  forbidDependency(
+    "src/ui/image-section-continuity.ts",
+    dependency,
+    `Image Section continuity must stay independent of move/persistence wiring (${dependency})`,
+  );
+}
+requireDependency(
+  "src/ui/image-section-continuity.ts",
+  "src/ui/image-section-visual-handoff.ts",
+  "Image Section continuity must delegate DOM snapshot/readiness to image-section-visual-handoff",
+);
+requireDependency(
+  "src/ui/image-section-renderer.ts",
+  "src/ui/image-section-continuity.ts",
+  "Image Section renderer must own the prepare/claim lifecycle wiring",
+);
+const visualHandoff = sourceByPath.get("src/ui/image-section-visual-handoff.ts")?.content ?? "";
+reject(
+  /document\.body\.(?:append|appendChild)\s*\(/,
+  "Image Section visual handoff must keep its clone in the original Markdown ancestor context",
+  visualHandoff,
+);
+const imageSectionLifecycle = sourceByPath.get("src/ui/image-section-move-lifecycle.ts")?.content ?? "";
+reject(
+  /participantUnloading|unloadImageSectionMoveParticipant/,
+  "Image Section move lifecycle must not own renderer visual unload responsibility",
+  imageSectionLifecycle,
+);
+const imageSectionRenderer = sourceByPath.get("src/ui/image-section-renderer.ts")?.content ?? "";
+require(
+  /prepareImageSectionHostContinuity\s*\(/,
+  "Image Section renderer must prepare visual handoff before a host is replaced",
+  imageSectionRenderer,
+);
+require(
+  /claimImageSectionHostContinuity\s*\(/,
+  "Image Section renderer must claim visual handoff for the successor host",
+  imageSectionRenderer,
+);
+
 const visitState = new Map();
 const visitStack = [];
 const reportedCycles = new Set();
