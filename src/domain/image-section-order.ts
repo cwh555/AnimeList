@@ -1,6 +1,5 @@
 import {
   findImageSectionBlocks,
-  locateImageSectionBlock,
   normalizeImageSectionPath,
   serializeImageSectionPaths,
   type ImageSectionBlock,
@@ -13,12 +12,6 @@ export interface ImageSectionStateUpdate {
   source: string;
   lineStart: number;
   lineEnd: number;
-}
-
-export interface ImageSectionMoveUpdate {
-  markdown: string;
-  sourceSection: ImageSectionStateUpdate;
-  targetSection: ImageSectionStateUpdate;
 }
 
 export interface ImageSectionOrderReplacement {
@@ -176,58 +169,4 @@ export function replaceImageSectionOrders(
     return stateFor(block);
   });
   return { markdown: updatedMarkdown, sections };
-}
-
-export function moveImageSectionPath(
-  markdown: unknown,
-  sourceLocator: ImageSectionLocator,
-  targetLocator: ImageSectionLocator,
-  movingPathValue: unknown,
-  targetPathValue: unknown,
-  placement: ImageSectionDropPlacement,
-): ImageSectionMoveUpdate {
-  const text = typeof markdown === "string" ? markdown : "";
-  const newline = text.includes("\r\n") ? "\r\n" : "\n";
-  const blocks = findImageSectionBlocks(text);
-  const sourceBlock = locateImageSectionBlock(text, sourceLocator);
-  const targetBlock = locateImageSectionBlock(text, targetLocator);
-  const sourceIndex = blockIndex(blocks, sourceBlock);
-  const targetIndex = blockIndex(blocks, targetBlock);
-  const movingPath = normalizeImageSectionPath(movingPathValue);
-  const targetPath = normalizeImageSectionPath(targetPathValue);
-
-  if (!movingPath || !sourceBlock.paths.includes(movingPath)) {
-    throw new Error("Could not find the dragged image in its source section");
-  }
-
-  const sameSection = sourceIndex === targetIndex;
-  const plan = planImageSectionPathMove(
-    sourceBlock.paths,
-    targetBlock.paths,
-    movingPath,
-    targetPath,
-    placement,
-    sameSection,
-  );
-  const lines = text.split(/\r?\n/u);
-  if (sameSection) {
-    replaceBlockPaths(lines, sourceBlock, plan.sourcePaths);
-  } else {
-    const replacements = [
-      { block: sourceBlock, paths: plan.sourcePaths },
-      { block: targetBlock, paths: plan.targetPaths },
-    ].sort((left, right) => right.block.lineStart - left.block.lineStart);
-    for (const replacement of replacements) replaceBlockPaths(lines, replacement.block, replacement.paths);
-  }
-
-  const updatedMarkdown = lines.join(newline);
-  const updatedBlocks = findImageSectionBlocks(updatedMarkdown);
-  const updatedSource = updatedBlocks[sourceIndex];
-  const updatedTarget = updatedBlocks[targetIndex];
-  if (!updatedSource || !updatedTarget) throw new Error("Could not verify the updated image sections");
-  return {
-    markdown: updatedMarkdown,
-    sourceSection: stateFor(updatedSource),
-    targetSection: stateFor(updatedTarget),
-  };
 }

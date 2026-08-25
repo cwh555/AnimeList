@@ -9,17 +9,23 @@ export interface ImageSectionMoveLifecycleParticipant {
 }
 
 export interface ImageSectionMoveLifecycleHooks {
-  participantRegistered(participant: ImageSectionMoveLifecycleParticipant): void;
-  interactionStarted(participant: ImageSectionMoveLifecycleParticipant): void;
-  interactionEnded(participant: ImageSectionMoveLifecycleParticipant): void;
+  participantRegistered?(participant: ImageSectionMoveLifecycleParticipant): void;
+  participantUnloading?(participant: ImageSectionMoveLifecycleParticipant): void;
+  interactionStarted?(participant: ImageSectionMoveLifecycleParticipant): void;
+  interactionEnded?(participant: ImageSectionMoveLifecycleParticipant): void;
 }
 
-interface RegisteredHooks {
-  owner: object;
-  hooks: ImageSectionMoveLifecycleHooks;
-}
+const hooksByDocument = new WeakMap<Document, Map<string, Map<object, ImageSectionMoveLifecycleHooks>>>();
 
-const hooksByDocument = new WeakMap<Document, Map<string, RegisteredHooks>>();
+function hooksFor(
+  participant: ImageSectionMoveLifecycleParticipant,
+): readonly ImageSectionMoveLifecycleHooks[] {
+  const container = participant.containerEl;
+  const sourcePath = participant.sourcePath;
+  if (!container?.ownerDocument || typeof sourcePath !== "string") return [];
+  const byPath = hooksByDocument.get(container.ownerDocument)?.get(sourcePath);
+  return byPath ? [...byPath.values()] : [];
+}
 
 export function registerImageSectionMoveLifecycleHooks(
   document: Document,
@@ -32,7 +38,12 @@ export function registerImageSectionMoveLifecycleHooks(
     byPath = new Map();
     hooksByDocument.set(document, byPath);
   }
-  byPath.set(sourcePath, { owner, hooks });
+  let listeners = byPath.get(sourcePath);
+  if (!listeners) {
+    listeners = new Map();
+    byPath.set(sourcePath, listeners);
+  }
+  listeners.set(owner, hooks);
 }
 
 export function unregisterImageSectionMoveLifecycleHooks(
@@ -41,23 +52,22 @@ export function unregisterImageSectionMoveLifecycleHooks(
   owner: object,
 ): void {
   const byPath = hooksByDocument.get(document);
-  const registered = byPath?.get(sourcePath);
-  if (!byPath || registered?.owner !== owner) return;
-  byPath.delete(sourcePath);
+  const listeners = byPath?.get(sourcePath);
+  if (!byPath || !listeners || !listeners.delete(owner)) return;
+  if (listeners.size === 0) byPath.delete(sourcePath);
   if (byPath.size === 0) hooksByDocument.delete(document);
-}
-
-function lifecycleHooks(participant: ImageSectionMoveLifecycleParticipant): ImageSectionMoveLifecycleHooks | null {
-  const container = participant.containerEl;
-  const sourcePath = participant.sourcePath;
-  if (!container?.ownerDocument || typeof sourcePath !== "string") return null;
-  return hooksByDocument.get(container.ownerDocument)?.get(sourcePath)?.hooks ?? null;
 }
 
 export function adoptImageSectionMoveParticipant(
   participant: ImageSectionMoveLifecycleParticipant,
 ): void {
-  lifecycleHooks(participant)?.participantRegistered(participant);
+  for (const hooks of hooksFor(participant)) hooks.participantRegistered?.(participant);
+}
+
+export function unloadImageSectionMoveParticipant(
+  participant: ImageSectionMoveLifecycleParticipant,
+): void {
+  for (const hooks of hooksFor(participant)) hooks.participantUnloading?.(participant);
 }
 
 export function scheduleImageSectionMoveParticipantAdoption(
@@ -71,9 +81,9 @@ export function scheduleImageSectionMoveParticipantAdoption(
 }
 
 export function beginImageSectionMoveInteraction(participant: ImageSectionMoveLifecycleParticipant): void {
-  lifecycleHooks(participant)?.interactionStarted(participant);
+  for (const hooks of hooksFor(participant)) hooks.interactionStarted?.(participant);
 }
 
 export function endImageSectionMoveInteraction(participant: ImageSectionMoveLifecycleParticipant): void {
-  lifecycleHooks(participant)?.interactionEnded(participant);
+  for (const hooks of hooksFor(participant)) hooks.interactionEnded?.(participant);
 }

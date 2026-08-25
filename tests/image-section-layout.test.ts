@@ -8,7 +8,6 @@ import {
   setImageSectionColumns,
 } from "../src/domain/image-section-layout";
 import {
-  moveImageSectionPath,
   planImageSectionPathMove,
   reorderImageSectionPaths,
   replaceImageSectionOrders,
@@ -175,7 +174,7 @@ describe("image section ordering model", () => {
     }]), /changed before the pending order/);
   });
 
-  it("moves an image between sections atomically without changing fence metadata or unrelated Markdown", () => {
+  it("replaces cross-section orders atomically without changing fence metadata or unrelated Markdown", () => {
     const markdown = [
       "# Demo",
       "## One",
@@ -192,13 +191,16 @@ describe("image section ordering model", () => {
       "",
     ].join("\n");
     const [source, target] = findImageSectionBlocks(markdown);
-    const result = moveImageSectionPath(markdown, source, target, "b.jpg", "d.jpg", "before");
+    const result = replaceImageSectionOrders(markdown, [
+      { locator: source, expectedPaths: ["a.jpg", "b.jpg"], paths: ["a.jpg"] },
+      { locator: target, expectedPaths: ["c.jpg", "d.jpg"], paths: ["c.jpg", "b.jpg", "d.jpg"] },
+    ]);
 
     assert.match(result.markdown, /```animelist-images columns=3 custom=keep\n- a\.jpg\n```/);
     assert.match(result.markdown, /Do not touch this paragraph\./);
     assert.match(result.markdown, /```animelist-images columns=5\n- c\.jpg\n- b\.jpg\n- d\.jpg\n```/);
-    assert.equal(result.sourceSection.source, "- a.jpg");
-    assert.equal(result.targetSection.source, "- c.jpg\n- b.jpg\n- d.jpg");
-    assert.ok(result.targetSection.lineStart < target.lineStart, "target line moves upward after source loses a line");
+    assert.equal(result.sections[0].source, "- a.jpg");
+    assert.equal(result.sections[1].source, "- c.jpg\n- b.jpg\n- d.jpg");
+    assert.ok(result.sections[1].lineStart < target.lineStart, "target line moves upward after source loses a line");
   });
 });

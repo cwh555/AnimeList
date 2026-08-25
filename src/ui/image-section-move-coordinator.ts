@@ -11,16 +11,7 @@ import {
   type ImageSectionMoveOutcome,
 } from "./image-section-move-commit-queue";
 
-export {
-  flushImageSectionMoveCommitOnUnload,
-  type ImageSectionMoveOutcome,
-} from "./image-section-move-commit-queue";
-export {
-  adoptImageSectionMoveParticipant,
-  beginImageSectionMoveInteraction,
-  endImageSectionMoveInteraction,
-  scheduleImageSectionMoveParticipantAdoption,
-} from "./image-section-move-lifecycle";
+export type { ImageSectionMoveOutcome } from "./image-section-move-commit-queue";
 
 export interface ImageSectionMoveParticipant extends ImageSectionCommitParticipant {
   readonly containerEl: HTMLElement;

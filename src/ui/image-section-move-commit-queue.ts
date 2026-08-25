@@ -346,16 +346,3 @@ export function queueImageSectionMoveCommit(
   scheduleBatch(batch);
   return outcome;
 }
-
-/**
- * Renderer unload must not force a pending optimistic reorder to persist.
- * Obsidian may be replacing the Markdown render child because an earlier write
- * completed; the successor renderer adopts the pending order before paint.
- */
-export function flushImageSectionMoveCommitOnUnload(
-  _service: ImageSectionService,
-  _participant: ImageSectionCommitParticipant,
-): void {
-  // Intentionally empty. The existing trailing timer / predecessor chain owns
-  // persistence; forcing a write here recreates the stale-renderer race.
-}

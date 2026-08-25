@@ -17,10 +17,7 @@ import {
 } from "../domain/image-section";
 import { setImageSectionColumns } from "../domain/image-section-layout";
 import {
-  moveImageSectionPath,
   replaceImageSectionOrders,
-  type ImageSectionDropPlacement,
-  type ImageSectionMoveUpdate,
   type ImageSectionOrderReplacement,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
@@ -304,31 +301,6 @@ export class ImageSectionService {
       const update = replaceImageSectionOrders(markdown, replacements);
       result = update.sections;
       return update.markdown;
-    });
-    if (!result) throw new Error("Could not update image section order");
-    return result;
-  }
-
-  async moveAsset(
-    sourcePath: string,
-    sourceLocator: ImageSectionLocator,
-    targetLocator: ImageSectionLocator,
-    pathValue: unknown,
-    targetPathValue: unknown,
-    placement: ImageSectionDropPlacement,
-  ): Promise<ImageSectionMoveUpdate> {
-    const note = this.noteFile(sourcePath);
-    let result: ImageSectionMoveUpdate | null = null;
-    await this.host.app.vault.process(note, (markdown) => {
-      result = moveImageSectionPath(
-        markdown,
-        sourceLocator,
-        targetLocator,
-        pathValue,
-        targetPathValue,
-        placement,
-      );
-      return result.markdown;
     });
     if (!result) throw new Error("Could not update image section order");
     return result;
