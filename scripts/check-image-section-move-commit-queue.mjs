@@ -12,8 +12,8 @@ await build({
   stdin: {
     contents: `
       export { moveImageSectionAsset } from "./src/ui/image-section-move-coordinator";
-      export { scheduleImageSectionMoveParticipantAdoption } from "./src/ui/image-section-move-lifecycle";
-      export { prepareImageSectionHostUnload, claimImageSectionHostContinuity } from "./src/ui/image-section-continuity";
+      export { scheduleImageSectionMoveParticipantAdoption, unloadImageSectionMoveParticipant } from "./src/ui/image-section-move-lifecycle";
+      export { claimImageSectionHostContinuity } from "./src/ui/image-section-continuity";
       export { armPointerDrag } from "./src/ui/pointer-drag";
     `,
     resolveDir: process.cwd(),
@@ -97,7 +97,7 @@ for(const [name,fn] of Object.entries({
        firstWriteResolveStart();
        await delay(90);
        persisted=desired;
-       api.prepareImageSectionHostUnload(oldContainer);
+       api.unloadImageSectionMoveParticipant(oldParticipant);
        oldParticipant.loseOwnership();
        const raw=document.createElement('pre');raw.className='raw';raw.textContent='RAW';oldContainer.replaceWith(raw);
        const freshContainer=renderContainer(persisted);raw.replaceWith(freshContainer);

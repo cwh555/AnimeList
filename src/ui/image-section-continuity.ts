@@ -1,3 +1,8 @@
+import {
+  registerImageSectionMoveLifecycleHooks,
+  unregisterImageSectionMoveLifecycleHooks,
+} from "./image-section-move-lifecycle";
+
 export interface ImageSectionContinuitySlot {
   container: HTMLElement;
   sourcePath: string;
@@ -75,9 +80,10 @@ function createContinuityOverlay(container: HTMLElement): ContinuityOverlay | nu
   const rect = container.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
 
-  const anchor = parent.createSpan({ cls: "al-image-continuity-anchor" });
+  const anchor = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+  anchor.className = "al-image-continuity-anchor";
   anchor.setAttribute("aria-hidden", "true");
-  anchor.setCssStyles({
+  Object.assign(anchor.style, {
     display: "block",
     width: "0",
     height: "0",
@@ -92,7 +98,7 @@ function createContinuityOverlay(container: HTMLElement): ContinuityOverlay | nu
 
   const clone = container.cloneNode(true) as HTMLElement;
   sanitizeOverlayClone(clone);
-  clone.setCssStyles({
+  Object.assign(clone.style, {
     position: "fixed",
     width: `${rect.width}px`,
     height: `${rect.height}px`,
@@ -111,10 +117,8 @@ function createContinuityOverlay(container: HTMLElement): ContinuityOverlay | nu
     if (stopped) return;
     if (anchor.isConnected) {
       const current = anchor.getBoundingClientRect();
-      clone.setCssStyles({
-        left: `${current.left + offsetLeft}px`,
-        top: `${current.top + offsetTop}px`,
-      });
+      clone.style.left = `${current.left + offsetLeft}px`;
+      clone.style.top = `${current.top + offsetTop}px`;
     }
     frame = view.requestAnimationFrame(syncPosition);
   };
@@ -148,6 +152,11 @@ function finishTransaction(transaction: PendingTransaction): void {
     transactions.delete(transaction.sourcePath);
     if (transactions.size === 0) activeTransactions.delete(transaction.document);
   }
+  unregisterImageSectionMoveLifecycleHooks(
+    transaction.document,
+    transaction.sourcePath,
+    transaction,
+  );
   for (const slot of transaction.slots) removeContinuityOverlay(slot.overlay);
   transaction.resolveDone();
 }
@@ -170,6 +179,13 @@ function createTransaction(slots: readonly ImageSectionContinuitySlot[], documen
     finishScheduled: false,
     finished: false,
   };
+  registerImageSectionMoveLifecycleHooks(document, transaction.sourcePath, transaction, {
+    participantUnloading: (participant) => {
+      const slot = transaction.slots.find((candidate) => candidate.container === participant.containerEl);
+      if (!slot || slot.overlay || slot.claimedContainer) return;
+      slot.overlay = createContinuityOverlay(participant.containerEl);
+    },
+  });
   const view = document.defaultView;
   if (view) {
     transaction.deadlineTimer = view.setTimeout(
@@ -190,17 +206,6 @@ function scheduleFinishAfterReplacement(transaction: PendingTransaction): void {
     return;
   }
   view.requestAnimationFrame(() => finishTransaction(transaction));
-}
-
-export function prepareImageSectionHostUnload(container: HTMLElement): void {
-  const transactions = activeTransactions.get(container.ownerDocument);
-  if (!transactions) return;
-  for (const transaction of transactions.values()) {
-    const slot = transaction.slots.find((candidate) => candidate.container === container);
-    if (!slot || slot.overlay || slot.claimedContainer) continue;
-    slot.overlay = createContinuityOverlay(container);
-    return;
-  }
 }
 
 export function claimImageSectionHostContinuity(
