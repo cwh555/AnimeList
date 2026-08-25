@@ -1,7 +1,6 @@
 import type { ImageSectionService } from "../data/image-section-service";
 import type { ImageSectionLocator } from "../domain/image-section";
 import type { ImageSectionStateUpdate } from "../domain/image-section-order";
-import { withImageSectionHostContinuity } from "./image-section-continuity";
 import {
   registerImageSectionMoveLifecycleHooks,
   unregisterImageSectionMoveLifecycleHooks,
@@ -260,7 +259,7 @@ function rollbackBatch(batch: PendingCommitBatch): void {
   }
 }
 
-async function flushBatch(batch: PendingCommitBatch, useContinuity = true): Promise<ImageSectionMoveOutcome> {
+async function flushBatch(batch: PendingCommitBatch): Promise<ImageSectionMoveOutcome> {
   if (batch.flushing || batch.sections.size === 0) return { status: "unchanged" };
   batch.flushing = true;
   clearBatchTimer(batch);
@@ -282,15 +281,6 @@ async function flushBatch(batch: PendingCommitBatch, useContinuity = true): Prom
       expectedPaths: section.baselinePaths,
       paths: section.desiredPaths,
     }));
-    const continuitySlots = sections
-      .filter((section) => section.participant.ownsContainer() && section.participant.containerEl.isConnected)
-      .map((section) => ({
-        container: section.participant.containerEl,
-        sourcePath: section.participant.sourcePath,
-        expectedPaths: section.desiredPaths,
-        lineStart: section.participant.locator().lineStart,
-      }));
-
     let stateApplied = false;
     const applyPersistedState = (states: ImageSectionStateUpdate[]): void => {
       if (stateApplied) return;
@@ -302,13 +292,7 @@ async function flushBatch(batch: PendingCommitBatch, useContinuity = true): Prom
     };
 
     try {
-      const persist = () => batch.service.setSectionOrders(batch.sourcePath, replacements);
-      let states: ImageSectionStateUpdate[];
-      if (useContinuity && continuitySlots.length > 0) {
-        states = await withImageSectionHostContinuity(continuitySlots, persist, applyPersistedState);
-      } else {
-        states = await persist();
-      }
+      const states = await batch.service.setSectionOrders(batch.sourcePath, replacements);
       applyPersistedState(states);
       const outcome: ImageSectionMoveOutcome = { status: "moved" };
       resolveBatch(batch, outcome);

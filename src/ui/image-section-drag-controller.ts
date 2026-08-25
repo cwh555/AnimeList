@@ -5,7 +5,6 @@ import {
   beginImageSectionMoveInteraction,
   endImageSectionMoveInteraction,
   scheduleImageSectionMoveParticipantAdoption,
-  unloadImageSectionMoveParticipant,
 } from "./image-section-move-lifecycle";
 import type { ImageSectionMoveParticipant } from "./image-section-move-coordinator";
 
@@ -120,7 +119,6 @@ export function registerImageSectionDragSurface(surface: ImageSectionDragSurface
   dragSurfaces.set(surface.containerEl, surface);
   scheduleImageSectionMoveParticipantAdoption(surface.participant, surface.signal);
   surface.signal.addEventListener("abort", () => {
-    unloadImageSectionMoveParticipant(surface.participant);
     if (dragSurfaces.get(surface.containerEl) === surface) dragSurfaces.delete(surface.containerEl);
     cancelSurfaceDrag(surface);
   }, { once: true });

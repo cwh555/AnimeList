@@ -10,7 +10,6 @@ export interface ImageSectionMoveLifecycleParticipant {
 
 export interface ImageSectionMoveLifecycleHooks {
   participantRegistered?(participant: ImageSectionMoveLifecycleParticipant): void;
-  participantUnloading?(participant: ImageSectionMoveLifecycleParticipant): void;
   interactionStarted?(participant: ImageSectionMoveLifecycleParticipant): void;
   interactionEnded?(participant: ImageSectionMoveLifecycleParticipant): void;
 }
@@ -62,12 +61,6 @@ export function adoptImageSectionMoveParticipant(
   participant: ImageSectionMoveLifecycleParticipant,
 ): void {
   for (const hooks of hooksFor(participant)) hooks.participantRegistered?.(participant);
-}
-
-export function unloadImageSectionMoveParticipant(
-  participant: ImageSectionMoveLifecycleParticipant,
-): void {
-  for (const hooks of hooksFor(participant)) hooks.participantUnloading?.(participant);
 }
 
 export function scheduleImageSectionMoveParticipantAdoption(
