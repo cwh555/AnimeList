@@ -1,0 +1,77 @@
+name: Apply image flash candidate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'ci/image-flash-actual-lifecycle' && github.base_ref == 'feature/component-polish'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify exact feature head and apply candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED=73d578db295eed395477e459026ae0fcb3cac632
+          cp .github/ci/image-flash-candidate.patch.gz.b64 /tmp/candidate.patch.gz.b64
+          git fetch origin feature/component-polish
+          ACTUAL=$(git rev-parse origin/feature/component-polish)
+          test "$ACTUAL" = "$EXPECTED"
+          git checkout --detach "$EXPECTED"
+          base64 -d /tmp/candidate.patch.gz.b64 | gzip -d > /tmp/candidate.patch
+          git apply --check /tmp/candidate.patch
+          git apply /tmp/candidate.patch
+          test "$(git hash-object src/ui/image-section-visual-handoff.ts)" = ae85aedf357f7a1de724b435a6bc1b2261e52dba
+          test "$(git hash-object src/ui/image-section-continuity.ts)" = 127afe42f31a0fbfc7d2746e524bdc0b8f36ab39
+          test "$(git hash-object src/ui/image-section-renderer.ts)" = fadd9c7d37976dd49b2a758c34610b6a608301ca
+          test "$(git hash-object src/ui/image-section-move-commit-queue.ts)" = e053509a1a9d21f90b0412600be1f92482d45798
+          test "$(git hash-object scripts/check-image-section-host-continuity.mjs)" = 39b1d679b9207685364f499b6ac1a4917f3b01da
+          test "$(git hash-object scripts/check-image-section-move-commit-queue.mjs)" = fe41b4378ea8bdc8a08a15eff5147a5b19b139a8
+          test "$(git hash-object scripts/check-architecture.mjs)" = 0aeca3f1559f3eb1e80c51c952d6cdf086b31364
+      - run: npm ci
+      - name: Validate candidate before push
+        shell: bash
+        run: |
+          set -euo pipefail
+          TZ=UTC npm run check
+          TZ=Asia/Taipei npm test
+          node scripts/check-image-section-host-continuity.mjs
+          node scripts/check-image-section-move-commit-queue.mjs
+          npm run release:check
+      - name: Create responsibility-separated commits and fast-forward feature
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED=73d578db295eed395477e459026ae0fcb3cac632
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/ui/image-section-visual-handoff.ts \
+            src/ui/image-section-continuity.ts \
+            src/ui/image-section-renderer.ts \
+            src/ui/image-section-move-commit-queue.ts
+          git commit -m 'fix: preserve painted image sections across markdown refresh'
+          RUNTIME_SHA=$(git rev-parse HEAD)
+          git add \
+            scripts/check-image-section-host-continuity.mjs \
+            scripts/check-image-section-move-commit-queue.mjs \
+            scripts/check-architecture.mjs
+          git commit -m 'test: cover actual image section refresh lifecycle'
+          FINAL_SHA=$(git rev-parse HEAD)
+          git fetch origin feature/component-polish
+          ACTUAL=$(git rev-parse origin/feature/component-polish)
+          test "$ACTUAL" = "$EXPECTED"
+          git push origin HEAD:refs/heads/feature/component-polish
+          echo "runtime_sha=$RUNTIME_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "final_sha=$FINAL_SHA" >> "$GITHUB_STEP_SUMMARY"
