@@ -25,20 +25,28 @@ jobs:
           set -euo pipefail
           EXPECTED=73d578db295eed395477e459026ae0fcb3cac632
           cp .github/ci/image-flash-candidate.patch.gz.b64 /tmp/candidate.patch.gz.b64
+          echo "b64 sha256: $(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)"
+          test "$(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)" = 5c89b702d2246b51303e09fdd7400fba6cc237d397556c1a7db8eb10aa862c1a
           git fetch origin feature/component-polish
           ACTUAL=$(git rev-parse origin/feature/component-polish)
+          echo "feature head: $ACTUAL"
           test "$ACTUAL" = "$EXPECTED"
           git checkout --detach "$EXPECTED"
-          base64 -d /tmp/candidate.patch.gz.b64 | gzip -d > /tmp/candidate.patch
+          base64 -d /tmp/candidate.patch.gz.b64 > /tmp/candidate.patch.gz
+          gzip -t /tmp/candidate.patch.gz
+          gzip -dc /tmp/candidate.patch.gz > /tmp/candidate.patch
+          echo "patch sha256: $(sha256sum /tmp/candidate.patch | cut -d' ' -f1)"
+          test "$(sha256sum /tmp/candidate.patch | cut -d' ' -f1)" = 6487a273b511a612ce7598901c62989a83ee6788e3378c04c691c403112b9ef3
           git apply --check /tmp/candidate.patch
           git apply /tmp/candidate.patch
-          test "$(git hash-object src/ui/image-section-visual-handoff.ts)" = ae85aedf357f7a1de724b435a6bc1b2261e52dba
-          test "$(git hash-object src/ui/image-section-continuity.ts)" = 127afe42f31a0fbfc7d2746e524bdc0b8f36ab39
-          test "$(git hash-object src/ui/image-section-renderer.ts)" = fadd9c7d37976dd49b2a758c34610b6a608301ca
-          test "$(git hash-object src/ui/image-section-move-commit-queue.ts)" = e053509a1a9d21f90b0412600be1f92482d45798
-          test "$(git hash-object scripts/check-image-section-host-continuity.mjs)" = 39b1d679b9207685364f499b6ac1a4917f3b01da
-          test "$(git hash-object scripts/check-image-section-move-commit-queue.mjs)" = fe41b4378ea8bdc8a08a15eff5147a5b19b139a8
-          test "$(git hash-object scripts/check-architecture.mjs)" = 0aeca3f1559f3eb1e80c51c952d6cdf086b31364
+          check_blob() { actual=$(git hash-object "$1"); echo "$1 $actual"; test "$actual" = "$2"; }
+          check_blob src/ui/image-section-visual-handoff.ts ae85aedf357f7a1de724b435a6bc1b2261e52dba
+          check_blob src/ui/image-section-continuity.ts 127afe42f31a0fbfc7d2746e524bdc0b8f36ab39
+          check_blob src/ui/image-section-renderer.ts fadd9c7d37976dd49b2a758c34610b6a608301ca
+          check_blob src/ui/image-section-move-commit-queue.ts e053509a1a9d21f90b0412600be1f92482d45798
+          check_blob scripts/check-image-section-host-continuity.mjs 39b1d679b9207685364f499b6ac1a4917f3b01da
+          check_blob scripts/check-image-section-move-commit-queue.mjs fe41b4378ea8bdc8a08a15eff5147a5b19b139a8
+          check_blob scripts/check-architecture.mjs 0aeca3f1559f3eb1e80c51c952d6cdf086b31364
       - run: npm ci
       - name: Validate candidate before push
         shell: bash
