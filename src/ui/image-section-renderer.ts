@@ -20,7 +20,10 @@ import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
-import { claimImageSectionHostContinuity } from "./image-section-continuity";
+import {
+  claimImageSectionHostContinuity,
+  prepareImageSectionHostContinuity,
+} from "./image-section-continuity";
 import {
   beginImageSectionPointerDrag,
   registerImageSectionDragSurface,
@@ -146,9 +149,19 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.saveEphemeralState();
   }
 
+  private prepareHostContinuity(): void {
+    prepareImageSectionHostContinuity(
+      this.containerEl,
+      this.context.sourcePath,
+      this.galleryPaths.length > 0 ? this.galleryPaths : parseImageSectionSource(this.source),
+      this.locator().lineStart,
+    );
+  }
+
   onload(): void {
     const previous = imageSectionRenderers.get(this.containerEl);
     if (previous && previous !== this) {
+      previous.prepareHostContinuity();
       previous.saveEphemeralState();
       previous.lifecycleEvents.abort();
       previous.mounted = false;
@@ -184,7 +197,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
-    if (this.ownsContainer()) this.saveEphemeralState();
+    if (this.ownsContainer()) {
+      this.prepareHostContinuity();
+      this.saveEphemeralState();
+    }
     this.lifecycleEvents.abort();
     this.mounted = false;
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
