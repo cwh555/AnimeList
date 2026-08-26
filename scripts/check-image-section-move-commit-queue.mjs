@@ -59,6 +59,7 @@ for(const [name,fn] of Object.entries({
  let persisted=['a.jpg','b.jpg','c.jpg'];
  let currentParticipant=null;
  let concurrent=0,maxConcurrent=0,writes=0;
+ let persistenceEvents=[];
  let firstWriteDesiredOrder='';
  let firstWriteResolveStart;
  const firstWriteStarted=new Promise((resolve)=>{firstWriteResolveStart=resolve;});
@@ -76,6 +77,7 @@ for(const [name,fn] of Object.entries({
      ownsContainer:()=>owned && container.isConnected,
      applyPaths:(next)=>{local=[...next];container.dataset.order=local.join(',');container.textContent=local.join(' | ');},
      applyState:(state)=>{lineStart=state.lineStart;},
+     preparePersistedRefresh:()=>{persistenceEvents.push('prepare');},
      preserveLayoutAcrossRefresh:()=>{},
      layoutMotion:()=>Promise.resolve(),
      loseOwnership:()=>{owned=false;},
@@ -89,6 +91,7 @@ for(const [name,fn] of Object.entries({
  const stateFor=(paths)=>({source:paths.map((path)=>'- '+path).join('\\n'),lineStart:10,lineEnd:10+paths.length+1});
  const service={
    setSectionOrders:async(_sourcePath,replacements)=>{
+     persistenceEvents.push('write');
      writes+=1;concurrent+=1;maxConcurrent=Math.max(maxConcurrent,concurrent);
      const desired=[...replacements[0].paths];
      if(writes===1){
@@ -153,10 +156,11 @@ for(const [name,fn] of Object.entries({
    replacementAdoptsPendingOrderBeforePaint:freshAdoptedOrder===expectedSecond && freshFirstPaintOrder===expectedSecond,
    noteWritesAreSerialized:maxConcurrent===1 && writes===2,
    latestOrderWins:secondOutcome.status==='moved' && finalPersistedOrder===expectedSecond && currentParticipant.paths().join(',')===expectedSecond,
+   everyWriteIsPrearmed:persistenceEvents.join(',')==='prepare,write,prepare,write',
    compatibilityClickIsSuppressed:compatibilityClickBlocked,
    nextRealPointerGestureIsNotLocked:nextRealGestureClickDelivered,
  };
- const details={...checks,writes,maxConcurrent,firstWriteDesiredOrder,persistedAtSecondMoveStart,secondImmediateOrder,freshAdoptedOrder,freshFirstPaintOrder,finalPersistedOrder};
+ const details={...checks,writes,maxConcurrent,firstWriteDesiredOrder,persistedAtSecondMoveStart,secondImmediateOrder,freshAdoptedOrder,freshFirstPaintOrder,finalPersistedOrder,persistenceEvents};
  document.body.dataset.details=JSON.stringify(details);
  document.body.dataset.result=Object.values(checks).every(Boolean)?'pass':'fail';
 })().catch((error)=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result='fail';});

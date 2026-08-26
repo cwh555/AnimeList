@@ -30,7 +30,10 @@ const slowImageUrl = `http://127.0.0.1:${address.port}/slow.svg`;
 await build({
   absWorkingDir: process.cwd(),
   stdin: {
-    contents: `export { ImageSectionRenderChild } from "./src/ui/image-section-renderer";`,
+    contents: `
+      export { ImageSectionRenderChild } from "./src/ui/image-section-renderer";
+      export * as continuity from "./src/ui/image-section-continuity";
+    `,
     resolveDir: process.cwd(),
     loader: "ts",
   },
@@ -53,8 +56,8 @@ await build({
           export class TFile {}
           export function normalizePath(value){return String(value||"");}
           export async function requestUrl(){throw new Error("unused");}
-          export class MenuItem { setTitle(){return this} setIcon(){return this} setWarning(){return this} onClick(){return this} }
-          export class Menu { addItem(callback){callback(new MenuItem());return this} showAtMouseEvent(){return this} }
+          export class MenuItem { setTitle(){return this} setIcon(){return this} setWarning(){return this} onClick(callback){this.callback=callback;return this} }
+          export class Menu { addItem(callback){const item=new MenuItem();callback(item);return this} showAtMouseEvent(){return this} }
           export function setIcon(parent){parent.dataset.icon="1";}
         `,
       }));
@@ -72,13 +75,14 @@ const readyPixelJs = JSON.stringify(readyPixel);
 const html = `<!doctype html><html><head><style>
 :root{--background-primary:#111;--background-secondary:#222;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#7777dd;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-error:#e66}
 html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family:sans-serif}${styles}
-#scroll-shell{height:420px;overflow:auto}.spacer{height:720px}#preview{width:360px;margin:0 20px}.host-raw{display:block;min-height:220px;width:100%;box-sizing:border-box;margin:0;padding:0;background:#f0f;color:#000}.animelist-image-section{min-height:220px}
+#scroll-shell{height:420px;overflow:auto}.spacer{height:720px}#preview{width:360px;margin:0 20px}.host-raw{display:block;min-height:220px;width:100%;box-sizing:border-box;margin:8px 0 22px;padding:10px;background:#f0f;color:#000}.animelist-image-section{min-height:220px}
 #preview > .animelist-image-section{background-color:rgb(12,34,56)}body > .animelist-image-section{background-color:rgb(200,0,0)}
-</style></head><body data-result="pending"><div id="scroll-shell"><div class="spacer"></div><div id="preview"></div><div class="spacer"></div></div>
+</style></head><body data-result="pending"><div id="scroll-shell"><div class="spacer"></div><div id="preview" class="markdown-preview-view"></div><div class="spacer"></div></div>
 <script>
 window.addEventListener("error",(event)=>{document.body.dataset.details=String(event.error?.stack||event.message||"window error");document.body.dataset.result="fail";});
 window.addEventListener("unhandledrejection",(event)=>{document.body.dataset.details=String(event.reason?.stack||event.reason||"unhandled rejection");document.body.dataset.result="fail";});
 let viewTransitionCalls=0;Object.defineProperty(document,"startViewTransition",{value:()=>{viewTransitionCalls+=1;throw new Error("ViewTransition forbidden");},configurable:true});
+let decodeCalls=0;const nativeDecode=HTMLImageElement.prototype.decode;if(nativeDecode)Object.defineProperty(HTMLImageElement.prototype,"decode",{configurable:true,value:function(){decodeCalls+=1;return nativeDecode.call(this);}});
 window.createEl=(tag)=>document.createElement(tag);
 for(const [name,fn] of Object.entries({addClass:function(...x){this.classList.add(...x)},removeClass:function(...x){this.classList.remove(...x)},toggleClass:function(n,v){this.classList.toggle(n,v)}})) if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn,writable:true,configurable:true});
 </script><script>${bundle}</script><script>
@@ -88,9 +92,9 @@ for(const [name,fn] of Object.entries({addClass:function(...x){this.classList.ad
  const delay=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
  const sourceFor=(paths)=>paths.map((path)=>'- '+path).join('\\n');
  const sectionText=(paths)=>String.fromCharCode(96).repeat(3)+'animelist-images\\n'+sourceFor(paths)+'\\n'+String.fromCharCode(96).repeat(3);
+ let currentPaths=['ready-a.jpg','ready-b.jpg'];
  const context={sourcePath:'Demo.md',getSectionInfo:()=>({lineStart:10,lineEnd:20,text:sectionText(currentPaths)})};
  const host={app:{}};
- let currentPaths=['ready-a.jpg','ready-b.jpg'];
  const service={
    resolve:(path)=>({resourcePath:path.startsWith('slow-')?${slowImageUrlJs}+'?p='+encodeURIComponent(path):${readyPixelJs}+'#'+path}),
    setColumns:async()=>({source:sourceFor(currentPaths),lineStart:10,lineEnd:20}),
@@ -103,58 +107,121 @@ for(const [name,fn] of Object.entries({addClass:function(...x){this.classList.ad
  const overlayCount=()=>document.querySelectorAll('[data-image-continuity-overlay="true"]').length;
  const hitInside=(section)=>{const rect=section.getBoundingClientRect();const hit=document.elementFromPoint(rect.left+40,rect.top+40);return Boolean(hit&&section.contains(hit));};
  const covered=(surface,visual)=>{if(!visual)return false;const a=surface.getBoundingClientRect(),b=visual.getBoundingClientRect();return Math.abs(a.left-b.left)<=1&&Math.abs(a.top-b.top)<=1&&Math.abs(a.width-b.width)<=1;};
+ const waitImages=async(container)=>{await Promise.all([...container.querySelectorAll('img')].map((image)=>image.decode?.().catch(()=>{})));await nextFrame();await nextFrame();};
+ const samplePixel=(image)=>{const canvas=document.createElement('canvas');canvas.width=1;canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,1,1);return [...ctx.getImageData(0,0,1,1).data].join(',');};
 
- // Normal Obsidian path: old child unloads, raw Markdown host is paintable, then a new container mounts.
+ // Real Obsidian ordering: arm before the note write, DOM detaches, then onunload fires.
  let section=makeSection();preview.appendChild(section);let renderer=new api.ImageSectionRenderChild(section,host,service,sourceFor(currentPaths),context);renderer.onload();
- await delay(30);scroll.scrollTop=650;await nextFrame();
+ scroll.scrollTop=650;await waitImages(section);
+ const oldImage=section.querySelector('img');const oldPixel=samplePixel(oldImage);const oldRect=section.getBoundingClientRect();
  const expectedContextColor=getComputedStyle(section).backgroundColor;
+ api.continuity.armImageSectionHostContinuity?.(section,context.sourcePath,currentPaths,10);
+ const raw=document.createElement('pre');raw.className='host-raw';raw.textContent='RAW MARKDOWN HOST';section.replaceWith(raw);
+ await Promise.resolve(); // MutationObserver rescues the already-painted descendants before rendering.
  renderer.onunload();
  const firstOverlay=overlay();
+ const overlayImage=firstOverlay?.querySelector('img');
  const contextStylePreserved=Boolean(firstOverlay)&&getComputedStyle(firstOverlay).backgroundColor===expectedContextColor;
  const overlaySharesMarkdownParent=firstOverlay?.parentElement===preview;
- const raw=document.createElement('pre');raw.className='host-raw';raw.textContent='RAW MARKDOWN HOST';section.replaceWith(raw);
+ const overlayPreservesPaintedImageNode=overlayImage===oldImage;
+ const overlayPixel=overlayImage?samplePixel(overlayImage):'';
+ const rawHostOverlayHasPaintedPixels=overlayPixel===oldPixel&&overlayPixel.endsWith(',255');
  let coveredRawFrames=0,pointerTransparentFrames=0;
  for(let i=0;i<10;i+=1){await nextFrame();const visual=overlay();if(covered(raw,visual))coveredRawFrames+=1;if(visual&&getComputedStyle(visual).pointerEvents==='none')pointerTransparentFrames+=1;}
+
  currentPaths=['slow-new-a.jpg','slow-new-b.jpg','slow-added.jpg'];
  const fresh=makeSection();raw.replaceWith(fresh);section=fresh;renderer=new api.ImageSectionRenderChild(fresh,host,service,sourceFor(currentPaths),context);renderer.onload();
  await nextFrame();
  let normalUnreadyCovered=0,normalFreshHit=0;
  for(let i=0;i<4;i+=1){const visual=overlay();if(covered(fresh,visual))normalUnreadyCovered+=1;if(hitInside(fresh))normalFreshHit+=1;await nextFrame();}
- await delay(300);await nextFrame();const normalReadyOverlayRemoved=overlayCount()===0;
+ await delay(320);await nextFrame();await nextFrame();const normalReadyOverlayRemoved=overlayCount()===0;
 
- // Same-container rebind: successor onload happens before old child onunload.
+ // Parent-wrapper replacement: observing the immediate parent is insufficient because
+ // Obsidian may detach the whole code-block wrapper in one mutation.
+ currentPaths=['ready-parent-a.jpg','ready-parent-b.jpg'];
+ const oldBlock=document.createElement('div');oldBlock.className='block-language-animelist-images';
+ const parentSection=makeSection();oldBlock.appendChild(parentSection);preview.appendChild(oldBlock);
+ let parentRenderer=new api.ImageSectionRenderChild(parentSection,host,service,sourceFor(currentPaths),context);parentRenderer.onload();await waitImages(parentSection);
+ const parentOldImage=parentSection.querySelector('img');
+ api.continuity.armImageSectionHostContinuity?.(parentSection,context.sourcePath,currentPaths,10);
+ const rawBlock=document.createElement('div');rawBlock.className='block-language-animelist-images';
+ const parentRaw=document.createElement('pre');parentRaw.className='host-raw';parentRaw.textContent='WHOLE BLOCK REPLACED';rawBlock.appendChild(parentRaw);
+ oldBlock.replaceWith(rawBlock);await Promise.resolve();parentRenderer.onunload();
+ const parentOverlay=overlay();
+ const parentReplacementObservedBeforeUnload=Boolean(parentOverlay);
+ const disconnectedParentContextRecreated=parentOverlay?.parentElement?.classList.contains('block-language-animelist-images')===true&&parentOverlay.parentElement.parentElement===preview;
+ const parentReplacementPreservesPaintedImageNode=parentOverlay?.querySelector('img')===parentOldImage;
+ currentPaths=['ready-parent-next.jpg'];
+ const newBlock=document.createElement('div');newBlock.className='block-language-animelist-images';const parentFresh=makeSection();newBlock.appendChild(parentFresh);rawBlock.replaceWith(newBlock);
+ parentRenderer=new api.ImageSectionRenderChild(parentFresh,host,service,sourceFor(currentPaths),context);parentRenderer.onload();await waitImages(parentFresh);await nextFrame();await nextFrame();
+ const parentReplacementCleansAfterClaim=overlayCount()===0;
+ parentRenderer.onunload();
+
+ // Same-container rebind: old painted descendants must move to the handoff before successor render mutates the container.
  currentPaths=['ready-same-a.jpg','ready-same-b.jpg'];
- const same=makeSection();preview.appendChild(same);const oldSame=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);oldSame.onload();await delay(30);
+ const same=makeSection();preview.appendChild(same);same.scrollIntoView({block:'center'});await nextFrame();const oldSame=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);oldSame.onload();await waitImages(same);
+ const oldSameImage=same.querySelector('img');
  currentPaths=['slow-same-a.jpg','slow-same-b.jpg','slow-same-added.jpg'];
  const successor=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);successor.onload();
  await nextFrame();
  const sameContainerHandoffCreated=overlayCount()===1;
- const sameContainerContextPreserved=Boolean(overlay())&&overlay().parentElement===preview&&getComputedStyle(overlay()).backgroundColor===expectedContextColor;
+ const sameOverlay=overlay();
+ const sameContainerPreservesPaintedImageNode=sameOverlay?.querySelector('img')===oldSameImage;
+ const sameContainerContextPreserved=Boolean(sameOverlay)&&sameOverlay.parentElement===preview&&getComputedStyle(sameOverlay).backgroundColor===expectedContextColor;
  let sameUnreadyCovered=0,sameFreshHit=0;
  for(let i=0;i<4;i+=1){const visual=overlay();if(covered(same,visual))sameUnreadyCovered+=1;if(hitInside(same))sameFreshHit+=1;await nextFrame();}
  const countBeforeLateUnload=overlayCount();oldSame.onunload();const countAfterLateUnload=overlayCount();
  const lateOldUnloadDoesNotCreateGhost=countBeforeLateUnload===1&&countAfterLateUnload===1;
- await delay(300);await nextFrame();const sameReadyOverlayRemoved=overlayCount()===0;
- successor.onunload();await delay(750); // let the unclaimed unload handoff self-release
+ await delay(320);await nextFrame();await nextFrame();const sameReadyOverlayRemoved=overlayCount()===0;
+ successor.onunload();
+
+ // Non-move note persistence must use the same pre-write continuity hook (column change).
+ currentPaths=['ready-column-a.jpg','ready-column-b.jpg'];
+ const columnSection=makeSection();preview.appendChild(columnSection);columnSection.scrollIntoView({block:'center'});await nextFrame();
+ let columnRenderer=new api.ImageSectionRenderChild(columnSection,host,service,sourceFor(currentPaths),context);columnRenderer.onload();await waitImages(columnSection);
+ const originalSetColumns=service.setColumns;
+ let columnRaw=null;
+ service.setColumns=async()=>{
+   columnRaw=document.createElement('pre');columnRaw.className='host-raw';columnRaw.textContent='COLUMN WRITE RAW';
+   columnSection.replaceWith(columnRaw);await Promise.resolve();columnRenderer.onunload();
+   return {source:sourceFor(currentPaths),lineStart:10,lineEnd:20};
+ };
+ const range=columnSection.querySelector('input[type="range"]');range.value='2';range.dispatchEvent(new Event('change',{bubbles:true}));
+ await Promise.resolve();await nextFrame();
+ const columnPersistenceWasPrearmed=overlayCount()===1&&Boolean(columnRaw)&&covered(columnRaw,overlay());
+ service.setColumns=originalSetColumns;
+ await delay(1550); // no successor: armed/visual state must self-clean.
+ const abandonedContinuitySelfCleans=overlayCount()===0;
 
  const checks={
    contextStylePreserved,
    overlaySharesMarkdownParent,
+   overlayPreservesPaintedImageNode,
+   rawHostOverlayHasPaintedPixels,
    rawHostGapCovered:coveredRawFrames===10,
    rawHostOverlayPointerTransparent:pointerTransparentFrames===10,
-   replacementStaysCoveredUntilImagesReady:normalUnreadyCovered===4,
+   replacementStaysCoveredUntilImagesDecoded:normalUnreadyCovered===4,
    replacementRemainsInteractiveUnderOverlay:normalFreshHit===4,
    normalReadyOverlayRemoved,
    changedPathSuccessorClaimsHandoff:normalUnreadyCovered===4,
+   parentReplacementObservedBeforeUnload,
+   disconnectedParentContextRecreated,
+   parentReplacementPreservesPaintedImageNode,
+   parentReplacementCleansAfterClaim,
    sameContainerReplacementGetsVisualHandoff:sameContainerHandoffCreated,
    sameContainerContextPreserved,
-   sameContainerStaysCoveredUntilImagesReady:sameUnreadyCovered===4,
+   sameContainerPreservesPaintedImageNode,
+   sameContainerStaysCoveredUntilImagesDecoded:sameUnreadyCovered===4,
    sameContainerFreshRendererHitTestable:sameFreshHit===4,
    lateOldRendererUnloadDoesNotCreateGhost:lateOldUnloadDoesNotCreateGhost,
    sameContainerReadyOverlayRemoved:sameReadyOverlayRemoved,
+   successorVisibleImagesAreDecoded:decodeCalls>=6,
+   columnPersistenceWasPrearmed,
+   abandonedContinuitySelfCleans,
+   sourceRectWasVisible:oldRect.width>0&&oldRect.height>0,
    viewTransitionCalls:viewTransitionCalls===0,
  };
- const details={...checks,coveredRawFrames,pointerTransparentFrames,normalUnreadyCovered,normalFreshHit,sameUnreadyCovered,sameFreshHit,countBeforeLateUnload,countAfterLateUnload};
+ const details={...checks,coveredRawFrames,pointerTransparentFrames,normalUnreadyCovered,normalFreshHit,sameUnreadyCovered,sameFreshHit,countBeforeLateUnload,countAfterLateUnload,decodeCalls,oldPixel,overlayPixel};
  document.body.dataset.details=JSON.stringify(details);document.body.dataset.result=Object.values(checks).every(Boolean)?'pass':'fail';
 })().catch((error)=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result='fail';});
 </script></body></html>`;

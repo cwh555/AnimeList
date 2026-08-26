@@ -51,7 +51,11 @@ reject(
   featureAndUiSources,
 );
 reject(/\.(?:openAddModal|openEditModal|collectMediaItems|createMediaNote|setFavorite|renderLibrary)\s*=/, "plugin or renderer method replacement is forbidden");
-reject(/new\s+MutationObserver\b/, "feature integration must not discover forms through MutationObserver");
+reject(
+  /new\s+MutationObserver\b/,
+  "feature integration must not discover forms through MutationObserver",
+  sources.filter(({ path: file }) => file !== "src/ui/image-section-continuity.ts").map(({ content }) => content).join("\n"),
+);
 reject(/^import\s+["'][^"']+["'];?\s*$/m, "side-effect-only feature imports are forbidden", entry);
 reject(/from\s+["'][^"']*(?:compat\/legacy-ui|\/legacy|\.\/legacy)["']/, "active source must not import the compatibility UI barrel", sources.filter(({ path: file }) => file !== "src/legacy.ts").map(({ content }) => content).join("\n"));
 reject(/eslint-disable/, "active source must not require eslint suppression");
@@ -217,7 +221,12 @@ requireDependency(
 const visualHandoff = sourceByPath.get("src/ui/image-section-visual-handoff.ts")?.content ?? "";
 reject(
   /document\.body\.(?:append|appendChild)\s*\(/,
-  "Image Section visual handoff must keep its clone in the original Markdown ancestor context",
+  "Image Section visual handoff must stay inside the Markdown ancestor context",
+  visualHandoff,
+);
+reject(
+  /cloneNode\(\s*true\s*\)/,
+  "Image Section visual handoff must preserve painted descendants instead of deep-cloning them",
   visualHandoff,
 );
 const imageSectionLifecycle = sourceByPath.get("src/ui/image-section-move-lifecycle.ts")?.content ?? "";
@@ -229,7 +238,12 @@ reject(
 const imageSectionRenderer = sourceByPath.get("src/ui/image-section-renderer.ts")?.content ?? "";
 require(
   /prepareImageSectionHostContinuity\s*\(/,
-  "Image Section renderer must prepare visual handoff before a host is replaced",
+  "Image Section renderer must prepare same-container visual handoff before a host is replaced",
+  imageSectionRenderer,
+);
+require(
+  /armImageSectionHostContinuity\s*\(/,
+  "Image Section renderer must arm continuity before self-induced note persistence",
   imageSectionRenderer,
 );
 require(
