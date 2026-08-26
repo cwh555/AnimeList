@@ -26,7 +26,7 @@ jobs:
           EXPECTED=73d578db295eed395477e459026ae0fcb3cac632
           cp .github/ci/image-flash-candidate.patch.gz.b64 /tmp/candidate.patch.gz.b64
           echo "b64 sha256: $(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)"
-          test "$(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)" = 5c89b702d2246b51303e09fdd7400fba6cc237d397556c1a7db8eb10aa862c1a
+          test "$(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)" = 4e225c15a48917d744e548f1767d12a9e1b50e4af805f4fec08dc11f9041db5e
           git fetch origin feature/component-polish
           ACTUAL=$(git rev-parse origin/feature/component-polish)
           echo "feature head: $ACTUAL"
@@ -36,7 +36,7 @@ jobs:
           gzip -t /tmp/candidate.patch.gz
           gzip -dc /tmp/candidate.patch.gz > /tmp/candidate.patch
           echo "patch sha256: $(sha256sum /tmp/candidate.patch | cut -d' ' -f1)"
-          test "$(sha256sum /tmp/candidate.patch | cut -d' ' -f1)" = 6487a273b511a612ce7598901c62989a83ee6788e3378c04c691c403112b9ef3
+          test "$(sha256sum /tmp/candidate.patch | cut -d' ' -f1)" = c874fdab9145ad851bb3a6c834e4933010cfe058c521bb62d4f11ba849d53c01
           git apply --check /tmp/candidate.patch
           git apply /tmp/candidate.patch
           check_blob() { actual=$(git hash-object "$1"); echo "$1 $actual"; test "$actual" = "$2"; }
