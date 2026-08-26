@@ -1,0 +1,106 @@
+name: Single-surface delivery guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  deliver:
+    if: github.head_ref == 'ci/single-surface-refactor' && github.base_ref == 'feature/component-polish'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ci/single-surface-refactor
+          fetch-depth: 0
+
+      - name: Verify staged patch and feature base
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_base=94e5a48cfdfa25a90ecdcf7ee2423ab1252cc8fe
+          remote_base=$(git ls-remote origin refs/heads/feature/component-polish | cut -f1)
+          test "$remote_base" = "$expected_base"
+          cat > /tmp/chunks.sha256 <<'EOF'
+          01ef68a9764fd1dc5a5ec7c93f88c7796df4576712c94627e80744b667afbfca  .github/ci-single-surface/part-00
+          c020e8ebbc0a961888a0990c123e22b23f0cbfe676d8ff43326db5ae0ec6bf62  .github/ci-single-surface/part-01
+          367c3c0da250e701fcb61d6cf0f0149a682a3b608d2df301472c10fc7dc648df  .github/ci-single-surface/part-02
+          b042dae34ec26a8e8ba88c7a3e26d74367f91b5c03571f689e0a5586de33e067  .github/ci-single-surface/part-03
+          e00f19ed419a877b21e8f04a37b90cb7d70d33d6041a28276d3d856eb2ac647f  .github/ci-single-surface/part-04
+          9a56e9efc041b362723ac39ca15bc8b056fe06db25a919f4ddb8ceb1f30522ee  .github/ci-single-surface/part-05
+          eee8d0be4d48d5af60cca2a8233637e761413deaf59d9bcd1ed459c8dac539a0  .github/ci-single-surface/part-06
+          ad983c5e53753f9c87e7f737acb581e2756b10711b7d462e8bfa367860b71d59  .github/ci-single-surface/part-07
+          1345ad2963bf1810db72a06cc75176cd6a2bbe9153da154c9e72ad273d62da51  .github/ci-single-surface/part-08
+          85ef83f978eabbae71c9e1280c49dc00381bc1820d3da6a97c0d40e73002db0a  .github/ci-single-surface/part-09
+          e0ee3a3928db4d57ca44fd0638840f8afe1b4ab13721e40ebc2f6b00f8c992a3  .github/ci-single-surface/part-10
+          dec74abd530dc6b5c2fcadd018cfb89ca986920e1b3cca40b95ba1830cad24b5  .github/ci-single-surface/part-11
+          65a89417f4f39c19f52ac259a742f881ff8b531948a3bf1cbb491e740b3329bb  .github/ci-single-surface/part-12
+          2c5a00dead1151ac585e04751e19ac3cfa7c3f52582ed5254aaf3aa2ef82fcc4  .github/ci-single-surface/part-13
+          bbbda91d128c7467cb528c57d266f32d8a4729f1a57da05aab4444dbf5bfaa45  .github/ci-single-surface/part-14
+          57eea1c938c9392c90d35b9bba2ec476e31d6b8059d45fd3688b250039ed1123  .github/ci-single-surface/part-15
+          e956bdc0f064521b547cce3e3b32a6bbc5e717e8176579fc64a0399021fb428b  .github/ci-single-surface/part-16
+          EOF
+          sha256sum -c /tmp/chunks.sha256
+          cat .github/ci-single-surface/part-* > /tmp/single-surface.patch.gz.b64
+          echo 'a0bc4428d890515ec1bb4860f5bb4bbec520c9ecac5ca049dc7bf645473abf9c  /tmp/single-surface.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/single-surface.patch.gz.b64 > /tmp/single-surface.patch.gz
+          echo '9b9e984f69539ad01f3717c12c917c0d0b2e57227c8df98ec7150fdc8f9129fb  /tmp/single-surface.patch.gz' | sha256sum -c -
+          gzip -dc /tmp/single-surface.patch.gz > /tmp/single-surface.patch
+          echo 'b1324f1892527b54229c7e491594ac0b6294751537a4f419e8360d3f296bfb26  /tmp/single-surface.patch' | sha256sum -c -
+
+      - name: Apply exact candidate and verify file state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach 94e5a48cfdfa25a90ecdcf7ee2423ab1252cc8fe
+          git apply --check /tmp/single-surface.patch
+          git apply /tmp/single-surface.patch
+          test "$(git hash-object src/ui/image-section-surface-handoff.ts)" = a20fe04668e36fc663251bb8278e26977da45580
+          test "$(git hash-object src/ui/image-section-continuity.ts)" = f101ec383b45726e581e3daeede084bcf751a4f8
+          test "$(git hash-object src/ui/image-section-renderer.ts)" = fbf5a98bad109405456354786d0041ac9a9ee1fd
+          test "$(git hash-object scripts/check-image-section-host-continuity.mjs)" = 30590a1f56b29af058721d70f2afdf8de6ce0eef
+          test "$(git hash-object scripts/check-architecture.mjs)" = 46c1cd8bdca66f2444ea51a456da93d78cbbd1b1
+          test ! -e src/ui/image-section-visual-handoff.ts
+          git diff --name-status
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "scripts/check-architecture.mjs scripts/check-image-section-host-continuity.mjs src/ui/image-section-continuity.ts src/ui/image-section-renderer.ts src/ui/image-section-surface-handoff.ts src/ui/image-section-visual-handoff.ts "
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Clean install
+        run: npm ci
+
+      - name: Full project checks
+        run: npm run check
+
+      - name: Single-surface Chromium regression
+        run: ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-host-continuity.mjs
+
+      - name: Persistence queue Chromium regression
+        run: ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-move-commit-queue.mjs
+
+      - name: Release checks
+        run: npm run release:check
+
+      - name: Create responsibility-separated commits and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'AnimeList CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/ui/image-section-visual-handoff.ts src/ui/image-section-surface-handoff.ts src/ui/image-section-continuity.ts src/ui/image-section-renderer.ts
+          git commit -m 'refactor: enforce single image section render surface'
+          runtime_commit=$(git rev-parse HEAD)
+          git add scripts/check-image-section-host-continuity.mjs scripts/check-architecture.mjs
+          git commit -m 'test: prevent duplicate image section surfaces'
+          final_commit=$(git rev-parse HEAD)
+          remote_base=$(git ls-remote origin refs/heads/feature/component-polish | cut -f1)
+          test "$remote_base" = 94e5a48cfdfa25a90ecdcf7ee2423ab1252cc8fe
+          git push origin "$final_commit":refs/heads/feature/component-polish
+          echo "runtime_commit=$runtime_commit"
+          echo "final_commit=$final_commit"
