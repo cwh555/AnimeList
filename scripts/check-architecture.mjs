@@ -210,25 +210,33 @@ for (const dependency of [
 }
 requireDependency(
   "src/ui/image-section-continuity.ts",
-  "src/ui/image-section-visual-handoff.ts",
-  "Image Section continuity must delegate DOM snapshot/readiness to image-section-visual-handoff",
+  "src/ui/image-section-surface-handoff.ts",
+  "Image Section continuity must delegate parked-surface/node transfer to image-section-surface-handoff",
 );
 requireDependency(
   "src/ui/image-section-renderer.ts",
   "src/ui/image-section-continuity.ts",
   "Image Section renderer must own the prepare/claim lifecycle wiring",
 );
-const visualHandoff = sourceByPath.get("src/ui/image-section-visual-handoff.ts")?.content ?? "";
+const surfaceHandoff = sourceByPath.get("src/ui/image-section-surface-handoff.ts")?.content ?? "";
 reject(
   /document\.body\.(?:append|appendChild)\s*\(/,
-  "Image Section visual handoff must stay inside the Markdown ancestor context",
-  visualHandoff,
+  "Image Section surface handoff must stay inside the Markdown ancestor context",
+  surfaceHandoff,
 );
 reject(
   /cloneNode\(\s*true\s*\)/,
-  "Image Section visual handoff must preserve painted descendants instead of deep-cloning them",
-  visualHandoff,
+  "Image Section surface handoff must preserve painted descendants instead of deep-cloning them",
+  surfaceHandoff,
 );
+reject(
+  /requestAnimationFrame\s*\(/,
+  "Image Section parked surface must not follow a rendered successor across frames",
+  surfaceHandoff,
+);
+if (sourceByPath.has("src/ui/image-section-visual-handoff.ts")) {
+  failures.push("obsolete Image Section visual overlay module must not remain after single-surface refactor");
+}
 const imageSectionLifecycle = sourceByPath.get("src/ui/image-section-move-lifecycle.ts")?.content ?? "";
 reject(
   /participantUnloading|unloadImageSectionMoveParticipant/,

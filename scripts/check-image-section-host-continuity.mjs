@@ -70,167 +70,151 @@ const [bundle, styles] = await Promise.all([
   readFile("styles.css", "utf8"),
 ]);
 const readyPixel = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='240'%3E%3Crect width='400' height='240' fill='%23666'/%3E%3C/svg%3E";
-const slowImageUrlJs = JSON.stringify(slowImageUrl);
-const readyPixelJs = JSON.stringify(readyPixel);
 const html = `<!doctype html><html><head><style>
 :root{--background-primary:#111;--background-secondary:#222;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#7777dd;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-error:#e66}
 html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family:sans-serif}${styles}
 #scroll-shell{height:420px;overflow:auto}.spacer{height:720px}#preview{width:360px;margin:0 20px}.host-raw{display:block;min-height:220px;width:100%;box-sizing:border-box;margin:8px 0 22px;padding:10px;background:#f0f;color:#000}.animelist-image-section{min-height:220px}
-#preview > .animelist-image-section{background-color:rgb(12,34,56)}body > .animelist-image-section{background-color:rgb(200,0,0)}
+#preview .animelist-image-section{background-color:rgb(12,34,56)}body > .animelist-image-section{background-color:rgb(200,0,0)}
 </style></head><body data-result="pending"><div id="scroll-shell"><div class="spacer"></div><div id="preview" class="markdown-preview-view"></div><div class="spacer"></div></div>
 <script>
 window.addEventListener("error",(event)=>{document.body.dataset.details=String(event.error?.stack||event.message||"window error");document.body.dataset.result="fail";});
 window.addEventListener("unhandledrejection",(event)=>{document.body.dataset.details=String(event.reason?.stack||event.reason||"unhandled rejection");document.body.dataset.result="fail";});
-let viewTransitionCalls=0;Object.defineProperty(document,"startViewTransition",{value:()=>{viewTransitionCalls+=1;throw new Error("ViewTransition forbidden");},configurable:true});
-let decodeCalls=0;const nativeDecode=HTMLImageElement.prototype.decode;if(nativeDecode)Object.defineProperty(HTMLImageElement.prototype,"decode",{configurable:true,value:function(){decodeCalls+=1;return nativeDecode.call(this);}});
 window.createEl=(tag)=>document.createElement(tag);
 for(const [name,fn] of Object.entries({addClass:function(...x){this.classList.add(...x)},removeClass:function(...x){this.classList.remove(...x)},toggleClass:function(n,v){this.classList.toggle(n,v)}})) if(!HTMLElement.prototype[name]) Object.defineProperty(HTMLElement.prototype,name,{value:fn,writable:true,configurable:true});
 </script><script>${bundle}</script><script>
 (async()=>{
- const api=AnimeListImageContinuityTest,preview=document.querySelector('#preview'),scroll=document.querySelector('#scroll-shell');
+ const api=AnimeListImageContinuityTest,preview=document.querySelector("#preview"),scroll=document.querySelector("#scroll-shell");
  const nextFrame=()=>new Promise((resolve)=>requestAnimationFrame(resolve));
  const delay=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
- const sourceFor=(paths)=>paths.map((path)=>'- '+path).join('\\n');
- const sectionText=(paths)=>String.fromCharCode(96).repeat(3)+'animelist-images\\n'+sourceFor(paths)+'\\n'+String.fromCharCode(96).repeat(3);
- let currentPaths=['ready-a.jpg','ready-b.jpg'];
- const context={sourcePath:'Demo.md',getSectionInfo:()=>({lineStart:10,lineEnd:20,text:sectionText(currentPaths)})};
+ const sourceFor=(paths)=>paths.map((path)=>"- "+path).join("\\n");
+ const sectionText=(paths)=>String.fromCharCode(96).repeat(3)+"animelist-images\\n"+sourceFor(paths)+"\\n"+String.fromCharCode(96).repeat(3);
+ let currentPaths=[];
+ const context={sourcePath:"Demo.md",getSectionInfo:()=>({lineStart:10,lineEnd:20,text:sectionText(currentPaths)})};
  const host={app:{}};
  const service={
-   resolve:(path)=>({resourcePath:path.startsWith('slow-')?${slowImageUrlJs}+'?p='+encodeURIComponent(path):${readyPixelJs}+'#'+path}),
+   resolve:(path)=>({resourcePath:path.startsWith("slow-")?${JSON.stringify(slowImageUrl)}+"?p="+encodeURIComponent(path):${JSON.stringify(readyPixel)}+"#"+path}),
    setColumns:async()=>({source:sourceFor(currentPaths),lineStart:10,lineEnd:20}),
    setSectionOrders:async()=>[{source:sourceFor(currentPaths),lineStart:10,lineEnd:20}],
    setAsCover:async()=>{},removeMany:async()=>sourceFor(currentPaths),addAssets:async()=>({source:sourceFor(currentPaths),duplicatesSkipped:0}),
-   fetchRemoteAsset:async()=>{throw new Error('unused')},
+   fetchRemoteAsset:async()=>{throw new Error("unused")},
  };
- const makeSection=()=>{const el=document.createElement('section');el.className='image-section-host';return el;};
- const overlay=()=>document.querySelector('[data-image-continuity-overlay="true"]');
- const overlayCount=()=>document.querySelectorAll('[data-image-continuity-overlay="true"]').length;
- const hitInside=(section)=>{const rect=section.getBoundingClientRect();const hit=document.elementFromPoint(rect.left+40,rect.top+40);return Boolean(hit&&section.contains(hit));};
+ const makeSection=()=>{const el=document.createElement("section");el.className="image-section-host";return el;};
+ const parked=()=>document.querySelector("[data-image-continuity-surface='true'],[data-image-continuity-overlay='true']");
+ const parkedCount=()=>document.querySelectorAll("[data-image-continuity-surface='true'],[data-image-continuity-overlay='true']").length;
+ const visibleSectionCount=()=>[...document.querySelectorAll(".animelist-image-section")].filter((el)=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;}).length;
  const covered=(surface,visual)=>{if(!visual)return false;const a=surface.getBoundingClientRect(),b=visual.getBoundingClientRect();return Math.abs(a.left-b.left)<=1&&Math.abs(a.top-b.top)<=1&&Math.abs(a.width-b.width)<=1;};
- const waitImages=async(container)=>{await Promise.all([...container.querySelectorAll('img')].map((image)=>image.decode?.().catch(()=>{})));await nextFrame();await nextFrame();};
- const samplePixel=(image)=>{const canvas=document.createElement('canvas');canvas.width=1;canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,1,1);return [...ctx.getImageData(0,0,1,1).data].join(',');};
+ const waitImages=async(container)=>{await Promise.all([...container.querySelectorAll("img")].map((image)=>image.decode?.().catch(()=>{})));await nextFrame();await nextFrame();};
+ const imageFor=(container,path)=>container.querySelector('.al-image-item[data-image-path="'+path+'"] img');
+ const cleanupRenderer=(renderer,element)=>{renderer?.onunload?.();element?.remove?.();};
 
- // Real Obsidian ordering: arm before the note write, DOM detaches, then onunload fires.
+ // Normal Obsidian replacement: keep one parked surface during the raw-host gap,
+ // then synchronously consume it before the successor becomes the visible surface.
+ currentPaths=["ready-a.jpg","ready-b.jpg","ready-c.jpg"];
  let section=makeSection();preview.appendChild(section);let renderer=new api.ImageSectionRenderChild(section,host,service,sourceFor(currentPaths),context);renderer.onload();
  scroll.scrollTop=650;await waitImages(section);
- const oldImage=section.querySelector('img');const oldPixel=samplePixel(oldImage);const oldRect=section.getBoundingClientRect();
- const expectedContextColor=getComputedStyle(section).backgroundColor;
- api.continuity.armImageSectionHostContinuity?.(section,context.sourcePath,currentPaths,10);
- const raw=document.createElement('pre');raw.className='host-raw';raw.textContent='RAW MARKDOWN HOST';section.replaceWith(raw);
- await Promise.resolve(); // MutationObserver rescues the already-painted descendants before rendering.
- renderer.onunload();
- const firstOverlay=overlay();
- const overlayImage=firstOverlay?.querySelector('img');
- const contextStylePreserved=Boolean(firstOverlay)&&getComputedStyle(firstOverlay).backgroundColor===expectedContextColor;
- const overlaySharesMarkdownParent=firstOverlay?.parentElement===preview;
- const overlayPreservesPaintedImageNode=overlayImage===oldImage;
- const overlayPixel=overlayImage?samplePixel(overlayImage):'';
- const rawHostOverlayHasPaintedPixels=overlayPixel===oldPixel&&overlayPixel.endsWith(',255');
- let coveredRawFrames=0,pointerTransparentFrames=0;
- for(let i=0;i<10;i+=1){await nextFrame();const visual=overlay();if(covered(raw,visual))coveredRawFrames+=1;if(visual&&getComputedStyle(visual).pointerEvents==='none')pointerTransparentFrames+=1;}
-
- currentPaths=['slow-new-a.jpg','slow-new-b.jpg','slow-added.jpg'];
+ const oldA=imageFor(section,"ready-a.jpg"),oldB=imageFor(section,"ready-b.jpg"),expectedContextColor=getComputedStyle(section).backgroundColor;
+ api.continuity.armImageSectionHostContinuity(section,context.sourcePath,currentPaths,10);
+ const raw=document.createElement("pre");raw.className="host-raw";raw.textContent="RAW MARKDOWN HOST";section.replaceWith(raw);await Promise.resolve();renderer.onunload();
+ const parkedBeforeSuccessor=parked();
+ const parkedUsesMarkdownContext=Boolean(parkedBeforeSuccessor)&&getComputedStyle(parkedBeforeSuccessor).backgroundColor===expectedContextColor;
+ const parkedKeepsOldImage=parkedBeforeSuccessor?.querySelector(".al-image-item[data-image-path='ready-a.jpg'] img")===oldA;
+ let gapCovered=0,gapSingleSurface=0;
+ for(let i=0;i<6;i+=1){await nextFrame();if(covered(raw,parked()))gapCovered+=1;if(visibleSectionCount()===1)gapSingleSurface+=1;}
+ currentPaths=["ready-c.jpg","ready-a.jpg","ready-b.jpg"];
  const fresh=makeSection();raw.replaceWith(fresh);section=fresh;renderer=new api.ImageSectionRenderChild(fresh,host,service,sourceFor(currentPaths),context);renderer.onload();
- await nextFrame();
- let normalUnreadyCovered=0,normalFreshHit=0;
- for(let i=0;i<4;i+=1){const visual=overlay();if(covered(fresh,visual))normalUnreadyCovered+=1;if(hitInside(fresh))normalFreshHit+=1;await nextFrame();}
- await delay(320);await nextFrame();await nextFrame();const normalReadyOverlayRemoved=overlayCount()===0;
+ const normalSurfaceReleasedSynchronously=parkedCount()===0;
+ const normalReusesA=imageFor(fresh,"ready-a.jpg")===oldA;
+ const normalReusesB=imageFor(fresh,"ready-b.jpg")===oldB;
+ let normalSingleSurfaceFrames=0;
+ for(let i=0;i<6;i+=1){await nextFrame();if(visibleSectionCount()===1&&parkedCount()===0)normalSingleSurfaceFrames+=1;}
+ cleanupRenderer(renderer,fresh);
 
- // Parent-wrapper replacement: observing the immediate parent is insufficient because
- // Obsidian may detach the whole code-block wrapper in one mutation.
- currentPaths=['ready-parent-a.jpg','ready-parent-b.jpg'];
- const oldBlock=document.createElement('div');oldBlock.className='block-language-animelist-images';
- const parentSection=makeSection();oldBlock.appendChild(parentSection);preview.appendChild(oldBlock);
- let parentRenderer=new api.ImageSectionRenderChild(parentSection,host,service,sourceFor(currentPaths),context);parentRenderer.onload();await waitImages(parentSection);
- const parentOldImage=parentSection.querySelector('img');
- api.continuity.armImageSectionHostContinuity?.(parentSection,context.sourcePath,currentPaths,10);
- const rawBlock=document.createElement('div');rawBlock.className='block-language-animelist-images';
- const parentRaw=document.createElement('pre');parentRaw.className='host-raw';parentRaw.textContent='WHOLE BLOCK REPLACED';rawBlock.appendChild(parentRaw);
- oldBlock.replaceWith(rawBlock);await Promise.resolve();parentRenderer.onunload();
- const parentOverlay=overlay();
- const parentReplacementObservedBeforeUnload=Boolean(parentOverlay);
- const disconnectedParentContextRecreated=parentOverlay?.parentElement?.classList.contains('block-language-animelist-images')===true&&parentOverlay.parentElement.parentElement===preview;
- const parentReplacementPreservesPaintedImageNode=parentOverlay?.querySelector('img')===parentOldImage;
- currentPaths=['ready-parent-next.jpg'];
- const newBlock=document.createElement('div');newBlock.className='block-language-animelist-images';const parentFresh=makeSection();newBlock.appendChild(parentFresh);rawBlock.replaceWith(newBlock);
- parentRenderer=new api.ImageSectionRenderChild(parentFresh,host,service,sourceFor(currentPaths),context);parentRenderer.onload();await waitImages(parentFresh);await nextFrame();await nextFrame();
- const parentReplacementCleansAfterClaim=overlayCount()===0;
- parentRenderer.onunload();
+ // A changed-path successor may introduce a slow image, but unchanged painted
+ // images are transferred and the old complete surface must still disappear
+ // before the successor can paint.
+ currentPaths=["ready-x.jpg","ready-y.jpg"];
+ const changedOld=makeSection();preview.appendChild(changedOld);let changedRenderer=new api.ImageSectionRenderChild(changedOld,host,service,sourceFor(currentPaths),context);changedRenderer.onload();await waitImages(changedOld);
+ const oldX=imageFor(changedOld,"ready-x.jpg");
+ api.continuity.armImageSectionHostContinuity(changedOld,context.sourcePath,currentPaths,10);
+ const changedRaw=document.createElement("pre");changedRaw.className="host-raw";changedOld.replaceWith(changedRaw);await Promise.resolve();changedRenderer.onunload();
+ currentPaths=["ready-y.jpg","slow-added.jpg","ready-x.jpg"];
+ const changedFresh=makeSection();changedRaw.replaceWith(changedFresh);changedRenderer=new api.ImageSectionRenderChild(changedFresh,host,service,sourceFor(currentPaths),context);changedRenderer.onload();
+ const changedPathSurfaceReleasedSynchronously=parkedCount()===0;
+ const changedPathReusesExistingImage=imageFor(changedFresh,"ready-x.jpg")===oldX;
+ let changedPathSingleSurfaceFrames=0;
+ for(let i=0;i<4;i+=1){if(visibleSectionCount()===1&&parkedCount()===0)changedPathSingleSurfaceFrames+=1;await nextFrame();}
+ await delay(300);cleanupRenderer(changedRenderer,changedFresh);
 
- // Same-container rebind: old painted descendants must move to the handoff before successor render mutates the container.
- currentPaths=['ready-same-a.jpg','ready-same-b.jpg'];
- const same=makeSection();preview.appendChild(same);same.scrollIntoView({block:'center'});await nextFrame();const oldSame=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);oldSame.onload();await waitImages(same);
- const oldSameImage=same.querySelector('img');
- currentPaths=['slow-same-a.jpg','slow-same-b.jpg','slow-same-added.jpg'];
+ // Whole code-block wrapper replacement must use the same single-surface rule.
+ currentPaths=["ready-parent-a.jpg","ready-parent-b.jpg"];
+ const oldBlock=document.createElement("div");oldBlock.className="block-language-animelist-images";const parentSection=makeSection();oldBlock.appendChild(parentSection);preview.appendChild(oldBlock);
+ let parentRenderer=new api.ImageSectionRenderChild(parentSection,host,service,sourceFor(currentPaths),context);parentRenderer.onload();await waitImages(parentSection);const parentImage=imageFor(parentSection,"ready-parent-a.jpg");
+ api.continuity.armImageSectionHostContinuity(parentSection,context.sourcePath,currentPaths,10);
+ const rawBlock=document.createElement("div");rawBlock.className="block-language-animelist-images";const parentRaw=document.createElement("pre");parentRaw.className="host-raw";rawBlock.appendChild(parentRaw);oldBlock.replaceWith(rawBlock);await Promise.resolve();parentRenderer.onunload();
+ const parentParkedBeforeSuccessor=Boolean(parked());
+ currentPaths=["ready-parent-b.jpg","ready-parent-a.jpg"];
+ const newBlock=document.createElement("div");newBlock.className="block-language-animelist-images";const parentFresh=makeSection();newBlock.appendChild(parentFresh);rawBlock.replaceWith(newBlock);parentRenderer=new api.ImageSectionRenderChild(parentFresh,host,service,sourceFor(currentPaths),context);parentRenderer.onload();
+ const parentSingleSurfaceAfterClaim=parkedCount()===0&&visibleSectionCount()===1;
+ const parentReusesImage=imageFor(parentFresh,"ready-parent-a.jpg")===parentImage;
+ cleanupRenderer(parentRenderer,newBlock);
+
+ // Same-container rebind is especially prone to the screenshot bug: the old
+ // full surface must be consumed before the successor render returns.
+ currentPaths=["ready-same-a.jpg","ready-same-b.jpg"];
+ const same=makeSection();preview.appendChild(same);same.scrollIntoView({block:"center"});await nextFrame();const oldSame=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);oldSame.onload();await waitImages(same);const sameA=imageFor(same,"ready-same-a.jpg");
+ currentPaths=["ready-same-b.jpg","ready-same-a.jpg"];
  const successor=new api.ImageSectionRenderChild(same,host,service,sourceFor(currentPaths),context);successor.onload();
- await nextFrame();
- const sameContainerHandoffCreated=overlayCount()===1;
- const sameOverlay=overlay();
- const sameContainerPreservesPaintedImageNode=sameOverlay?.querySelector('img')===oldSameImage;
- const sameContainerContextPreserved=Boolean(sameOverlay)&&sameOverlay.parentElement===preview&&getComputedStyle(sameOverlay).backgroundColor===expectedContextColor;
- let sameUnreadyCovered=0,sameFreshHit=0;
- for(let i=0;i<4;i+=1){const visual=overlay();if(covered(same,visual))sameUnreadyCovered+=1;if(hitInside(same))sameFreshHit+=1;await nextFrame();}
- const countBeforeLateUnload=overlayCount();oldSame.onunload();const countAfterLateUnload=overlayCount();
- const lateOldUnloadDoesNotCreateGhost=countBeforeLateUnload===1&&countAfterLateUnload===1;
- await delay(320);await nextFrame();await nextFrame();const sameReadyOverlayRemoved=overlayCount()===0;
- successor.onunload();
+ const sameContainerSurfaceReleasedSynchronously=parkedCount()===0;
+ const sameContainerSingleSurfaceImmediately=visibleSectionCount()===1;
+ const sameContainerReusesImage=imageFor(same,"ready-same-a.jpg")===sameA;
+ let sameSingleSurfaceFrames=0;
+ for(let i=0;i<6;i+=1){await nextFrame();if(visibleSectionCount()===1&&parkedCount()===0)sameSingleSurfaceFrames+=1;}
+ const beforeLateUnload=parkedCount();oldSame.onunload();const afterLateUnload=parkedCount();
+ const lateOldUnloadNoGhost=beforeLateUnload===0&&afterLateUnload===0;
+ cleanupRenderer(successor,same);
 
- // Non-move note persistence must use the same pre-write continuity hook (column change).
- currentPaths=['ready-column-a.jpg','ready-column-b.jpg'];
- const columnSection=makeSection();preview.appendChild(columnSection);columnSection.scrollIntoView({block:'center'});await nextFrame();
- let columnRenderer=new api.ImageSectionRenderChild(columnSection,host,service,sourceFor(currentPaths),context);columnRenderer.onload();await waitImages(columnSection);
- const originalSetColumns=service.setColumns;
- let columnRaw=null;
- service.setColumns=async()=>{
-   columnRaw=document.createElement('pre');columnRaw.className='host-raw';columnRaw.textContent='COLUMN WRITE RAW';
-   columnSection.replaceWith(columnRaw);await Promise.resolve();columnRenderer.onunload();
-   return {source:sourceFor(currentPaths),lineStart:10,lineEnd:20};
- };
- const range=columnSection.querySelector('input[type="range"]');range.value='2';range.dispatchEvent(new Event('change',{bubbles:true}));
- await Promise.resolve();await nextFrame();
- const columnPersistenceWasPrearmed=overlayCount()===1&&Boolean(columnRaw)&&covered(columnRaw,overlay());
- service.setColumns=originalSetColumns;
- await delay(1550); // no successor: armed/visual state must self-clean.
- const abandonedContinuitySelfCleans=overlayCount()===0;
+ // Non-move persistence still pre-arms, and an abandoned parked surface cleans itself.
+ currentPaths=["ready-column-a.jpg","ready-column-b.jpg"];
+ const columnSection=makeSection();preview.appendChild(columnSection);columnSection.scrollIntoView({block:"center"});await nextFrame();let columnRenderer=new api.ImageSectionRenderChild(columnSection,host,service,sourceFor(currentPaths),context);columnRenderer.onload();await waitImages(columnSection);
+ const originalSetColumns=service.setColumns;let columnRaw=null;
+ service.setColumns=async()=>{columnRaw=document.createElement("pre");columnRaw.className="host-raw";columnSection.replaceWith(columnRaw);await Promise.resolve();columnRenderer.onunload();return {source:sourceFor(currentPaths),lineStart:10,lineEnd:20};};
+ const range=columnSection.querySelector("input[type='range']");range.value="2";range.dispatchEvent(new Event("change",{bubbles:true}));await Promise.resolve();await nextFrame();
+ const columnPersistenceWasPrearmed=parkedCount()===1&&Boolean(columnRaw)&&covered(columnRaw,parked());
+ service.setColumns=originalSetColumns;await delay(850);const abandonedContinuitySelfCleans=parkedCount()===0;columnRaw?.remove();
 
  const checks={
-   contextStylePreserved,
-   overlaySharesMarkdownParent,
-   overlayPreservesPaintedImageNode,
-   rawHostOverlayHasPaintedPixels,
-   rawHostGapCovered:coveredRawFrames===10,
-   rawHostOverlayPointerTransparent:pointerTransparentFrames===10,
-   replacementStaysCoveredUntilImagesDecoded:normalUnreadyCovered===4,
-   replacementRemainsInteractiveUnderOverlay:normalFreshHit===4,
-   normalReadyOverlayRemoved,
-   changedPathSuccessorClaimsHandoff:normalUnreadyCovered===4,
-   parentReplacementObservedBeforeUnload,
-   disconnectedParentContextRecreated,
-   parentReplacementPreservesPaintedImageNode,
-   parentReplacementCleansAfterClaim,
-   sameContainerReplacementGetsVisualHandoff:sameContainerHandoffCreated,
-   sameContainerContextPreserved,
-   sameContainerPreservesPaintedImageNode,
-   sameContainerStaysCoveredUntilImagesDecoded:sameUnreadyCovered===4,
-   sameContainerFreshRendererHitTestable:sameFreshHit===4,
-   lateOldRendererUnloadDoesNotCreateGhost:lateOldUnloadDoesNotCreateGhost,
-   sameContainerReadyOverlayRemoved:sameReadyOverlayRemoved,
-   successorVisibleImagesAreDecoded:decodeCalls>=6,
+   parkedUsesMarkdownContext,
+   parkedKeepsOldImage,
+   rawGapCovered:gapCovered===6,
+   rawGapHasSingleVisibleSurface:gapSingleSurface===6,
+   normalSurfaceReleasedSynchronously,
+   normalReusesA,
+   normalReusesB,
+   normalNeverShowsDuplicateSurface:normalSingleSurfaceFrames===6,
+   changedPathSurfaceReleasedSynchronously,
+   changedPathReusesExistingImage,
+   changedPathNeverShowsDuplicateSurface:changedPathSingleSurfaceFrames===4,
+   parentParkedBeforeSuccessor,
+   parentSingleSurfaceAfterClaim,
+   parentReusesImage,
+   sameContainerSurfaceReleasedSynchronously,
+   sameContainerSingleSurfaceImmediately,
+   sameContainerReusesImage,
+   sameContainerNeverShowsDuplicateSurface:sameSingleSurfaceFrames===6,
+   lateOldUnloadNoGhost,
    columnPersistenceWasPrearmed,
    abandonedContinuitySelfCleans,
-   sourceRectWasVisible:oldRect.width>0&&oldRect.height>0,
-   viewTransitionCalls:viewTransitionCalls===0,
  };
- const details={...checks,coveredRawFrames,pointerTransparentFrames,normalUnreadyCovered,normalFreshHit,sameUnreadyCovered,sameFreshHit,countBeforeLateUnload,countAfterLateUnload,decodeCalls,oldPixel,overlayPixel};
- document.body.dataset.details=JSON.stringify(details);document.body.dataset.result=Object.values(checks).every(Boolean)?'pass':'fail';
-})().catch((error)=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result='fail';});
+ const details={...checks,gapCovered,gapSingleSurface,normalSingleSurfaceFrames,changedPathSingleSurfaceFrames,sameSingleSurfaceFrames,beforeLateUnload,afterLateUnload};
+ document.body.dataset.details=JSON.stringify(details);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";
+})().catch((error)=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result="fail";});
 </script></body></html>`;
 
 try {
   await runChromiumDatasetTest({
     html,
     profile,
-    testName: "Image Section renderer host continuity",
+    testName: "Image Section single-surface host continuity",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 480, height: 720 },
     resultTimeoutMs: 15000,
