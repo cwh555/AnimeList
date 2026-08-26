@@ -39,6 +39,7 @@ jobs:
           test "$(git hash-object scripts/check-image-section-host-continuity.mjs)" = 30590a1f56b29af058721d70f2afdf8de6ce0eef
           test "$(git hash-object scripts/check-architecture.mjs)" = 46c1cd8bdca66f2444ea51a456da93d78cbbd1b1
           test ! -e src/ui/image-section-visual-handoff.ts
+          git add -N src/ui/image-section-surface-handoff.ts
           test "$(git diff --name-only | sort | tr '\n' ' ')" = "scripts/check-architecture.mjs scripts/check-image-section-host-continuity.mjs src/ui/image-section-continuity.ts src/ui/image-section-renderer.ts src/ui/image-section-surface-handoff.ts src/ui/image-section-visual-handoff.ts "
 
       - uses: actions/setup-node@v7
