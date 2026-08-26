@@ -24,6 +24,7 @@ import {
   armImageSectionHostContinuity,
   claimImageSectionHostContinuity,
   prepareImageSectionHostContinuity,
+  type ReusableImageSectionImage,
 } from "./image-section-continuity";
 import {
   beginImageSectionPointerDrag,
@@ -178,6 +179,20 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     return operation();
   }
 
+  private adoptContinuityImages(images: readonly ReusableImageSectionImage[]): void {
+    for (const entry of images) {
+      const resolved = this.service.resolve(entry.path, this.context.sourcePath);
+      if (!resolved.resourcePath) continue;
+      const source = resolved.thumbnailSources?.src || resolved.resourcePath;
+      const srcset = resolved.thumbnailSources?.srcset || "";
+      if (entry.source !== source || entry.srcset !== srcset) continue;
+      this.imageNodeCache.set(entry.path, {
+        signature: `${source}::${srcset}`,
+        image: entry.image,
+      });
+    }
+  }
+
   onload(): void {
     const previous = imageSectionRenderers.get(this.containerEl);
     if (previous && previous !== this) {
@@ -205,13 +220,14 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     }
     imageSectionRenderers.set(this.containerEl, this);
     registerImageSectionDragSurface(this.dragSurface);
-    this.render();
-    claimImageSectionHostContinuity(
+    const reusableImages = claimImageSectionHostContinuity(
       this.containerEl,
       this.context.sourcePath,
       parseImageSectionSource(this.source),
       section?.lineStart,
     );
+    this.adoptContinuityImages(reusableImages);
+    this.render();
     if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
     document.addEventListener("click", () => this.closeMenus(), { signal: this.lifecycleEvents.signal });
   }

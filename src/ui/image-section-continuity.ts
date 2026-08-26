@@ -1,9 +1,10 @@
 import {
-  IMAGE_SECTION_VISUAL_READY_DEADLINE_MS,
-  preserveImageSectionVisual,
-  waitForImageSectionVisualReady,
-  type ImageSectionVisualHandoff,
-} from "./image-section-visual-handoff";
+  parkImageSectionSurface,
+  type ImageSectionSurfaceHandoff,
+  type ReusableImageSectionImage,
+} from "./image-section-surface-handoff";
+
+export type { ReusableImageSectionImage } from "./image-section-surface-handoff";
 
 interface PendingHandoff {
   document: Document;
@@ -14,15 +15,14 @@ interface PendingHandoff {
   ancestors: HTMLElement[];
   sourceRect: DOMRectReadOnly;
   observer: MutationObserver | null;
-  visual: ImageSectionVisualHandoff | null;
-  claimed: boolean;
+  surface: ImageSectionSurfaceHandoff | null;
   deadlineTimer: number | null;
   finished: boolean;
 }
 
 const pendingByDocument = new WeakMap<Document, Map<string, PendingHandoff[]>>();
 const PERSISTED_REFRESH_ARM_DEADLINE_MS = 1500;
-const UNCLAIMED_VISUAL_DEADLINE_MS = IMAGE_SECTION_VISUAL_READY_DEADLINE_MS;
+const UNCLAIMED_SURFACE_DEADLINE_MS = 700;
 
 function keyForPaths(paths: readonly string[]): string {
   return JSON.stringify(paths);
@@ -75,34 +75,37 @@ function finishHandoff(handoff: PendingHandoff): void {
   if (handoff.deadlineTimer !== null) view?.clearTimeout(handoff.deadlineTimer);
   handoff.deadlineTimer = null;
   removeHandoff(handoff);
-  handoff.visual?.release();
-  handoff.visual = null;
+  handoff.surface?.release();
+  handoff.surface = null;
 }
 
-function scheduleUnclaimedVisualDeadline(handoff: PendingHandoff): void {
+function scheduleUnclaimedSurfaceDeadline(handoff: PendingHandoff): void {
   const view = handoff.document.defaultView;
-  if (!view || handoff.claimed || handoff.deadlineTimer !== null) return;
+  if (!view || handoff.deadlineTimer !== null) return;
   handoff.deadlineTimer = view.setTimeout(
     () => finishHandoff(handoff),
-    UNCLAIMED_VISUAL_DEADLINE_MS,
+    UNCLAIMED_SURFACE_DEADLINE_MS,
   );
 }
 
 function activateHandoff(handoff: PendingHandoff): void {
-  if (handoff.finished || handoff.visual) return;
+  if (handoff.finished || handoff.surface) return;
   handoff.observer?.disconnect();
   handoff.observer = null;
-  const visual = preserveImageSectionVisual(
+  const surface = parkImageSectionSurface(
     handoff.sourceContainer,
     handoff.ancestors,
     handoff.sourceRect,
   );
-  if (!visual) {
+  if (!surface) {
     finishHandoff(handoff);
     return;
   }
-  handoff.visual = visual;
-  scheduleUnclaimedVisualDeadline(handoff);
+  handoff.surface = surface;
+  const view = handoff.document.defaultView;
+  if (handoff.deadlineTimer !== null) view?.clearTimeout(handoff.deadlineTimer);
+  handoff.deadlineTimer = null;
+  scheduleUnclaimedSurfaceDeadline(handoff);
 }
 
 function createPendingHandoff(
@@ -137,8 +140,7 @@ function createPendingHandoff(
     ancestors: ancestorChain(container),
     sourceRect: rect,
     observer: null,
-    visual: null,
-    claimed: false,
+    surface: null,
     deadlineTimer: null,
     finished: false,
   };
@@ -148,9 +150,9 @@ function createPendingHandoff(
 }
 
 /**
- * Arms continuity before a note write. MutationObserver runs after the DOM
- * removal mutation but before the browser returns to rendering, so the already
- * painted image nodes can be rescued even when Obsidian unloads the child later.
+ * Arms continuity before a persisted Markdown write. The observer only exists
+ * for the refresh window. If Obsidian detaches the source first, the old
+ * surface is parked before the browser paints the raw/replacement host.
  */
 export function armImageSectionHostContinuity(
   container: HTMLElement,
@@ -160,7 +162,7 @@ export function armImageSectionHostContinuity(
 ): void {
   const handoff = createPendingHandoff(container, sourcePath, paths, lineStart);
   const view = container.ownerDocument.defaultView;
-  if (!handoff || !view || handoff.visual) return;
+  if (!handoff || !view || handoff.surface) return;
   if (handoff.observer) {
     if (handoff.deadlineTimer !== null) view.clearTimeout(handoff.deadlineTimer);
     handoff.deadlineTimer = view.setTimeout(
@@ -185,7 +187,7 @@ export function armImageSectionHostContinuity(
   );
 }
 
-/** Captures immediately for same-container renderer rebinds before DOM mutation. */
+/** Parks immediately for same-container renderer rebinds before DOM mutation. */
 export function prepareImageSectionHostContinuity(
   container: HTMLElement,
   sourcePath: string,
@@ -219,7 +221,7 @@ function selectPendingHandoff(
   lineStart?: number,
 ): PendingHandoff | null {
   const handoffs = pendingByDocument.get(container.ownerDocument)?.get(sourcePath)
-    ?.filter((handoff) => !handoff.finished && !handoff.claimed) ?? [];
+    ?.filter((handoff) => !handoff.finished) ?? [];
   if (handoffs.length === 0) return null;
 
   const sameContainer = handoffs.find((handoff) => handoff.sourceContainer === container);
@@ -231,23 +233,23 @@ function selectPendingHandoff(
   return closestByLine(handoffs, lineStart);
 }
 
+/**
+ * Claims a predecessor synchronously. The parked surface is destroyed before
+ * this function returns, so the successor may render without ever overlapping
+ * a second complete Image Section. Reusable image nodes survive the handoff and
+ * can be moved directly into the successor DOM.
+ */
 export function claimImageSectionHostContinuity(
   container: HTMLElement,
   sourcePath: string,
   paths: readonly string[],
   lineStart?: number,
-): void {
+): ReusableImageSectionImage[] {
   const handoff = selectPendingHandoff(container, sourcePath, paths, lineStart);
-  if (!handoff) return;
+  if (!handoff) return [];
 
-  if (!handoff.visual && !handoff.sourceContainer.isConnected) activateHandoff(handoff);
-  if (!handoff.visual) return;
-
-  handoff.claimed = true;
-  const view = handoff.document.defaultView;
-  if (handoff.deadlineTimer !== null) view?.clearTimeout(handoff.deadlineTimer);
-  handoff.deadlineTimer = null;
-  handoff.visual.follow(container);
-  void waitForImageSectionVisualReady(container)
-    .finally(() => finishHandoff(handoff));
+  if (!handoff.surface) activateHandoff(handoff);
+  const reusable = handoff.surface?.takeReusableImages() ?? [];
+  finishHandoff(handoff);
+  return reusable;
 }
