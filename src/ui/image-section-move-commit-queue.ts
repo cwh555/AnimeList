@@ -15,6 +15,7 @@ export interface ImageSectionCommitParticipant {
   ownsContainer(): boolean;
   applyPaths(paths: readonly string[], renderEmpty?: boolean): void;
   applyState(update: ImageSectionStateUpdate): void;
+  preparePersistedRefresh(): void;
 }
 
 export type ImageSectionMoveOutcome =
@@ -292,6 +293,7 @@ async function flushBatch(batch: PendingCommitBatch): Promise<ImageSectionMoveOu
     };
 
     try {
+      for (const section of sections) section.participant.preparePersistedRefresh();
       const states = await batch.service.setSectionOrders(batch.sourcePath, replacements);
       applyPersistedState(states);
       const outcome: ImageSectionMoveOutcome = { status: "moved" };

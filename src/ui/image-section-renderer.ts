@@ -21,6 +21,7 @@ import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
 import {
+  armImageSectionHostContinuity,
   claimImageSectionHostContinuity,
   prepareImageSectionHostContinuity,
 } from "./image-section-continuity";
@@ -102,6 +103,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       ownsContainer: () => this.ownsContainer(),
       applyPaths: (paths, renderEmpty) => this.applyGalleryPaths(paths, renderEmpty),
       applyState: (update) => this.applyOrderedSectionState(update),
+      preparePersistedRefresh: () => this.armHostContinuityForPersistence(),
       preserveLayoutAcrossRefresh: () => this.preserveLayoutAcrossRefresh(),
       layoutMotion: () => this.lastLayoutMotion,
       setDragSource: (active) => this.containerEl.toggleClass("is-image-drag-source", active),
@@ -149,13 +151,31 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.saveEphemeralState();
   }
 
+  private continuityPaths(): readonly string[] {
+    return this.galleryPaths.length > 0 ? this.galleryPaths : parseImageSectionSource(this.source);
+  }
+
   private prepareHostContinuity(): void {
     prepareImageSectionHostContinuity(
       this.containerEl,
       this.context.sourcePath,
-      this.galleryPaths.length > 0 ? this.galleryPaths : parseImageSectionSource(this.source),
+      this.continuityPaths(),
       this.locator().lineStart,
     );
+  }
+
+  private armHostContinuityForPersistence(): void {
+    armImageSectionHostContinuity(
+      this.containerEl,
+      this.context.sourcePath,
+      this.continuityPaths(),
+      this.locator().lineStart,
+    );
+  }
+
+  private persistWithHostContinuity<T>(operation: () => Promise<T>): Promise<T> {
+    this.armHostContinuityForPersistence();
+    return operation();
   }
 
   onload(): void {
@@ -197,10 +217,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
-    if (this.ownsContainer()) {
-      this.prepareHostContinuity();
-      this.saveEphemeralState();
-    }
+    if (this.ownsContainer()) this.saveEphemeralState();
     this.lifecycleEvents.abort();
     this.mounted = false;
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
@@ -249,7 +266,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private openAddModal(): void {
     new AddImageSectionModal(this.host.app, this.service, async (assets) => {
-      const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
+      const result = await this.persistWithHostContinuity(
+        () => this.service.addAssets(this.context.sourcePath, this.locator(), assets),
+      );
       if (this.ownsContainer()) this.applyAddResult(result);
     }).open();
   }
@@ -259,7 +278,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     if (!accepted.length) return;
     try {
       const assets: ImageSectionAssetInput[] = await Promise.all(accepted.map((file) => imageAssetFromFile(file)));
-      const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
+      const result = await this.persistWithHostContinuity(
+        () => this.service.addAssets(this.context.sourcePath, this.locator(), assets),
+      );
       if (this.ownsContainer()) this.applyAddResult(result);
     } catch (error) {
       new Notice(imageSectionText("addFailed", { error: errorMessage(error) }));
@@ -275,7 +296,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private deletePaths(paths: readonly string[]): void {
     if (!paths.length) return;
     new DeleteImageSectionModal(this.host.app, async () => {
-      const next = await this.service.removeMany(this.context.sourcePath, this.locator(), paths);
+      const next = await this.persistWithHostContinuity(
+        () => this.service.removeMany(this.context.sourcePath, this.locator(), paths),
+      );
       if (this.ownsContainer()) this.setSource(next);
     }, paths.length).open();
   }
@@ -304,9 +327,13 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     menu.addItem((item) => item
       .setTitle(imageSectionText("setCover"))
       .setIcon("image")
-      .onClick(() => void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
-        new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
-      })));
+      .onClick(() => {
+        void this.persistWithHostContinuity(
+          () => this.service.setAsCover(this.context.sourcePath, path),
+        ).catch((error) => {
+          new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
+        });
+      }));
     menu.addItem((item) => item
       .setTitle(imageSectionText("delete"))
       .setIcon("trash")
@@ -340,7 +367,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     cover.addEventListener("click", (event) => {
       event.stopPropagation();
       menu.removeClass("is-open");
-      void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
+      void this.persistWithHostContinuity(
+        () => this.service.setAsCover(this.context.sourcePath, path),
+      ).catch((error) => {
         new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
       });
     });
@@ -775,7 +804,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         const scrollPosition = captureScrollPosition(this.containerEl);
         range.blur();
         scrollPosition.stabilize(12);
-        void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
+        void this.persistWithHostContinuity(
+          () => this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns),
+        )
           .then((update) => {
             if (!this.ownsContainer()) return;
             this.acceptSectionState(update);

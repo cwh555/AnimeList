@@ -1,6 +1,6 @@
 import {
-  captureImageSectionVisualHandoff,
   IMAGE_SECTION_VISUAL_READY_DEADLINE_MS,
+  preserveImageSectionVisual,
   waitForImageSectionVisualReady,
   type ImageSectionVisualHandoff,
 } from "./image-section-visual-handoff";
@@ -11,14 +11,18 @@ interface PendingHandoff {
   sourceContainer: HTMLElement;
   pathsKey: string;
   lineStart?: number;
-  visual: ImageSectionVisualHandoff;
+  ancestors: HTMLElement[];
+  sourceRect: DOMRectReadOnly;
+  observer: MutationObserver | null;
+  visual: ImageSectionVisualHandoff | null;
   claimed: boolean;
   deadlineTimer: number | null;
   finished: boolean;
 }
 
 const pendingByDocument = new WeakMap<Document, Map<string, PendingHandoff[]>>();
-const UNCLAIMED_HANDOFF_DEADLINE_MS = IMAGE_SECTION_VISUAL_READY_DEADLINE_MS;
+const PERSISTED_REFRESH_ARM_DEADLINE_MS = 1500;
+const UNCLAIMED_VISUAL_DEADLINE_MS = IMAGE_SECTION_VISUAL_READY_DEADLINE_MS;
 
 function keyForPaths(paths: readonly string[]): string {
   return JSON.stringify(paths);
@@ -31,6 +35,25 @@ function handoffsForDocument(document: Document): Map<string, PendingHandoff[]> 
     pendingByDocument.set(document, byPath);
   }
   return byPath;
+}
+
+function ancestorChain(container: HTMLElement): HTMLElement[] {
+  const ancestors: HTMLElement[] = [];
+  let current = container.parentElement;
+  while (current) {
+    ancestors.push(current);
+    current = current.parentElement;
+  }
+  return ancestors;
+}
+
+function observationRootFor(handoff: PendingHandoff): Node | null {
+  const markdownRoot = handoff.sourceContainer.closest<HTMLElement>(
+    ".markdown-preview-view, .markdown-reading-view, .markdown-rendered",
+  );
+  if (markdownRoot?.isConnected) return markdownRoot;
+  const documentElement = handoff.document.documentElement;
+  return documentElement?.contains(handoff.sourceContainer) ? documentElement : null;
 }
 
 function removeHandoff(handoff: PendingHandoff): void {
@@ -46,11 +69,132 @@ function removeHandoff(handoff: PendingHandoff): void {
 function finishHandoff(handoff: PendingHandoff): void {
   if (handoff.finished) return;
   handoff.finished = true;
+  handoff.observer?.disconnect();
+  handoff.observer = null;
   const view = handoff.document.defaultView;
   if (handoff.deadlineTimer !== null) view?.clearTimeout(handoff.deadlineTimer);
   handoff.deadlineTimer = null;
   removeHandoff(handoff);
-  handoff.visual.release();
+  handoff.visual?.release();
+  handoff.visual = null;
+}
+
+function scheduleUnclaimedVisualDeadline(handoff: PendingHandoff): void {
+  const view = handoff.document.defaultView;
+  if (!view || handoff.claimed || handoff.deadlineTimer !== null) return;
+  handoff.deadlineTimer = view.setTimeout(
+    () => finishHandoff(handoff),
+    UNCLAIMED_VISUAL_DEADLINE_MS,
+  );
+}
+
+function activateHandoff(handoff: PendingHandoff): void {
+  if (handoff.finished || handoff.visual) return;
+  handoff.observer?.disconnect();
+  handoff.observer = null;
+  const visual = preserveImageSectionVisual(
+    handoff.sourceContainer,
+    handoff.ancestors,
+    handoff.sourceRect,
+  );
+  if (!visual) {
+    finishHandoff(handoff);
+    return;
+  }
+  handoff.visual = visual;
+  scheduleUnclaimedVisualDeadline(handoff);
+}
+
+function createPendingHandoff(
+  container: HTMLElement,
+  sourcePath: string,
+  paths: readonly string[],
+  lineStart?: number,
+): PendingHandoff | null {
+  const document = container.ownerDocument;
+  const view = document.defaultView;
+  if (!view || !container.isConnected) return null;
+  const rect = container.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  const byPath = handoffsForDocument(document);
+  const handoffs = byPath.get(sourcePath) ?? [];
+  const existing = handoffs.find((handoff) => !handoff.finished && handoff.sourceContainer === container);
+  if (existing) {
+    existing.pathsKey = keyForPaths(paths);
+    existing.lineStart = lineStart;
+    existing.ancestors = ancestorChain(container);
+    existing.sourceRect = rect;
+    return existing;
+  }
+
+  const handoff: PendingHandoff = {
+    document,
+    sourcePath,
+    sourceContainer: container,
+    pathsKey: keyForPaths(paths),
+    lineStart,
+    ancestors: ancestorChain(container),
+    sourceRect: rect,
+    observer: null,
+    visual: null,
+    claimed: false,
+    deadlineTimer: null,
+    finished: false,
+  };
+  handoffs.push(handoff);
+  byPath.set(sourcePath, handoffs);
+  return handoff;
+}
+
+/**
+ * Arms continuity before a note write. MutationObserver runs after the DOM
+ * removal mutation but before the browser returns to rendering, so the already
+ * painted image nodes can be rescued even when Obsidian unloads the child later.
+ */
+export function armImageSectionHostContinuity(
+  container: HTMLElement,
+  sourcePath: string,
+  paths: readonly string[],
+  lineStart?: number,
+): void {
+  const handoff = createPendingHandoff(container, sourcePath, paths, lineStart);
+  const view = container.ownerDocument.defaultView;
+  if (!handoff || !view || handoff.visual) return;
+  if (handoff.observer) {
+    if (handoff.deadlineTimer !== null) view.clearTimeout(handoff.deadlineTimer);
+    handoff.deadlineTimer = view.setTimeout(
+      () => finishHandoff(handoff),
+      PERSISTED_REFRESH_ARM_DEADLINE_MS,
+    );
+    return;
+  }
+
+  const observationRoot = observationRootFor(handoff);
+  if (!observationRoot) {
+    finishHandoff(handoff);
+    return;
+  }
+  handoff.observer = new MutationObserver(() => {
+    if (!handoff.sourceContainer.isConnected) activateHandoff(handoff);
+  });
+  handoff.observer.observe(observationRoot, { childList: true, subtree: true });
+  handoff.deadlineTimer = view.setTimeout(
+    () => finishHandoff(handoff),
+    PERSISTED_REFRESH_ARM_DEADLINE_MS,
+  );
+}
+
+/** Captures immediately for same-container renderer rebinds before DOM mutation. */
+export function prepareImageSectionHostContinuity(
+  container: HTMLElement,
+  sourcePath: string,
+  paths: readonly string[],
+  lineStart?: number,
+): void {
+  const handoff = createPendingHandoff(container, sourcePath, paths, lineStart);
+  if (!handoff) return;
+  activateHandoff(handoff);
 }
 
 function lineDistance(handoff: PendingHandoff, lineStart: number | undefined): number {
@@ -84,43 +228,7 @@ function selectPendingHandoff(
   const pathsKey = keyForPaths(paths);
   const samePaths = handoffs.filter((handoff) => handoff.pathsKey === pathsKey);
   if (samePaths.length > 0) return closestByLine(samePaths, lineStart);
-
   return closestByLine(handoffs, lineStart);
-}
-
-export function prepareImageSectionHostContinuity(
-  container: HTMLElement,
-  sourcePath: string,
-  paths: readonly string[],
-  lineStart?: number,
-): void {
-  const document = container.ownerDocument;
-  const view = document.defaultView;
-  if (!view || !container.isConnected) return;
-
-  const byPath = handoffsForDocument(document);
-  const handoffs = byPath.get(sourcePath) ?? [];
-  if (handoffs.some((handoff) => !handoff.finished && handoff.sourceContainer === container)) return;
-
-  const visual = captureImageSectionVisualHandoff(container);
-  if (!visual) return;
-  const handoff: PendingHandoff = {
-    document,
-    sourcePath,
-    sourceContainer: container,
-    pathsKey: keyForPaths(paths),
-    lineStart,
-    visual,
-    claimed: false,
-    deadlineTimer: null,
-    finished: false,
-  };
-  handoffs.push(handoff);
-  byPath.set(sourcePath, handoffs);
-  handoff.deadlineTimer = view.setTimeout(
-    () => finishHandoff(handoff),
-    UNCLAIMED_HANDOFF_DEADLINE_MS,
-  );
 }
 
 export function claimImageSectionHostContinuity(
@@ -132,10 +240,14 @@ export function claimImageSectionHostContinuity(
   const handoff = selectPendingHandoff(container, sourcePath, paths, lineStart);
   if (!handoff) return;
 
+  if (!handoff.visual && !handoff.sourceContainer.isConnected) activateHandoff(handoff);
+  if (!handoff.visual) return;
+
   handoff.claimed = true;
   const view = handoff.document.defaultView;
   if (handoff.deadlineTimer !== null) view?.clearTimeout(handoff.deadlineTimer);
   handoff.deadlineTimer = null;
+  handoff.visual.follow(container);
   void waitForImageSectionVisualReady(container)
     .finally(() => finishHandoff(handoff));
 }
