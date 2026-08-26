@@ -27,11 +27,22 @@ jobs:
           check_part() { actual=$(sha256sum "$1" | cut -d' ' -f1); echo "$1 $actual"; test "$actual" = "$2"; }
           check_part .github/ci/image-flash-candidate.part-00 9603cbd6662d7193b05205257eb8dfe884c89d21fa72a9286dbdb87e307c7eff
           check_part .github/ci/image-flash-candidate.part-01 2565e8048fd2cc385b00f544d14d24d97639fab9095afedb87ec12ea7b19b93a
-          check_part .github/ci/image-flash-candidate.part-02 ba08ca844b59a98705696fb6feecafff394aec789e4ca4cb700ac4b6549822a4
+          check_part .github/ci/image-flash-candidate.part-02a 4e23c1e1f450694b76886f66c4b60a9b8a45025348b484ef93c9209b01cab4c6
+          check_part .github/ci/image-flash-candidate.part-02b cc38d8fb66f69f7d9047e5b7c44ef850bae99b1b2c1070f98850f732cd731bb5
+          check_part .github/ci/image-flash-candidate.part-02c bf8f48e31711f5fc845dd0d842f1fb41deb4e906084ebabda1e0c5f12afb5d8e
           check_part .github/ci/image-flash-candidate.part-03 b0675068e260afb0afe3556384a2b45d933d49d419835b00ebe29c6e06a62c37
           check_part .github/ci/image-flash-candidate.part-04 19325ab4e01f01e381ec15890d49598cef762b5685b5dd445f761b0ee1dc30da
           check_part .github/ci/image-flash-candidate.part-05 5e80a6062382b0f8b96fc1e972f4ff4d7b7b24c58c363f2f7f7a1c2fd573d043
-          cat .github/ci/image-flash-candidate.part-* > /tmp/candidate.patch.gz.b64
+          cat \
+            .github/ci/image-flash-candidate.part-00 \
+            .github/ci/image-flash-candidate.part-01 \
+            .github/ci/image-flash-candidate.part-02a \
+            .github/ci/image-flash-candidate.part-02b \
+            .github/ci/image-flash-candidate.part-02c \
+            .github/ci/image-flash-candidate.part-03 \
+            .github/ci/image-flash-candidate.part-04 \
+            .github/ci/image-flash-candidate.part-05 \
+            > /tmp/candidate.patch.gz.b64
           echo "b64 sha256: $(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)"
           test "$(sha256sum /tmp/candidate.patch.gz.b64 | cut -d' ' -f1)" = 4e225c15a48917d744e548f1767d12a9e1b50e4af805f4fec08dc11f9041db5e
           git fetch origin feature/component-polish
