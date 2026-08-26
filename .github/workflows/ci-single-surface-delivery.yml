@@ -42,6 +42,33 @@ jobs:
           git add -N src/ui/image-section-surface-handoff.ts
           test "$(git diff --name-only | sort | tr '\n' ' ')" = "scripts/check-architecture.mjs scripts/check-image-section-host-continuity.mjs src/ui/image-section-continuity.ts src/ui/image-section-renderer.ts src/ui/image-section-surface-handoff.ts src/ui/image-section-visual-handoff.ts "
 
+      - name: Pack exact materialized candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/single-surface-candidate/src/ui /tmp/single-surface-candidate/scripts
+          cp src/ui/image-section-surface-handoff.ts /tmp/single-surface-candidate/src/ui/
+          cp src/ui/image-section-continuity.ts /tmp/single-surface-candidate/src/ui/
+          cp src/ui/image-section-renderer.ts /tmp/single-surface-candidate/src/ui/
+          cp scripts/check-image-section-host-continuity.mjs /tmp/single-surface-candidate/scripts/
+          cp scripts/check-architecture.mjs /tmp/single-surface-candidate/scripts/
+          cat > /tmp/single-surface-candidate/MANIFEST.txt <<'EOF'
+          base=94e5a48cfdfa25a90ecdcf7ee2423ab1252cc8fe
+          delete=src/ui/image-section-visual-handoff.ts
+          src/ui/image-section-surface-handoff.ts=a20fe04668e36fc663251bb8278e26977da45580
+          src/ui/image-section-continuity.ts=f101ec383b45726e581e3daeede084bcf751a4f8
+          src/ui/image-section-renderer.ts=fbf5a98bad109405456354786d0041ac9a9ee1fd
+          scripts/check-image-section-host-continuity.mjs=30590a1f56b29af058721d70f2afdf8de6ce0eef
+          scripts/check-architecture.mjs=46c1cd8bdca66f2444ea51a456da93d78cbbd1b1
+          EOF
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: single-surface-materialized-candidate
+          path: /tmp/single-surface-candidate
+          if-no-files-found: error
+          retention-days: 1
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
