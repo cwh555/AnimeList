@@ -18,7 +18,9 @@ import {
 import { setImageSectionColumns } from "../domain/image-section-layout";
 import {
   replaceImageSectionOrders,
+  resolveImageSectionPendingOrders,
   type ImageSectionOrderReplacement,
+  type ImageSectionPendingOrder,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
 import { allManagedImageReferences } from "../domain/media-image-references";
@@ -258,8 +260,9 @@ export class ImageSectionService {
     sourcePath: string,
     locator: ImageSectionLocator,
     assets: readonly ImageSectionAssetInput[],
+    currentPaths?: readonly string[],
   ): Promise<ImageSectionAddResult> {
-    const current = parseImageSectionSource(locator.source);
+    const current = currentPaths ? [...currentPaths] : parseImageSectionSource(locator.source);
     const stored = await this.storeAssets(sourcePath, current, assets);
     if (stored.addedPaths.length > 0) {
       const note = this.noteFile(sourcePath);
@@ -306,6 +309,27 @@ export class ImageSectionService {
     return result;
   }
 
+  async commitPendingSectionOrders(
+    sourcePath: string,
+    pending: readonly ImageSectionPendingOrder[],
+  ): Promise<void> {
+    if (!pending.length) return;
+    const note = this.noteFile(sourcePath);
+    await this.host.app.vault.process(note, (markdown) => {
+      const resolutions = resolveImageSectionPendingOrders(markdown, pending);
+      const replacements: ImageSectionOrderReplacement[] = [];
+      for (const resolution of resolutions) {
+        if (resolution.status !== "pending" || !resolution.locator) continue;
+        replacements.push({
+          locator: resolution.locator,
+          expectedPaths: resolution.pending.expectedPaths,
+          paths: resolution.pending.paths,
+        });
+      }
+      return replacements.length ? replaceImageSectionOrders(markdown, replacements).markdown : markdown;
+    });
+  }
+
   async remove(
     sourcePath: string,
     locator: ImageSectionLocator,
@@ -318,10 +342,11 @@ export class ImageSectionService {
     sourcePath: string,
     locator: ImageSectionLocator,
     pathValues: readonly unknown[],
+    currentPaths?: readonly string[],
   ): Promise<string> {
     const note = this.noteFile(sourcePath);
     const targets = new Set(pathValues.map(normalizeImageSectionPath).filter(Boolean));
-    const current = parseImageSectionSource(locator.source);
+    const current = currentPaths ? [...currentPaths] : parseImageSectionSource(locator.source);
     if (targets.size === 0) return serializeImageSectionPaths(current);
 
     const nextPaths = current.filter((entry) => !targets.has(entry));

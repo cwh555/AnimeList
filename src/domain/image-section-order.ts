@@ -31,6 +31,72 @@ export interface ImageSectionPathMovePlan {
   changed: boolean;
 }
 
+export interface ImageSectionPendingOrder {
+  lineStart?: number;
+  expectedPaths: readonly string[];
+  paths: readonly string[];
+}
+
+export type ImageSectionPendingOrderResolutionStatus = "pending" | "committed" | "conflict";
+
+export interface ImageSectionPendingOrderResolution {
+  status: ImageSectionPendingOrderResolutionStatus;
+  pending: ImageSectionPendingOrder;
+  locator?: ImageSectionLocator;
+}
+
+export function classifyImageSectionPendingOrder(
+  currentPaths: readonly string[],
+  pending: ImageSectionPendingOrder,
+): ImageSectionPendingOrderResolutionStatus {
+  if (samePathOrder(pending.expectedPaths, pending.paths)) return "committed";
+  if (samePathOrder(currentPaths, pending.paths)) return "committed";
+  if (samePathOrder(currentPaths, pending.expectedPaths)) return "pending";
+  return "conflict";
+}
+
+function closestMatchingBlock(
+  blocks: readonly ImageSectionBlock[],
+  used: ReadonlySet<number>,
+  hint: number | null,
+  pending: ImageSectionPendingOrder,
+): { block: ImageSectionBlock; index: number; status: ImageSectionPendingOrderResolutionStatus } | null {
+  const matches: Array<{ block: ImageSectionBlock; index: number; status: ImageSectionPendingOrderResolutionStatus; distance: number }> = [];
+  blocks.forEach((block, index) => {
+    if (used.has(index)) return;
+    const status = classifyImageSectionPendingOrder(block.paths, pending);
+    if (status === "conflict") return;
+    const containsHint = hint !== null && hint >= block.lineStart && hint <= block.lineEnd;
+    const distance = containsHint ? -1 : hint === null ? index : Math.abs(block.lineStart - hint);
+    matches.push({ block, index, status, distance });
+  });
+  if (!matches.length) return null;
+  matches.sort((left, right) => left.distance - right.distance || left.index - right.index);
+  return matches[0];
+}
+
+export function resolveImageSectionPendingOrders(
+  markdown: unknown,
+  pendingOrders: readonly ImageSectionPendingOrder[],
+): ImageSectionPendingOrderResolution[] {
+  const text = typeof markdown === "string" ? markdown : "";
+  const blocks = findImageSectionBlocks(text);
+  const used = new Set<number>();
+  return pendingOrders.map((pending) => {
+    if (samePathOrder(pending.expectedPaths, pending.paths)) return { status: "committed", pending };
+    const hint = typeof pending.lineStart === "number" ? pending.lineStart : null;
+    const match = closestMatchingBlock(blocks, used, hint, pending);
+    if (!match) return { status: "conflict", pending };
+    used.add(match.index);
+    if (match.status === "committed") return { status: "committed", pending };
+    return {
+      status: "pending",
+      pending,
+      locator: { source: match.block.source, lineStart: match.block.lineStart },
+    };
+  });
+}
+
 function samePathOrder(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((path, index) => path === right[index]);
 }
