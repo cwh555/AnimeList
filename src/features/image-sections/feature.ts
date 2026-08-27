@@ -1,9 +1,11 @@
 import type { Editor } from "obsidian";
 import type { AnimeListFeature, AnimeListFeatureHost } from "../../app/feature-types";
 import { imageSectionServiceForHost } from "../../data/image-section-service";
+import { ImageSectionOrderJournal } from "../../data/image-section-order-journal";
 import { IMAGE_SECTION_LANGUAGE, imageSectionInsertionPlan } from "../../domain/image-section";
 import { registerMediaNoteInsertAction, renderAnimeListInsertMenu } from "../../ui/media-note-insert-menu";
 import { ImageSectionRenderChild } from "../../ui/image-section-renderer";
+import { ImageSectionOrderSession } from "../../ui/image-section-order-session";
 
 const IMAGE_INSERT_ACTION = {
   id: "image-section",
@@ -26,10 +28,17 @@ export const imageSectionFeature: AnimeListFeature<AnimeListFeatureHost> = {
   id: "image-sections",
   contributions: [{
     kind: "lifecycle",
-    activate(host) {
+    async activate(host) {
       const service = imageSectionServiceForHost(host);
+      const journal = new ImageSectionOrderJournal(
+        host.app.vault.adapter,
+        `${host.app.vault.configDir}/plugins/animelist/state/image-order`,
+      );
+      const orderSession = new ImageSectionOrderSession(journal, service);
+      await orderSession.initialize();
+      host.register(() => orderSession.dispose());
       host.registerMarkdownCodeBlockProcessor(IMAGE_SECTION_LANGUAGE, (source, element, context) => {
-        context.addChild(new ImageSectionRenderChild(element, host, service, source, context));
+        context.addChild(new ImageSectionRenderChild(element, host, service, orderSession, source, context));
       });
       registerMediaNoteInsertAction(host, IMAGE_INSERT_ACTION);
     },

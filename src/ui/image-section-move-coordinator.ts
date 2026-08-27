@@ -1,33 +1,30 @@
-import type { ImageSectionService } from "../data/image-section-service";
 import type { ImageSectionLocator } from "../domain/image-section";
 import {
   planImageSectionPathMove,
   type ImageSectionDropPlacement,
-  type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
 import {
-  queueImageSectionMoveCommit,
-  type ImageSectionCommitParticipant,
   type ImageSectionMoveOutcome,
-} from "./image-section-move-commit-queue";
+  type ImageSectionOrderParticipant,
+  ImageSectionOrderSession,
+} from "./image-section-order-session";
 
-export type { ImageSectionMoveOutcome } from "./image-section-move-commit-queue";
+export type { ImageSectionMoveOutcome } from "./image-section-order-session";
 
-export interface ImageSectionMoveParticipant extends ImageSectionCommitParticipant {
+export interface ImageSectionMoveParticipant extends ImageSectionOrderParticipant {
   readonly containerEl: HTMLElement;
   readonly sourcePath: string;
+  canonicalPaths(): readonly string[];
   paths(): readonly string[];
   locator(): ImageSectionLocator;
   ownsContainer(): boolean;
   applyPaths(paths: readonly string[], renderEmpty?: boolean): void;
-  applyState(update: ImageSectionStateUpdate): void;
-  preserveLayoutAcrossRefresh(): void;
   layoutMotion(): Promise<void>;
   setDragSource?(active: boolean): void;
 }
 
 export interface ImageSectionMoveRequest {
-  service: ImageSectionService;
+  orderSession: ImageSectionOrderSession;
   source: ImageSectionMoveParticipant;
   target: ImageSectionMoveParticipant;
   path: string;
@@ -36,7 +33,7 @@ export interface ImageSectionMoveRequest {
 }
 
 export async function moveImageSectionAsset(request: ImageSectionMoveRequest): Promise<ImageSectionMoveOutcome> {
-  const { service, source, target, path, targetPath, placement } = request;
+  const { orderSession, source, target, path, targetPath, placement } = request;
   if (source.sourcePath !== target.sourcePath) return { status: "unsupported" };
 
   const sameSection = source === target;
@@ -55,22 +52,17 @@ export async function moveImageSectionAsset(request: ImageSectionMoveRequest): P
 
   source.applyPaths(plan.sourcePaths, sameSection);
   if (!sameSection) target.applyPaths(plan.targetPaths, false);
-  source.preserveLayoutAcrossRefresh();
-  if (!sameSection) target.preserveLayoutAcrossRefresh();
-  const layout: Promise<void> = (async () => {
+  const layout = (async () => {
     await source.layoutMotion();
     if (!sameSection) await target.layoutMotion();
   })();
-
-  return queueImageSectionMoveCommit({
-    service,
+  const persisted = orderSession.recordMove({
     source,
     target,
-    sourceBefore,
-    targetBefore,
     sourceAfter: plan.sourcePaths,
     targetAfter: plan.targetPaths,
     sameSection,
-    layout,
   });
+  const [outcome] = await Promise.all([persisted, layout]);
+  return outcome;
 }

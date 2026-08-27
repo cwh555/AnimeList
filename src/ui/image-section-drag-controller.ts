@@ -1,11 +1,5 @@
 import type { ImageSectionDropPlacement } from "../domain/image-section-order";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
-import {
-  adoptImageSectionMoveParticipant,
-  beginImageSectionMoveInteraction,
-  endImageSectionMoveInteraction,
-  scheduleImageSectionMoveParticipantAdoption,
-} from "./image-section-move-lifecycle";
 import type { ImageSectionMoveParticipant } from "./image-section-move-coordinator";
 
 export interface ImageSectionDragSurface {
@@ -117,7 +111,6 @@ function cancelSurfaceDrag(surface: ImageSectionDragSurface): void {
 
 export function registerImageSectionDragSurface(surface: ImageSectionDragSurface): void {
   dragSurfaces.set(surface.containerEl, surface);
-  scheduleImageSectionMoveParticipantAdoption(surface.participant, surface.signal);
   surface.signal.addEventListener("abort", () => {
     if (dragSurfaces.get(surface.containerEl) === surface) dragSurfaces.delete(surface.containerEl);
     cancelSurfaceDrag(surface);
@@ -131,16 +124,13 @@ export function beginImageSectionPointerDrag(
   event: PointerEvent,
 ): void {
   if (!surface.canStart(item, event)) return;
-  adoptImageSectionMoveParticipant(surface.participant);
   activeDrag = { source: surface, path, target: null };
   armPointerDrag({
     event,
     captureElement: item,
     dragElement: item,
     signal: surface.signal,
-    onArm: () => beginImageSectionMoveInteraction(surface.participant),
     onFinish: () => {
-      endImageSectionMoveInteraction(surface.participant);
       if (activeDrag?.source === surface) cancelSurfaceDrag(surface);
     },
     onStart: () => {

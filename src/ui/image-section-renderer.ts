@@ -21,12 +21,6 @@ import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
 import {
-  armImageSectionHostContinuity,
-  claimImageSectionHostContinuity,
-  prepareImageSectionHostContinuity,
-  type ReusableImageSectionImage,
-} from "./image-section-continuity";
-import {
   beginImageSectionPointerDrag,
   registerImageSectionDragSurface,
   type ImageSectionDragSurface,
@@ -35,6 +29,7 @@ import {
   moveImageSectionAsset,
   type ImageSectionMoveParticipant,
 } from "./image-section-move-coordinator";
+import { ImageSectionOrderSession } from "./image-section-order-session";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
 
@@ -74,6 +69,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private galleryRelayout: (() => void) | null = null;
   private lastLayoutMotion: Promise<void> = Promise.resolve();
   private galleryPaths: string[] = [];
+  private effectivePaths: string[];
   private readonly imageElements = new Map<string, HTMLElement>();
   private readonly imageNodeCache = new Map<string, { signature: string; image: HTMLImageElement }>();
   private galleryViewport: HTMLElement | null = null;
@@ -91,21 +87,21 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     containerEl: HTMLElement,
     private readonly host: AnimeListFeatureHost,
     private readonly service: ImageSectionService,
+    private readonly orderSession: ImageSectionOrderSession,
     source: string,
     private readonly context: MarkdownPostProcessorContext,
   ) {
     super(containerEl);
     this.source = source;
+    this.effectivePaths = parseImageSectionSource(source);
     this.moveParticipant = {
       containerEl,
       sourcePath: context.sourcePath,
-      paths: () => this.galleryPaths,
+      canonicalPaths: () => parseImageSectionSource(this.source),
+      paths: () => this.effectivePaths,
       locator: () => this.locator(),
       ownsContainer: () => this.ownsContainer(),
       applyPaths: (paths, renderEmpty) => this.applyGalleryPaths(paths, renderEmpty),
-      applyState: (update) => this.applyOrderedSectionState(update),
-      preparePersistedRefresh: () => this.armHostContinuityForPersistence(),
-      preserveLayoutAcrossRefresh: () => this.preserveLayoutAcrossRefresh(),
       layoutMotion: () => this.lastLayoutMotion,
       setDragSource: (active) => this.containerEl.toggleClass("is-image-drag-source", active),
     };
@@ -152,52 +148,11 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.saveEphemeralState();
   }
 
-  private continuityPaths(): readonly string[] {
-    return this.galleryPaths.length > 0 ? this.galleryPaths : parseImageSectionSource(this.source);
-  }
-
-  private prepareHostContinuity(): void {
-    prepareImageSectionHostContinuity(
-      this.containerEl,
-      this.context.sourcePath,
-      this.continuityPaths(),
-      this.locator().lineStart,
-    );
-  }
-
-  private armHostContinuityForPersistence(): void {
-    armImageSectionHostContinuity(
-      this.containerEl,
-      this.context.sourcePath,
-      this.continuityPaths(),
-      this.locator().lineStart,
-    );
-  }
-
-  private persistWithHostContinuity<T>(operation: () => Promise<T>): Promise<T> {
-    this.armHostContinuityForPersistence();
-    return operation();
-  }
-
-  private adoptContinuityImages(images: readonly ReusableImageSectionImage[]): void {
-    for (const entry of images) {
-      const resolved = this.service.resolve(entry.path, this.context.sourcePath);
-      if (!resolved.resourcePath) continue;
-      const source = resolved.thumbnailSources?.src || resolved.resourcePath;
-      const srcset = resolved.thumbnailSources?.srcset || "";
-      if (entry.source !== source || entry.srcset !== srcset) continue;
-      this.imageNodeCache.set(entry.path, {
-        signature: `${source}::${srcset}`,
-        image: entry.image,
-      });
-    }
-  }
-
   onload(): void {
     const previous = imageSectionRenderers.get(this.containerEl);
     if (previous && previous !== this) {
-      previous.prepareHostContinuity();
       previous.saveEphemeralState();
+      previous.orderSession.unregister(previous.moveParticipant);
       previous.lifecycleEvents.abort();
       previous.mounted = false;
     }
@@ -218,15 +173,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         preserveUntil: ephemeral.preserveUntil,
       };
     }
+    this.effectivePaths = [...this.orderSession.register(this.moveParticipant)];
     imageSectionRenderers.set(this.containerEl, this);
     registerImageSectionDragSurface(this.dragSurface);
-    const reusableImages = claimImageSectionHostContinuity(
-      this.containerEl,
-      this.context.sourcePath,
-      parseImageSectionSource(this.source),
-      section?.lineStart,
-    );
-    this.adoptContinuityImages(reusableImages);
     this.render();
     if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
     document.addEventListener("click", () => this.closeMenus(), { signal: this.lifecycleEvents.signal });
@@ -234,6 +183,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   onunload(): void {
     if (this.ownsContainer()) this.saveEphemeralState();
+    this.orderSession.unregister(this.moveParticipant);
     this.lifecycleEvents.abort();
     this.mounted = false;
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
@@ -257,6 +207,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private setSource(source: string): void {
     if (!this.ownsContainer()) return;
     this.source = source;
+    this.effectivePaths = parseImageSectionSource(source);
     this.selectionMode = false;
     this.selectedPaths.clear();
     this.render();
@@ -282,10 +233,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private openAddModal(): void {
     new AddImageSectionModal(this.host.app, this.service, async (assets) => {
-      const result = await this.persistWithHostContinuity(
-        () => this.service.addAssets(this.context.sourcePath, this.locator(), assets),
+      const result = await this.service.addAssets(
+        this.context.sourcePath,
+        this.locator(),
+        assets,
+        this.effectivePaths,
       );
-      if (this.ownsContainer()) this.applyAddResult(result);
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.applyAddResult(result);
+      }
     }).open();
   }
 
@@ -294,10 +251,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     if (!accepted.length) return;
     try {
       const assets: ImageSectionAssetInput[] = await Promise.all(accepted.map((file) => imageAssetFromFile(file)));
-      const result = await this.persistWithHostContinuity(
-        () => this.service.addAssets(this.context.sourcePath, this.locator(), assets),
+      const result = await this.service.addAssets(
+        this.context.sourcePath,
+        this.locator(),
+        assets,
+        this.effectivePaths,
       );
-      if (this.ownsContainer()) this.applyAddResult(result);
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.applyAddResult(result);
+      }
     } catch (error) {
       new Notice(imageSectionText("addFailed", { error: errorMessage(error) }));
     }
@@ -312,15 +275,21 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private deletePaths(paths: readonly string[]): void {
     if (!paths.length) return;
     new DeleteImageSectionModal(this.host.app, async () => {
-      const next = await this.persistWithHostContinuity(
-        () => this.service.removeMany(this.context.sourcePath, this.locator(), paths),
+      const next = await this.service.removeMany(
+        this.context.sourcePath,
+        this.locator(),
+        paths,
+        this.effectivePaths,
       );
-      if (this.ownsContainer()) this.setSource(next);
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.setSource(next);
+      }
     }, paths.length).open();
   }
 
   private openLightbox(path: string): void {
-    const paths = parseImageSectionSource(this.source);
+    const paths = [...this.effectivePaths];
     const index = Math.max(0, paths.indexOf(path));
     new ImageLightboxModal(this.host.app, this.service, imageLightboxEntries(this.context.sourcePath, paths), index).open();
   }
@@ -344,9 +313,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       .setTitle(imageSectionText("setCover"))
       .setIcon("image")
       .onClick(() => {
-        void this.persistWithHostContinuity(
-          () => this.service.setAsCover(this.context.sourcePath, path),
-        ).catch((error) => {
+        void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
           new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
         });
       }));
@@ -383,9 +350,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     cover.addEventListener("click", (event) => {
       event.stopPropagation();
       menu.removeClass("is-open");
-      void this.persistWithHostContinuity(
-        () => this.service.setAsCover(this.context.sourcePath, path),
-      ).catch((error) => {
+      void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
         new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
       });
     });
@@ -443,6 +408,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private applyGalleryPaths(nextPaths: readonly string[], renderEmpty = true): void {
     if (!this.ownsContainer()) return;
+    this.effectivePaths = [...nextPaths];
     const alreadyApplied = Boolean(this.galleryRelayout)
       && nextPaths.length === this.galleryPaths.length
       && nextPaths.every((path, index) => path === this.galleryPaths[index] && this.imageElements.has(path));
@@ -466,12 +432,6 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout();
   }
 
-  private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
-    if (!this.ownsContainer()) return;
-    this.acceptSectionState(update);
-    this.applyGalleryPaths(parseImageSectionSource(update.source));
-    this.saveEphemeralState();
-  }
 
   private async handleInternalImageDrop(
     source: ImageSectionMoveParticipant,
@@ -480,7 +440,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     placement: ImageSectionDropPlacement,
   ): Promise<void> {
     const outcome = await moveImageSectionAsset({
-      service: this.service,
+      orderSession: this.orderSession,
       source,
       target: this.moveParticipant,
       path,
@@ -820,9 +780,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         const scrollPosition = captureScrollPosition(this.containerEl);
         range.blur();
         scrollPosition.stabilize(12);
-        void this.persistWithHostContinuity(
-          () => this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns),
-        )
+        void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
           .then((update) => {
             if (!this.ownsContainer()) return;
             this.acceptSectionState(update);
@@ -860,7 +818,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.containerEl.toggleClass("is-selecting", this.selectionMode);
     this.containerEl.tabIndex = 0;
 
-    const paths = parseImageSectionSource(this.source);
+    const paths = [...this.effectivePaths];
     const activePaths = new Set(paths);
     for (const path of this.imageNodeCache.keys()) if (!activePaths.has(path)) this.imageNodeCache.delete(path);
     this.renderToolbar(paths);
