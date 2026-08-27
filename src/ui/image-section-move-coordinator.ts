@@ -50,7 +50,7 @@ export async function moveImageSectionAsset(request: ImageSectionMoveRequest): P
 
   if (!plan.changed) return { status: "unchanged" };
 
-  source.applyPaths(plan.sourcePaths, sameSection);
+  source.applyPaths(plan.sourcePaths, true);
   if (!sameSection) target.applyPaths(plan.targetPaths, false);
   const layout = (async () => {
     await source.layoutMotion();
