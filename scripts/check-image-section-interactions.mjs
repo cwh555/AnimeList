@@ -15,6 +15,7 @@ await build({
   stdin: {
     contents: `
       export { ImageSectionRenderChild } from "./src/ui/image-section-renderer";
+      export { ImageSectionOrderSession } from "./src/ui/image-section-order-session";
       export { AddImageSectionModal } from "./src/ui/image-section-modal";
       export { reorderImageSectionPaths } from "./src/domain/image-section-order";
       export { ImageLightboxModal, imageLightboxEntries } from "./src/ui/image-lightbox";
@@ -117,6 +118,7 @@ let columns=4;
 let staleColumnsMetadata=false;
 let moveDelay=90;
 let moveCalls=0;
+let journalWrites=0;
 let addCalls=0;
 const source=()=>current.map(p=>"- "+p).join("\\n");
 const state=()=>({source:source(),lineStart:0,lineEnd:current.length+1});
@@ -137,16 +139,25 @@ const service={
   return replacements.map((entry)=>({source:entry.paths.map((path)=>"- "+path).join("\\n"),lineStart:0,lineEnd:entry.paths.length+1}));
  },
  setAsCover:async()=>{},
- removeMany:async()=>source(),
- addAssets:async()=>{addCalls+=1;return{source:source(),duplicatesSkipped:0}},
+ removeMany:async(_note,_loc,_paths,currentPaths)=>{current=[...(currentPaths||current)];return source()},
+ addAssets:async(_note,_loc,_assets,currentPaths)=>{addCalls+=1;current=[...(currentPaths||current)];return{source:source(),duplicatesSkipped:0}},
  fetchRemoteAsset:async()=>{throw new Error("unused")},
 };
+const journalRecords=new Map();
+const journal={
+ async loadAll(){return [...journalRecords.values()].map((record)=>structuredClone(record))},
+ async write(record){journalWrites+=1;journalRecords.set(record.sourcePath,structuredClone(record))},
+ async remove(sourcePath){journalRecords.delete(sourcePath)},
+};
+const orderSession=new AnimeListImageSections.ImageSectionOrderSession(journal,service);
 const context={sourcePath:"Demo.md",getSectionInfo:()=>({lineStart:0,lineEnd:current.length+1,text:String.fromCharCode(96).repeat(3)+"animelist-images"+(columns===4?"":" columns="+columns)+"\\n"+source()+"\\n"+String.fromCharCode(96).repeat(3)})};
 const host={app:{}};
 const section=document.querySelector("#section");
-const renderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
-renderer.onload();
+let renderer=null;
 (async()=>{
+ await orderSession.initialize();
+ renderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,orderSession,source(),context);
+ renderer.onload();
  const details={};
  const scrollShell=document.querySelector('#scroll-shell');
  scrollShell.scrollTop=430;
@@ -251,7 +262,7 @@ renderer.onload();
  // user's presentation state from the internal reorder instead of falling back
  // to the legacy default of four columns.
  staleColumnsMetadata=true;
- const replacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
+ const replacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,orderSession,source(),context);
  replacement.onload();
  details.renderChildReplacementPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  details.renderChildReplacementPreservesColumns=section.querySelectorAll('.al-image-masonry-column').length===2
@@ -261,8 +272,9 @@ renderer.onload();
  replacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:end.x,clientY:end.y+10}));
  await delay(20);
  details.dragReleaseDoesNotOpenLightbox=(window.__modalOpenCount||0)===modalCountBeforeDropClick;
- for(let wait=0;wait<120 && moveCalls===0;wait+=1) await delay(10);
- details.touchGalleryReorderPersisted=moveCalls===1 && current.join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
+ await delay(20);
+ details.touchGalleryReorderPersisted=moveCalls===0 && journalWrites>=1
+   && logicalOrder(section).join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
 
  const mouseMoving=section.querySelector('.al-image-item[data-image-path="b.jpg"]');
  const mouseTarget=section.querySelector('.al-image-item[data-image-path="d.jpg"]');
@@ -275,7 +287,7 @@ renderer.onload();
  const modalCountBeforeMouseDropClick=window.__modalOpenCount||0;
  replacement.onunload();
  section.replaceChildren();
- const mouseReplacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
+ const mouseReplacement=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,orderSession,source(),context);
  mouseReplacement.onload();
  const mouseReplacementTarget=section.querySelector('.al-image-item[data-image-path="b.jpg"]');
  mouseReplacementTarget.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,clientX:mouseEnd.x,clientY:mouseEnd.y+10}));
@@ -286,8 +298,8 @@ renderer.onload();
  await delay(330);
  details.unloadedRendererCannotRepaintReplacement=section.querySelector('.al-image-item[data-image-path="a.jpg"]')===replacementCardBeforeStaleCompletion
    && replacementCardBeforeStaleCompletion?.querySelector('img')===replacementImageBeforeStaleCompletion;
- for(let wait=0;wait<120 && moveCalls<2;wait+=1) await delay(10);
- const stressRenderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,source(),context);
+ await delay(20);
+ const stressRenderer=new AnimeListImageSections.ImageSectionRenderChild(section,host,service,orderSession,source(),context);
  stressRenderer.onload();
  const stressCardAfterOwnershipTransfer=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
  const stressImageAfterOwnershipTransfer=stressCardAfterOwnershipTransfer?.querySelector('img');
@@ -304,6 +316,7 @@ renderer.onload();
  const stressModalCount=window.__modalOpenCount||0;
  const stressImages=new Map([...section.querySelectorAll('.al-image-item')].map((item)=>[item.dataset.imagePath,item.querySelector('img')]));
  const stressCallsBefore=moveCalls;
+ const stressJournalWritesBefore=journalWrites;
  let stressStable=true;
  for(let iteration=0;iteration<100;iteration+=1){
    const liveMoving=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
@@ -327,12 +340,13 @@ renderer.onload();
    }
  }
  const stressFinalOrder=logicalOrder(section).join(',');
- await delay(340);
- for(let wait=0;wait<250 && moveCalls===stressCallsBefore;wait+=1) await delay(1);
+ await delay(40);
  window.matchMedia=originalMatchMedia;
  moveDelay=90;
  details.hundredReordersKeepSingleMediaSurface=stressStable;
- details.hundredReordersCoalescePersistence=moveCalls===stressCallsBefore+1 && current.join(',')===stressFinalOrder;
+ details.hundredReordersCoalescePersistence=moveCalls===stressCallsBefore
+   && journalWrites===stressJournalWritesBefore+1
+   && logicalOrder(section).join(',')===stressFinalOrder;
 
  const addCallsBeforeRootDrop=addCalls;
  const rootDrop=new Event('drop',{bubbles:true,cancelable:true});
@@ -379,7 +393,7 @@ renderer.onload();
  resilienceBox.close();
 
  const brokenSection=document.createElement('section'); document.body.appendChild(brokenSection);
- const brokenRenderer=new AnimeListImageSections.ImageSectionRenderChild(brokenSection,host,service,'- broken.jpg', {sourcePath:context.sourcePath,getSectionInfo:()=>({lineStart:0,lineEnd:2,text:'broken'})});
+ const brokenRenderer=new AnimeListImageSections.ImageSectionRenderChild(brokenSection,host,service,orderSession,'- broken.jpg', {sourcePath:context.sourcePath,getSectionInfo:()=>({lineStart:0,lineEnd:2,text:'broken'})});
  brokenRenderer.onload();
  await delay(80);
  details.imageSectionDecodeFailureFallsBack=brokenSection.querySelector('.al-image-missing')!==null && brokenSection.querySelector('.al-image-item img')===null;
@@ -449,6 +463,8 @@ renderer.onload();
  details.closingAddModalCancelsActivePointerDrag=cancelDragStarted && !cancelMoving.classList.contains('is-pointer-dragging')
    && !document.querySelector('.al-image-queue-drag-ghost,.al-pointer-drag-ghost');
 
+ stressRenderer.onunload();
+ orderSession.dispose();
  document.body.dataset.details=JSON.stringify(details);
  document.body.dataset.result=Object.values(details).every(Boolean)?"pass":"fail";
 })().catch(error=>{document.body.dataset.details=String(error?.stack||error);document.body.dataset.result="fail"});

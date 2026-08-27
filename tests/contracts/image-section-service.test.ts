@@ -305,4 +305,45 @@ describe("image section storage service", () => {
     assert.equal(h.files.has(path), true);
   });
 
+  it("folds a pending live reorder into an add mutation instead of restoring stale canonical order", async () => {
+    const h = harness([
+      "# Demo", "```animelist-images",
+      "- a.jpg", "- b.jpg", "- c.jpg", "```", "",
+    ].join("\n"));
+    const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
+    const result = await h.service.addAssets(
+      h.note.path,
+      block,
+      [{ name: "new.png", data: new Uint8Array([9, 9, 9]).buffer, contentType: "image/png" }],
+      ["b.jpg", "a.jpg", "c.jpg"],
+    );
+    assert.match(result.source, /^- b\.jpg\n- a\.jpg\n- c\.jpg\n- /);
+    assert.match(h.data.get(h.note.path) ?? "", /```animelist-images\n- b\.jpg\n- a\.jpg\n- c\.jpg\n- .*new\.png\n```/);
+  });
+
+  it("folds a pending live reorder into removal and resolves external-order conflicts without clobbering Markdown", async () => {
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images", "- a.jpg", "- b.jpg", "- c.jpg", "```",
+      "## Two", "```animelist-images", "- external.jpg", "```", "",
+    ].join("\n"));
+    const [first] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
+    const next = await h.service.removeMany(
+      h.note.path,
+      first,
+      ["b.jpg"],
+      ["c.jpg", "b.jpg", "a.jpg"],
+    );
+    assert.equal(next, "- c.jpg\n- a.jpg");
+    assert.match(h.data.get(h.note.path) ?? "", /## One\n```animelist-images\n- c\.jpg\n- a\.jpg\n```/);
+
+    await h.service.commitPendingSectionOrders(h.note.path, [
+      { lineStart: 2, expectedPaths: ["c.jpg", "a.jpg"], paths: ["a.jpg", "c.jpg"] },
+      { lineStart: 8, expectedPaths: ["old.jpg"], paths: ["new.jpg", "old.jpg"] },
+    ]);
+    const updated = h.data.get(h.note.path) ?? "";
+    assert.match(updated, /## One\n```animelist-images\n- a\.jpg\n- c\.jpg\n```/);
+    assert.match(updated, /## Two\n```animelist-images\n- external\.jpg\n```/);
+  });
+
 });

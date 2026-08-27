@@ -11,6 +11,7 @@ import {
   planImageSectionPathMove,
   reorderImageSectionPaths,
   replaceImageSectionOrders,
+  resolveImageSectionPendingOrders,
 } from "../src/domain/image-section-order";
 
 describe("image section layout model", () => {
@@ -203,4 +204,29 @@ describe("image section ordering model", () => {
     assert.equal(result.sections[1].source, "- c.jpg\n- b.jpg\n- d.jpg");
     assert.ok(result.sections[1].lineStart < target.lineStart, "target line moves upward after source loses a line");
   });
+  it("reconciles pending, already-committed, and externally changed orders without overwriting conflicts", () => {
+    const markdown = [
+      "# Demo",
+      "```animelist-images",
+      "- a.jpg",
+      "- b.jpg",
+      "```",
+      "```animelist-images",
+      "- d.jpg",
+      "- c.jpg",
+      "```",
+      "```animelist-images",
+      "- external.jpg",
+      "```",
+      "",
+    ].join("\n");
+    const resolutions = resolveImageSectionPendingOrders(markdown, [
+      { lineStart: 1, expectedPaths: ["a.jpg", "b.jpg"], paths: ["b.jpg", "a.jpg"] },
+      { lineStart: 5, expectedPaths: ["c.jpg", "d.jpg"], paths: ["d.jpg", "c.jpg"] },
+      { lineStart: 9, expectedPaths: ["x.jpg"], paths: ["y.jpg", "x.jpg"] },
+    ]);
+    assert.deepEqual(resolutions.map((entry) => entry.status), ["pending", "committed", "conflict"]);
+    assert.equal(resolutions[0]?.locator?.lineStart, 1);
+  });
+
 });

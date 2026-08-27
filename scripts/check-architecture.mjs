@@ -53,8 +53,8 @@ reject(
 reject(/\.(?:openAddModal|openEditModal|collectMediaItems|createMediaNote|setFavorite|renderLibrary)\s*=/, "plugin or renderer method replacement is forbidden");
 reject(
   /new\s+MutationObserver\b/,
-  "feature integration must not discover forms through MutationObserver",
-  sources.filter(({ path: file }) => file !== "src/ui/image-section-continuity.ts").map(({ content }) => content).join("\n"),
+  "feature integration must not depend on MutationObserver lifecycle discovery",
+  sources.map(({ content }) => content).join("\n"),
 );
 reject(/^import\s+["'][^"']+["'];?\s*$/m, "side-effect-only feature imports are forbidden", entry);
 reject(/from\s+["'][^"']*(?:compat\/legacy-ui|\/legacy|\.\/legacy)["']/, "active source must not import the compatibility UI barrel", sources.filter(({ path: file }) => file !== "src/legacy.ts").map(({ content }) => content).join("\n"));
@@ -188,76 +188,66 @@ function requireDependency(importer, dependency, message) {
   if (!dependencyGraph.get(importer)?.has(dependency)) failures.push(message);
 }
 
-// Image Section move persistence and visual continuity are intentionally
-// independent state machines. Persistence may adopt replacement participants,
-// but it must never own DOM snapshots or renderer visual readiness.
-forbidDependency(
-  "src/ui/image-section-move-commit-queue.ts",
-  "src/ui/image-section-continuity.ts",
-  "Image Section move commit queue must not depend on visual continuity",
-);
-for (const dependency of [
-  "src/ui/image-section-move-commit-queue.ts",
-  "src/ui/image-section-move-lifecycle.ts",
-  "src/ui/image-section-drag-controller.ts",
-  "src/data/image-section-service.ts",
-]) {
-  forbidDependency(
-    "src/ui/image-section-continuity.ts",
-    dependency,
-    `Image Section continuity must stay independent of move/persistence wiring (${dependency})`,
-  );
-}
-requireDependency(
+// Image Section reordering must not rewrite a visible fenced block and then
+// compensate with DOM continuity. The durable order session owns pending order
+// state; Markdown is committed only after all render participants for the note
+// have gone away.
+for (const obsolete of [
   "src/ui/image-section-continuity.ts",
   "src/ui/image-section-surface-handoff.ts",
-  "Image Section continuity must delegate parked-surface/node transfer to image-section-surface-handoff",
+  "src/ui/image-section-visual-handoff.ts",
+  "src/ui/image-section-move-commit-queue.ts",
+  "src/ui/image-section-move-lifecycle.ts",
+]) {
+  if (sourceByPath.has(obsolete)) failures.push(`obsolete Image Section refresh workaround must not remain (${obsolete})`);
+}
+requireDependency(
+  "src/ui/image-section-move-coordinator.ts",
+  "src/ui/image-section-order-session.ts",
+  "Image Section move coordinator must persist through the durable order session",
+);
+forbidDependency(
+  "src/ui/image-section-move-coordinator.ts",
+  "src/data/image-section-service.ts",
+  "Image Section visible reorder must not write canonical Markdown through the service",
 );
 requireDependency(
   "src/ui/image-section-renderer.ts",
-  "src/ui/image-section-continuity.ts",
-  "Image Section renderer must own the prepare/claim lifecycle wiring",
+  "src/ui/image-section-order-session.ts",
+  "Image Section renderer must register with the durable order session",
 );
-const surfaceHandoff = sourceByPath.get("src/ui/image-section-surface-handoff.ts")?.content ?? "";
-reject(
-  /document\.body\.(?:append|appendChild)\s*\(/,
-  "Image Section surface handoff must stay inside the Markdown ancestor context",
-  surfaceHandoff,
+requireDependency(
+  "src/features/image-sections/feature.ts",
+  "src/data/image-section-order-journal.ts",
+  "Image Section feature must own durable journal initialization",
 );
-reject(
-  /cloneNode\(\s*true\s*\)/,
-  "Image Section surface handoff must preserve painted descendants instead of deep-cloning them",
-  surfaceHandoff,
-);
-reject(
-  /requestAnimationFrame\s*\(/,
-  "Image Section parked surface must not follow a rendered successor across frames",
-  surfaceHandoff,
-);
-if (sourceByPath.has("src/ui/image-section-visual-handoff.ts")) {
-  failures.push("obsolete Image Section visual overlay module must not remain after single-surface refactor");
-}
-const imageSectionLifecycle = sourceByPath.get("src/ui/image-section-move-lifecycle.ts")?.content ?? "";
-reject(
-  /participantUnloading|unloadImageSectionMoveParticipant/,
-  "Image Section move lifecycle must not own renderer visual unload responsibility",
-  imageSectionLifecycle,
+requireDependency(
+  "src/features/image-sections/feature.ts",
+  "src/ui/image-section-order-session.ts",
+  "Image Section feature must own one order session for renderer lifecycle",
 );
 const imageSectionRenderer = sourceByPath.get("src/ui/image-section-renderer.ts")?.content ?? "";
-require(
-  /prepareImageSectionHostContinuity\s*\(/,
-  "Image Section renderer must prepare same-container visual handoff before a host is replaced",
+reject(
+  /(?:continuity|surfaceHandoff|HostContinuity|preparePersistedRefresh)/i,
+  "Image Section renderer must not reintroduce visual refresh handoff state",
   imageSectionRenderer,
 );
+const imageSectionMoveCoordinator = sourceByPath.get("src/ui/image-section-move-coordinator.ts")?.content ?? "";
+reject(
+  /setSectionOrders\s*\(|vault\.process\s*\(/,
+  "Image Section move coordinator must not synchronously rewrite Markdown",
+  imageSectionMoveCoordinator,
+);
+const imageSectionSession = sourceByPath.get("src/ui/image-section-order-session.ts")?.content ?? "";
 require(
-  /armImageSectionHostContinuity\s*\(/,
-  "Image Section renderer must arm continuity before self-induced note persistence",
-  imageSectionRenderer,
+  /journal\.(?:write|remove)\s*\(/,
+  "Image Section order session must durably journal pending order state",
+  imageSectionSession,
 );
 require(
-  /claimImageSectionHostContinuity\s*\(/,
-  "Image Section renderer must claim visual handoff for the successor host",
-  imageSectionRenderer,
+  /commitPendingSectionOrders\s*\(/,
+  "Image Section order session must delegate canonical commit after renderers leave",
+  imageSectionSession,
 );
 
 const visitState = new Map();
