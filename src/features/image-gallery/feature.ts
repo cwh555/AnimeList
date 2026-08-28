@@ -10,6 +10,7 @@ import {
   type ImageGalleryUiState,
 } from "../../ui/image-gallery-renderer";
 import { makeEl, setAnimeListIcon } from "../../ui/ui-helpers";
+import type { WorkspacePageRenderContext } from "../../ui/workspace-contracts";
 import { imageGalleryText } from "./text";
 
 const STATES = new WeakMap<object, ImageGalleryUiState>();
@@ -18,16 +19,24 @@ function stateFor(host: AnimeListFeatureHost): ImageGalleryUiState {
   return STATES.get(host) ?? { ...DEFAULT_IMAGE_GALLERY_STATE };
 }
 
-async function renderGalleryPage(host: AnimeListFeatureHost, container: HTMLElement): Promise<void> {
-  container.replaceChildren();
-  const loading = makeEl("div", "al-gallery-loading");
-  const icon = makeEl("span", "al-gallery-loading-icon");
-  setAnimeListIcon(icon, "images");
-  loading.append(icon, makeEl("span", "", imageGalleryText("loading")));
-  container.appendChild(loading);
+async function renderGalleryPage(
+  host: AnimeListFeatureHost,
+  container: HTMLElement,
+  context: WorkspacePageRenderContext,
+): Promise<void> {
+  const keepCurrentSurface = context.samePageRefresh
+    && container.querySelector(".al-image-gallery-page") !== null;
+  if (!keepCurrentSurface) {
+    container.replaceChildren();
+    const loading = makeEl("div", "al-gallery-loading");
+    const icon = makeEl("span", "al-gallery-loading-icon");
+    setAnimeListIcon(icon, "images");
+    loading.append(icon, makeEl("span", "", imageGalleryText("loading")));
+    container.appendChild(loading);
+  }
 
   const works = await imageGalleryServiceForHost(host).collect(host.collectMediaItems());
-  if (!container.isConnected) return;
+  if (context.signal.aborted || !container.isConnected) return;
   const imageService = imageSectionServiceForHost(host);
   renderImageGallery(container, works, stateFor(host), {
     resolve: (image) => imageService.resolve(image.path, image.sourcePath),
@@ -68,7 +77,7 @@ export const imageGalleryFeature = {
         label: imageGalleryText("title"),
         icon: "images",
         order: 40,
-        render: (container: HTMLElement) => renderGalleryPage(host, container),
+        render: (container: HTMLElement, context: WorkspacePageRenderContext) => renderGalleryPage(host, container, context),
       };
     },
   }],

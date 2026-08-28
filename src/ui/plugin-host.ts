@@ -6,6 +6,7 @@ import type {
   MediaNoteForm,
   MediaType,
 } from "../types";
+import type { MediaCoverAssetInput } from "../domain/manual-media";
 import type { LibraryRenderAdapters, LibraryViewMode } from "./library-contracts";
 import type { MediaFormContext, MediaFormSubmitContext } from "./media-form-contracts";
 import type { SearchModalAdapter } from "./search-contracts";
@@ -26,7 +27,7 @@ export interface AnimeListUiHost {
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;
   getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>>;
-  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile>;
+  createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
   deleteMediaFile(file: TFile): Promise<void>;
   setFavorite(path: string, next: boolean): Promise<void>;

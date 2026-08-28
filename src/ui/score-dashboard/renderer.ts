@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { bindImageFallback } from "../image-fallback";
 import {
   SCORE_DASHBOARD_MAX_SCALE,
   SCORE_DASHBOARD_MIN_SCALE,
@@ -25,6 +26,8 @@ import type { ScoreDashboardClampSummary } from "./operation-ui";
 import { scoreDashboardText as text } from "../../features/score-dashboard/text";
 import type { MediaItem } from "../../types";
 import type { ScoreDashboardMediaType } from "../../domain/score-dashboard/model";
+import { applyScoreDashboardDomChanges } from "./dom-move";
+import { animateLayoutChange } from "../layout-motion";
 
 export interface ScoreDashboardUiState {
   type: ScoreDashboardMediaType;
@@ -182,6 +185,7 @@ export function renderScoreDashboard(
   batchBar.append(selectedCount, selectVisibleButton, clearButton, targetSelect, shiftDown, shiftUp);
 
   const board = create("div", "al-score-board");
+  const posterCache = new Map<string, HTMLButtonElement>();
   shell.append(header, controls, batchBar, board);
 
   const emitState = () => adapters.onStateChange({ ...state });
@@ -259,58 +263,24 @@ export function renderScoreDashboard(
     updateUnratedControl(data.unrated.length);
   };
 
-  const updateLanePlaceholder = (lane: HTMLElement): void => {
-    const posters = lane.querySelector<HTMLElement>(".al-score-lane-posters");
-    if (!posters) return;
-    const empty = posters.querySelector<HTMLElement>(".al-score-lane-empty");
-    if (posters.querySelector(".al-score-poster")) empty?.remove();
-    else if (!empty) posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
-  };
-
-  const updateGroupCount = (group: HTMLElement | null): void => {
-    if (!group) return;
-    const count = group.querySelectorAll(".al-score-poster").length;
-    const countElement = group.querySelector<HTMLElement>(".al-score-major-count");
-    if (countElement) countElement.textContent = `${count} ${text.works}`;
-  };
-
-  const insertPosterByTitle = (posters: HTMLElement, poster: HTMLButtonElement): void => {
-    const following = Array.from(posters.querySelectorAll<HTMLButtonElement>(".al-score-poster"))
-      .find((candidate) => poster.title.localeCompare(candidate.title, "zh-Hant", { numeric: true, sensitivity: "base" }) < 0);
-    posters.insertBefore(poster, following ?? null);
-  };
-
   const applyDroppedChange = (
     changes: readonly ScoreDashboardScoreChange[],
     poster: HTMLButtonElement,
     targetLane: HTMLElement,
   ): boolean => {
     const change = changes.length === 1 ? changes[0] : null;
-    const sourceLane = poster.closest<HTMLElement>(".al-score-lane");
-    const targetPosters = targetLane.querySelector<HTMLElement>(".al-score-lane-posters");
-    if (!change || change.filePath !== poster.dataset.filePath || !sourceLane || !targetPosters || sourceLane === targetLane) {
+    if (!change || change.filePath !== poster.dataset.filePath || poster.closest(".al-score-lane") === targetLane) {
       return false;
     }
-
-    const sourceGroup = sourceLane.closest<HTMLElement>(".al-score-group");
-    const targetGroup = targetLane.closest<HTMLElement>(".al-score-group");
     const targetTop = targetLane.getBoundingClientRect().top;
-    shell.classList.add("is-moving-poster");
-    targetPosters.querySelector(".al-score-lane-empty")?.remove();
-    insertPosterByTitle(targetPosters, poster);
-    poster.dataset.score = change.nextScore == null ? "unrated" : change.nextScore.toFixed(1);
-    poster.setAttribute("aria-label", text.posterAria(poster.title, change.nextScore == null ? text.unrated : change.nextScore.toFixed(1)));
-    updateLanePlaceholder(sourceLane);
-    updateLanePlaceholder(targetLane);
-    updateGroupCount(sourceGroup);
-    if (targetGroup !== sourceGroup) updateGroupCount(targetGroup);
+    const result = applyScoreDashboardDomChanges(container, changes);
+    if (!result.applied) return false;
     updateSummary();
     container.scrollTop = preserveScoreDashboardAnchorScrollTop(
       container.scrollTop,
       targetTop,
       targetLane.getBoundingClientRect().top,
     );
-    window.requestAnimationFrame(() => shell.classList.remove("is-moving-poster"));
     return true;
   };
 
@@ -352,7 +322,55 @@ export function renderScoreDashboard(
     }
   };
 
+  const reconcilePosterVisual = (button: HTMLButtonElement, item: MediaItem): void => {
+    const source = item.cover ? item.coverSources?.src || item.cover : "";
+    const srcset = item.coverSources?.srcset || "";
+    const signature = `${source}::${srcset}`;
+    const current = button.querySelector<HTMLElement>(".al-score-poster-image, .al-score-poster-missing");
+
+    if (button.dataset.coverSignature === signature && current) {
+      if (current.tagName === "IMG") (current as HTMLImageElement).alt = text.coverAlt(item.title);
+      else setIcon(current, item.mediaType === "anime" ? "clapperboard" : "book-open");
+      return;
+    }
+
+    current?.remove();
+    button.dataset.coverSignature = signature;
+    if (source) {
+      const image = create("img", "al-score-poster-image");
+      image.alt = text.coverAlt(item.title);
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.draggable = false;
+      bindImageFallback(image, () => {
+        const missing = create("span", "al-score-poster-missing");
+        setIcon(missing, button.dataset.mediaType === "anime" ? "clapperboard" : "book-open");
+        return missing;
+      });
+      if (srcset) image.srcset = srcset;
+      button.appendChild(image);
+      image.src = source;
+      return;
+    }
+
+    const missing = create("span", "al-score-poster-missing");
+    setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
+    button.appendChild(missing);
+  };
+
   const renderCover = (item: MediaItem): HTMLElement => {
+    const cached = posterCache.get(item.filePath);
+    if (cached) {
+      cached.title = item.title;
+      cached.dataset.mediaType = item.mediaType;
+      cached.dataset.score = item.score == null ? "unrated" : item.score.toFixed(1);
+      cached.draggable = !batchMode;
+      cached.setAttribute("aria-label", text.posterAria(item.title, item.score == null ? text.unrated : item.score.toFixed(1)));
+      updatePosterSelection(cached, selectedPaths.has(item.filePath));
+      reconcilePosterVisual(cached, item);
+      return cached;
+    }
+
     const button = create("button", "al-score-poster");
     button.type = "button";
     button.title = item.title;
@@ -388,30 +406,16 @@ export function renderScoreDashboard(
     });
     button.addEventListener("dragend", () => button.classList.remove("is-dragging"));
 
-    if (item.cover) {
-      const image = create("img", "al-score-poster-image");
-      image.alt = text.coverAlt(item.title);
-      image.loading = "lazy";
-      image.decoding = "async";
-      image.draggable = false;
-      image.src = item.coverSources?.src || item.cover;
-      if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-      image.addEventListener("error", () => {
-        image.remove();
-        const missing = create("span", "al-score-poster-missing");
-        setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
-        button.appendChild(missing);
-      }, { once: true });
-      button.appendChild(image);
-    } else {
-      const missing = create("span", "al-score-poster-missing");
-      setIcon(missing, item.mediaType === "anime" ? "clapperboard" : "book-open");
-      button.appendChild(missing);
-    }
+    reconcilePosterVisual(button, item);
+    posterCache.set(item.filePath, button);
     return button;
   };
 
-  const renderLane = (score: number | null, laneItems: readonly MediaItem[]): HTMLElement => {
+  const renderLane = (
+    score: number | null,
+    laneItems: readonly MediaItem[],
+    mountPosters = true,
+  ): HTMLElement => {
     const lane = create("div", "al-score-lane");
     lane.dataset.score = score == null ? "unrated" : score.toFixed(1);
     lane.setAttribute("role", "listbox");
@@ -443,8 +447,10 @@ export function renderScoreDashboard(
     const label = create("div", "al-score-lane-label", score == null ? "—" : score.toFixed(1));
     if (score != null) label.style.setProperty("--al-score-color", scoreColor(score));
     const posters = create("div", "al-score-lane-posters");
-    if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
-    else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+    if (mountPosters) {
+      if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
+      else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+    }
     lane.append(label, posters);
     return lane;
   };
@@ -468,6 +474,7 @@ export function renderScoreDashboard(
     updateUnratedControl(data.unrated.length);
     updateBatchControls();
 
+    const laneMounts: Array<{ lane: HTMLElement; items: readonly MediaItem[] }> = [];
     const groupElements = data.groups.map((group) => {
       const groupElement = create("section", "al-score-group");
       groupElement.dataset.majorScore = String(group.major);
@@ -478,7 +485,11 @@ export function renderScoreDashboard(
         create("span", "al-score-major-count", `${group.itemCount} ${text.works}`),
       );
       const lanes = create("div", "al-score-group-lanes");
-      group.lanes.forEach((scoreLane) => lanes.appendChild(renderLane(scoreLane.score, scoreLane.items)));
+      group.lanes.forEach((scoreLane) => {
+        const lane = renderLane(scoreLane.score, [], false);
+        laneMounts.push({ lane, items: scoreLane.items });
+        lanes.appendChild(lane);
+      });
       groupElement.append(major, lanes);
       return groupElement;
     });
@@ -487,11 +498,23 @@ export function renderScoreDashboard(
       const major = create("div", "al-score-major");
       major.append(create("strong", "al-score-major-number", "—"), create("span", "al-score-major-count", `${data.unrated.length} ${text.works}`));
       const lanes = create("div", "al-score-group-lanes");
-      lanes.appendChild(renderLane(null, data.unrated));
+      const lane = renderLane(null, [], false);
+      laneMounts.push({ lane, items: data.unrated });
+      lanes.appendChild(lane);
       groupElement.append(major, lanes);
       groupElements.push(groupElement);
     }
-    board.replaceChildren(...groupElements);
+
+    const movingPosters = [...posterCache.values()].filter((poster) => poster.isConnected);
+    void animateLayoutChange(movingPosters, () => {
+      board.replaceChildren(...groupElements);
+      for (const { lane, items: laneItems } of laneMounts) {
+        const posters = lane.querySelector<HTMLElement>(".al-score-lane-posters");
+        if (!posters) continue;
+        if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
+        else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));
+      }
+    });
     container.scrollTop = scrollTop;
   };
 

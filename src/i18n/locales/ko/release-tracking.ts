@@ -79,6 +79,7 @@ export const KO_RELEASE_TRACKING_MESSAGES = {
   "modal.open": "열기",
   "modal.review": "출처 선택",
   "modal.close": "닫기",
+  "modal.stopAndClose": "중지하고 닫기",
   "modal.note": "검증된 최신 정보만 기록하며 읽기 진행도는 변경하지 않습니다.",
   "match.title": "업데이트 출처 확인",
   "match.description": "안전한 단일 후보를 자동으로 찾지 못했습니다. 올바른 출처를 선택하거나 이 작품의 추적을 끄세요.",

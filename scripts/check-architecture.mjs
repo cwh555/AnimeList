@@ -24,6 +24,9 @@ const joined = sources.map(({ path: file, content }) => `// ${file}\n${content}`
 const main = fs.readFileSync(path.join(root, "src/main.ts"), "utf8");
 const entry = fs.readFileSync(path.join(root, "src/plugin-entry.ts"), "utf8");
 const legacy = fs.readFileSync(path.join(root, "src/legacy.ts"), "utf8");
+const libraryRenderer = fs.readFileSync(path.join(root, "src/ui/library-renderer.ts"), "utf8");
+const libraryWorkspaceLayout = fs.readFileSync(path.join(root, "src/ui/library-workspace-layout.ts"), "utf8");
+const pointerDrag = fs.readFileSync(path.join(root, "src/ui/pointer-drag.ts"), "utf8");
 const featureAndUiSources = sources
   .filter(({ path: file }) => (
     !file.startsWith("src/data/")
@@ -48,10 +51,44 @@ reject(
   featureAndUiSources,
 );
 reject(/\.(?:openAddModal|openEditModal|collectMediaItems|createMediaNote|setFavorite|renderLibrary)\s*=/, "plugin or renderer method replacement is forbidden");
-reject(/new\s+MutationObserver\b/, "feature integration must not discover forms through MutationObserver");
+reject(
+  /new\s+MutationObserver\b/,
+  "feature integration must not depend on MutationObserver lifecycle discovery",
+  sources.map(({ content }) => content).join("\n"),
+);
 reject(/^import\s+["'][^"']+["'];?\s*$/m, "side-effect-only feature imports are forbidden", entry);
 reject(/from\s+["'][^"']*(?:compat\/legacy-ui|\/legacy|\.\/legacy)["']/, "active source must not import the compatibility UI barrel", sources.filter(({ path: file }) => file !== "src/legacy.ts").map(({ content }) => content).join("\n"));
 reject(/eslint-disable/, "active source must not require eslint suppression");
+reject(
+  /workspaceActionHost|al-workspace-page-actions/,
+  "generic Library renderer must not own or mutate Workspace header actions",
+  libraryRenderer,
+);
+reject(
+  /\.closest(?:<[^>]+>)?\([^)]*al-workspace|querySelector(?:<[^>]+>)?\([^)]*al-workspace-page-actions/,
+  "Library workspace layout must receive Workspace-owned action slots explicitly instead of discovering ancestors",
+  libraryWorkspaceLayout,
+);
+reject(
+  /cloneNode\s*\(/,
+  "pointer drag must not clone whole media/card DOM surfaces; keep the original node and use explicit drop indicators",
+  pointerDrag,
+);
+
+// Every user-facing image element needs an explicit load-failure contract. This
+// prevents one component from leaking browser broken-image UI while another
+// silently removes the image. Internal raster decoding is intentionally excluded.
+const imageCreationPattern = /(?:\b(?:makeEl|createEl|makeElement|create|el)\(\s*["']img["']|\.createEl\(\s*["']img["']|document\.createElement\(\s*["']img["']|new\s+Image\s*\()/g;
+const imageFailurePattern = /(?:\bbindImageFallback\s*\(|addEventListener\(\s*["']error["']|\.onerror\s*=)/g;
+for (const source of sources) {
+  if (!(source.path.startsWith("src/ui/") || source.path.startsWith("src/features/"))) continue;
+  const imageCreations = source.content.match(imageCreationPattern)?.length ?? 0;
+  if (!imageCreations) continue;
+  const failureContracts = source.content.match(imageFailurePattern)?.length ?? 0;
+  if (failureContracts < imageCreations) {
+    failures.push(`every user-facing image creation needs its own explicit failure contract (${source.path}: ${imageCreations} image creation(s), ${failureContracts} failure contract(s))`);
+  }
+}
 require(/class\s+AnimeListPlugin\s+extends\s+Plugin\b/, "main plugin must extend Obsidian Plugin directly", main);
 reject(/extends\s+LegacyAnimeListPlugin\b/, "main plugin must not inherit the legacy plugin", main);
 reject(/from\s+["\']\.\/data\//, "main.ts must delegate data services through the application service", main);
@@ -143,6 +180,75 @@ for (const source of sources) {
     }
   }
 }
+
+function forbidDependency(importer, dependency, message) {
+  if (dependencyGraph.get(importer)?.has(dependency)) failures.push(message);
+}
+function requireDependency(importer, dependency, message) {
+  if (!dependencyGraph.get(importer)?.has(dependency)) failures.push(message);
+}
+
+// Image Section reordering must not rewrite a visible fenced block and then
+// compensate with DOM continuity. The durable order session owns pending order
+// state; Markdown is committed only after all render participants for the note
+// have gone away.
+for (const obsolete of [
+  "src/ui/image-section-continuity.ts",
+  "src/ui/image-section-surface-handoff.ts",
+  "src/ui/image-section-visual-handoff.ts",
+  "src/ui/image-section-move-commit-queue.ts",
+  "src/ui/image-section-move-lifecycle.ts",
+]) {
+  if (sourceByPath.has(obsolete)) failures.push(`obsolete Image Section refresh workaround must not remain (${obsolete})`);
+}
+requireDependency(
+  "src/ui/image-section-move-coordinator.ts",
+  "src/ui/image-section-order-session.ts",
+  "Image Section move coordinator must persist through the durable order session",
+);
+forbidDependency(
+  "src/ui/image-section-move-coordinator.ts",
+  "src/data/image-section-service.ts",
+  "Image Section visible reorder must not write canonical Markdown through the service",
+);
+requireDependency(
+  "src/ui/image-section-renderer.ts",
+  "src/ui/image-section-order-session.ts",
+  "Image Section renderer must register with the durable order session",
+);
+requireDependency(
+  "src/features/image-sections/feature.ts",
+  "src/data/image-section-order-journal.ts",
+  "Image Section feature must own durable journal initialization",
+);
+requireDependency(
+  "src/features/image-sections/feature.ts",
+  "src/ui/image-section-order-session.ts",
+  "Image Section feature must own one order session for renderer lifecycle",
+);
+const imageSectionRenderer = sourceByPath.get("src/ui/image-section-renderer.ts")?.content ?? "";
+reject(
+  /(?:continuity|surfaceHandoff|HostContinuity|preparePersistedRefresh)/i,
+  "Image Section renderer must not reintroduce visual refresh handoff state",
+  imageSectionRenderer,
+);
+const imageSectionMoveCoordinator = sourceByPath.get("src/ui/image-section-move-coordinator.ts")?.content ?? "";
+reject(
+  /setSectionOrders\s*\(|vault\.process\s*\(/,
+  "Image Section move coordinator must not synchronously rewrite Markdown",
+  imageSectionMoveCoordinator,
+);
+const imageSectionSession = sourceByPath.get("src/ui/image-section-order-session.ts")?.content ?? "";
+require(
+  /journal\.(?:write|remove)\s*\(/,
+  "Image Section order session must durably journal pending order state",
+  imageSectionSession,
+);
+require(
+  /commitPendingSectionOrders\s*\(/,
+  "Image Section order session must delegate canonical commit after renderers leave",
+  imageSectionSession,
+);
 
 const visitState = new Map();
 const visitStack = [];

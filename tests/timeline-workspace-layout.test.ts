@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildTimelineDensityCurve,
+  timelineAdaptiveDensitySamples,
   timelineDensityBandwidth,
   groupTimelineHistory,
   timelineTimeForX,
@@ -23,7 +24,7 @@ describe("timeline workspace layout", () => {
     assert.equal(timelineTimeForX(day30, minimum, spacing, 64), minimum + 30 * DAY);
   });
 
-  it("builds a smooth Gaussian density curve instead of histogram bins", () => {
+  it("builds a smooth adaptive Gaussian density curve instead of histogram bins", () => {
     const minimum = new Date(2025, 0, 1).getTime();
     const times = [minimum, minimum, minimum + DAY, minimum + 2 * DAY, minimum + 90 * DAY];
     const curve = buildTimelineDensityCurve(times, minimum, times.at(-1)!, 128);
@@ -34,6 +35,27 @@ describe("timeline workspace layout", () => {
     assert.ok(curve.bandwidthMs >= DAY);
     const peak = curve.points.reduce((best, point) => point.density > best.density ? point : best);
     assert.ok(peak.ratio < 0.2, `expected dense early cluster to dominate, got ratio ${peak.ratio}`);
+  });
+
+
+  it("uses narrower local bandwidth around dense bursts than isolated dates", () => {
+    const minimum = new Date(2026, 0, 1).getTime();
+    const times = [0, 1, 2, 3, 40, 120].map((day) => minimum + day * DAY);
+    const samples = timelineAdaptiveDensitySamples(times);
+    const dense = samples.find((sample) => sample.time === minimum + DAY)!;
+    const isolated = samples.find((sample) => sample.time === minimum + 120 * DAY)!;
+    assert.ok(dense.bandwidth < isolated.bandwidth, `${dense.bandwidth} should be less than ${isolated.bandwidth}`);
+  });
+
+  it("keeps a local cluster peak sharp even with a far-away completion", () => {
+    const minimum = new Date(2026, 0, 1).getTime();
+    const times = [0, 1, 2, 3, 120].map((day) => minimum + day * DAY);
+    const curve = buildTimelineDensityCurve(times, minimum, minimum + 120 * DAY, 512);
+    const nearCluster = curve.points.filter((point) => point.time <= minimum + 10 * DAY);
+    const middle = curve.points.filter((point) => point.time >= minimum + 45 * DAY && point.time <= minimum + 75 * DAY);
+    const clusterPeak = Math.max(...nearCluster.map((point) => point.density));
+    const valley = Math.max(...middle.map((point) => point.density));
+    assert.ok(clusterPeak > valley * 4, `expected a local peak, got peak=${clusterPeak} valley=${valley}`);
   });
 
   it("uses at least one day of density bandwidth for discrete completion dates", () => {

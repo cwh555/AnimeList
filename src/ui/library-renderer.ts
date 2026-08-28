@@ -1,4 +1,6 @@
 import type { MediaItem } from "../types";
+import { compareLibraryCompletion } from "../domain/library-sort";
+import { isUnknownCompletionDate } from "../domain/completion-date";
 import { normalizeGenres } from "../domain/media-metadata";
 import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
 import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../domain/media-status";
@@ -7,6 +9,8 @@ import { mediaFormatLabel, statusFilterOptions, uiText } from "../ui-text";
 import type { LibraryMediaFilter, LibraryRenderAdapters, LibraryRenderer, LibraryViewMode } from "./library-contracts";
 import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBatch } from "./library-progressive-render";
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
+import { animateLayoutChange } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
   if (view === "list") return "116px";
@@ -19,6 +23,8 @@ export function libraryEagerCoverCount(view: LibraryViewMode): number {
 }
 
 const activeProgressiveRenders = new WeakMap<HTMLElement, () => void>();
+interface LibraryCoverCacheEntry { signature: string; image: HTMLImageElement; }
+const libraryCoverCaches = new WeakMap<HTMLElement, Map<string, LibraryCoverCacheEntry>>();
 
 export const AnimeListUI: LibraryRenderer = (() => {
   const normalize = (item: MediaItem): MediaItem => ({
@@ -77,6 +83,13 @@ export const AnimeListUI: LibraryRenderer = (() => {
     activeProgressiveRenders.delete(container);
     container.replaceChildren();
     const items = inputItems.map(normalize);
+    let coverCache = libraryCoverCaches.get(container);
+    if (!coverCache) {
+      coverCache = new Map<string, LibraryCoverCacheEntry>();
+      libraryCoverCaches.set(container, coverCache);
+    }
+    const activePaths = new Set(items.map((item) => item.filePath));
+    for (const path of coverCache.keys()) if (!activePaths.has(path)) coverCache.delete(path);
     const workspacePresentation = adapters.presentation === "workspace";
     const filterOptions = collectLibraryFilterOptions(items);
     const initialState = adapters.initialState ?? {};
@@ -191,17 +204,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       typeButtons.set(key, button);
       nav.appendChild(button);
     });
-    if (workspacePresentation && addItem) {
-      const typeRow = makeEl("div", "al-library-workspace-type-row");
-      const collect = makeEl("button", "al-add-button al-library-workspace-collect");
-      collect.type = "button";
-      appendIconLabel(collect, "plus", uiText("action.collect"));
-      collect.addEventListener("click", () => addItem(state.type === "all" ? "anime" : state.type));
-      typeRow.append(nav, collect);
-      shell.appendChild(typeRow);
-    } else {
-      shell.appendChild(nav);
-    }
+    shell.appendChild(nav);
 
     const toolbar = makeEl("div", "al-toolbar");
     const searchWrap = makeEl("label", "al-search");
@@ -331,8 +334,14 @@ export const AnimeListUI: LibraryRenderer = (() => {
 
       const media = makeEl("div", "al-cover-wrap");
       if (item.cover) {
-        const image = makeEl("img", "al-cover");
         const sources = item.coverSources;
+        const source = sources?.src || item.cover;
+        const srcset = sources?.srcset || "";
+        const signature = `${source}::${srcset}`;
+        const cached = coverCache.get(item.filePath);
+        const image = cached?.signature === signature ? cached.image : makeEl("img", "al-cover");
+        if (cached?.signature !== signature) coverCache.set(item.filePath, { signature, image });
+        image.className = "al-cover";
         image.alt = uiText("library.coverAlt", { title: item.title });
         image.loading = "lazy";
         image.decoding = "async";
@@ -341,23 +350,28 @@ export const AnimeListUI: LibraryRenderer = (() => {
           media.classList.add("has-cover-placeholder");
           media.style.backgroundImage = `url(${JSON.stringify(sources.placeholder)})`;
         }
-        if (sources?.srcset) image.srcset = sources.srcset;
-        image.src = sources?.src || item.cover;
-        const reveal = (): void => image.classList.add("is-loaded");
-        image.addEventListener("load", reveal, { once: true });
-        image.addEventListener("error", () => {
-          image.remove();
-          media.classList.remove("has-cover-placeholder");
-          media.style.removeProperty("background-image");
-          const missing = makeEl("div", "al-cover-missing");
-          const icon = makeEl("span", "al-icon-large");
-          setAnimeListIcon(icon, "book");
-          missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
-          media.prepend(missing);
-        }, { once: true });
-        if (image.complete && image.naturalWidth > 0) reveal();
+        if (cached?.signature !== signature) {
+          const reveal = (): void => image.classList.add("is-loaded");
+          image.addEventListener("load", reveal, { once: true });
+          bindImageFallback(image, () => {
+            coverCache.delete(item.filePath);
+            media.classList.remove("has-cover-placeholder");
+            media.style.removeProperty("background-image");
+            const missing = makeEl("div", "al-cover-missing");
+            const icon = makeEl("span", "al-icon-large");
+            setAnimeListIcon(icon, "book");
+            missing.append(icon, makeEl("span", "", uiText("library.coverMissing")));
+            return missing;
+          });
+        }
+        if (srcset) {
+          if (image.getAttribute("srcset") !== srcset) image.srcset = srcset;
+        } else if (image.hasAttribute("srcset")) image.removeAttribute("srcset");
+        if (image.getAttribute("src") !== source) image.src = source;
         media.appendChild(image);
+        if (cached?.signature !== signature && image.complete && image.naturalWidth > 0) image.classList.add("is-loaded");
       } else {
+        coverCache.delete(item.filePath);
         const missing = makeEl("div", "al-cover-missing");
         const icon = makeEl("span", "al-icon-large");
         setAnimeListIcon(icon, "book");
@@ -417,7 +431,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       if (item.startedAt || item.completedAt) {
         const dates = makeEl("div", "al-date-row");
         if (item.startedAt) dates.appendChild(makeEl("span", "", uiText("library.startedAt", { date: item.startedAt })));
-        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: item.completedAt })));
+        if (item.completedAt) dates.appendChild(makeEl("span", "", uiText("library.completedAt", { date: isUnknownCompletionDate(item.completedAt) ? uiText("date.unknown") : item.completedAt })));
         body.appendChild(dates);
       }
       if (item.genres.length) {
@@ -484,8 +498,8 @@ export const AnimeListUI: LibraryRenderer = (() => {
         "score-asc": (a, b) => (a.score ?? Number.MAX_SAFE_INTEGER) - (b.score ?? Number.MAX_SAFE_INTEGER),
         "started-desc": (a, b) => missingLast(parseDateValue(b.startedAt), -1) - missingLast(parseDateValue(a.startedAt), -1),
         "started-asc": (a, b) => missingLast(parseDateValue(a.startedAt), 1) - missingLast(parseDateValue(b.startedAt), 1),
-        "completed-desc": (a, b) => missingLast(parseDateValue(b.completedAt), -1) - missingLast(parseDateValue(a.completedAt), -1),
-        "completed-asc": (a, b) => missingLast(parseDateValue(a.completedAt), 1) - missingLast(parseDateValue(b.completedAt), 1),
+        "completed-desc": (a, b) => compareLibraryCompletion(a, b, "desc"),
+        "completed-asc": (a, b) => compareLibraryCompletion(a, b, "asc"),
         "year-desc": (a, b) => numeric(b.year) - numeric(a.year),
         "year-asc": (a, b) => numeric(a.year) - numeric(b.year),
         "title-asc": (a, b) => a.title.localeCompare(b.title, "zh-Hant"),
@@ -497,13 +511,16 @@ export const AnimeListUI: LibraryRenderer = (() => {
       const filterSuffix = activeFilterCount ? ` · ${uiText("library.filterActiveCount", { count: activeFilterCount })}` : "";
       resultMeta.textContent = uiText("library.resultMeta", { shown: filtered.length, total: items.length, genre: filterSuffix });
       grid.className = `al-grid is-${state.view}`;
-      grid.replaceChildren();
+      const previousCards = Array.from(grid.querySelectorAll<HTMLElement>(".al-card"));
       if (!filtered.length) {
-        const empty = makeEl("div", "al-empty");
-        const icon = makeEl("span", "al-empty-icon");
-        setAnimeListIcon(icon, "book");
-        empty.append(icon, makeEl("strong", "", uiText("library.emptyTitle")), makeEl("span", "", uiText("library.emptyDescription")));
-        grid.appendChild(empty);
+        void animateLayoutChange(previousCards, () => {
+          grid.replaceChildren();
+          const empty = makeEl("div", "al-empty");
+          const icon = makeEl("span", "al-empty-icon");
+          setAnimeListIcon(icon, "book");
+          empty.append(icon, makeEl("strong", "", uiText("library.emptyTitle")), makeEl("span", "", uiText("library.emptyDescription")));
+          grid.appendChild(empty);
+        });
         adapters.afterRender?.({ ...state });
         return;
       }
@@ -521,7 +538,14 @@ export const AnimeListUI: LibraryRenderer = (() => {
         adapters.afterRender?.({ ...state });
       };
       const initialBatch = renderWindow.reset();
-      appendBatch(initialBatch);
+      const initialPaths = new Set(filtered.slice(initialBatch.start, initialBatch.end).map((item) => item.filePath));
+      void animateLayoutChange(previousCards, () => {
+        for (const child of Array.from(grid.children)) {
+          const card = child as HTMLElement;
+          if (!card.classList?.contains("al-card") || !initialPaths.has(card.dataset.path ?? "")) card.remove();
+        }
+        appendBatch(initialBatch);
+      });
       if (adapters.onStateChange) adapters.onStateChange({ ...state });
       if (initialBatch.done) return;
 

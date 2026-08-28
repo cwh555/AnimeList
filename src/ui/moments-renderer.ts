@@ -11,6 +11,14 @@ import { createMomentStackVisual } from "./moment-stack";
 import { rasterizeMomentStackToPng } from "./moment-stack-raster";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
+
+function momentMissingImageNode(): HTMLElement {
+  const missing = makeEl("div", "al-moment-image-missing");
+  setAnimeListIcon(missing, "image-off");
+  missing.appendChild(makeEl("span", "", momentsText("missingImage")));
+  return missing;
+}
 
 function targetElement(event: Event): Element | null {
   const target = event.target as { closest?: (selector: string) => Element | null } | null;
@@ -26,6 +34,8 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   private lineHint: number | undefined;
   private scrollerObservers: ResizeObserver[] = [];
   private readonly expandedTextIds = new Set<string>();
+  private readonly momentMediaCache = new Map<string, { signature: string; media: HTMLElement }>();
+  private readonly momentCardCache = new Map<string, { signature: string; card: HTMLElement }>();
 
   constructor(
     containerEl: HTMLElement,
@@ -332,7 +342,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       const resolved = this.imageService.resolve(path, this.context.sourcePath);
       if (resolved.resourcePath) {
         const image = makeEl("img");
-        image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
+        bindImageFallback(image, momentMissingImageNode);
         if (resolved.thumbnailSources?.srcset) {
           image.srcset = resolved.thumbnailSources.srcset;
           image.sizes = moment.images.length === 1 ? "720px" : "360px";
@@ -349,11 +359,9 @@ export class MomentsRenderChild extends MarkdownRenderChild {
         image.addEventListener("load", updateRatio, { once: true });
         if (image.complete) updateRatio();
         frame.appendChild(image);
+        image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
       } else {
-        const missing = makeEl("div", "al-moment-image-missing");
-        setAnimeListIcon(missing, "image-off");
-        missing.appendChild(makeEl("span", "", momentsText("missingImage")));
-        frame.appendChild(missing);
+        frame.appendChild(momentMissingImageNode());
       }
       frame.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -424,9 +432,21 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     });
 
     const stacked = moment.imageLayout === "stacked" && moment.images.length > 1;
-    const carousel = stacked ? null : this.renderCarouselMedia(moment);
-    const media = stacked ? this.renderStackedMedia(moment) : carousel.media;
-    const scroller = carousel?.scroller ?? null;
+    const mediaSignature = JSON.stringify({ layout: stacked ? "stacked" : "carousel", images: moment.images, gaps: stacked ? normalizeMomentStackGapsY(moment.stackGapsY, moment.images.length) : [] });
+    const cachedMedia = this.momentMediaCache.get(moment.id);
+    let media: HTMLElement;
+    let scroller: { row: HTMLElement; previous: HTMLButtonElement; next: HTMLButtonElement } | null = null;
+    if (cachedMedia?.signature === mediaSignature) {
+      media = cachedMedia.media;
+    } else if (stacked) {
+      media = this.renderStackedMedia(moment);
+      this.momentMediaCache.set(moment.id, { signature: mediaSignature, media });
+    } else {
+      const carousel = this.renderCarouselMedia(moment);
+      media = carousel.media;
+      scroller = carousel.scroller;
+      this.momentMediaCache.set(moment.id, { signature: mediaSignature, media });
+    }
 
     const content = makeEl("div", "al-moment-content");
     const metadata = this.renderMeta(moment);
@@ -476,11 +496,13 @@ export class MomentsRenderChild extends MarkdownRenderChild {
   }
 
   private render(): void {
-    this.clearScrollerObservers();
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-moments-section");
 
     const moments = parseMomentsSource(this.source);
+    const activeMomentIds = new Set(moments.map((moment) => moment.id));
+    for (const key of this.momentMediaCache.keys()) if (!activeMomentIds.has(key)) this.momentMediaCache.delete(key);
+    for (const key of this.momentCardCache.keys()) if (!activeMomentIds.has(key)) this.momentCardCache.delete(key);
     const toolbar = makeEl("div", "al-moments-toolbar");
     const identity = makeEl("div", "al-moments-identity");
     const identityIcon = makeEl("span", "al-moments-icon");
@@ -502,7 +524,13 @@ export class MomentsRenderChild extends MarkdownRenderChild {
       return;
     }
     const list = makeEl("div", "al-moments-list");
-    moments.forEach((moment) => list.appendChild(this.renderMoment(moment)));
+    moments.forEach((moment) => {
+      const signature = JSON.stringify(moment);
+      const cached = this.momentCardCache.get(moment.id);
+      const card = cached?.signature === signature ? cached.card : this.renderMoment(moment);
+      this.momentCardCache.set(moment.id, { signature, card });
+      list.appendChild(card);
+    });
     this.containerEl.appendChild(list);
   }
 }

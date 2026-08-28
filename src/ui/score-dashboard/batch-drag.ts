@@ -14,6 +14,7 @@ import {
   shouldExitScoreDashboardTouchBatchMode,
 } from "./touch";
 import { renderScoreDashboard, type ScoreDashboardUiAdapters, type ScoreDashboardUiState } from "./renderer";
+import { applyScoreDashboardDomChanges, refreshScoreDashboardDomSummary } from "./dom-move";
 import type { MediaItem } from "../../types";
 
 const controllers = new WeakMap<HTMLElement, AbortController>();
@@ -124,8 +125,19 @@ export function renderScoreDashboardWithBatchDrag(
       void adapters.applyChanges(plan.changes)
         .then(() => {
           applyLocalChanges(items, plan.changes);
+          const local = applyScoreDashboardDomChanges(container, plan.changes);
+          if (!local.applied) {
+            render(preservedScrollTop, restoreBatchMode);
+          } else {
+            refreshScoreDashboardDomSummary(container, items, currentState.type);
+            // Clear the batch selection through the renderer's own state machine
+            // without replacing the board. Re-enter only for desktop batch drag.
+            if (shell.classList.contains("is-batch-mode")) batchButton.click();
+            if (restoreBatchMode && !shell.classList.contains("is-batch-mode")) batchButton.click();
+            container.scrollTop = preservedScrollTop;
+            syncDraggablePosters();
+          }
           adapters.showNotice(text.moveSuccess(plan.changes.length));
-          render(preservedScrollTop, restoreBatchMode);
         })
         .catch((error) => {
           const message = error instanceof Error ? error.message : String(error);

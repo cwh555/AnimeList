@@ -117,7 +117,7 @@ const waitForImages=async(root)=>{
 };
 const matchesIntrinsicRatio=(rect,width,height)=>Boolean(rect) && rect.width>1 && rect.height>1
  && Math.abs(rect.height-(rect.width*height/width))<=2;
-const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}"};
+const urls={"a.png":"${a}","b.png":"${b}","c.png":"${c}","broken.png":"data:image/png;base64,not-valid"};
 const readAssetPaths=[];
 let storeCalls=0;
 const service={
@@ -238,6 +238,13 @@ renderer.onload();
  const editorLayers=()=>[...modal.contentEl.querySelectorAll('.al-moment-stack-editor .al-moment-stack-layer')];
  details.editorStartsInStackedMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active')?.textContent?.length>0
    && editorLayers().length===3;
+ const editorTileBeforeRerender=modal.contentEl.querySelector('.al-moment-editor-image');
+ const editorImageBeforeRerender=editorTileBeforeRerender?.querySelector('img');
+ const activeLayoutMode=modal.contentEl.querySelector('.al-moment-editor-layout-mode.is-active');
+ activeLayoutMode?.click(); await nextLayout();
+ details.editorRerenderPreservesImageNode=!!editorTileBeforeRerender && !!editorImageBeforeRerender
+   && modal.contentEl.querySelector('.al-moment-editor-image')===editorTileBeforeRerender
+   && modal.contentEl.querySelector('.al-moment-editor-image img')===editorImageBeforeRerender;
  const reveal=modal.contentEl.querySelector('.al-moment-editor-reveal input[type="range"]');
  reveal.value="68"; reveal.dispatchEvent(new Event("input",{bubbles:true}));
  await nextLayout();
@@ -264,6 +271,18 @@ renderer.onload();
    && saved.stackGapsY?.[0]===0 && saved.stackGapsY?.[1]===28 && saved.stackGapsY?.[2]===72
    && saved.stackReveal===undefined && saved.stackFocusY===undefined;
 
+ const brokenReading=document.createElement("section"); document.body.appendChild(brokenReading);
+ const brokenSource=["moments:",'  - id: "m_broken123"',"    text: broken","    images:",'      - "broken.png"'].join("\\n");
+ const brokenRenderer=new AnimeListMomentsStacked.MomentsRenderChild(brokenReading,host,{},service,brokenSource,context);
+ brokenRenderer.onload(); await delay(100);
+ details.momentDecodeFailureFallsBack=!!brokenReading.querySelector('.al-moment-image-missing') && !brokenReading.querySelector('.al-moment-image img');
+ brokenRenderer.onunload(); brokenReading.remove();
+
+ const brokenEditor=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",{id:"m_brokeneditor",text:"broken",images:["broken.png"]},async()=>{});
+ brokenEditor.open(); await delay(100);
+ details.momentEditorDecodeFailureFallsBack=!!brokenEditor.contentEl.querySelector('.al-moment-editor-image-missing') && !brokenEditor.contentEl.querySelector('.al-moment-editor-image img');
+ brokenEditor.close();
+
  const legacyInitial={id:"m_legacy123",text:"legacy",images:["a.png","b.png"]};
  const legacy=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",legacyInitial,async()=>{});
  legacy.open(); await delay(20);
@@ -282,6 +301,7 @@ try {
     testName: "Moments whole-image stacked subtitle layout and touch adjustment",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    resultTimeoutMs: 8000,
   });
 } finally {
   await rm(output, { recursive: true, force: true });

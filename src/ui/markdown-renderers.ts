@@ -8,7 +8,9 @@ import type { AnimeListUiHost } from "./plugin-host";
 import { shouldRefreshAnimeListBlockPath, shouldRefreshAnimeListBlockRename } from "./markdown-refresh-scope";
 import { detailMediaQuarterLabel } from "./media-quarter-label";
 import { ConfirmDeleteModal } from "./media-modals";
-import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel } from "./ui-helpers";
+import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel, setAnimeListIcon } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
+import { transitionSurface } from "./layout-motion";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
@@ -98,6 +100,7 @@ function appendDetailMetaRow(container: HTMLElement, label: string, value: strin
 export class DetailActionsRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
   private legacyCoverElement: HTMLElement | null = null;
+  private detailCoverCache: { resource: string; image: HTMLImageElement } | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -123,6 +126,7 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
     this.legacyCoverElement?.removeClass("animelist-detail-legacy-cover");
     this.legacyCoverElement = null;
+    this.detailCoverCache = null;
   }
 
   private hideLegacyCoverEmbed(resourcePath: string): void {
@@ -169,7 +173,7 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
     if (!(file instanceof TFile)) return;
     const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter || {};
-    this.containerEl.replaceChildren();
+    transitionSurface(this.containerEl, () => this.containerEl.replaceChildren());
 
     const mediaType: MediaType = fm.media_type === "manga" || fm.media_type === "novel" ? fm.media_type : "anime";
     const detailItem = {
@@ -257,13 +261,26 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     const coverResource = coverPath ? this.plugin.resolveMediaCoverPath(coverPath, file.path) : "";
     if (coverResource) {
       const cover = makeEl("div", "al-detail-cover");
-      const image = makeEl("img");
-      image.src = coverResource;
+      const image = this.detailCoverCache?.resource === coverResource
+        ? this.detailCoverCache.image
+        : makeEl("img");
       image.alt = uiText("library.coverAlt", { title: detailString(fm.title) || file.basename });
       image.loading = "lazy";
       image.decoding = "async";
+      if (this.detailCoverCache?.image !== image) {
+        bindImageFallback(image, () => {
+          this.detailCoverCache = null;
+          const missing = makeEl("div", "al-detail-cover-missing");
+          setAnimeListIcon(missing, "book");
+          return missing;
+        });
+      }
+      this.detailCoverCache = { resource: coverResource, image };
       cover.appendChild(image);
+      if (image.getAttribute("src") !== coverResource) image.src = coverResource;
       body.appendChild(cover);
+    } else {
+      this.detailCoverCache = null;
     }
 
     const metadata = makeEl("dl", "al-detail-metadata");

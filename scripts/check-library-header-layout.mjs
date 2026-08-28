@@ -15,7 +15,7 @@ await build({
     contents: `
       export { AnimeListUI } from "./src/ui/library-renderer";
       export { installLibraryLayoutControl } from "./src/ui/library-layout-controls";
-      export { installLibraryWorkspaceLayout } from "./src/ui/library-workspace-layout";
+      export { installLibraryWorkspaceLayout, renderLibraryWorkspaceActions } from "./src/ui/library-workspace-layout";
       export { renderAnimeListWorkspaceShell } from "./src/ui/workspace-shell";
     `,
     resolveDir: root,
@@ -132,8 +132,9 @@ try {
   }
 
   const pages=[
-    {id:'library',label:'收藏庫',icon:'library',order:10,render(el){
-      api.AnimeListUI.renderLibrary(el,items,{presentation:'workspace',initialState:state,requiresCompleteDom:()=>true,addItem:(type)=>{collectType=type},openFilterModal:()=>{}});
+    {id:'library',label:'收藏庫',icon:'library',order:10,render(el,context){
+      api.renderLibraryWorkspaceActions(context.pageActions,{currentType:()=>state.type,addItem:(type)=>{collectType=type}});
+      api.AnimeListUI.renderLibrary(el,items,{presentation:'workspace',initialState:state,requiresCompleteDom:()=>true,addItem:(type)=>{collectType=type},openFilterModal:()=>{},onStateChange:(next)=>Object.assign(state,next)});
       api.installLibraryLayoutControl(el,{initialState:state,onColumnsChange:()=>{}});
       api.installLibraryWorkspaceLayout(el);
     }},
@@ -150,7 +151,7 @@ try {
 
   for(const section of sections){
     const result=api.renderAnimeListWorkspaceShell(root,{pages,activeSection:section,actions:[{id:'export',label:'匯出',icon:'download',order:10,run(){}}],onSelect(){}});
-    result.activePage.render(result.page);
+    result.activePage.render(result.page,{pageActions:result.pageActions,samePageRefresh:false,signal:new AbortController().signal});
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const shell=root.querySelector('.al-workspace-shell');
     const appBar=root.querySelector('.al-workspace-header');

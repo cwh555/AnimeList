@@ -1,4 +1,13 @@
 /* AnimeList Dashboard v0.6.2 — loaded by the bundled plugin. */
+/* AnimeList-owned elements must respect the HTML hidden contract even when
+   component CSS assigns flex/grid display for the visible state. The :not()
+   guard deliberately gives this contract ID-level specificity without using
+   priority overrides, which are forbidden by the community/release preflight. */
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"])[hidden]:not(#animelist-allow-hidden-display),
+:is([class^="al-"], [class*=" al-"], [class^="animelist-"], [class*=" animelist-"]):not(#animelist-allow-hidden-display) [hidden] {
+  display: none;
+}
+
 .animelist-dashboard.animelist-dashboard .markdown-preview-sizer,
 .animelist-dashboard.animelist-dashboard .markdown-source-view.mod-cm6 .cm-sizer { max-width: 100%; width: 100%; }
 .animelist-dashboard .markdown-preview-view,
@@ -290,6 +299,36 @@
 .al-timeline-volume-label { color:var(--text-accent); font-size:9px; font-weight:650; line-height:1.2; }
 .al-timeline-card-copy small { color:var(--text-muted); font-size:8px; }
 .al-timeline-score { position:absolute; top:5px; right:5px; padding:2px 5px; border-radius:6px; color:#fff1b7; background:rgba(20,16,5,.8); font-size:9px; }
+
+/* Explicitly unknown completion dates are a parallel, non-chronological dimension. */
+.animelist-timeline-modal .al-timeline-undated-dimension {
+  display:grid;
+  min-width:0;
+  flex:0 0 auto;
+  grid-template-columns:minmax(120px,180px) minmax(0,1fr);
+  align-items:center;
+  gap:12px;
+  margin:0;
+  padding:10px 14px;
+  border-top:1px solid var(--background-modifier-border);
+  background:var(--background-secondary);
+}
+.animelist-timeline-modal .al-timeline-undated-header { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.animelist-timeline-modal .al-timeline-undated-header strong { color:var(--text-normal); font-size:.76rem; }
+.animelist-timeline-modal .al-timeline-undated-header span { color:var(--text-muted); font-size:.62rem; line-height:1.35; }
+.animelist-timeline-modal .al-timeline-undated-rail { display:flex; min-width:0; gap:10px; overflow-x:auto; padding:2px; }
+.animelist-timeline-modal .al-timeline-undated-card {
+  position:relative;
+  inset:auto;
+  width:72px;
+  min-width:72px;
+  height:108px;
+  flex:0 0 72px;
+}
+.animelist-timeline-modal .al-timeline-undated-card img { height:100%; object-fit:cover; }
+.animelist-timeline-modal .al-timeline-undated-card .al-timeline-card-copy { position:absolute; right:0; bottom:0; left:0; padding:18px 5px 5px; background:linear-gradient(transparent,rgba(0,0,0,.78)); }
+.animelist-timeline-modal .al-timeline-undated-card .al-timeline-card-copy strong { color:#fff; font-size:8px; }
+.animelist-timeline-modal .al-timeline-undated-card .al-timeline-score { font-size:8px; }
 .al-timeline-empty { display:flex; height:100%; min-height:420px; flex-direction:column; align-items:center; justify-content:center; gap:9px; color:var(--text-muted); }
 .al-timeline-root > .al-timeline-empty { flex:1; min-height:0; }
 .al-timeline-empty svg { width:44px; height:44px; fill:none; stroke:currentColor; stroke-width:1.4; }
@@ -321,6 +360,7 @@
   .al-timeline-type-filter { flex:1 0 auto; }
   .al-timeline-controls { width:100%; flex-wrap:wrap; }
   .al-timeline-control-group { flex:1 1 auto; justify-content:center; }
+  .animelist-timeline-modal .al-timeline-undated-dimension { grid-template-columns:1fr; gap:8px; }
 }
 .al-timeline-controls svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 

@@ -13,6 +13,7 @@ import { MOMENTS_MESSAGES } from "./moments";
 import { IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 import { LIBRARY_EXPORT_MESSAGES } from "./library-export";
 import { TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
+import { MANUAL_MEDIA_MESSAGES } from "./manual-media";
 
 export {
   CORE_MESSAGES,
@@ -30,6 +31,7 @@ export {
   IMAGE_GALLERY_MESSAGES,
   LIBRARY_EXPORT_MESSAGES,
   TIMELINE_WORKSPACE_MESSAGES,
+  MANUAL_MEDIA_MESSAGES,
 };
 
 import { LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
@@ -51,6 +53,7 @@ export const ZH_TW_CATALOGS = {
   "library-layout": LIBRARY_LAYOUT_MESSAGES,
   "library-export": LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": TIMELINE_WORKSPACE_MESSAGES,
+  "manual-media": MANUAL_MEDIA_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

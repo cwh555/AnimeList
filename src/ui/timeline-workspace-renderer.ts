@@ -21,7 +21,9 @@ import {
   TIMELINE_DAY_MS,
 } from "../domain/timeline/layout";
 import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
+import { isUnknownCompletionDate } from "../domain/completion-date";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
+import { animateLayoutChange } from "./layout-motion";
 import { assignTimelineLanes, compareTimelineEntries, filterTimelineEntries, timelineStemGeometry, TIMELINE_MEDIA_FILTERS } from "./timeline-renderer";
 import { timelineWorkspaceText } from "../features/timeline/text";
 import { uiText } from "../ui-text";
@@ -76,10 +78,15 @@ export function renderTimelineWorkspace(
   options: TimelineWorkspaceOptions = {},
 ): TimelineWorkspaceResult {
   container.replaceChildren();
-  const allItems = expandTimelineEntries(inputItems)
+  const expandedItems = expandTimelineEntries(inputItems);
+  const allItems = expandedItems
+    .filter((item) => !isUnknownCompletionDate(item.completedAt))
     .map((item): TimedTimelineEntry => ({ ...item, completedTime: dayStart(item.completedAt) }))
     .filter((item) => item.completedTime)
     .sort((left, right) => left.completedTime - right.completedTime || compareTimelineEntries(left, right));
+  const allUndatedItems = expandedItems
+    .filter((item) => isUnknownCompletionDate(item.completedAt))
+    .sort(compareTimelineEntries);
 
   const openFile = options.openFile ?? (() => undefined);
   const state: {
@@ -162,6 +169,7 @@ export function renderTimelineWorkspace(
   container.appendChild(root);
 
   let currentItems: TimedTimelineEntry[] = [];
+  let currentUndatedItems: TimelineMediaEntry[] = [];
   let minimumTime = 0;
   let maximumTime = 0;
   let rangeDays = 1;
@@ -175,9 +183,12 @@ export function renderTimelineWorkspace(
   let updateOverviewWindow: (() => void) | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let lastWindowSize = windowSize(root);
+  const timelinePosterCache = new Map<string, HTMLButtonElement>();
+  const timelineEntryKey = (item: TimelineMediaEntry): string => `${item.filePath}::${item.volumeLabel ?? ""}::${item.completedAt}::${item.title}::${item.cover ?? ""}`;
 
   function refreshData(preserveSpacing = true): void {
     currentItems = filterTimelineEntries(allItems, state.type);
+    currentUndatedItems = filterTimelineEntries(allUndatedItems, state.type);
     minimumTime = currentItems[0]?.completedTime ?? 0;
     maximumTime = currentItems[currentItems.length - 1]?.completedTime ?? minimumTime;
     rangeDays = Math.max(1, (maximumTime - minimumTime) / TIMELINE_DAY_MS);
@@ -188,9 +199,12 @@ export function renderTimelineWorkspace(
     );
     if (!preserveSpacing || !state.daySpacing || state.daySpacing === 1) state.daySpacing = baseDaySpacing;
     if (!state.focusTime || state.focusTime < minimumTime || state.focusTime > maximumTime) state.focusTime = maximumTime;
-    summary.textContent = currentItems.length
+    const datedSummary = currentItems.length
       ? uiText("timeline.summary", { count: currentItems.length, start: formatTimelineDate(minimumTime), end: formatTimelineDate(maximumTime) })
       : uiText("timeline.summaryEmpty");
+    summary.textContent = currentUndatedItems.length
+      ? `${datedSummary} · ${timelineWorkspaceText("timeline.undatedCount", { count: currentUndatedItems.length })}`
+      : datedSummary;
   }
 
   function syncControls(): void {
@@ -212,17 +226,40 @@ export function renderTimelineWorkspace(
     scaleLabel.textContent = uiText("timeline.scaleLabel", { percent: Math.round(state.viewScale * 100) });
   }
 
+  function renderUndatedDimension(): HTMLElement | null {
+    if (!currentUndatedItems.length) return null;
+    const section = makeEl("section", "al-timeline-undated-dimension al-timeline-temporal-dimension");
+    section.dataset.temporalDimension = "unknown";
+    const header = makeEl("header", "al-timeline-undated-header");
+    header.append(
+      makeEl("strong", "", timelineWorkspaceText("timeline.undatedTitle")),
+      makeEl("span", "", timelineWorkspaceText("timeline.undatedDescription")),
+    );
+    const rail = makeEl("div", "al-timeline-undated-rail");
+    for (const item of currentUndatedItems) {
+      rail.appendChild(createTimelinePosterCard(item, {
+        dateLabel: timelineWorkspaceText("timeline.undatedTitle"),
+        className: "al-timeline-card al-timeline-undated-card",
+        openFile,
+      }));
+    }
+    section.append(header, rail);
+    return section;
+  }
+
   function renderHistory(): void {
     body.replaceChildren();
     viewport = null;
     scene = null;
     updateOverviewWindow = null;
     const history = makeEl("div", "al-timeline-history");
-    if (!currentItems.length) {
+    if (!currentItems.length && !currentUndatedItems.length) {
       history.appendChild(makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
       body.appendChild(history);
       return;
     }
+    const undated = renderUndatedDimension();
+    if (undated) history.appendChild(undated);
     for (const year of groupTimelineHistory(currentItems)) {
       const yearSection = makeEl("section", "al-timeline-history-year");
       yearSection.appendChild(makeEl("h2", "al-timeline-history-year-title", String(year.year)));
@@ -275,7 +312,6 @@ export function renderTimelineWorkspace(
 
   function renderScaleGeometry(): void {
     if (!viewport || !scene) return;
-    scene.replaceChildren();
     const compact = windowSize(root) === "compact";
     const positioned = currentItems.map((item) => ({
       item,
@@ -294,14 +330,13 @@ export function renderTimelineWorkspace(
       viewport.clientWidth / Math.max(state.viewScale, Number.EPSILON),
       SIDE_PADDING * 2 + rangeDays * state.daySpacing,
     );
-    scene.style.width = `${sceneWidth}px`;
-    scene.style.height = `${Math.max(sceneHeight, viewport.clientHeight / Math.max(state.viewScale, Number.EPSILON))}px`;
 
+    const geometryNodes: HTMLElement[] = [];
     const axis = makeEl("div", "al-timeline-axis");
     axis.style.left = `${SIDE_PADDING}px`;
     axis.style.top = `${axisY}px`;
     axis.style.width = `${Math.max(1, rangeDays * state.daySpacing)}px`;
-    scene.appendChild(axis);
+    geometryNodes.push(axis);
 
     const tickStep = timelineTickStepForSpacing(state.daySpacing);
     for (let day = 0; day <= rangeDays; day += tickStep) {
@@ -309,26 +344,32 @@ export function renderTimelineWorkspace(
       tick.style.left = `${SIDE_PADDING + day * state.daySpacing}px`;
       tick.style.top = `${axisY - 7}px`;
       tick.appendChild(makeEl("span", "", formatTimelineDate(minimumTime + day * TIMELINE_DAY_MS)));
-      scene.appendChild(tick);
+      geometryNodes.push(tick);
     }
     if (rangeDays % tickStep !== 0) {
       const tick = makeEl("div", "al-timeline-tick");
       tick.style.left = `${SIDE_PADDING + rangeDays * state.daySpacing}px`;
       tick.style.top = `${axisY - 7}px`;
       tick.appendChild(makeEl("span", "", formatTimelineDate(maximumTime)));
-      scene.appendChild(tick);
+      geometryNodes.push(tick);
     }
-
-    const uniqueTimes = [...new Set(currentItems.map((item) => item.completedTime))];
-    for (const time of uniqueTimes) {
+    for (const time of [...new Set(currentItems.map((item) => item.completedTime))]) {
       const x = timelineXForTime(time, minimumTime, state.daySpacing, SIDE_PADDING);
       const marker = makeEl("div", "al-timeline-day-marker");
       marker.style.left = `${x - 5}px`;
       marker.style.top = `${axisY - 5}px`;
-      scene.appendChild(marker);
+      geometryNodes.push(marker);
     }
 
-    laidOut.forEach(({ item, time, x, lane }, index) => {
+    const nextKeys = new Set<string>();
+    const cards = laidOut.map(({ item, time, x, lane }, index) => {
+      const key = timelineEntryKey(item);
+      nextKeys.add(key);
+      let card = timelinePosterCache.get(key);
+      if (!card) {
+        card = createTimelinePosterCard(item, { time, openFile });
+        timelinePosterCache.set(key, card);
+      }
       const above = compact || lane % 2 === 0;
       const level = compact ? lane : Math.floor(lane / 2);
       const cardY = above
@@ -339,13 +380,30 @@ export function renderTimelineWorkspace(
       stem.style.left = `${x}px`;
       stem.style.top = `${stemGeometry.start}px`;
       stem.style.height = `${stemGeometry.height}px`;
-      scene.appendChild(stem);
-      const card = createTimelinePosterCard(item, { time, openFile });
-      card.dataset.timelineLane = String(lane);
-      card.style.left = `${x - CARD_WIDTH / 2}px`;
-      card.style.top = `${cardY}px`;
-      scene.appendChild(card);
+      geometryNodes.push(stem);
       if (index === laidOut.length - 1) latestItemCenterX = x;
+      return { card, lane, x, cardY };
+    });
+
+    for (const [key, card] of timelinePosterCache) {
+      if (nextKeys.has(key)) continue;
+      card.remove();
+      timelinePosterCache.delete(key);
+    }
+    const movingCards = cards.map(({ card }) => card).filter((card) => card.isConnected);
+    void animateLayoutChange(movingCards, () => {
+      for (const child of Array.from(scene.children)) {
+        if (!(child as HTMLElement).classList?.contains("al-timeline-card")) child.remove();
+      }
+      scene.style.width = `${sceneWidth}px`;
+      scene.style.height = `${Math.max(sceneHeight, viewport.clientHeight / Math.max(state.viewScale, Number.EPSILON))}px`;
+      scene.append(...geometryNodes);
+      for (const { card, lane, x, cardY } of cards) {
+        card.dataset.timelineLane = String(lane);
+        card.style.left = `${x - CARD_WIDTH / 2}px`;
+        card.style.top = `${cardY}px`;
+        scene.appendChild(card);
+      }
     });
     applyPan();
   }
@@ -445,16 +503,20 @@ export function renderTimelineWorkspace(
   function renderScale(): void {
     body.replaceChildren();
     if (!currentItems.length) {
-      body.appendChild(makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
+      const undatedOnly = renderUndatedDimension();
+      body.appendChild(undatedOnly ?? makeEl("div", "al-timeline-empty", uiText("timeline.emptyTitle")));
       return;
     }
-    const wrap = makeEl("section", "al-timeline-scale-wrap");
+    const wrap = makeEl("section", "al-timeline-scale-wrap al-timeline-temporal-dimension");
+    wrap.dataset.temporalDimension = "dated";
     viewport = makeEl("div", "al-timeline-viewport al-timeline-workspace-viewport");
     scene = makeEl("div", "al-timeline-scene");
     viewport.appendChild(scene);
     wrap.appendChild(viewport);
     body.appendChild(wrap);
     renderOverview();
+    const undated = renderUndatedDimension();
+    if (undated) body.appendChild(undated);
     renderScaleGeometry();
     state.focusTime = maximumTime;
     centerFocus(true);
@@ -614,5 +676,5 @@ export function renderTimelineWorkspace(
     resizeObserver.observe(root);
   }
 
-  return { items: currentItems.length, totalItems: allItems.length, type: state.type, mode: state.mode };
+  return { items: currentItems.length + currentUndatedItems.length, totalItems: allItems.length + allUndatedItems.length, type: state.type, mode: state.mode };
 }

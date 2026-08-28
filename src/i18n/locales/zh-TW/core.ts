@@ -158,6 +158,9 @@ export const CORE_MESSAGES = {
   "date.year": "年",
   "date.month": "月",
   "date.day": "日",
+  "date.known": "指定日期",
+  "date.unknown": "日期未知",
+  "date.unknownSupporting": "已完成，但無法確定實際完成日期。",
 
   "volume.title": "分卷紀錄",
   "volume.description": "卷數支援整數、.5、EX；新增卷預設今天完成。",
@@ -205,7 +208,7 @@ export const CORE_MESSAGES = {
   "add.startedAt": "開始日期",
   "add.startedHint": "選填",
   "add.completedAt": "完成日期",
-  "add.completedHint": "{status}時必填。",
+  "add.completedHint": "{status}時請指定日期；若無法確定，可選「日期未知」。",
   "add.progressAnime": "目前進度",
   "add.progressManga": "目前閱讀話數",
   "add.progressNovel": "目前閱讀卷數",

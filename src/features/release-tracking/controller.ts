@@ -21,6 +21,7 @@ type ReleaseProgressListener = (progress: ReleaseRefreshProgress) => void;
 interface ActiveReleaseCheck {
   promise: Promise<ReleaseRefreshSummary>;
   listeners: Set<ReleaseProgressListener>;
+  controller: AbortController;
   latest?: ReleaseRefreshProgress;
 }
 
@@ -74,6 +75,7 @@ async function performReleaseCheck(
   if (onProgress) listeners.add(onProgress);
   const active = {} as ActiveReleaseCheck;
   active.listeners = listeners;
+  active.controller = new AbortController();
   const service = serviceFor(host);
   const trackedItems = releaseTrackingItemsForRefresh(
     host.collectMediaItems(),
@@ -84,20 +86,24 @@ async function performReleaseCheck(
     .then(() => service.refreshAll(trackedItems, (progress) => {
       active.latest = progress;
       active.listeners.forEach((listener) => listener(progress));
-    }))
+    }, active.controller.signal))
     .finally(() => activeChecks.delete(host));
   activeChecks.set(host, active);
   return active.promise;
 }
 
-async function performReleaseItemCheck(host: AnimeListFeatureHost, item: MediaItem) {
+export function cancelReleaseCheck(host: AnimeListFeatureHost): void {
+  activeChecks.get(host)?.controller.abort();
+}
+
+async function performReleaseItemCheck(host: AnimeListFeatureHost, item: MediaItem, signal?: AbortSignal) {
   const existing = activeChecks.get(host);
   if (existing) {
     const summary = await existing.promise;
     const result = summary.results.find((entry) => entry.item.filePath === item.filePath);
     if (result) return result;
   }
-  return serviceFor(host).refreshItem(item);
+  return serviceFor(host).refreshItem(item, undefined, signal);
 }
 
 export function openReleaseDashboard(host: AnimeListFeatureHost): void {
@@ -109,7 +115,8 @@ export function openReleaseDashboard(host: AnimeListFeatureHost): void {
   const service = serviceFor(host);
   new ReleaseTrackingDashboardModal(host.app, service, host.collectMediaItems(), {
     refreshAll: (onProgress) => performReleaseCheck(host, onProgress),
-    refreshItem: (item) => performReleaseItemCheck(host, item),
+    cancelRefreshAll: () => cancelReleaseCheck(host),
+    refreshItem: (item, signal) => performReleaseItemCheck(host, item, signal),
     reviewItem: (item, onResolved) => openMatchModal(host, item, onResolved),
     openMedia: (path) => host.openMediaFile(path),
     onChanged: () => host.refreshViews(),

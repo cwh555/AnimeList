@@ -13,18 +13,33 @@ import {
   normalizeImageSectionColumns,
   parseImageSectionColumns,
 } from "../domain/image-section-layout";
-import {
-  planImageSectionPathMove,
-  type ImageSectionDropPlacement,
-  type ImageSectionStateUpdate,
-} from "../domain/image-section-order";
+import type { ImageSectionDropPlacement, ImageSectionStateUpdate } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
 import { copyImageToClipboard } from "./image-clipboard";
 import { ImageLightboxModal, imageLightboxEntries } from "./image-lightbox";
-import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
+import { animateLayoutChange } from "./layout-motion";
+import { bindImageFallback } from "./image-fallback";
+import {
+  beginImageSectionPointerDrag,
+  registerImageSectionDragSurface,
+  type ImageSectionDragSurface,
+} from "./image-section-drag-controller";
+import {
+  moveImageSectionAsset,
+  type ImageSectionMoveParticipant,
+} from "./image-section-move-coordinator";
+import { ImageSectionOrderSession } from "./image-section-order-session";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { captureScrollPosition, captureViewportAnchor } from "./viewport-anchor";
+
+function imageSectionMissingNode(): HTMLElement {
+  const missing = makeEl("div", "al-image-missing");
+  const icon = makeEl("div", "al-image-missing-icon");
+  setAnimeListIcon(icon, "image-off");
+  missing.append(icon, makeEl("span", "", imageSectionText("missing")));
+  return missing;
+}
 
 function eventTargetElement(event: Event): Element | null {
   const target = event.target as { closest?: (selector: string) => Element | null } | null;
@@ -35,31 +50,9 @@ function isInteractiveTarget(target: Element | null): boolean {
   return Boolean(target?.closest("button, a, input, textarea, select, [role='button']"));
 }
 
-interface ImagePointerDropTarget {
-  renderer: ImageSectionRenderChild;
-  path: string | null;
-  placement: ImageSectionDropPlacement;
-}
-
-interface ActiveImagePointerDrag {
-  source: ImageSectionRenderChild;
-  path: string;
-  target: ImagePointerDropTarget | null;
-}
-
 const imageSectionRenderers = new WeakMap<HTMLElement, ImageSectionRenderChild>();
-let activeImageDrag: ActiveImagePointerDrag | null = null;
-
-function clearImageDropIndicators(): void {
-  for (const item of document.querySelectorAll<HTMLElement>(
-    ".al-image-item.is-drop-before, .al-image-item.is-drop-after",
-  )) {
-    item.removeClass("is-drop-before", "is-drop-after");
-  }
-  for (const section of document.querySelectorAll<HTMLElement>(".animelist-image-section.is-image-drag-target")) {
-    section.removeClass("is-image-drag-target");
-  }
-}
+interface ImageSectionEphemeralState { expanded: boolean; scrollTop: number; preferredColumns?: number; preserveUntil?: number; }
+const imageSectionEphemeralState = new Map<string, ImageSectionEphemeralState>();
 
 export class ImageSectionRenderChild extends MarkdownRenderChild {
   private source: string;
@@ -74,38 +67,133 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private selectionDeleteButton: HTMLButtonElement | null = null;
   private preferredColumns = DEFAULT_IMAGE_SECTION_COLUMNS;
   private galleryRelayout: (() => void) | null = null;
+  private lastLayoutMotion: Promise<void> = Promise.resolve();
   private galleryPaths: string[] = [];
+  private effectivePaths: string[];
   private readonly imageElements = new Map<string, HTMLElement>();
+  private readonly imageNodeCache = new Map<string, { signature: string; image: HTMLImageElement }>();
+  private galleryViewport: HTMLElement | null = null;
+  private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
+  private mounted = false;
+  private readonly lifecycleEvents = new AbortController();
+  private readonly moveParticipant: ImageSectionMoveParticipant;
+  private readonly dragSurface: ImageSectionDragSurface;
+
+  private ownsContainer(): boolean {
+    return this.mounted && imageSectionRenderers.get(this.containerEl) === this;
+  }
 
   constructor(
     containerEl: HTMLElement,
     private readonly host: AnimeListFeatureHost,
     private readonly service: ImageSectionService,
+    private readonly orderSession: ImageSectionOrderSession,
     source: string,
     private readonly context: MarkdownPostProcessorContext,
   ) {
     super(containerEl);
     this.source = source;
+    this.effectivePaths = parseImageSectionSource(source);
+    this.moveParticipant = {
+      containerEl,
+      sourcePath: context.sourcePath,
+      canonicalPaths: () => parseImageSectionSource(this.source),
+      paths: () => this.effectivePaths,
+      locator: () => this.locator(),
+      ownsContainer: () => this.ownsContainer(),
+      applyPaths: (paths, renderEmpty) => this.applyGalleryPaths(paths, renderEmpty),
+      layoutMotion: () => this.lastLayoutMotion,
+      setDragSource: (active) => this.containerEl.toggleClass("is-image-drag-source", active),
+    };
+    this.dragSurface = {
+      containerEl,
+      participant: this.moveParticipant,
+      signal: this.lifecycleEvents.signal,
+      canStart: (item, event) => this.canStartImagePointerDrag(item, event),
+      closeMenus: () => this.closeMenus(),
+      drop: (sourceParticipant, path, targetPath, placement) => {
+        void this.handleInternalImageDrop(sourceParticipant, path, targetPath, placement);
+      },
+    };
+  }
+
+  private ephemeralStateKey(): string {
+    const section = this.context.getSectionInfo(this.containerEl);
+    const lineStart = this.lineHintAuthoritative ? this.lineHint : section?.lineStart ?? this.lineHint;
+    return `${this.context.sourcePath}:${lineStart ?? -1}`;
+  }
+
+  private saveEphemeralState(): void {
+    const key = this.ephemeralStateKey();
+    const existing = imageSectionEphemeralState.get(key);
+    const now = Date.now();
+    const activePreservation = this.layoutPreservation?.preserveUntil && this.layoutPreservation.preserveUntil >= now
+      ? this.layoutPreservation
+      : existing?.preserveUntil && existing.preserveUntil >= now && existing.preferredColumns !== undefined
+        ? { preferredColumns: existing.preferredColumns, preserveUntil: existing.preserveUntil }
+        : null;
+    imageSectionEphemeralState.set(key, {
+      expanded: this.expanded,
+      scrollTop: this.galleryViewport?.scrollTop ?? 0,
+      preferredColumns: activePreservation?.preferredColumns,
+      preserveUntil: activePreservation?.preserveUntil,
+    });
+  }
+
+  private preserveLayoutAcrossRefresh(): void {
+    this.layoutPreservation = {
+      preferredColumns: this.preferredColumns,
+      preserveUntil: Date.now() + 2500,
+    };
+    this.saveEphemeralState();
   }
 
   onload(): void {
+    const previous = imageSectionRenderers.get(this.containerEl);
+    if (previous && previous !== this) {
+      previous.saveEphemeralState();
+      previous.orderSession.unregister(previous.moveParticipant);
+      previous.lifecycleEvents.abort();
+      previous.mounted = false;
+    }
+    this.mounted = true;
     const section = this.context.getSectionInfo(this.containerEl);
     this.lineHint = section?.lineStart;
-    this.preferredColumns = parseImageSectionColumns(section?.text);
+    const parsedColumns = parseImageSectionColumns(section?.text);
+    const ephemeralKey = this.ephemeralStateKey();
+    const ephemeral = imageSectionEphemeralState.get(ephemeralKey);
+    const preservesLayout = Boolean(ephemeral?.preserveUntil && ephemeral.preserveUntil >= Date.now());
+    this.preferredColumns = preservesLayout && ephemeral?.preferredColumns !== undefined
+      ? normalizeImageSectionColumns(ephemeral.preferredColumns)
+      : parsedColumns;
+    if (ephemeral) this.expanded = ephemeral.expanded;
+    if (preservesLayout && ephemeral?.preferredColumns !== undefined && ephemeral.preserveUntil !== undefined) {
+      this.layoutPreservation = {
+        preferredColumns: normalizeImageSectionColumns(ephemeral.preferredColumns),
+        preserveUntil: ephemeral.preserveUntil,
+      };
+    }
+    this.effectivePaths = [...this.orderSession.register(this.moveParticipant)];
     imageSectionRenderers.set(this.containerEl, this);
+    registerImageSectionDragSurface(this.dragSurface);
     this.render();
-    this.registerDomEvent(document, "click", () => this.closeMenus());
+    if (ephemeral && this.galleryViewport) this.galleryViewport.scrollTop = ephemeral.scrollTop;
+    document.addEventListener("click", () => this.closeMenus(), { signal: this.lifecycleEvents.signal });
   }
 
   onunload(): void {
+    if (this.ownsContainer()) this.saveEphemeralState();
+    this.orderSession.unregister(this.moveParticipant);
+    this.lifecycleEvents.abort();
+    this.mounted = false;
     if (this.lineHintResetTimer !== null) window.clearTimeout(this.lineHintResetTimer);
     this.lineHintResetTimer = null;
     this.galleryRelayout = null;
+    this.galleryViewport = null;
     this.galleryPaths = [];
     this.imageElements.clear();
-    imageSectionRenderers.delete(this.containerEl);
-    if (activeImageDrag?.source === this) activeImageDrag = null;
-    clearImageDropIndicators();
+    this.imageNodeCache.clear();
+    if (imageSectionRenderers.get(this.containerEl) === this) imageSectionRenderers.delete(this.containerEl);
   }
 
   private locator(): ImageSectionLocator {
@@ -117,7 +205,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private setSource(source: string): void {
+    if (!this.ownsContainer()) return;
     this.source = source;
+    this.effectivePaths = parseImageSectionSource(source);
     this.selectionMode = false;
     this.selectedPaths.clear();
     this.render();
@@ -143,8 +233,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private openAddModal(): void {
     new AddImageSectionModal(this.host.app, this.service, async (assets) => {
-      const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
-      this.applyAddResult(result);
+      const result = await this.service.addAssets(
+        this.context.sourcePath,
+        this.locator(),
+        assets,
+        this.effectivePaths,
+      );
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.applyAddResult(result);
+      }
     }).open();
   }
 
@@ -153,8 +251,16 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     if (!accepted.length) return;
     try {
       const assets: ImageSectionAssetInput[] = await Promise.all(accepted.map((file) => imageAssetFromFile(file)));
-      const result = await this.service.addAssets(this.context.sourcePath, this.locator(), assets);
-      this.applyAddResult(result);
+      const result = await this.service.addAssets(
+        this.context.sourcePath,
+        this.locator(),
+        assets,
+        this.effectivePaths,
+      );
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.applyAddResult(result);
+      }
     } catch (error) {
       new Notice(imageSectionText("addFailed", { error: errorMessage(error) }));
     }
@@ -169,13 +275,21 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private deletePaths(paths: readonly string[]): void {
     if (!paths.length) return;
     new DeleteImageSectionModal(this.host.app, async () => {
-      const next = await this.service.removeMany(this.context.sourcePath, this.locator(), paths);
-      this.setSource(next);
+      const next = await this.service.removeMany(
+        this.context.sourcePath,
+        this.locator(),
+        paths,
+        this.effectivePaths,
+      );
+      if (this.ownsContainer()) {
+        this.orderSession.acceptCanonicalMutation(this.moveParticipant);
+        this.setSource(next);
+      }
     }, paths.length).open();
   }
 
   private openLightbox(path: string): void {
-    const paths = parseImageSectionSource(this.source);
+    const paths = [...this.effectivePaths];
     const index = Math.max(0, paths.indexOf(path));
     new ImageLightboxModal(this.host.app, this.service, imageLightboxEntries(this.context.sourcePath, paths), index).open();
   }
@@ -198,9 +312,11 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     menu.addItem((item) => item
       .setTitle(imageSectionText("setCover"))
       .setIcon("image")
-      .onClick(() => void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
-        new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
-      })));
+      .onClick(() => {
+        void this.service.setAsCover(this.context.sourcePath, path).catch((error) => {
+          new Notice(imageSectionText("coverFailed", { error: errorMessage(error) }));
+        });
+      }));
     menu.addItem((item) => item
       .setTitle(imageSectionText("delete"))
       .setIcon("trash")
@@ -290,55 +406,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.render();
   }
 
-  private dropPlacement(item: HTMLElement, clientY: number): ImageSectionDropPlacement {
-    const rect = item.getBoundingClientRect();
-    return clientY < rect.top + rect.height / 2 ? "before" : "after";
-  }
-
-  private markDropTarget(item: HTMLElement | null, placement: ImageSectionDropPlacement): void {
-    clearImageDropIndicators();
-    this.containerEl.addClass("is-image-drag-target");
-    if (!item) return;
-    item.addClass(placement === "before" ? "is-drop-before" : "is-drop-after");
-  }
-
-  private pointerDropTarget(point: PointerDragPoint): ImagePointerDropTarget | null {
-    const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
-    const section = hit?.closest<HTMLElement>(".animelist-image-section") ?? null;
-    if (!section) return null;
-    const renderer = imageSectionRenderers.get(section);
-    if (!renderer) return null;
-    const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
-    if (item && section.contains(item)) {
-      const path = item.dataset.imagePath ?? "";
-      if (!path) return null;
-      return { renderer, path, placement: renderer.dropPlacement(item, point.clientY) };
-    }
-    const galleryTarget = hit?.closest(
-      ".al-image-gallery-viewport, .al-image-masonry, .al-image-masonry-column, .al-image-empty",
-    );
-    return galleryTarget && section.contains(galleryTarget)
-      ? { renderer, path: null, placement: "append" }
-      : null;
-  }
-
-  private updatePointerDropTarget(point: PointerDragPoint): void {
-    if (!activeImageDrag) return;
-    const target = this.pointerDropTarget(point);
-    activeImageDrag.target = target;
-    if (!target) {
-      clearImageDropIndicators();
-      return;
-    }
-    const item = target.path
-      ? target.renderer.containerEl.querySelector<HTMLElement>(
-        `.al-image-item[data-image-path="${CSS.escape(target.path)}"]`,
-      )
-      : null;
-    target.renderer.markDropTarget(item, target.placement);
-  }
-
   private applyGalleryPaths(nextPaths: readonly string[], renderEmpty = true): void {
+    if (!this.ownsContainer()) return;
+    this.effectivePaths = [...nextPaths];
     const alreadyApplied = Boolean(this.galleryRelayout)
       && nextPaths.length === this.galleryPaths.length
       && nextPaths.every((path, index) => path === this.galleryPaths[index] && this.imageElements.has(path));
@@ -353,6 +423,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       if (nextSet.has(path)) continue;
       element.remove();
       this.imageElements.delete(path);
+      this.imageNodeCache.delete(path);
     }
     for (const path of nextPaths) {
       if (!this.imageElements.has(path)) this.imageElements.set(path, this.createImage(path));
@@ -361,72 +432,25 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout();
   }
 
-  private applyOrderedSectionState(update: ImageSectionStateUpdate): void {
-    this.acceptSectionState(update);
-    this.selectionMode = false;
-    this.selectedPaths.clear();
-    this.applyGalleryPaths(parseImageSectionSource(update.source));
-  }
-
-  private optimisticMovePaths(
-    source: ImageSectionRenderChild,
-    path: string,
-    targetPath: string | null,
-    placement: ImageSectionDropPlacement,
-  ): { sourceBefore: string[]; targetBefore: string[]; changed: boolean } {
-    const sourceBefore = [...source.galleryPaths];
-    const targetBefore = source === this ? sourceBefore : [...this.galleryPaths];
-    const plan = planImageSectionPathMove(
-      sourceBefore,
-      targetBefore,
-      path,
-      targetPath ?? "",
-      placement,
-      source === this,
-    );
-    if (plan.changed) {
-      source.applyGalleryPaths(plan.sourcePaths, source === this);
-      if (source !== this) this.applyGalleryPaths(plan.targetPaths, false);
-    }
-    return { sourceBefore, targetBefore, changed: plan.changed };
-  }
 
   private async handleInternalImageDrop(
-    source: ImageSectionRenderChild,
+    source: ImageSectionMoveParticipant,
     path: string,
     targetPath: string | null,
     placement: ImageSectionDropPlacement,
   ): Promise<void> {
-    clearImageDropIndicators();
-    if (source.context.sourcePath !== this.context.sourcePath) {
+    const outcome = await moveImageSectionAsset({
+      orderSession: this.orderSession,
+      source,
+      target: this.moveParticipant,
+      path,
+      targetPath,
+      placement,
+    });
+    if (outcome.status === "unsupported") {
       new Notice(imageSectionText("crossNoteMoveUnsupported"));
-      return;
-    }
-    const optimistic = this.optimisticMovePaths(source, path, targetPath, placement);
-    if (!optimistic.changed) {
-      source.containerEl.removeClass("is-image-drag-source");
-      return;
-    }
-    try {
-      const update = await this.service.moveAsset(
-        this.context.sourcePath,
-        source.locator(),
-        this.locator(),
-        path,
-        targetPath ?? "",
-        placement,
-      );
-      source.containerEl.removeClass("is-image-drag-source");
-      if (source === this) {
-        this.applyOrderedSectionState(update.sourceSection);
-      } else {
-        source.applyOrderedSectionState(update.sourceSection);
-        this.applyOrderedSectionState(update.targetSection);
-      }
-    } catch (error) {
-      source.applyGalleryPaths(optimistic.sourceBefore);
-      if (source !== this) this.applyGalleryPaths(optimistic.targetBefore);
-      new Notice(imageSectionText("moveFailed", { error: errorMessage(error) }));
+    } else if (outcome.status === "failed") {
+      new Notice(imageSectionText("moveFailed", { error: errorMessage(outcome.error) }));
     }
   }
 
@@ -441,37 +465,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   private beginImagePointerDrag(item: HTMLElement, path: string, event: PointerEvent): void {
-    if (!this.canStartImagePointerDrag(item, event)) return;
-    activeImageDrag = { source: this, path, target: null };
-    armPointerDrag({
-      event,
-      captureElement: item,
-      dragElement: item,
-      ghostClass: "al-image-drag-ghost",
-      onStart: () => {
-        this.containerEl.addClass("is-image-drag-source");
-        this.closeMenus();
-      },
-      onMove: (point) => this.updatePointerDropTarget(point),
-      onDrop: () => {
-        const drag = activeImageDrag;
-        activeImageDrag = null;
-        this.containerEl.removeClass("is-image-drag-source");
-        clearImageDropIndicators();
-        if (!drag?.target) return;
-        void drag.target.renderer.handleInternalImageDrop(
-          drag.source,
-          drag.path,
-          drag.target.path,
-          drag.target.placement,
-        );
-      },
-      onCancel: () => {
-        if (activeImageDrag?.source === this && activeImageDrag.path === path) activeImageDrag = null;
-        this.containerEl.removeClass("is-image-drag-source");
-        clearImageDropIndicators();
-      },
-    });
+    beginImageSectionPointerDrag(this.dragSurface, item, path, event);
   }
 
   private createImage(path: string): HTMLElement {
@@ -479,23 +473,37 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     item.dataset.imagePath = path;
     const resolved = this.service.resolve(path, this.context.sourcePath);
     if (resolved.resourcePath) {
-      const image = makeEl("img");
-      image.src = resolved.thumbnailSources?.src || resolved.resourcePath;
-      if (resolved.thumbnailSources?.srcset) {
-        image.srcset = resolved.thumbnailSources.srcset;
-        image.sizes = "(max-width: 620px) 50vw, 25vw";
+      const source = resolved.thumbnailSources?.src || resolved.resourcePath;
+      const srcset = resolved.thumbnailSources?.srcset || "";
+      const signature = `${source}::${srcset}`;
+      let image = this.imageNodeCache.get(path)?.signature === signature
+        ? this.imageNodeCache.get(path)?.image ?? null
+        : null;
+      if (!image) {
+        image = makeEl("img");
+        const created = image;
+        bindImageFallback(created, imageSectionMissingNode, {
+          onError: () => this.imageNodeCache.delete(path),
+        });
+        this.imageNodeCache.set(path, { signature, image });
+      }
+      if (srcset) {
+        if (image.getAttribute("srcset") !== srcset) image.srcset = srcset;
+        const sizes = "(max-width: 620px) 50vw, 25vw";
+        if (image.getAttribute("sizes") !== sizes) image.sizes = sizes;
+      } else {
+        if (image.hasAttribute("srcset")) image.removeAttribute("srcset");
+        if (image.hasAttribute("sizes")) image.removeAttribute("sizes");
       }
       image.alt = "";
       image.loading = "lazy";
       image.decoding = "async";
       image.draggable = false;
       item.appendChild(image);
+      if (image.getAttribute("src") !== source) image.src = source;
     } else {
-      const missing = makeEl("div", "al-image-missing");
-      const icon = makeEl("div", "al-image-missing-icon");
-      setAnimeListIcon(icon, "image-off");
-      missing.append(icon, makeEl("span", "", imageSectionText("missing")));
-      item.appendChild(missing);
+      this.imageNodeCache.delete(path);
+      item.appendChild(imageSectionMissingNode());
     }
 
     if (this.selectionMode) {
@@ -567,22 +575,34 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
   private renderGallery(paths: readonly string[]): void {
     const viewport = makeEl("div", `al-image-gallery-viewport${this.expanded ? " is-expanded" : ""}`);
+    this.galleryViewport = viewport;
     const gallery = makeEl("div", "al-image-masonry");
     this.galleryPaths = [...paths];
     this.imageElements.clear();
     for (const path of paths) this.imageElements.set(path, this.createImage(path));
+    let renderedColumnCount = 0;
+    let columnElements: HTMLElement[] = [];
+    let updateToggle: () => void = () => {};
     const relayout = (): void => {
-      const columns = normalizeImageSectionColumns(this.preferredColumns);
-      gallery.style.setProperty("--al-image-columns", String(columns));
-      const columnElements = imageSectionColumnBuckets(this.galleryPaths, columns).map((bucket) => {
-        const column = makeEl("div", "al-image-masonry-column");
-        for (const path of bucket) {
-          const item = this.imageElements.get(path);
-          if (item) column.appendChild(item);
+      const movingItems = [...this.imageElements.values()].filter((item) => item.isConnected);
+      this.lastLayoutMotion = animateLayoutChange(movingItems, () => {
+        const columns = normalizeImageSectionColumns(this.preferredColumns);
+        gallery.style.setProperty("--al-image-columns", String(columns));
+        if (renderedColumnCount !== columns) {
+          renderedColumnCount = columns;
+          columnElements = Array.from({ length: columns }, () => makeEl("div", "al-image-masonry-column"));
+          gallery.replaceChildren(...columnElements);
         }
-        return column;
+        const buckets = imageSectionColumnBuckets(this.galleryPaths, columns);
+        buckets.forEach((bucket, index) => {
+          const column = columnElements[index];
+          for (const path of bucket) {
+            const item = this.imageElements.get(path);
+            if (item) column.appendChild(item);
+          }
+        });
       });
-      gallery.replaceChildren(...columnElements);
+      window.requestAnimationFrame(updateToggle);
     };
     this.galleryRelayout = relayout;
     relayout();
@@ -590,7 +610,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
 
     const toggle = makeEl("button", "al-image-expand-button");
     toggle.type = "button";
-    const updateToggle = (): void => {
+    updateToggle = (): void => {
       if (!this.expanded) {
         this.galleryCollapsible = viewport.scrollHeight > viewport.clientHeight + 2;
       }
@@ -605,6 +625,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       toggle.blur();
       this.expanded = expanding;
       viewport.toggleClass("is-expanded", this.expanded);
+      this.saveEphemeralState();
       updateToggle();
       if (!this.expanded) viewport.scrollTop = 0;
       if (anchor) {
@@ -613,7 +634,10 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         for (const image of gallery.querySelectorAll<HTMLImageElement>("img")) {
           if (image.complete) continue;
           image.addEventListener("load", () => {
-            window.requestAnimationFrame(() => anchor.restore());
+            if (!this.ownsContainer()) return;
+            window.requestAnimationFrame(() => {
+              if (this.ownsContainer()) anchor.restore();
+            });
           }, { once: true });
         }
       }
@@ -631,7 +655,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.interactionsBound = true;
     this.containerEl.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("mousedown", (event) => {
       const target = eventTargetElement(event);
       if (!isInteractiveTarget(target)) return;
@@ -641,34 +665,34 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       }
       event.preventDefault();
       event.stopPropagation();
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("click", (event) => {
       if (event.defaultPrevented || isInteractiveTarget(eventTargetElement(event))) return;
       this.containerEl.focus({ preventScroll: true });
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("dragover", (event) => {
       if (![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === "file")) return;
       event.preventDefault();
       this.containerEl.addClass("is-dragging");
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("dragleave", (event) => {
       if (!this.containerEl.contains(event.relatedTarget as Node | null)) {
         this.containerEl.removeClass("is-dragging");
       }
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("drop", (event) => {
       const files = [...(event.dataTransfer?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
       this.containerEl.removeClass("is-dragging");
       void this.addFiles(files);
-    });
+    }, { signal: this.lifecycleEvents.signal });
     this.containerEl.addEventListener("paste", (event) => {
       const files = [...(event.clipboardData?.files ?? [])];
       if (!files.length) return;
       event.preventDefault();
       void this.addFiles(files);
-    });
+    }, { signal: this.lifecycleEvents.signal });
   }
 
   private renderToolbar(paths: readonly string[]): void {
@@ -739,6 +763,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         // throughout both directions of adjustment.
         const controlAnchor = captureViewportAnchor(range);
         this.preferredColumns = normalizeImageSectionColumns(range.value);
+        if (this.layoutPreservation) this.layoutPreservation.preferredColumns = this.preferredColumns;
         value.value = String(this.preferredColumns);
         value.textContent = String(this.preferredColumns);
         this.galleryRelayout?.();
@@ -747,6 +772,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       });
       range.addEventListener("change", () => {
         const nextColumns = normalizeImageSectionColumns(range.value);
+        this.preferredColumns = nextColumns;
+        this.preserveLayoutAcrossRefresh();
         // Persisting the fence metadata rewrites the note. Obsidian may replace
         // this Markdown render child as a result; keep the surrounding scroller
         // at the exact user-visible offset through that refresh.
@@ -755,6 +782,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         scrollPosition.stabilize(12);
         void this.service.setColumns(this.context.sourcePath, this.locator(), nextColumns)
           .then((update) => {
+            if (!this.ownsContainer()) return;
             this.acceptSectionState(update);
             this.preferredColumns = nextColumns;
             persistedColumns = nextColumns;
@@ -762,12 +790,14 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
             scrollPosition.stabilize(12);
           })
           .catch((error) => {
-            this.preferredColumns = persistedColumns;
-            range.value = String(persistedColumns);
-            value.value = String(persistedColumns);
-            value.textContent = String(persistedColumns);
-            this.galleryRelayout?.();
-            scrollPosition.restore();
+            if (this.ownsContainer()) {
+              this.preferredColumns = persistedColumns;
+              range.value = String(persistedColumns);
+              value.value = String(persistedColumns);
+              value.textContent = String(persistedColumns);
+              this.galleryRelayout?.();
+              scrollPosition.restore();
+            }
             new Notice(imageSectionText("layoutFailed", { error: errorMessage(error) }));
           });
       });
@@ -778,7 +808,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
+    if (!this.ownsContainer()) return;
     this.galleryRelayout = null;
+    this.galleryViewport = null;
     this.galleryPaths = [];
     this.imageElements.clear();
     this.containerEl.replaceChildren();
@@ -786,7 +818,9 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.containerEl.toggleClass("is-selecting", this.selectionMode);
     this.containerEl.tabIndex = 0;
 
-    const paths = parseImageSectionSource(this.source);
+    const paths = [...this.effectivePaths];
+    const activePaths = new Set(paths);
+    for (const path of this.imageNodeCache.keys()) if (!activePaths.has(path)) this.imageNodeCache.delete(path);
     this.renderToolbar(paths);
     if (!paths.length) {
       const empty = makeEl("button", "al-image-empty");

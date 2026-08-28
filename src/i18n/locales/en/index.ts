@@ -16,6 +16,7 @@ import { EN_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 import { EN_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
 import { EN_LIBRARY_EXPORT_MESSAGES } from "./library-export";
 import { EN_TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
+import { EN_MANUAL_MEDIA_MESSAGES } from "./manual-media";
 
 export const EN_CATALOGS = {
   core: EN_CORE_MESSAGES,
@@ -34,4 +35,5 @@ export const EN_CATALOGS = {
   "library-layout": EN_LIBRARY_LAYOUT_MESSAGES,
   "library-export": EN_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": EN_TIMELINE_WORKSPACE_MESSAGES,
+  "manual-media": EN_MANUAL_MEDIA_MESSAGES,
 } as const satisfies LocaleCatalogs;

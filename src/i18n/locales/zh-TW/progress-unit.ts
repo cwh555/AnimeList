@@ -21,6 +21,7 @@ export const PROGRESS_UNIT_MESSAGES = {
   unitField: "進度單位",
   progressHintInteger: "支援非負整數。",
   progressHintVolume: "支援整數、.5 與 EX。",
+  progressHintFreeform: "進度可自由輸入文字，例如「第 12 話 / Web版」或「Vol. 3 中段」。",
   timelineEntryTitle: "{title} — 第 {label} {unit}",
   timelineEntryLabel: "第 {label} {unit}",
 } as const;

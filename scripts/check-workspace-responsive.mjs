@@ -16,7 +16,7 @@ await build({
       export { renderAnimeListWorkspaceShell } from "./src/ui/workspace-shell";
       export { AnimeListUI } from "./src/ui/library-renderer";
       export { installLibraryLayoutControl } from "./src/ui/library-layout-controls";
-      export { installLibraryWorkspaceLayout } from "./src/ui/library-workspace-layout";
+      export { installLibraryWorkspaceLayout, renderLibraryWorkspaceActions } from "./src/ui/library-workspace-layout";
       export { renderScoreDashboard } from "./src/ui/score-dashboard/renderer";
       export { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "./src/ui/image-gallery-renderer";
       export { renderTimelineWorkspace } from "./src/ui/timeline-workspace-renderer";
@@ -98,7 +98,7 @@ try{
   const galleryWorks=items.slice(0,5).map((item,index)=>{const base={sourcePath:item.filePath,title:item.title,originalTitle:item.originalTitle,mediaType:item.mediaType};const images=[galleryImage(base,index*2),galleryImage(base,index*2+1)];return {...base,sessions:[{index:0,images}],images};});
   let galleryState={...api.DEFAULT_IMAGE_GALLERY_STATE,columns:4};
   const pages=[
-    {id:'library',label:'Library',icon:'library',order:10,render(el){api.AnimeListUI.renderLibrary(el,items,{presentation:'workspace',initialState:state,requiresCompleteDom:()=>true,addItem:()=>{},openFilterModal:()=>{}});api.installLibraryLayoutControl(el,{initialState:state,onColumnsChange:()=>{}});api.installLibraryWorkspaceLayout(el);}},
+    {id:'library',label:'Library',icon:'library',order:10,render(el,context){api.renderLibraryWorkspaceActions(context.pageActions,{currentType:()=>state.type,addItem:()=>{}});api.AnimeListUI.renderLibrary(el,items,{presentation:'workspace',initialState:state,requiresCompleteDom:()=>true,addItem:()=>{},openFilterModal:()=>{}});api.installLibraryLayoutControl(el,{initialState:state,onColumnsChange:()=>{}});api.installLibraryWorkspaceLayout(el);}},
     {id:'timeline',label:'Timeline',icon:'clock-3',order:20,render(el){api.renderTimelineWorkspace(el,items,{openFile:()=>{}});}},
     {id:'scores',label:'Score Dashboard',icon:'table-properties',order:30,render(el){el.classList.add('animelist-score-dashboard-view');api.renderScoreDashboard(el,items,{type:'all',scale:100,showUnrated:false},{openFile:()=>{},applyChanges:async()=>{},confirmClamp:async()=>true,showNotice:()=>{},onStateChange:()=>{}});}},
     {id:'images',label:'Images',icon:'images',order:40,render(el){api.renderImageGallery(el,galleryWorks,galleryState,{resolve:()=>({resourcePath:'${pixel}'}),openLightbox:()=>{},openSource:()=>{},onStateChange:(next)=>{galleryState={...next}}});}},
@@ -106,7 +106,7 @@ try{
   const details={};
   async function render(section){
     const result=api.renderAnimeListWorkspaceShell(app,{pages,activeSection:section,actions:[{id:'export',label:'Export',icon:'download',order:10,run(){}}],onSelect:()=>{}});
-    result.activePage.render(result.page);
+    result.activePage.render(result.page,{pageActions:result.pageActions,samePageRefresh:false,signal:new AbortController().signal});
     await wait();
     return app.querySelector('.al-workspace-shell');
   }

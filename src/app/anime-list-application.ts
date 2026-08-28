@@ -12,6 +12,7 @@ import { MediaUpdateService } from "../data/media-update-service";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
+import { MANUAL_MEDIA_PROVIDER, type MediaCoverAssetInput } from "../domain/manual-media";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
 
 export interface AnimeListApplicationCallbacks {
@@ -223,7 +224,8 @@ export class AnimeListApplicationServices {
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.mediaNotes().downloadCover(result); }
-  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
+    if (result.provider === MANUAL_MEDIA_PROVIDER) return this.mediaNotes().create(result, form, coverAsset);
     if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
       return this.mediaNotes().create(result, form);
     }
@@ -235,7 +237,7 @@ export class AnimeListApplicationServices {
     const preparedForm = genresWereUnchanged && enriched.genres.length
       ? { ...form, genres: enriched.genres }
       : form;
-    return this.mediaNotes().create(enriched, preparedForm);
+    return this.mediaNotes().create(enriched, preparedForm, coverAsset);
   }
   async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> { await this.mediaUpdates().update(file, mediaType, form); }
 }

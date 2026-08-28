@@ -12,8 +12,10 @@ export interface PointerDragOptions {
   onDrop: (point: PointerDragPoint) => void;
   onCancel?: () => void;
   onStart?: () => void;
+  onArm?: () => void;
+  onFinish?: () => void;
   threshold?: number;
-  ghostClass?: string;
+  signal?: AbortSignal;
 }
 
 function point(event: PointerEvent): PointerDragPoint {
@@ -26,7 +28,6 @@ function distanceSquared(left: PointerDragPoint, right: PointerDragPoint): numbe
   return dx * dx + dy * dy;
 }
 
-
 function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, radius = 32): void {
   const view = window;
   const deadline = performance.now() + timeoutMs;
@@ -35,8 +36,10 @@ function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, r
 
   const cleanup = (): void => {
     view.removeEventListener("click", block, true);
+    view.removeEventListener("pointerdown", releaseForNextPointer, true);
     if (timeout) view.clearTimeout(timeout);
   };
+  const releaseForNextPointer = (): void => cleanup();
   const block = (event: MouseEvent): void => {
     if (performance.now() > deadline) {
       cleanup();
@@ -51,23 +54,8 @@ function suppressSyntheticClick(pointValue: PointerDragPoint, timeoutMs = 500, r
   };
 
   view.addEventListener("click", block, true);
+  view.addEventListener("pointerdown", releaseForNextPointer, true);
   timeout = view.setTimeout(cleanup, timeoutMs);
-}
-
-function createGhost(element: HTMLElement, className: string): HTMLElement {
-  const rect = element.getBoundingClientRect();
-  const ghost = element.cloneNode(true) as HTMLElement;
-  ghost.removeAttribute("id");
-  ghost.classList.add(className);
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.style.width = `${rect.width}px`;
-  ghost.style.height = `${rect.height}px`;
-  document.body.appendChild(ghost);
-  return ghost;
-}
-
-function positionGhost(ghost: HTMLElement, pointValue: PointerDragPoint): void {
-  ghost.style.transform = `translate3d(${Math.round(pointValue.clientX + 12)}px,${Math.round(pointValue.clientY + 12)}px,0)`;
 }
 
 export function armPointerDrag(options: PointerDragOptions): void {
@@ -79,34 +67,47 @@ export function armPointerDrag(options: PointerDragOptions): void {
     onDrop,
     onCancel,
     onStart,
+    onArm,
+    onFinish,
     threshold = 5,
-    ghostClass = "al-pointer-drag-ghost",
+    signal,
   } = options;
   if (event.button !== 0 && event.pointerType === "mouse") return;
+  if (signal?.aborted) return;
 
   const pointerId = event.pointerId;
   const start = point(event);
+  onArm?.();
   let started = false;
-  let ghost: HTMLElement | null = null;
+  let finished = false;
+
+  const finish = (): void => {
+    if (finished) return;
+    finished = true;
+    onFinish?.();
+  };
 
   const cleanup = (): void => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", cancel);
+    signal?.removeEventListener("abort", abort);
     try {
       if (captureElement.hasPointerCapture(pointerId)) captureElement.releasePointerCapture(pointerId);
     } catch {
       // The browser may already have released pointer capture.
     }
-    ghost?.remove();
-    ghost = null;
     dragElement.removeClass("is-pointer-dragging");
+    finish();
   };
 
-  const startDrag = (current: PointerDragPoint): void => {
+  const abort = (): void => {
+    if (started) onCancel?.();
+    cleanup();
+  };
+
+  const startDrag = (): void => {
     started = true;
-    ghost = createGhost(dragElement, ghostClass);
-    positionGhost(ghost, current);
     dragElement.addClass("is-pointer-dragging");
     onStart?.();
   };
@@ -115,10 +116,9 @@ export function armPointerDrag(options: PointerDragOptions): void {
     if (moveEvent.pointerId !== pointerId) return;
     const current = point(moveEvent);
     if (!started && distanceSquared(start, current) < threshold * threshold) return;
-    if (!started) startDrag(current);
+    if (!started) startDrag();
     moveEvent.preventDefault();
     moveEvent.stopPropagation();
-    if (ghost) positionGhost(ghost, current);
     onMove(current);
   };
 
@@ -128,9 +128,6 @@ export function armPointerDrag(options: PointerDragOptions): void {
     if (started) {
       upEvent.preventDefault();
       upEvent.stopPropagation();
-      // Browsers may emit a click after pointerup even when the drag changed
-      // the underlying Markdown and replaced the render child. Suppress that
-      // one click at the drop point independently of renderer lifetime.
       suppressSyntheticClick(current);
       onDrop(current);
     }
@@ -143,6 +140,7 @@ export function armPointerDrag(options: PointerDragOptions): void {
     cleanup();
   };
 
+  signal?.addEventListener("abort", abort, { once: true });
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", cancel);

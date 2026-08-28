@@ -16,6 +16,7 @@ import { KO_IMAGE_GALLERY_MESSAGES } from "./image-gallery";
 import { KO_LIBRARY_LAYOUT_MESSAGES } from "./library-layout";
 import { KO_LIBRARY_EXPORT_MESSAGES } from "./library-export";
 import { KO_TIMELINE_WORKSPACE_MESSAGES } from "./timeline-workspace";
+import { KO_MANUAL_MEDIA_MESSAGES } from "./manual-media";
 
 export const KO_CATALOGS = {
   core: KO_CORE_MESSAGES,
@@ -34,4 +35,5 @@ export const KO_CATALOGS = {
   "library-layout": KO_LIBRARY_LAYOUT_MESSAGES,
   "library-export": KO_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": KO_TIMELINE_WORKSPACE_MESSAGES,
+  "manual-media": KO_MANUAL_MEDIA_MESSAGES,
 } as const satisfies LocaleCatalogs;
