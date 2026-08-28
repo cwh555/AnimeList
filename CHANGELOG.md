@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.1 - 2026-08-29
+
+### Fixed
+
+- Stabilized Image Section drag/reorder persistence so moving images no longer triggers renderer-refresh flicker or transient duplicate/blank media surfaces.
+- Restored the original large empty Image Section add/drop target immediately after moving the final image out of a section.
+- Preserved the validated component-polish interaction fixes, including stable Library refresh/scroll behavior and existing media component interactions.
 ## 1.5.0 - 2026-08-21
 
 ### Added
