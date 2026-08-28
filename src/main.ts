@@ -25,6 +25,7 @@ import type { MediaFormContext, MediaFormSubmitContext } from "./ui/media-form-c
 import { AddMediaModal, EditMediaModal } from "./ui/media-modals";
 import type { AnimeListUiHost } from "./ui/plugin-host";
 import type { SearchModalAdapter } from "./ui/search-contracts";
+import type { MediaCoverAssetInput } from "./domain/manual-media";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./ui/workspace-contracts";
 
 function errorMessage(value: unknown): string {
@@ -310,8 +311,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }
   getImageThumbnailSources(file: TFile): CoverSources | undefined { return this.services().getImageThumbnailSources(file); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.services().downloadCover(result); }
-  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm): Promise<TFile> {
-    return this.services().createMediaNote(result, form);
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
+    return this.services().createMediaNote(result, form, coverAsset);
   }
 
   async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {

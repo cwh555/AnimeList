@@ -42,6 +42,7 @@ export async function runChromiumDatasetTest({
   testName,
   requireEnvironment = "ANIMELIST_REQUIRE_CHROMIUM",
   viewport,
+  resultTimeoutMs = 3600,
 }) {
   const browser = await findChromium();
   if (!browser) {
@@ -144,14 +145,16 @@ export async function runChromiumDatasetTest({
     });
 
     let dataset = {};
-    for (let attempt = 0; attempt < 120; attempt += 1) {
+    const resultPollIntervalMs = 30;
+    const resultAttempts = Math.max(1, Math.ceil(resultTimeoutMs / resultPollIntervalMs));
+    for (let attempt = 0; attempt < resultAttempts; attempt += 1) {
       const evaluated = await send("Runtime.evaluate", {
         expression: "JSON.stringify({ ...document.body.dataset })",
         returnByValue: true,
       });
       dataset = JSON.parse(evaluated.result.value || "{}");
       if (dataset.result && dataset.result !== "pending") break;
-      await sleep(30);
+      await sleep(resultPollIntervalMs);
     }
     assert.equal(dataset.result, "pass", dataset.details || "No browser details returned");
     console.log(`${testName} passed in Chromium: ${dataset.details}`);

@@ -7,4 +7,7 @@ export const KO_TIMELINE_WORKSPACE_MESSAGES = {
   "timeline.overviewLabel": "시간 개요",
   "timeline.historyCount": "{count}개",
   "timeline.monthLabel": "{month}월",
+  "timeline.undatedTitle": "완료일 미상",
+  "timeline.undatedDescription": "완료되었지만 정확한 완료 날짜를 알 수 없어 실제 시간축과 별도로 표시합니다.",
+  "timeline.undatedCount": "완료일 미상 · {count}개",
 } as const;

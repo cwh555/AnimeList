@@ -79,6 +79,7 @@ export const EN_RELEASE_TRACKING_MESSAGES = {
   "modal.open": "Open",
   "modal.review": "Choose source",
   "modal.close": "Close",
+  "modal.stopAndClose": "Stop and close",
   "modal.note": "Only verified release information is written. Reading progress is never changed.",
   "match.title": "Confirm release source",
   "match.description": "AnimeList could not find one uniquely safe match. Choose the correct source, or disable tracking for this title.",

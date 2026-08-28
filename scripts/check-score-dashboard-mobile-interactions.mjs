@@ -62,12 +62,14 @@ const html = `<!doctype html>
   <script>${bundle}</script>
   <script>
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const item = (title, score) => ({
-      title, originalTitle:"", mediaType:"anime", format:"", status:"completed", releaseStatus:"finished",
+    const cover = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='36'%3E%3Crect width='24' height='36' fill='%23888'/%3E%3C/svg%3E";
+    const cover2 = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='36'%3E%3Crect width='24' height='36' fill='%23555'/%3E%3C/svg%3E";
+    const item = (title, score, mediaType="anime") => ({
+      title, originalTitle:"", mediaType, format:"", status:"completed", releaseStatus:"finished",
       progress:0, total:0, unit:"", score, favorite:false, year:"", genres:[], people:[], platforms:[],
-      sourceUrls:[], cover:"", filePath:title + ".md", updated:0, updatedLabel:"", startedAt:"", completedAt:"", volumeLog:[],
+      sourceUrls:[], cover, filePath:title + ".md", updated:0, updatedLabel:"", startedAt:"", completedAt:"", volumeLog:[],
     });
-    const items = [item("Alpha", 9.5), item("Beta", 9.0)];
+    const items = [item("Alpha", 9.5), item("Beta", 9.0), item("Delta", 8.5, "manga"), item("Gamma", null)];
     const applied = [];
     const opened = [];
     const dashboard = document.querySelector("#dashboard");
@@ -98,6 +100,11 @@ const html = `<!doctype html>
     (async () => {
       const details = {};
 
+      const gammaInitial = poster("Delta.md");
+      gammaInitial?.querySelector('img')?.dispatchEvent(new Event('error'));
+      await delay(20);
+      details.brokenPosterFallsBack=!!gammaInitial?.querySelector('.al-score-poster-missing') && !gammaInitial?.querySelector('img');
+
       const alpha = poster("Alpha.md");
       const lane90 = lane("9.0");
       lane90.scrollIntoView({ block:"center" });
@@ -116,7 +123,8 @@ const html = `<!doctype html>
         && applied[0][0].filePath === "Alpha.md"
         && applied[0][0].nextScore === 9;
       details.dragDoesNotOpenFile = opened.length === 0;
-      details.dragReRenderedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
+      details.dragMovedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
+      details.dragPreservesPosterNode = poster("Alpha.md") === alpha;
 
       const alphaAfterDrag = poster("Alpha.md");
       alphaAfterDrag.scrollIntoView({ block:"center" });
@@ -156,6 +164,42 @@ const html = `<!doctype html>
       batchButton.click();
       await delay(30);
       details.emptyTouchBatchCannotPersist = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
+
+      const alphaBeforeFilters = poster("Alpha.md");
+      const alphaCoverBeforeFilters = alphaBeforeFilters?.querySelector("img");
+      let stableCoverSourceMutations = 0;
+      const stableCoverObserver = new MutationObserver((records) => {
+        stableCoverSourceMutations += records.filter((record) => record.type === "attributes" && (record.attributeName === "src" || record.attributeName === "srcset")).length;
+      });
+      if (alphaCoverBeforeFilters) stableCoverObserver.observe(alphaCoverBeforeFilters, { attributes:true, attributeFilter:["src", "srcset"] });
+      const animeTab = [...dashboard.querySelectorAll(".al-score-dashboard-tab")][1];
+      animeTab.click();
+      await delay(30);
+      details.typeFilterPreservesPosterAndCover = poster("Alpha.md") === alphaBeforeFilters
+        && poster("Alpha.md")?.querySelector("img") === alphaCoverBeforeFilters;
+      const unratedToggle = dashboard.querySelector(".al-score-dashboard-action-group .al-score-tool-button");
+      unratedToggle.click();
+      await delay(30);
+      details.unratedTogglePreservesPosterAndCover = poster("Alpha.md") === alphaBeforeFilters
+        && poster("Alpha.md")?.querySelector("img") === alphaCoverBeforeFilters
+        && !!poster("Gamma.md");
+      unratedToggle.click();
+      await delay(30);
+      details.unratedToggleHidesUnratedAgain = !poster("Gamma.md");
+      stableCoverObserver.disconnect();
+      details.stableCoverSourceIsNotReassigned = stableCoverSourceMutations === 0;
+
+      const alphaItem = items.find((entry) => entry.filePath === "Alpha.md");
+      if (alphaItem) alphaItem.cover = cover2;
+      const allTab = [...dashboard.querySelectorAll(".al-score-dashboard-tab")][0];
+      allTab.click();
+      await delay(30);
+      const alphaAfterCoverChange = poster("Alpha.md");
+      const alphaCoverAfterChange = alphaAfterCoverChange?.querySelector("img");
+      details.coverMetadataChangePreservesPosterButRefreshesImage = alphaAfterCoverChange === alphaBeforeFilters
+        && alphaCoverAfterChange !== alphaCoverBeforeFilters
+        && alphaCoverAfterChange?.getAttribute("src") === cover2
+        && !alphaCoverBeforeFilters?.isConnected;
 
       document.body.dataset.details = JSON.stringify(details);
       document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";

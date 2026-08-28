@@ -238,22 +238,44 @@ describe("image section storage service", () => {
     assert.match(h.data.get(h.note.path) ?? "", /## Two\n```animelist-images\n- c\.jpg/);
   });
 
-  it("reorders an image inside one section without trashing or rewriting other content", async () => {
+  it("persists coalesced absolute section orders in one note update", async () => {
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images columns=2", "- a.jpg", "- b.jpg", "```",
+      "Keep this paragraph.",
+      "## Two", "```animelist-images columns=5", "- c.jpg", "- d.jpg", "```", "",
+    ].join("\n"));
+    const [first, second] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
+    const states = await h.service.setSectionOrders(h.note.path, [
+      { locator: first, expectedPaths: ["a.jpg", "b.jpg"], paths: ["b.jpg", "a.jpg"] },
+      { locator: second, expectedPaths: ["c.jpg", "d.jpg"], paths: ["d.jpg", "c.jpg"] },
+    ]);
+    const updated = h.data.get(h.note.path) ?? "";
+    assert.deepEqual(states.map((state) => state.source), ["- b.jpg\n- a.jpg", "- d.jpg\n- c.jpg"]);
+    assert.match(updated, /```animelist-images columns=2\n- b\.jpg\n- a\.jpg/);
+    assert.match(updated, /```animelist-images columns=5\n- d\.jpg\n- c\.jpg/);
+    assert.match(updated, /Keep this paragraph\./);
+  });
+
+  it("persists a same-section reorder without trashing or rewriting other content", async () => {
     const h = harness([
       "# Demo", "```animelist-images columns=3",
       "- a.jpg", "- b.jpg", "- c.jpg", "```",
       "Keep this paragraph.", "",
     ].join("\n"));
     const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
-    const result = await h.service.moveAsset(h.note.path, block, block, "c.jpg", "a.jpg", "before");
-    assert.equal(result.sourceSection.source, "- c.jpg\n- a.jpg\n- b.jpg");
-    assert.equal(result.targetSection.source, result.sourceSection.source);
+    const [state] = await h.service.setSectionOrders(h.note.path, [{
+      locator: block,
+      expectedPaths: ["a.jpg", "b.jpg", "c.jpg"],
+      paths: ["c.jpg", "a.jpg", "b.jpg"],
+    }]);
+    assert.equal(state.source, "- c.jpg\n- a.jpg\n- b.jpg");
     assert.match(h.data.get(h.note.path) ?? "", /```animelist-images columns=3\n- c\.jpg\n- a\.jpg\n- b\.jpg\n```/);
     assert.match(h.data.get(h.note.path) ?? "", /Keep this paragraph\./);
     assert.deepEqual(h.trashed, []);
   });
 
-  it("moves an image between sections in one atomic note update without trashing the asset", async () => {
+  it("persists cross-section orders in one atomic note update without trashing the asset", async () => {
     const path = "AnimeList/Images/anime/demo-bangumi-42/move.jpg";
     const h = harness([
       "# Demo",
@@ -263,7 +285,10 @@ describe("image section storage service", () => {
     ].join("\n"));
     h.files.set(path, file(path));
     const [source, target] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
-    const result = await h.service.moveAsset(h.note.path, source, target, path, "target-b.jpg", "before");
+    const states = await h.service.setSectionOrders(h.note.path, [
+      { locator: source, expectedPaths: [path, "stay.jpg"], paths: ["stay.jpg"] },
+      { locator: target, expectedPaths: ["target-a.jpg", "target-b.jpg"], paths: ["target-a.jpg", path, "target-b.jpg"] },
+    ]);
     const updated = h.data.get(h.note.path) ?? "";
     assert.match(updated, /```animelist-images columns=2\n- stay\.jpg\n```/);
     assert.ok(updated.includes([
@@ -274,10 +299,51 @@ describe("image section storage service", () => {
       "```",
     ].join("\n")));
     assert.match(updated, /Keep this paragraph\./);
-    assert.equal(result.sourceSection.source, "- stay.jpg");
-    assert.match(result.targetSection.source, /move\.jpg/);
+    assert.equal(states[0].source, "- stay.jpg");
+    assert.match(states[1].source, /move\.jpg/);
     assert.deepEqual(h.trashed, []);
     assert.equal(h.files.has(path), true);
+  });
+
+  it("folds a pending live reorder into an add mutation instead of restoring stale canonical order", async () => {
+    const h = harness([
+      "# Demo", "```animelist-images",
+      "- a.jpg", "- b.jpg", "- c.jpg", "```", "",
+    ].join("\n"));
+    const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
+    const result = await h.service.addAssets(
+      h.note.path,
+      block,
+      [{ name: "new.png", data: new Uint8Array([9, 9, 9]).buffer, contentType: "image/png" }],
+      ["b.jpg", "a.jpg", "c.jpg"],
+    );
+    assert.match(result.source, /^- b\.jpg\n- a\.jpg\n- c\.jpg\n- /);
+    assert.match(h.data.get(h.note.path) ?? "", /```animelist-images\n- b\.jpg\n- a\.jpg\n- c\.jpg\n- .*new\.png\n```/);
+  });
+
+  it("folds a pending live reorder into removal and resolves external-order conflicts without clobbering Markdown", async () => {
+    const h = harness([
+      "# Demo",
+      "## One", "```animelist-images", "- a.jpg", "- b.jpg", "- c.jpg", "```",
+      "## Two", "```animelist-images", "- external.jpg", "```", "",
+    ].join("\n"));
+    const [first] = findImageSectionBlocks(h.data.get(h.note.path) ?? "");
+    const next = await h.service.removeMany(
+      h.note.path,
+      first,
+      ["b.jpg"],
+      ["c.jpg", "b.jpg", "a.jpg"],
+    );
+    assert.equal(next, "- c.jpg\n- a.jpg");
+    assert.match(h.data.get(h.note.path) ?? "", /## One\n```animelist-images\n- c\.jpg\n- a\.jpg\n```/);
+
+    await h.service.commitPendingSectionOrders(h.note.path, [
+      { lineStart: 2, expectedPaths: ["c.jpg", "a.jpg"], paths: ["a.jpg", "c.jpg"] },
+      { lineStart: 8, expectedPaths: ["old.jpg"], paths: ["new.jpg", "old.jpg"] },
+    ]);
+    const updated = h.data.get(h.note.path) ?? "";
+    assert.match(updated, /## One\n```animelist-images\n- a\.jpg\n- c\.jpg\n```/);
+    assert.match(updated, /## Two\n```animelist-images\n- external\.jpg\n```/);
   });
 
 });

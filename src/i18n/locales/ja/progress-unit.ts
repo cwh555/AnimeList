@@ -21,6 +21,7 @@ export const JA_PROGRESS_UNIT_MESSAGES = {
     unitField: "進捗単位",
     progressHintInteger: "0以上の整数に対応します。",
     progressHintVolume: "整数、.5、EX に対応します。",
+  progressHintFreeform: "進捗は「第12話 / Web版」のように自由な文字列で入力できます。",
     timelineEntryTitle: "{title} — 第 {label} {unit}",
     timelineEntryLabel: "第 {label} {unit}",
   } as const;

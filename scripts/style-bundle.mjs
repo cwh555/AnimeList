@@ -23,10 +23,15 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/serial-cover.css",
   "styles/library-list.css",
   "styles/media-metadata.css",
+  "styles/media-form-polish.css",
+  "styles/interaction-motion.css",
   "styles/library-filters.css",
   "styles/user-tags.css",
   "styles/mobile.css",
   "styles/release-tracking.css",
+  "styles/workspace-responsive-shell.css",
+  "styles/workspace-responsive-library.css",
+  "styles/workspace-responsive-pages.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {

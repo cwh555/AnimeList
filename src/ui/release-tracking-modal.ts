@@ -9,7 +9,10 @@ import type {
   ReleaseTrackingService,
 } from "../data/release-tracking-service";
 import { releaseTrackingText } from "../features/release-tracking/text";
+import { abortable, isOperationCancelled } from "../domain/abort";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
+import { transitionSurface } from "./layout-motion";
 
 export interface ReleaseTrackingModalActions {
   openMedia(path: string): Promise<void> | void;
@@ -70,16 +73,13 @@ function resultCover(item: MediaItem, className = "al-release-result-cover"): HT
     return cover;
   }
   const image = makeElement("img");
-  image.src = source;
   image.alt = item.title;
   image.loading = "lazy";
   image.decoding = "async";
+  bindImageFallback(image, () => icon("book-open", "al-release-cover-fallback"));
   if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-  image.addEventListener("error", () => {
-    image.remove();
-    cover.appendChild(icon("book-open", "al-release-cover-fallback"));
-  }, { once: true });
   cover.appendChild(image);
+  image.src = source;
   return cover;
 }
 
@@ -215,13 +215,12 @@ export class ReleaseTrackingResultsModal extends Modal {
   }
 
   close(): void {
-    if (this.busy) return;
     super.close();
   }
 
   showProgress(progress: ReleaseRefreshProgress): void {
     this.progress = progress;
-    if (this.opened && this.busy) this.renderRunning();
+    if (this.opened && this.busy && !this.updateRunningProgress()) this.renderRunning();
   }
 
   showResults(summary: ReleaseRefreshSummary): void {
@@ -253,8 +252,51 @@ export class ReleaseTrackingResultsModal extends Modal {
     this.contentEl.appendChild(header);
   }
 
+  private updateRunningProgress(): boolean {
+    const body = this.contentEl.querySelector<HTMLElement>(".al-release-running");
+    if (!body) return false;
+    const progress = this.progress;
+    const completed = progress?.completed ?? 0;
+    const total = progress?.total ?? 0;
+    const count = body.querySelector<HTMLElement>(".al-release-running-head span");
+    const fill = body.querySelector<HTMLElement>(".al-release-running-fill");
+    if (count) count.textContent = releaseTrackingText("modal.runningProgress", { completed, total });
+    if (fill) fill.style.width = total > 0 ? `${Math.min(100, Math.max(0, completed / total * 100))}%` : "0%";
+
+    const current = body.querySelector<HTMLElement>(".al-release-running-item, .al-release-running-preparing");
+    const nextPath = progress?.item.filePath ?? "";
+    if (current?.dataset.filePath === nextPath || (!progress && current?.classList.contains("al-release-running-preparing"))) {
+      return true;
+    }
+    const replacement = progress
+      ? (() => {
+        const item = makeElement("div", "al-release-running-item");
+        item.dataset.filePath = progress.item.filePath;
+        const copy = makeElement("div", "al-release-running-item-copy");
+        copy.append(
+          makeElement("strong", "", progress.item.title),
+          makeElement("span", "al-release-media-chip", mediaTypeLabel(progress.item)),
+        );
+        item.append(
+          resultCover(progress.item, "al-release-running-cover"),
+          copy,
+          makeElement("span", "al-release-running-provider", providerLabel(progress.provider)),
+        );
+        return item;
+      })()
+      : (() => {
+        const preparing = makeElement("div", "al-release-running-preparing");
+        preparing.dataset.filePath = "";
+        preparing.append(icon("loader-circle"), makeElement("span", "", releaseTrackingText("modal.runningPreparing")));
+        return preparing;
+      })();
+    if (current) current.replaceWith(replacement);
+    else body.appendChild(replacement);
+    return true;
+  }
+
   private renderRunning(): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(
       releaseTrackingText("modal.runningTitle"),
       releaseTrackingText("modal.runningDescription"),
@@ -277,6 +319,7 @@ export class ReleaseTrackingResultsModal extends Modal {
 
     if (progress) {
       const current = makeElement("div", "al-release-running-item");
+      current.dataset.filePath = progress.item.filePath;
       const copy = makeElement("div", "al-release-running-item-copy");
       copy.append(
         makeElement("strong", "", progress.item.title),
@@ -305,7 +348,7 @@ export class ReleaseTrackingResultsModal extends Modal {
   private renderResults(): void {
     const summary = this.summary;
     if (!summary) return;
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(releaseTrackingText("modal.title"), "");
 
     const stats = makeElement("div", "al-release-summary-grid");
@@ -371,7 +414,7 @@ export class ReleaseTrackingResultsModal extends Modal {
   }
 
   private renderFailure(message: string): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.appendHeader(releaseTrackingText("modal.failedTitle"), releaseTrackingText("modal.failedDescription", { message }));
     const failure = makeElement("div", "al-release-failure");
     failure.append(icon("triangle-alert"), makeElement("span", "", message));
@@ -414,18 +457,27 @@ export class ReleaseTrackingMatchModal extends Modal {
   private busy = false;
   private candidates: ReleaseMatchCandidate[] = [];
   private failure = "";
+  private requestController: AbortController | null = null;
+  private opened = false;
 
   constructor(app: App, private readonly service: ReleaseTrackingService, private readonly item: MediaItem, private readonly options: ReleaseTrackingMatchModalOptions) {
     super(app);
   }
 
   onOpen(): void {
+    this.opened = true;
     this.modalEl.classList.add("animelist-modal", "animelist-release-match-modal");
     void this.loadCandidates();
   }
 
+  onClose(): void {
+    this.opened = false;
+    this.requestController?.abort();
+    this.requestController = null;
+  }
+
   close(): void {
-    if (this.busy) return;
+    this.requestController?.abort();
     super.close();
   }
 
@@ -442,26 +494,35 @@ export class ReleaseTrackingMatchModal extends Modal {
 
   private async loadCandidates(): Promise<void> {
     const requestId = ++this.requestId;
-    this.contentEl.replaceChildren();
+    this.requestController?.abort();
+    const controller = new AbortController();
+    this.requestController = controller;
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.renderHeading();
     this.contentEl.appendChild(makeElement("div", "al-release-match-loading", releaseTrackingText("match.loading")));
 
     let candidates: ReleaseMatchCandidate[] = [];
-    try { candidates = await this.service.matchCandidates(this.item); } catch { candidates = []; }
-    if (requestId !== this.requestId) return;
+    try {
+      candidates = await abortable(this.service.matchCandidates(this.item), controller.signal);
+    } catch (error) {
+      if (isOperationCancelled(error)) return;
+      candidates = [];
+    }
+    if (!this.opened || controller.signal.aborted || requestId !== this.requestId) return;
     this.candidates = candidates;
     this.failure = "";
 
     if (candidates.length === 1) {
       this.renderCandidates(candidates, true);
-      await this.resolveCandidate(candidates[0], true);
+      await this.resolveCandidate(candidates[0], true, controller);
       return;
     }
+    this.requestController = null;
     this.renderCandidates(candidates, false);
   }
 
   private renderCandidates(candidates: ReleaseMatchCandidate[], autoResolving: boolean): void {
-    this.contentEl.replaceChildren();
+    transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     this.renderHeading();
 
     if (autoResolving) {
@@ -508,16 +569,27 @@ export class ReleaseTrackingMatchModal extends Modal {
     this.contentEl.querySelectorAll<HTMLButtonElement>("button").forEach((button) => { button.disabled = disabled; });
   }
 
-  private async resolveCandidate(candidate: ReleaseMatchCandidate, automatic: boolean): Promise<void> {
+  private async resolveCandidate(
+    candidate: ReleaseMatchCandidate,
+    automatic: boolean,
+    existingController: AbortController | null = null,
+  ): Promise<void> {
     if (this.busy) return;
+    const controller = existingController ?? new AbortController();
+    if (!existingController) {
+      this.requestController?.abort();
+      this.requestController = controller;
+    }
     this.busy = true;
     this.failure = "";
     this.modalEl.classList.add("is-busy");
-    this.renderCandidates(this.candidates, automatic);
+    if (this.opened) this.renderCandidates(this.candidates, automatic);
     try {
-      const result = await this.service.refreshItem(this.item, candidate.binding);
+      const result = await this.service.refreshItem(this.item, candidate.binding, controller.signal);
+      if (!this.opened || controller.signal.aborted) return;
       if (result.status === "verified") {
         this.busy = false;
+        this.requestController = null;
         this.modalEl.classList.remove("is-busy");
         await this.options.onResolved(result);
         super.close();
@@ -525,12 +597,14 @@ export class ReleaseTrackingMatchModal extends Modal {
       }
       this.failure = result.message || statusLabel(result.status);
     } catch (error) {
+      if (isOperationCancelled(error)) return;
       this.failure = error instanceof Error ? error.message : String(error);
     } finally {
+      if (this.requestController === controller) this.requestController = null;
       if (this.busy) {
         this.busy = false;
         this.modalEl.classList.remove("is-busy");
-        this.renderCandidates(this.candidates, false);
+        if (this.opened && !controller.signal.aborted) this.renderCandidates(this.candidates, false);
       }
     }
   }

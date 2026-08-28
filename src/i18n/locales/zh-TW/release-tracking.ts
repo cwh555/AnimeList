@@ -79,6 +79,7 @@ export const RELEASE_TRACKING_MESSAGES = {
   "modal.open": "開啟",
   "modal.review": "選擇來源",
   "modal.close": "關閉",
+  "modal.stopAndClose": "停止並關閉",
   "modal.note": "只會寫入已驗證的最新資訊，不會修改閱讀進度。",
   "match.title": "確認更新來源",
   "match.description": "找不到唯一且安全的自動匹配。請確認正確來源；如果沒有正確項目，可以停用這部作品的追蹤。",

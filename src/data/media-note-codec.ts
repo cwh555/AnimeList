@@ -20,7 +20,7 @@ import {
   defaultProgressUnit,
   isReadingProgressUnit,
   normalizeSerialLog,
-  normalizeSerialProgress,
+  normalizeReadingProgressValue,
   serializeSerialLog,
   type ReadingProgressUnit,
 } from "../domain/progress-units";
@@ -110,7 +110,7 @@ export function completedProgress(
   unit: unknown = defaultProgressUnit(mediaType, undefined),
 ): ProgressValue {
   const safeCurrent = mediaType !== "anime" && isReadingProgressUnit(unit)
-    ? normalizeSerialProgress(current, unit) ?? 0
+    ? normalizeReadingProgressValue(current)
     : Math.max(0, numeric(current));
   if (mediaType !== "anime") return safeCurrent;
   const safeTotal = Math.max(0, numeric(total));

@@ -47,7 +47,8 @@ const html = `<!doctype html>
       }
       return element;
     }
-    HTMLElement.prototype.createDiv = function(info) {
+    window.createDiv = () => document.createElement("div");
+        HTMLElement.prototype.createDiv = function(info) {
       const element = applyInfo(document.createElement("div"), info);
       this.append(element);
       return element;
@@ -66,7 +67,7 @@ const html = `<!doctype html>
   <script>${pickerBundle}</script>
   <script>
     const candidates = [
-      { provider: "Bangumi", sourceId: "first", title: "Volume 1", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 100 },
+      { provider: "Bangumi", sourceId: "first", title: "Volume 1", coverUrl: "data:image/png;base64,AAAA", infoUrl: "", score: 100 },
       { provider: "Bangumi", sourceId: "second", title: "Volume 2", coverUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", infoUrl: "", score: 99 },
     ];
     const modal = document.querySelector(".al-serial-cover-modal");
@@ -75,11 +76,14 @@ const html = `<!doctype html>
     let applied = "";
     let loaded = "";
     let closed = false;
+    let initialBrokenFallback = false;
 
     const finish = () => {
       const rows = [...results.querySelectorAll("button.al-search-result")];
+      const brokenFallback = initialBrokenFallback;
       const passed = rows.length === 2
         && rows.every((row) => row instanceof HTMLButtonElement && row.type === "button")
+        && brokenFallback
         && !document.querySelector(".al-search-result-use")
         && ![...document.querySelectorAll("button")].some((button) => button.textContent === "Apply" || button.textContent === "選用")
         && loaded === "second"
@@ -91,6 +95,7 @@ const html = `<!doctype html>
       document.body.dataset.applied = applied;
       document.body.dataset.closed = String(closed);
       document.body.dataset.rowCount = String(rows.length);
+      document.body.dataset.brokenFallback = String(brokenFallback);
     };
 
     const render = () => {
@@ -121,7 +126,11 @@ const html = `<!doctype html>
     };
 
     render();
-    const secondRow = results.querySelectorAll("button.al-search-result")[1];
+    const initialRows = results.querySelectorAll("button.al-search-result");
+    initialRows[0].querySelector("img")?.dispatchEvent(new Event("error"));
+    initialBrokenFallback = initialRows[0].querySelector(".al-search-result-placeholder") !== null
+      && initialRows[0].querySelector("img") === null;
+    const secondRow = initialRows[1];
     secondRow.click();
   </script>
 </body>
@@ -255,6 +264,7 @@ try {
     applied: "cover:second",
     closed: "true",
     rowCount: "2",
+    brokenFallback: "true",
   });
   console.log("Serial cover card click directly applies and closes in Chromium.");
 } finally {

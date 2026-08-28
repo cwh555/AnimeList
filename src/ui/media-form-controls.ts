@@ -3,6 +3,7 @@ import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { normalizeGenres } from "../domain/media-metadata";
 import { normalizeUserTags } from "../domain/user-tags";
 import { normalizeMediaStatus } from "../domain/media-status";
+import { UNKNOWN_COMPLETION_DATE, isUnknownCompletionDate } from "../domain/completion-date";
 import { normalizeReleaseStatus, progressDisplayValue } from "../domain/progress/novel-progress";
 import { completedStatusLabel, mediaStatusOptions, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
@@ -128,6 +129,77 @@ export function createDateInput(value = ""): MediaFormDateControl {
     if (!(event.relatedTarget instanceof Node) || !root.contains(event.relatedTarget)) emit("change");
   });
   setValue(value);
+  return root;
+}
+
+
+export function createCompletionDateInput(value = ""): MediaFormDateControl {
+  const root = createDiv() as MediaFormDateControl;
+  root.className = "al-completion-date-control";
+  const date = createDateInput(isUnknownCompletionDate(value) ? "" : value);
+  const mode = makeEl("div", "al-completion-date-mode");
+  mode.setAttribute("role", "radiogroup");
+  mode.setAttribute("aria-label", uiText("add.completedAt"));
+  const known = makeEl("button", "al-completion-date-mode-button", uiText("date.known"));
+  const unknown = makeEl("button", "al-completion-date-mode-button", uiText("date.unknown"));
+  for (const button of [known, unknown]) {
+    button.type = "button";
+    button.setAttribute("role", "radio");
+  }
+  mode.append(known, unknown);
+  const supporting = makeEl("small", "al-completion-date-support", uiText("date.unknownSupporting"));
+  root.append(mode, date, supporting);
+
+  let unknownSelected = isUnknownCompletionDate(value);
+  let required = false;
+  const sync = (emitInput = true): void => {
+    root.toggleClass("is-unknown", unknownSelected);
+    known.toggleClass("is-selected", !unknownSelected);
+    unknown.toggleClass("is-selected", unknownSelected);
+    known.setAttribute("aria-checked", String(!unknownSelected));
+    unknown.setAttribute("aria-checked", String(unknownSelected));
+    date.hidden = unknownSelected;
+    supporting.hidden = !unknownSelected;
+    date.required = required && !unknownSelected;
+    if (emitInput) root.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const selectMode = (nextUnknown: boolean): void => {
+    if (unknownSelected === nextUnknown) return;
+    unknownSelected = nextUnknown;
+    sync();
+    root.dispatchEvent(new Event("change", { bubbles: true }));
+    if (!nextUnknown) date.querySelector<HTMLInputElement>("input")?.focus();
+  };
+  known.addEventListener("click", () => selectMode(false));
+  unknown.addEventListener("click", () => selectMode(true));
+  mode.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    selectMode(event.key === "ArrowRight");
+    (event.key === "ArrowRight" ? unknown : known).focus();
+  });
+
+  Object.defineProperty(root, "value", {
+    configurable: true,
+    get: () => unknownSelected ? UNKNOWN_COMPLETION_DATE : date.value,
+    set: (nextValue: unknown) => {
+      unknownSelected = isUnknownCompletionDate(nextValue);
+      date.value = unknownSelected ? "" : String(formValue(nextValue));
+      sync(false);
+    },
+  });
+  Object.defineProperty(root, "required", {
+    configurable: true,
+    get: () => required,
+    set: (nextRequired: boolean) => {
+      required = Boolean(nextRequired);
+      date.required = required && !unknownSelected;
+      root.setAttribute("aria-required", required ? "true" : "false");
+    },
+  });
+  date.addEventListener("input", () => root.dispatchEvent(new Event("input", { bubbles: true })));
+  date.addEventListener("change", () => root.dispatchEvent(new Event("change", { bubbles: true })));
+  sync(false);
   return root;
 }
 
@@ -334,7 +406,7 @@ export function createMediaEditorFields({
   const completedAt = createLabeledField(
     parent,
     uiText("add.completedAt"),
-    createTextInput("date", String(formValue(values.completedAt))),
+    createCompletionDateInput(String(formValue(values.completedAt))),
     uiText("add.completedHint", { status: completedStatusLabel(mediaType) }),
   );
 

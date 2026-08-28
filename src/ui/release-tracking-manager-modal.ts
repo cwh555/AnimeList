@@ -5,6 +5,7 @@ import type { MediaItem } from "../domain/media-types";
 import { isReleaseTrackingEnabled, isReleaseTrackingMedia } from "../domain/release-tracking-enrollment";
 import { releaseTrackingText } from "../features/release-tracking/text";
 import { MEDIA_UI_LABELS } from "./ui-helpers";
+import { bindImageFallback } from "./image-fallback";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
   const node = createEl(tag);
@@ -28,16 +29,13 @@ function cover(item: MediaItem): HTMLElement {
     return node;
   }
   const image = el("img");
-  image.src = source;
   image.alt = item.title;
   image.loading = "lazy";
   image.decoding = "async";
+  bindImageFallback(image, () => icon("book-open"));
   if (item.coverSources?.srcset) image.srcset = item.coverSources.srcset;
-  image.addEventListener("error", () => {
-    image.remove();
-    node.appendChild(icon("book-open"));
-  }, { once: true });
   node.appendChild(image);
+  image.src = source;
   return node;
 }
 

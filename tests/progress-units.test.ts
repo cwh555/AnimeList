@@ -6,6 +6,7 @@ import {
   highestCompletedSerialLabel,
   normalizeSerialLabel,
   normalizeSerialLog,
+  normalizeReadingProgressValue,
   normalizeSerialProgress,
   progressUnitsFor,
   serializeSerialLog,
@@ -31,6 +32,8 @@ describe("reading progress units", () => {
     assert.equal(normalizeSerialLabel("7.2", "volume"), null);
     assert.equal(normalizeSerialProgress("3", "season"), 3);
     assert.equal(normalizeSerialProgress("EX", "volume"), "EX");
+    assert.equal(normalizeReadingProgressValue("第 12 話 / Web版"), "第 12 話 / Web版");
+    assert.equal(normalizeReadingProgressValue(" 12 "), 12);
   });
 
   it("normalizes, deduplicates, and serializes dated entries for every reading unit", () => {

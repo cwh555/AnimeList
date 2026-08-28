@@ -15,6 +15,8 @@ import {
   type StoredSerialCover,
 } from "../../app/serial-covers/serial-cover-service";
 import { serialCoverText } from "./text";
+import { bindImageFallback } from "../../ui/image-fallback";
+import { makeEl } from "../../ui/ui-helpers";
 import { READING_EDITOR_STATE_KEY, type ReadingProgressEditorState } from "../progress/additional-progress-units";
 import type { MediaFormContext, MediaFormSubmitContext } from "../../ui/media-form-contracts";
 import type { NovelVolumeEntry } from "../../types";
@@ -235,8 +237,14 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
       return;
     }
     const image = coverButton.createEl("img");
-    image.src = context.host.resolveMediaCoverPath(stored.cover, context.form.file?.path ?? "") || stored.cover;
     image.alt = `${context.originalTitle} ${labelInput.value}`;
+    bindImageFallback(image, () => {
+      const missing = makeEl("span");
+      setIcon(missing, "image-off");
+      status.setText(serialCoverText("notFound"));
+      return missing;
+    });
+    image.src = context.host.resolveMediaCoverPath(stored.cover, context.form.file?.path ?? "") || stored.cover;
     status.setText(stored.manual ? serialCoverText("manual") : serialCoverText("autoFound"));
     clear.hidden = false;
   };

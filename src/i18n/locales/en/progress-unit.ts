@@ -21,6 +21,7 @@ export const EN_PROGRESS_UNIT_MESSAGES = {
     unitField: "Progress unit",
     progressHintInteger: "Supports non-negative integers.",
     progressHintVolume: "Supports integers, .5, and EX.",
+  progressHintFreeform: "Progress can be any text, for example “Chapter 12 / Web edition”.",
     timelineEntryTitle: "{title} — {unit} {label}",
     timelineEntryLabel: "{unit} {label}",
   } as const;

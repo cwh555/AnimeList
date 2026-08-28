@@ -612,4 +612,59 @@ describe("release tracking persistence", () => {
     assert.equal(frontmatter.latest_volume, "9");
   });
 
+  it("keeps arbitrary reading-progress text opaque while refreshing release metadata", async () => {
+    const freeProgress = "第 120 話 / 單行本同步中";
+    const { app, file, frontmatter } = harness({
+      progress: freeProgress,
+      progress_unit: "chapter",
+      release_tracking_provider: "mangadex",
+      release_tracking_ref: "series-1",
+      release_tracking_title: "Test",
+      release_tracking_status: "verified",
+      latest_chapter: "120",
+    });
+    const mangaDex = { async latestChapter() { return "121"; } } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    manga.progress = freeProgress;
+
+    const result = await service.refreshItem(manga);
+
+    assert.equal(result.status, "verified");
+    assert.equal(result.after, "121");
+    assert.equal(frontmatter.progress, freeProgress);
+    assert.equal(frontmatter.latest_chapter, "121");
+  });
+
+  it("cancels an in-flight provider check immediately without persisting the late result", async () => {
+    const { app, file, frontmatter } = harness({
+      progress: 120,
+      progress_unit: "chapter",
+      release_tracking_provider: "mangadex",
+      release_tracking_ref: "series-1",
+      release_tracking_title: "Test",
+      release_tracking_status: "verified",
+      latest_chapter: "120",
+    });
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const mangaDex = {
+      async latestChapter() {
+        markStarted();
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        return "121";
+      },
+    } as unknown as MangaDexReleaseClient;
+    const service = new ReleaseTrackingService(app, { mangaDex, ndl: {} as NdlReleaseClient });
+    const manga = item(file.path, "manga");
+    const controller = new AbortController();
+    const refresh = service.refreshItem(manga, undefined, controller.signal);
+    await started;
+    controller.abort();
+    await assert.rejects(refresh, (error: unknown) => error instanceof Error && error.name === "AbortError");
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(frontmatter.latest_chapter, "120");
+    assert.equal(frontmatter.release_tracking_status, "verified");
+  });
+
 });

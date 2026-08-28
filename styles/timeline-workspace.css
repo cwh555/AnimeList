@@ -308,24 +308,35 @@
 .animelist-native-view .al-timeline-history-item .al-timeline-card { position: relative; inset: auto; }
 .animelist-native-view .al-timeline-history-date { color: var(--al-m3-on-surface-variant); font-size: .64rem; text-align: center; }
 
-.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-timeline-workspace-controls { flex-wrap: wrap; }
-.animelist-native-view .al-workspace-shell[data-window-size="medium"] .al-timeline-scale-actions { margin-left: 0; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-controls {
-  align-items: stretch;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+/* Completion dates that are explicitly unknown live outside the chronological axis. */
+.animelist-native-view .al-timeline-undated-dimension {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(110px, 170px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--al-m3-outline) 68%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--al-m3-surface-container) 82%, transparent);
 }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-view-modes,
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-type-filters { width: 100%; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-timeline-view-mode,
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline button.al-timeline-type-filter { flex: 1 1 0; padding-inline: 9px; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-actions { width: 100%; margin-left: 0; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group { flex: 1 1 150px; justify-content: center; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap,
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-viewport { min-height: 0; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview { grid-template-columns: 1fr; gap: 2px; margin-top: 6px; padding: 6px 10px 8px; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-overview-label { padding-bottom: 0; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month { grid-template-columns: 1fr; gap: 10px; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-month-header { flex-direction: row; justify-content: space-between; padding-left: 8px; }
-.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-history-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); justify-items: center; }
+.animelist-native-view .al-timeline-undated-header { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.animelist-native-view .al-timeline-undated-header strong { font-size: .76rem; }
+.animelist-native-view .al-timeline-undated-header span { color: var(--al-m3-on-surface-variant); font-size: .62rem; line-height: 1.35; }
+.animelist-native-view .al-timeline-undated-rail { display: flex; min-width: 0; gap: 10px; overflow-x: auto; padding: 2px; }
+.animelist-native-view .al-timeline-undated-card {
+  position: relative;
+  inset: auto;
+  width: 72px;
+  min-width: 72px;
+  height: 108px;
+  flex: 0 0 72px;
+}
+.animelist-native-view .al-timeline-undated-card .al-timeline-card-copy { font-size: .56rem; }
+.animelist-native-view .al-timeline-undated-card .al-timeline-score { font-size: .52rem; }
+.animelist-native-view .al-timeline-history > .al-timeline-undated-dimension { order: -1; }
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-undated-dimension {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}

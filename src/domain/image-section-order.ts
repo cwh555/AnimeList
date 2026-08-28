@@ -1,6 +1,5 @@
 import {
   findImageSectionBlocks,
-  locateImageSectionBlock,
   normalizeImageSectionPath,
   serializeImageSectionPaths,
   type ImageSectionBlock,
@@ -15,16 +14,87 @@ export interface ImageSectionStateUpdate {
   lineEnd: number;
 }
 
-export interface ImageSectionMoveUpdate {
+export interface ImageSectionOrderReplacement {
+  locator: ImageSectionLocator;
+  expectedPaths: readonly string[];
+  paths: readonly string[];
+}
+
+export interface ImageSectionOrderBatchUpdate {
   markdown: string;
-  sourceSection: ImageSectionStateUpdate;
-  targetSection: ImageSectionStateUpdate;
+  sections: ImageSectionStateUpdate[];
 }
 
 export interface ImageSectionPathMovePlan {
   sourcePaths: string[];
   targetPaths: string[];
   changed: boolean;
+}
+
+export interface ImageSectionPendingOrder {
+  lineStart?: number;
+  expectedPaths: readonly string[];
+  paths: readonly string[];
+}
+
+export type ImageSectionPendingOrderResolutionStatus = "pending" | "committed" | "conflict";
+
+export interface ImageSectionPendingOrderResolution {
+  status: ImageSectionPendingOrderResolutionStatus;
+  pending: ImageSectionPendingOrder;
+  locator?: ImageSectionLocator;
+}
+
+export function classifyImageSectionPendingOrder(
+  currentPaths: readonly string[],
+  pending: ImageSectionPendingOrder,
+): ImageSectionPendingOrderResolutionStatus {
+  if (samePathOrder(pending.expectedPaths, pending.paths)) return "committed";
+  if (samePathOrder(currentPaths, pending.paths)) return "committed";
+  if (samePathOrder(currentPaths, pending.expectedPaths)) return "pending";
+  return "conflict";
+}
+
+function closestMatchingBlock(
+  blocks: readonly ImageSectionBlock[],
+  used: ReadonlySet<number>,
+  hint: number | null,
+  pending: ImageSectionPendingOrder,
+): { block: ImageSectionBlock; index: number; status: ImageSectionPendingOrderResolutionStatus } | null {
+  const matches: Array<{ block: ImageSectionBlock; index: number; status: ImageSectionPendingOrderResolutionStatus; distance: number }> = [];
+  blocks.forEach((block, index) => {
+    if (used.has(index)) return;
+    const status = classifyImageSectionPendingOrder(block.paths, pending);
+    if (status === "conflict") return;
+    const containsHint = hint !== null && hint >= block.lineStart && hint <= block.lineEnd;
+    const distance = containsHint ? -1 : hint === null ? index : Math.abs(block.lineStart - hint);
+    matches.push({ block, index, status, distance });
+  });
+  if (!matches.length) return null;
+  matches.sort((left, right) => left.distance - right.distance || left.index - right.index);
+  return matches[0];
+}
+
+export function resolveImageSectionPendingOrders(
+  markdown: unknown,
+  pendingOrders: readonly ImageSectionPendingOrder[],
+): ImageSectionPendingOrderResolution[] {
+  const text = typeof markdown === "string" ? markdown : "";
+  const blocks = findImageSectionBlocks(text);
+  const used = new Set<number>();
+  return pendingOrders.map((pending) => {
+    if (samePathOrder(pending.expectedPaths, pending.paths)) return { status: "committed", pending };
+    const hint = typeof pending.lineStart === "number" ? pending.lineStart : null;
+    const match = closestMatchingBlock(blocks, used, hint, pending);
+    if (!match) return { status: "conflict", pending };
+    used.add(match.index);
+    if (match.status === "committed") return { status: "committed", pending };
+    return {
+      status: "pending",
+      pending,
+      locator: { source: match.block.source, lineStart: match.block.lineStart },
+    };
+  });
 }
 
 function samePathOrder(left: readonly string[], right: readonly string[]): boolean {
@@ -97,6 +167,28 @@ function blockIndex(blocks: readonly ImageSectionBlock[], block: ImageSectionBlo
   return index;
 }
 
+function locateExpectedOrderBlock(
+  markdown: string,
+  locator: ImageSectionLocator,
+  expectedPaths: readonly string[],
+): ImageSectionBlock {
+  const blocks = findImageSectionBlocks(markdown);
+  const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
+  const containing = hint === null
+    ? null
+    : blocks.find((block) => hint >= block.lineStart && hint <= block.lineEnd) ?? null;
+  if (containing && samePathOrder(containing.paths, expectedPaths)) return containing;
+
+  const matches = blocks.filter((block) => samePathOrder(block.paths, expectedPaths));
+  if (matches.length === 1) return matches[0];
+  if (hint !== null && matches.length > 1) {
+    return [...matches].sort((left, right) => (
+      Math.abs(left.lineStart - hint) - Math.abs(right.lineStart - hint)
+    ))[0];
+  }
+  throw new Error("Image section changed before the pending order could be saved");
+}
+
 function replaceBlockPaths(lines: string[], block: ImageSectionBlock, paths: readonly string[]): void {
   const source = serializeImageSectionPaths(paths);
   const replacement = [lines[block.lineStart], ...(source ? source.split("\n") : []), lines[block.lineEnd]];
@@ -107,56 +199,40 @@ function stateFor(block: ImageSectionBlock): ImageSectionStateUpdate {
   return { source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd };
 }
 
-export function moveImageSectionPath(
+export function replaceImageSectionOrders(
   markdown: unknown,
-  sourceLocator: ImageSectionLocator,
-  targetLocator: ImageSectionLocator,
-  movingPathValue: unknown,
-  targetPathValue: unknown,
-  placement: ImageSectionDropPlacement,
-): ImageSectionMoveUpdate {
+  replacements: readonly ImageSectionOrderReplacement[],
+): ImageSectionOrderBatchUpdate {
   const text = typeof markdown === "string" ? markdown : "";
+  if (replacements.length === 0) return { markdown: text, sections: [] };
+
   const newline = text.includes("\r\n") ? "\r\n" : "\n";
   const blocks = findImageSectionBlocks(text);
-  const sourceBlock = locateImageSectionBlock(text, sourceLocator);
-  const targetBlock = locateImageSectionBlock(text, targetLocator);
-  const sourceIndex = blockIndex(blocks, sourceBlock);
-  const targetIndex = blockIndex(blocks, targetBlock);
-  const movingPath = normalizeImageSectionPath(movingPathValue);
-  const targetPath = normalizeImageSectionPath(targetPathValue);
-
-  if (!movingPath || !sourceBlock.paths.includes(movingPath)) {
-    throw new Error("Could not find the dragged image in its source section");
+  const indexed = replacements.map((replacement) => {
+    const block = locateExpectedOrderBlock(text, replacement.locator, replacement.expectedPaths);
+    return {
+      index: blockIndex(blocks, block),
+      block,
+      paths: [...replacement.paths],
+    };
+  });
+  const seen = new Set<number>();
+  for (const entry of indexed) {
+    if (seen.has(entry.index)) throw new Error("Image section order batch contains the same section twice");
+    seen.add(entry.index);
   }
 
-  const sameSection = sourceIndex === targetIndex;
-  const plan = planImageSectionPathMove(
-    sourceBlock.paths,
-    targetBlock.paths,
-    movingPath,
-    targetPath,
-    placement,
-    sameSection,
-  );
   const lines = text.split(/\r?\n/u);
-  if (sameSection) {
-    replaceBlockPaths(lines, sourceBlock, plan.sourcePaths);
-  } else {
-    const replacements = [
-      { block: sourceBlock, paths: plan.sourcePaths },
-      { block: targetBlock, paths: plan.targetPaths },
-    ].sort((left, right) => right.block.lineStart - left.block.lineStart);
-    for (const replacement of replacements) replaceBlockPaths(lines, replacement.block, replacement.paths);
+  for (const entry of [...indexed].sort((left, right) => right.block.lineStart - left.block.lineStart)) {
+    replaceBlockPaths(lines, entry.block, entry.paths);
   }
 
   const updatedMarkdown = lines.join(newline);
   const updatedBlocks = findImageSectionBlocks(updatedMarkdown);
-  const updatedSource = updatedBlocks[sourceIndex];
-  const updatedTarget = updatedBlocks[targetIndex];
-  if (!updatedSource || !updatedTarget) throw new Error("Could not verify the updated image sections");
-  return {
-    markdown: updatedMarkdown,
-    sourceSection: stateFor(updatedSource),
-    targetSection: stateFor(updatedTarget),
-  };
+  const sections = indexed.map(({ index }) => {
+    const block = updatedBlocks[index];
+    if (!block) throw new Error("Could not verify the updated image section order");
+    return stateFor(block);
+  });
+  return { markdown: updatedMarkdown, sections };
 }

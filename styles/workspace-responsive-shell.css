@@ -1,0 +1,69 @@
+/* Unified workspace adaptive layout.
+ *
+ * This is the only stylesheet that changes Workspace geometry by available
+ * width. The width class is assigned from the actual Obsidian leaf by
+ * workspace-responsive.ts, so a narrow desktop split and a phone use the same
+ * compact contract. Feature styles own visuals; mobile.css continues to own
+ * device/standalone concerns outside this Workspace layer.
+ */
+
+
+/* Shared shell rules only. Page-specific responsive geometry lives in the
+ * adjacent Library and secondary-page adaptive stylesheets. */
+/* Compact shared shell. */
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] {
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-header {
+  min-height: 56px;
+  gap: 10px;
+  padding: 7px 2px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-title {
+  font-size: 1.12rem;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-header-actions {
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-workspace-action,
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-workspace-more {
+  min-height: 44px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] button.al-workspace-tab {
+  min-width: 82px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding-inline: 12px;
+  scroll-snap-align: start;
+  font-size: .7rem;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page {
+  padding-top: 12px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-header {
+  min-height: 44px;
+  gap: 10px;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-heading {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-title {
+  overflow: hidden;
+  font-size: 1.18rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-actions {
+  flex: 0 0 auto;
+}
+.animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page-body {
+  padding-top: 8px;
+}
+

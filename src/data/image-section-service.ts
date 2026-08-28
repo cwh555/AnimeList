@@ -17,9 +17,10 @@ import {
 } from "../domain/image-section";
 import { setImageSectionColumns } from "../domain/image-section-layout";
 import {
-  moveImageSectionPath,
-  type ImageSectionDropPlacement,
-  type ImageSectionMoveUpdate,
+  replaceImageSectionOrders,
+  resolveImageSectionPendingOrders,
+  type ImageSectionOrderReplacement,
+  type ImageSectionPendingOrder,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
 import { allManagedImageReferences } from "../domain/media-image-references";
@@ -259,8 +260,9 @@ export class ImageSectionService {
     sourcePath: string,
     locator: ImageSectionLocator,
     assets: readonly ImageSectionAssetInput[],
+    currentPaths?: readonly string[],
   ): Promise<ImageSectionAddResult> {
-    const current = parseImageSectionSource(locator.source);
+    const current = currentPaths ? [...currentPaths] : parseImageSectionSource(locator.source);
     const stored = await this.storeAssets(sourcePath, current, assets);
     if (stored.addedPaths.length > 0) {
       const note = this.noteFile(sourcePath);
@@ -292,29 +294,40 @@ export class ImageSectionService {
     return block;
   }
 
-  async moveAsset(
+  async setSectionOrders(
     sourcePath: string,
-    sourceLocator: ImageSectionLocator,
-    targetLocator: ImageSectionLocator,
-    pathValue: unknown,
-    targetPathValue: unknown,
-    placement: ImageSectionDropPlacement,
-  ): Promise<ImageSectionMoveUpdate> {
+    replacements: readonly ImageSectionOrderReplacement[],
+  ): Promise<ImageSectionStateUpdate[]> {
     const note = this.noteFile(sourcePath);
-    let result: ImageSectionMoveUpdate | null = null;
+    let result: ImageSectionStateUpdate[] | null = null;
     await this.host.app.vault.process(note, (markdown) => {
-      result = moveImageSectionPath(
-        markdown,
-        sourceLocator,
-        targetLocator,
-        pathValue,
-        targetPathValue,
-        placement,
-      );
-      return result.markdown;
+      const update = replaceImageSectionOrders(markdown, replacements);
+      result = update.sections;
+      return update.markdown;
     });
     if (!result) throw new Error("Could not update image section order");
     return result;
+  }
+
+  async commitPendingSectionOrders(
+    sourcePath: string,
+    pending: readonly ImageSectionPendingOrder[],
+  ): Promise<void> {
+    if (!pending.length) return;
+    const note = this.noteFile(sourcePath);
+    await this.host.app.vault.process(note, (markdown) => {
+      const resolutions = resolveImageSectionPendingOrders(markdown, pending);
+      const replacements: ImageSectionOrderReplacement[] = [];
+      for (const resolution of resolutions) {
+        if (resolution.status !== "pending" || !resolution.locator) continue;
+        replacements.push({
+          locator: resolution.locator,
+          expectedPaths: resolution.pending.expectedPaths,
+          paths: resolution.pending.paths,
+        });
+      }
+      return replacements.length ? replaceImageSectionOrders(markdown, replacements).markdown : markdown;
+    });
   }
 
   async remove(
@@ -329,10 +342,11 @@ export class ImageSectionService {
     sourcePath: string,
     locator: ImageSectionLocator,
     pathValues: readonly unknown[],
+    currentPaths?: readonly string[],
   ): Promise<string> {
     const note = this.noteFile(sourcePath);
     const targets = new Set(pathValues.map(normalizeImageSectionPath).filter(Boolean));
-    const current = parseImageSectionSource(locator.source);
+    const current = currentPaths ? [...currentPaths] : parseImageSectionSource(locator.source);
     if (targets.size === 0) return serializeImageSectionPaths(current);
 
     const nextPaths = current.filter((entry) => !targets.has(entry));

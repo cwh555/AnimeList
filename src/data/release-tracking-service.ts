@@ -5,6 +5,7 @@ import {
   officialMangaReleaseSources,
   type MangaChapterEvidence,
 } from "../domain/manga-release-sources";
+import { abortable, throwIfAborted } from "../domain/abort";
 import {
   compareChapterLabels,
   groupPublicationLines,
@@ -572,29 +573,42 @@ export class ReleaseTrackingService {
     }
   }
 
-  async refreshItem(item: MediaItem, binding?: ReleaseTrackingBinding): Promise<ReleaseRefreshItemResult> {
-    const prepared = await this.prepareItem(item, binding);
-    await prepared.persist();
+  async refreshItem(
+    item: MediaItem,
+    binding?: ReleaseTrackingBinding,
+    signal?: AbortSignal,
+  ): Promise<ReleaseRefreshItemResult> {
+    throwIfAborted(signal);
+    const prepared = await abortable(this.prepareItem(item, binding), signal);
+    throwIfAborted(signal);
+    await abortable(prepared.persist(), signal);
     return prepared.result;
   }
 
   async refreshAll(
     items: readonly MediaItem[],
     onProgress?: (progress: ReleaseRefreshProgress) => void,
+    signal?: AbortSignal,
   ): Promise<ReleaseRefreshSummary> {
     const trackable = items.filter((item) => {
       if (item.mediaType !== "manga" && item.mediaType !== "novel") return false;
       return this.state.read(item.filePath, item.mediaType).status !== "disabled";
     });
     const prepared: PreparedReleaseRefresh[] = [];
+    throwIfAborted(signal);
     for (let index = 0; index < trackable.length; index += 1) {
+      throwIfAborted(signal);
       const item = trackable[index];
       const provider = providerNameForItem(item);
       onProgress?.({ completed: index, total: trackable.length, item, provider, stage: "checking" });
-      prepared.push(await this.prepareItem(item));
+      prepared.push(await abortable(this.prepareItem(item), signal));
+      throwIfAborted(signal);
       onProgress?.({ completed: index + 1, total: trackable.length, item, provider, stage: "completed" });
     }
-    for (const entry of prepared) await entry.persist();
+    for (const entry of prepared) {
+      throwIfAborted(signal);
+      await abortable(entry.persist(), signal);
+    }
 
     const results = prepared.map((entry) => entry.result);
     return {

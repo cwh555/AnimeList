@@ -13,6 +13,7 @@ import {
   isReadingProgressUnit,
   normalizeSerialLabel,
   normalizeSerialLog,
+  normalizeReadingProgressValue,
   normalizeSerialProgress,
   progressUnitsFor,
   type ReadingProgressUnit,
@@ -199,16 +200,14 @@ function renderEditor(state: ReadingProgressEditorState): void {
 function updatePresentation(state: ReadingProgressEditorState): void {
   const { fields } = state.context;
   fields.progress.type = "text";
-  fields.progress.inputMode = state.unit === "volume" ? "decimal" : "numeric";
+  fields.progress.inputMode = "text";
   fields.progress.removeAttribute("min");
   fields.progress.removeAttribute("step");
   const progressField = fields.progress.closest<HTMLElement>(".al-form-field");
   progressField?.querySelector<HTMLElement>(".al-form-label")?.setText(textForUnit("progressLabel", state.unit));
   const hint = progressField?.querySelector<HTMLElement>(".al-form-hint");
   if (hint) {
-    hint.setText(progressUnitFeatureText(
-      state.unit === "volume" ? "progressHintVolume" : "progressHintInteger",
-    ));
+    hint.setText(progressUnitFeatureText("progressHintFreeform"));
   }
   renderEditor(state);
 }
@@ -231,17 +230,13 @@ function validateAndPrepare(state: ReadingProgressEditorState): void {
   }
   state.entries = entries.sort((left, right) => compareSerialLabels(left.label, right.label, state.unit));
 
-  const progress = normalizeSerialProgress(state.context.fields.progress.value, state.unit);
-  if (progress === null) {
-    throw new Error(progressUnitFeatureText(
-      state.unit === "volume" ? "invalidVolume" : "invalidInteger",
-      { unit: unitLabel },
-    ));
-  }
+  const progress = normalizeReadingProgressValue(state.context.fields.progress.value);
+  const strictProgress = normalizeSerialProgress(progress, state.unit);
   const completed = highestCompletedSerialLabel(state.entries, state.unit);
-  state.preparedProgress = completed !== null && compareSerialLabels(progress, completed, state.unit) < 0
-    ? completed === "EX" ? completed : Number(completed)
-    : progress;
+  state.preparedProgress = completed !== null && strictProgress !== null
+    && compareSerialLabels(strictProgress, completed, state.unit) < 0
+      ? completed === "EX" ? completed : Number(completed)
+      : progress;
   state.context.fields.progress.value = String(state.preparedProgress);
 }
 
@@ -271,7 +266,7 @@ function configureReadingEditor(context: MediaFormContext<AnimeListFeatureHost>)
     unit: selected,
     entries: normalizeSerialLog(context.frontmatter.volume_log, selected),
     editor,
-    preparedProgress: normalizeSerialProgress(context.fields.progress.value, selected) ?? 0,
+    preparedProgress: normalizeReadingProgressValue(context.fields.progress.value),
     originalTitle: originalTitle(context),
     listeners: new Set(),
     keyboard,
