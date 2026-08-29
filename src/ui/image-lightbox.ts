@@ -31,6 +31,7 @@ export class ImageLightboxModal extends Modal {
   private panY = 0;
   private pan: { id: number; x: number; y: number; startX: number; startY: number } | null = null;
   private syncToken = 0;
+  private fitFrame = 0;
   private readonly preloadResults = new Map<string, Promise<boolean>>();
 
   constructor(
@@ -45,16 +46,51 @@ export class ImageLightboxModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("animelist-image-lightbox");
+    this.modalEl.style.height = "min(92dvh, calc(100dvh - 24px))";
+    this.modalEl.style.maxHeight = "calc(100dvh - 24px)";
+    this.contentEl.style.height = "100%";
+    this.contentEl.style.minHeight = "0";
+    this.contentEl.style.boxSizing = "border-box";
     this.modalEl.addEventListener("keydown", this.handleKeydown);
+    window.addEventListener("resize", this.handleViewportResize);
     this.buildShell();
     this.syncEntry();
+    this.scheduleStageFit();
   }
 
   onClose(): void {
     this.syncToken += 1;
     this.preloadResults.clear();
+    if (this.fitFrame) window.cancelAnimationFrame(this.fitFrame);
+    this.fitFrame = 0;
+    window.removeEventListener("resize", this.handleViewportResize);
     this.modalEl.removeEventListener("keydown", this.handleKeydown);
     this.contentEl.replaceChildren();
+  }
+
+  private readonly handleViewportResize = (): void => this.scheduleStageFit();
+
+  private scheduleStageFit(): void {
+    if (this.fitFrame) window.cancelAnimationFrame(this.fitFrame);
+    this.fitFrame = window.requestAnimationFrame(() => {
+      this.fitFrame = 0;
+      this.fitStageToModal();
+    });
+  }
+
+  private fitStageToModal(): void {
+    if (!this.stage || !this.counter) return;
+    const contentHeight = this.contentEl.getBoundingClientRect().height;
+    if (contentHeight <= 0) return;
+    const contentStyle = window.getComputedStyle(this.contentEl);
+    const paddingTop = Number.parseFloat(contentStyle.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(contentStyle.paddingBottom) || 0;
+    const gap = Number.parseFloat(contentStyle.rowGap || contentStyle.gap) || 0;
+    const counterHeight = this.counter.getBoundingClientRect().height;
+    const available = Math.max(120, contentHeight - paddingTop - paddingBottom - gap - counterHeight);
+    this.stage.style.height = `${available}px`;
+    this.stage.style.minHeight = "0";
+    this.stage.style.maxHeight = `${available}px`;
   }
 
   private readonly handleKeydown = (event: KeyboardEvent): void => {
@@ -97,10 +133,18 @@ export class ImageLightboxModal extends Modal {
   private buildShell(): void {
     this.contentEl.replaceChildren();
     this.stage = makeEl("div", "al-image-lightbox-stage");
+    this.stage.style.flex = "1 1 auto";
+    this.stage.style.minHeight = "0";
+    this.stage.style.maxHeight = "none";
+    this.stage.style.boxSizing = "border-box";
+    this.stage.style.padding = "clamp(8px, 1.8vh, 18px)";
     this.image = makeEl("img", "al-image-lightbox-image");
+    this.image.style.maxWidth = "100%";
+    this.image.style.maxHeight = "100%";
     this.image.alt = "";
     this.image.draggable = false;
     this.image.hidden = true;
+    this.image.addEventListener("load", () => this.scheduleStageFit());
     this.image.addEventListener("error", () => {
       if (!this.image || !this.missing) return;
       this.image.hidden = true;
@@ -160,6 +204,7 @@ export class ImageLightboxModal extends Modal {
     this.stage.addEventListener("pointercancel", endPan);
 
     this.counter = makeEl("div", "al-image-lightbox-counter");
+    this.counter.style.flex = "0 0 auto";
     this.contentEl.append(this.stage, this.counter);
   }
 
@@ -209,6 +254,7 @@ export class ImageLightboxModal extends Modal {
     const resolved = this.service.resolve(entry.path, entry.sourcePath);
     this.counter.textContent = `${targetIndex + 1} / ${this.entries.length}`;
     this.applyTransform();
+    this.scheduleStageFit();
 
     if (!resolved.resourcePath) {
       this.stage?.removeAttribute("aria-busy");
@@ -234,6 +280,7 @@ export class ImageLightboxModal extends Modal {
       this.image.src = resourcePath;
       this.image.hidden = false;
       this.missing.hidden = true;
+      this.scheduleStageFit();
     });
     this.preloadAdjacent();
   }
