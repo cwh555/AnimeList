@@ -32,9 +32,15 @@ jobs:
           git fetch origin preview
           test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
 
-          cat .github/garbage-cleanup.patch.b64.part{1,2,3,4} | base64 -d > /tmp/garbage-cleanup.patch
-          test "$(wc -c < /tmp/garbage-cleanup.patch | tr -d ' ')" = "79434"
-          test "$(sha256sum /tmp/garbage-cleanup.patch | cut -d' ' -f1)" = "21773e2c3b5d85dd037cabc70172664c42c7302ead6f04713b710ca464379a11"
+          : > /tmp/garbage-cleanup.patch
+          for part in .github/garbage-cleanup.patch.b64.part{1,2,3,4}; do
+            base64 -d "$part" >> /tmp/garbage-cleanup.patch
+          done
+          actual_size="$(wc -c < /tmp/garbage-cleanup.patch | tr -d ' ')"
+          actual_sha="$(sha256sum /tmp/garbage-cleanup.patch | cut -d' ' -f1)"
+          echo "decoded patch size=$actual_size sha256=$actual_sha"
+          test "$actual_size" = "79434"
+          test "$actual_sha" = "21773e2c3b5d85dd037cabc70172664c42c7302ead6f04713b710ca464379a11"
 
           git reset --hard "$BASE_HEAD"
           git clean -fd
