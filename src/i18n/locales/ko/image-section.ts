@@ -41,6 +41,7 @@ export const KO_IMAGE_SECTION_MESSAGES = {
   columnsLabel: "이미지 열 수",
   layoutFailed: "이미지 레이아웃을 업데이트할 수 없습니다: {error}",
   dragImage: "드래그하여 순서 변경",
+  dropHere: "여기에 놓기",
   moveFailed: "이미지를 이동할 수 없습니다: {error}",
   crossNoteMoveUnsupported: "현재 이미지는 같은 노트의 이미지 섹션 사이에서만 드래그하여 이동할 수 있습니다.",
 } as const;
