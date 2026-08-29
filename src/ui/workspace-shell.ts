@@ -3,6 +3,7 @@ import type { LibrarySection } from "../domain/settings-types";
 import { uiText } from "../ui-text";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { appendIconLabel, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 import { disconnectWorkspaceWindowSize, observeWorkspaceWindowSize } from "./workspace-responsive";
 
 export interface WorkspaceShellOptions {
@@ -115,7 +116,7 @@ export function renderAnimeListWorkspaceShell(
   header.append(brand, actions);
 
   const navRow = makeEl("div", "al-workspace-nav-row");
-  const nav = makeEl("nav", "al-workspace-nav");
+  const nav = isolateHorizontalSwipeSurface(makeEl("nav", "al-workspace-nav"));
   nav.setAttribute("aria-label", "Primary navigation");
   for (const page of pages) {
     const button = makeEl("button", `al-workspace-tab${page.id === activePage.id ? " is-active" : ""}`);

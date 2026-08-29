@@ -155,6 +155,10 @@ render();
  const modeTabs=document.querySelector('.al-gallery-mode-tabs');
  const modeButton=document.querySelector('.al-gallery-mode-tab');
  details.secondaryNavDistinct=!!modeTabs && !modeButton.classList.contains('al-workspace-tab') && parseFloat(getComputedStyle(modeTabs).borderRadius)>=8;
+ details.workspaceAndGallerySwipeOwnership=document.querySelector('.al-workspace-nav')?.getAttribute('data-ignore-swipe')==='true'
+   && modeTabs?.getAttribute('data-ignore-swipe')==='true'
+   && document.querySelector('.al-gallery-type-filters')?.getAttribute('data-ignore-swipe')==='true'
+   && !document.querySelector('.al-workspace-shell')?.hasAttribute('data-ignore-swipe');
 
  const slider=document.querySelector('.al-gallery-columns input');
  slider.value='2'; const tileBeforeColumns=document.querySelector('.al-gallery-image-tile'); const imageBeforeColumns=tileBeforeColumns?.querySelector('img'); slider.dispatchEvent(new Event('input',{bubbles:true})); await frames(); details.galleryColumnChangeUsesLayoutMotion=[...document.querySelectorAll('.al-gallery-image-tile')].some(tile=>tile.dataset.layoutMotion==='active'||tile.getAnimations().length>0); details.galleryColumnChangePreservesImageNode=document.querySelector('.al-gallery-image-tile')===tileBeforeColumns&&document.querySelector('.al-gallery-image-tile img')===imageBeforeColumns; await new Promise(r=>setTimeout(r,230)); await frames();
@@ -179,6 +183,7 @@ render();
  details.workBoardsAreExpanded=document.querySelector('.al-gallery-work-card').getBoundingClientRect().height>120;
  click(document.querySelector('.al-gallery-work-card')); await new Promise(r=>setTimeout(r,10));
  details.workDetailHasSessions=document.querySelectorAll('.al-gallery-session-filter').length===3;
+ details.gallerySessionRailOwnsSwipe=document.querySelector('.al-gallery-session-filters')?.getAttribute('data-ignore-swipe')==='true';
  details.workDetailHidesSearchAndTypesByComputedStyle=getComputedStyle(document.querySelector('.al-gallery-search')).display==='none' && getComputedStyle(document.querySelector('.al-gallery-type-filters')).display==='none' && getComputedStyle(document.querySelector('.al-gallery-columns')).display!=='none';
  const sessionButtons=[...document.querySelectorAll('.al-gallery-session-filter')]; click(sessionButtons[2]); await new Promise(r=>setTimeout(r,10));
  details.sessionFilterUsesSessionImages=document.querySelectorAll('.al-gallery-image-tile').length===2;

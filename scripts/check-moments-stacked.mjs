@@ -287,6 +287,8 @@ renderer.onload();
  const legacy=new AnimeListMomentsStacked.MomentEditorModal({},service,"Anime/Demo.md",legacyInitial,async()=>{});
  legacy.open(); await delay(20);
  details.legacyDefaultsToCarousel=legacy.contentEl.querySelector('.al-moment-editor-layout-mode.is-active')?.textContent!==""
+   && legacy.contentEl.querySelector('.al-moment-editor-images')?.getAttribute('data-ignore-swipe')==='true'
+   && !legacy.contentEl.hasAttribute('data-ignore-swipe')
    && !legacy.contentEl.querySelector('.al-moment-stack-editor');
  legacy.close();
  document.body.dataset.details=JSON.stringify(details);

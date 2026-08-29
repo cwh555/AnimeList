@@ -133,6 +133,13 @@ try{
     details.libraryToolbarStacks=Math.abs(displayTools.getBoundingClientRect().top-queryTools.getBoundingClientRect().top)<=2;
   }
   details.libraryToolbarVisible=toolbar.getBoundingClientRect().height>0;
+  const workspaceNav=app.querySelector('.al-workspace-nav');
+  details.workspaceNavOwnsHorizontalSwipe=workspaceNav?.getAttribute('data-ignore-swipe')==='true';
+  details.horizontalSwipeIsolationKeepsVerticalPan=getComputedStyle(workspaceNav).touchAction==='auto';
+  details.libraryHorizontalSurfacesOwnSwipe=app.querySelector('.al-type-tabs')?.getAttribute('data-ignore-swipe')==='true'
+    && statuses?.getAttribute('data-ignore-swipe')==='true';
+  details.workspaceRootKeepsNativeSwipe=!app.querySelector('.al-workspace-shell')?.hasAttribute('data-ignore-swipe')
+    && !app.querySelector('.al-workspace-page')?.hasAttribute('data-ignore-swipe');
   details.libraryFits=noOverflow(app);
 
   shell=await render('scores');
@@ -147,6 +154,8 @@ try{
   }else{
     details.scoreControlsStack=getComputedStyle(scoreControls).display==='flex';
   }
+  details.scoreHorizontalSurfacesOwnSwipe=app.querySelector('.al-score-dashboard-tabs')?.getAttribute('data-ignore-swipe')==='true'
+    && scorePosters?.getAttribute('data-ignore-swipe')==='true';
   details.scoresFit=noOverflow(app);
 
   shell=await render('images');
@@ -159,6 +168,8 @@ try{
   }else{
     details.imageFiltersStack=columns(galleryFilters)>=2;
   }
+  details.imageHorizontalSurfacesOwnSwipe=app.querySelector('.al-gallery-mode-tabs')?.getAttribute('data-ignore-swipe')==='true'
+    && app.querySelector('.al-gallery-type-filters')?.getAttribute('data-ignore-swipe')==='true';
   details.imagesFit=noOverflow(app);
 
   shell=await render('timeline');
@@ -169,6 +180,8 @@ try{
   else if('${expectedSize}'==='medium')details.timelineControlsStack=getComputedStyle(timelineControls).flexWrap==='wrap';
   else details.timelineControlsStack=getComputedStyle(timelineControls).flexDirection==='row';
   details.timelineCanvasVisible=timelineViewport.getBoundingClientRect().height>180;
+  details.timelineHorizontalSurfacesOwnSwipe=app.querySelector('.al-timeline-view-modes')?.getAttribute('data-ignore-swipe')==='true'
+    && app.querySelector('.al-timeline-type-filters')?.getAttribute('data-ignore-swipe')==='true';
   details.timelineFits=noOverflow(app);
 
   if(${dynamic}){
