@@ -32,9 +32,9 @@ jobs:
           git fetch origin preview
           test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
 
-          tr -d '\r\n[:space:]' < .github/garbage-cleanup.patch.b64.part1 > /tmp/garbage-cleanup.b64
-          for part in .github/garbage-cleanup.patch.b64.part{2,3,4}; do
-            tr -d '\r\n[:space:]' < "$part" >> /tmp/garbage-cleanup.b64
+          : > /tmp/garbage-cleanup.b64
+          for part in .github/garbage-cleanup.patch.b64.part{1,2,3,4}; do
+            LC_ALL=C tr -cd 'A-Za-z0-9+/' < "$part" >> /tmp/garbage-cleanup.b64
           done
           remainder=$(( $(wc -c < /tmp/garbage-cleanup.b64) % 4 ))
           if [ "$remainder" -eq 2 ]; then printf '==' >> /tmp/garbage-cleanup.b64; fi
