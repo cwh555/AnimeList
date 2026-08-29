@@ -89,41 +89,39 @@ jobs:
           test -z "$(git status --porcelain)"
           test "$(git rev-list --count "$BASE_HEAD"..HEAD)" = "3"
 
-          expected="$(cat <<'EOF' | sort
-scripts/check-image-fallback-surfaces.mjs
-scripts/check-serial-reading-ui.mjs
-src/app/anime-list-application.ts
-src/app/feature-types.ts
-src/app/serial-covers/serial-cover-service.ts
-src/data/cover-cache.ts
-src/data/image-section-service.ts
-src/data/media-asset-garbage-collector.ts
-src/data/media-asset-reference-service.ts
-src/data/media-note-service.ts
-src/data/vault-scope.ts
-src/domain/media-asset-cleanup.ts
-src/domain/media-asset-references.ts
-src/features/serial-covers/feature.ts
-src/i18n/locales/en/core.ts
-src/i18n/locales/ja/core.ts
-src/i18n/locales/ko/core.ts
-src/i18n/locales/zh-TW/core.ts
-src/main.ts
-src/ui/media-form-contracts.ts
-src/ui/media-form-controls.ts
-src/ui/media-modals.ts
-src/ui/settings.ts
-tests/contracts/image-section-service.test.ts
-tests/contracts/media-asset-garbage-collector.test.ts
-tests/contracts/media-note-service.test.ts
-tests/contracts/moments-service.test.ts
-tests/legacy-characterization.test.ts
-tests/media-asset-cleanup.test.ts
-tests/media-form-lifecycle.test.ts
-tests/search-settings.test.ts
-tests/test-catalog.mjs
-EOF
-)"
+          expected="$(printf '%s\n' \
+            scripts/check-image-fallback-surfaces.mjs \
+            scripts/check-serial-reading-ui.mjs \
+            src/app/anime-list-application.ts \
+            src/app/feature-types.ts \
+            src/app/serial-covers/serial-cover-service.ts \
+            src/data/cover-cache.ts \
+            src/data/image-section-service.ts \
+            src/data/media-asset-garbage-collector.ts \
+            src/data/media-asset-reference-service.ts \
+            src/data/media-note-service.ts \
+            src/data/vault-scope.ts \
+            src/domain/media-asset-cleanup.ts \
+            src/domain/media-asset-references.ts \
+            src/features/serial-covers/feature.ts \
+            src/i18n/locales/en/core.ts \
+            src/i18n/locales/ja/core.ts \
+            src/i18n/locales/ko/core.ts \
+            src/i18n/locales/zh-TW/core.ts \
+            src/main.ts \
+            src/ui/media-form-contracts.ts \
+            src/ui/media-form-controls.ts \
+            src/ui/media-modals.ts \
+            src/ui/settings.ts \
+            tests/contracts/image-section-service.test.ts \
+            tests/contracts/media-asset-garbage-collector.test.ts \
+            tests/contracts/media-note-service.test.ts \
+            tests/contracts/moments-service.test.ts \
+            tests/legacy-characterization.test.ts \
+            tests/media-asset-cleanup.test.ts \
+            tests/media-form-lifecycle.test.ts \
+            tests/search-settings.test.ts \
+            tests/test-catalog.mjs | sort)"
           actual="$(git diff --name-only "$BASE_HEAD"..HEAD | sort)"
           test "$actual" = "$expected"
 
