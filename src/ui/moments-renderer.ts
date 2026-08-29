@@ -12,6 +12,7 @@ import { rasterizeMomentStackToPng } from "./moment-stack-raster";
 import { DeleteMomentModal, MomentEditorModal } from "./moments-modal";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { bindImageFallback } from "./image-fallback";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 function momentMissingImageNode(): HTMLElement {
   const missing = makeEl("div", "al-moment-image-missing");
@@ -331,7 +332,7 @@ export class MomentsRenderChild extends MarkdownRenderChild {
     media.classList.toggle("is-featured", moment.images.length === 1);
     media.classList.toggle("is-filmstrip", moment.images.length > 1);
     const viewport = makeEl("div", "al-moment-image-viewport");
-    const row = makeEl("div", "al-moment-image-row");
+    const row = isolateHorizontalSwipeSurface(makeEl("div", "al-moment-image-row"));
     row.setAttribute("role", "list");
     row.dataset.imageCount = String(moment.images.length);
     for (const path of moment.images) {

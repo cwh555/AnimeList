@@ -21,6 +21,7 @@ import { imageAssetsFromClipboard } from "./image-clipboard";
 import { errorMessage, makeEl, setAnimeListIcon } from "./ui-helpers";
 import { createMomentStackVisual, type MomentStackVisual } from "./moment-stack";
 import { bindImageFallback } from "./image-fallback";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 interface PendingAsset {
   key: number;
@@ -384,7 +385,7 @@ export class MomentEditorModal extends Modal {
   }
 
   private renderImageRow(): HTMLElement {
-    const row = makeEl("div", "al-moment-editor-images");
+    const row = isolateHorizontalSwipeSurface(makeEl("div", "al-moment-editor-images"));
     row.addEventListener("dragover", (event) => { event.preventDefault(); row.addClass("is-dragging"); });
     row.addEventListener("dragleave", () => row.removeClass("is-dragging"));
     row.addEventListener("drop", (event) => {

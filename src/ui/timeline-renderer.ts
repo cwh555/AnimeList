@@ -10,6 +10,7 @@ import { timelineWorkspaceText } from "../features/timeline/text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 import { animateLayoutChange } from "./layout-motion";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
 
@@ -189,7 +190,7 @@ export const TimelineUI = (() => {
         ? uiText("timeline.summary", { count: items.length, start: formatDate(minTime), end: formatDate(maxTime) })
         : uiText("timeline.summaryEmpty")),
     );
-    const typeFilters = makeEl("div", "al-timeline-type-filters");
+    const typeFilters = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-type-filters"));
     typeFilters.setAttribute("role", "group");
     typeFilters.setAttribute("aria-label", uiText("timeline.title"));
     const typeLabels: Record<LibraryMediaFilter, string> = {
@@ -209,7 +210,7 @@ export const TimelineUI = (() => {
       });
       typeFilters.appendChild(button);
     }
-    const controls = makeEl("div", "al-timeline-controls");
+    const controls = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-controls"));
     const spacingControls = makeEl("div", "al-timeline-control-group");
     spacingControls.setAttribute("role", "group");
     spacingControls.setAttribute("aria-label", uiText("timeline.spacingControls"));
@@ -245,7 +246,7 @@ export const TimelineUI = (() => {
       section.dataset.temporalDimension = "unknown";
       const header = makeEl("header", "al-timeline-undated-header");
       header.append(makeEl("strong", "", timelineWorkspaceText("timeline.undatedTitle")), makeEl("span", "", timelineWorkspaceText("timeline.undatedDescription")));
-      const rail = makeEl("div", "al-timeline-undated-rail");
+      const rail = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-undated-rail"));
       for (const item of unknownItems) rail.appendChild(createTimelinePosterCard(item, {
         dateLabel: timelineWorkspaceText("timeline.undatedTitle"),
         className: "al-timeline-card al-timeline-undated-card",

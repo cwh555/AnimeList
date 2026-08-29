@@ -11,6 +11,7 @@ import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBat
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
   if (view === "list") return "116px";
@@ -183,7 +184,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       shell.appendChild(summary);
     }
 
-    const nav = makeEl("nav", "al-type-tabs");
+    const nav = isolateHorizontalSwipeSurface(makeEl("nav", "al-type-tabs"));
     const typeButtons = new Map<LibraryMediaFilter, HTMLButtonElement>();
     ([
       ["all", uiText("library.tabAll")],
@@ -290,7 +291,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
     toolbar.append(searchWrap, filterButton, sortWrap, views);
     shell.appendChild(toolbar);
 
-    const statusBar = makeEl("div", "al-status-bar");
+    const statusBar = isolateHorizontalSwipeSurface(makeEl("div", "al-status-bar"));
     const statusButtons = new Map<string, HTMLButtonElement>();
     const renderStatusButtons = (): void => {
       statusButtons.clear();

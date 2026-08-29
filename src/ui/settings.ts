@@ -25,6 +25,7 @@ import type {
 export { DEFAULT_SETTINGS } from "../app/settings-model";
 import { uiText } from "../ui-text";
 import { buildDeclarativeSettingsPage } from "./settings-declarative";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 const DEFAULT_LIBRARY_FOLDER = "AnimeList";
 const ADDITIONAL_FOLDER_EXAMPLE = "Media\nArchive/Anime";
@@ -238,7 +239,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
   }
 
   private renderPageTabs(containerEl: HTMLElement): void {
-    const tabList = containerEl.createDiv({ cls: "animelist-settings-tabs" });
+    const tabList = isolateHorizontalSwipeSurface(containerEl.createDiv({ cls: "animelist-settings-tabs" }));
     tabList.setAttribute("role", "tablist");
     tabList.setAttribute("aria-label", "Settings pages");
 
