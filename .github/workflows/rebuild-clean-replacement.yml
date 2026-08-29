@@ -72,8 +72,42 @@ jobs:
             tests/media-form-lifecycle.test.ts \
             tests/search-settings.test.ts \
             tests/test-catalog.mjs | sort)"
+
+          git add -N \
+            scripts/check-image-fallback-surfaces.mjs \
+            scripts/check-serial-reading-ui.mjs \
+            src/app/anime-list-application.ts \
+            src/app/feature-types.ts \
+            src/data/image-section-service.ts \
+            src/data/media-asset-garbage-collector.ts \
+            src/data/media-asset-reference-service.ts \
+            src/data/media-note-service.ts \
+            src/data/vault-scope.ts \
+            src/domain/media-asset-cleanup.ts \
+            src/domain/media-asset-references.ts \
+            src/features/serial-covers/feature.ts \
+            src/main.ts \
+            src/ui/media-form-contracts.ts \
+            src/ui/media-form-controls.ts \
+            src/ui/media-modals.ts \
+            src/ui/settings.ts \
+            tests/contracts/image-section-service.test.ts \
+            tests/contracts/media-asset-garbage-collector.test.ts \
+            tests/contracts/media-note-service.test.ts \
+            tests/contracts/moments-service.test.ts \
+            tests/legacy-characterization.test.ts \
+            tests/media-asset-cleanup.test.ts \
+            tests/media-form-lifecycle.test.ts \
+            tests/search-settings.test.ts \
+            tests/test-catalog.mjs
           actual="$(git diff --name-only "$BASE_HEAD" | sort)"
-          test "$actual" = "$expected"
+          if [ "$actual" != "$expected" ]; then
+            echo "Expected changed files:"
+            printf '%s\n' "$expected"
+            echo "Actual changed files:"
+            printf '%s\n' "$actual"
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
