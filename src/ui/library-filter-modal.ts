@@ -62,8 +62,10 @@ export class LibraryFilterModal extends Modal {
     const clear = makeEl("button", "al-filter-clear", uiText("library.filterClear"));
     clear.type = "button";
     clear.addEventListener("click", () => {
-      this.draft = normalizeLibraryFilters({});
-      this.renderGroups();
+      const empty = normalizeLibraryFilters({});
+      this.draft = empty;
+      this.onApply(empty);
+      this.close();
     });
     const spacer = makeEl("span", "al-filter-action-spacer");
     const cancel = makeEl("button", "", uiText("action.cancel"));
