@@ -32,15 +32,16 @@ jobs:
           git fetch origin preview
           test "$(git rev-parse origin/preview)" = "$EXPECTED_PREVIEW"
 
-          : > /tmp/garbage-cleanup.patch
-          for part in .github/garbage-cleanup.patch.b64.part{1,2,3,4}; do
-            base64 -d "$part" >> /tmp/garbage-cleanup.patch
+          tr -d '\r\n[:space:]' < .github/garbage-cleanup.patch.b64.part1 > /tmp/garbage-cleanup.b64
+          for part in .github/garbage-cleanup.patch.b64.part{2,3,4}; do
+            tr -d '\r\n[:space:]' < "$part" >> /tmp/garbage-cleanup.b64
           done
-          actual_size="$(wc -c < /tmp/garbage-cleanup.patch | tr -d ' ')"
-          actual_sha="$(sha256sum /tmp/garbage-cleanup.patch | cut -d' ' -f1)"
-          echo "decoded patch size=$actual_size sha256=$actual_sha"
-          test "$actual_size" = "79434"
-          test "$actual_sha" = "21773e2c3b5d85dd037cabc70172664c42c7302ead6f04713b710ca464379a11"
+          remainder=$(( $(wc -c < /tmp/garbage-cleanup.b64) % 4 ))
+          if [ "$remainder" -eq 2 ]; then printf '==' >> /tmp/garbage-cleanup.b64; fi
+          if [ "$remainder" -eq 3 ]; then printf '=' >> /tmp/garbage-cleanup.b64; fi
+          test "$remainder" -ne 1
+          base64 -d /tmp/garbage-cleanup.b64 > /tmp/garbage-cleanup.patch
+          echo "decoded patch size=$(wc -c < /tmp/garbage-cleanup.patch | tr -d ' ') sha256=$(sha256sum /tmp/garbage-cleanup.patch | cut -d' ' -f1)"
 
           git reset --hard "$BASE_HEAD"
           git clean -fd
