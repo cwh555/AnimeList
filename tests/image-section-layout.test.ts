@@ -7,6 +7,7 @@ import {
   parseImageSectionColumns,
   setImageSectionColumns,
 } from "../src/domain/image-section-layout";
+import { imageSectionShortestColumnBuckets } from "../src/domain/image-section-masonry";
 import {
   planImageSectionPathMove,
   reorderImageSectionPaths,
@@ -48,6 +49,20 @@ describe("image section layout model", () => {
   it("builds independent round-robin columns while preserving a stable flat source order", () => {
     assert.deepEqual(imageSectionColumnBuckets([1, 2, 3, 4, 5, 6], 4), [
       [1, 5], [2, 6], [3], [4],
+    ]);
+  });
+
+  it("places each masonry item into the currently shortest estimated column", () => {
+    const items = [
+      { name: "tall", height: 3 },
+      { name: "square-1", height: 1 },
+      { name: "square-2", height: 1 },
+      { name: "square-3", height: 1 },
+    ];
+    const buckets = imageSectionShortestColumnBuckets(items, 2, (item) => item.height, 0.1);
+    assert.deepEqual(buckets.map((bucket) => bucket.map((item) => item.name)), [
+      ["tall"],
+      ["square-1", "square-2", "square-3"],
     ]);
   });
 });
