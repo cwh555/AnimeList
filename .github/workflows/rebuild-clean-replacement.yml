@@ -1,4 +1,4 @@
-name: Rebuild clean bugfix replacement
+name: Retired clean rebuild workflow
 
 on:
   workflow_dispatch:
