@@ -1,8 +1,10 @@
 import type { ImageSectionDropPlacement } from "../domain/image-section-order";
-import { imageSectionText } from "../features/image-sections/text";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
-import type { ImageSectionMoveParticipant } from "./image-section-move-coordinator";
-import { makeEl } from "./ui-helpers";
+import {
+  clearImageSectionAssetMovePreview,
+  previewImageSectionAssetMove,
+  type ImageSectionMoveParticipant,
+} from "./image-section-move-coordinator";
 
 export interface ImageSectionDragSurface {
   containerEl: HTMLElement;
@@ -35,7 +37,6 @@ interface ActiveImageDrag {
 
 interface DropPreview {
   target: ImageSectionDropTarget;
-  placeholder: HTMLElement;
   highlightedItem: HTMLElement | null;
 }
 
@@ -52,27 +53,12 @@ function sameDropTarget(left: ImageSectionDropTarget | null, right: ImageSection
     && left.placement === right.placement;
 }
 
-function shortestColumn(container: HTMLElement): HTMLElement | null {
-  const columns = [...container.querySelectorAll<HTMLElement>(".al-image-masonry-column")];
-  if (!columns.length) return null;
-  return columns.reduce((shortest, column) => (
-    column.getBoundingClientRect().height < shortest.getBoundingClientRect().height ? column : shortest
-  ));
-}
-
-function createDropPlaceholder(sourceItem: HTMLElement): HTMLElement {
-  const rect = sourceItem.getBoundingClientRect();
-  const placeholder = makeEl("div", "al-image-item al-image-drop-placeholder is-selected");
-  placeholder.setAttribute("aria-hidden", "true");
-  placeholder.style.setProperty("height", `${Math.max(72, Math.round(rect.height))}px`);
-  placeholder.appendChild(makeEl("div", "al-image-missing", imageSectionText("dropHere")));
-  return placeholder;
-}
-
-function clearDropPreview(): void {
+function clearDropPreview(restoreLayout = true): void {
   if (!dropPreview) return;
-  const { target, placeholder, highlightedItem } = dropPreview;
-  placeholder.remove();
+  const { target, highlightedItem } = dropPreview;
+  if (restoreLayout && activeDrag) {
+    clearImageSectionAssetMovePreview(activeDrag.source.participant, target.surface.participant);
+  }
   highlightedItem?.removeClass("is-selected");
   target.surface.containerEl.removeClass("is-image-drag-target");
   if (activeDrag?.source !== target.surface) target.surface.setDragging(false);
@@ -87,11 +73,9 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
   const targetSurface = dragSurfaces.get(section);
   if (!targetSurface) return null;
 
-  const placeholder = hit?.closest<HTMLElement>(".al-image-drop-placeholder") ?? null;
-  if (placeholder && dropPreview?.placeholder === placeholder) return dropPreview.target;
-
   const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
   if (item && section.contains(item)) {
+    if (item === activeDrag?.item) return dropPreview?.target ?? null;
     const path = item.dataset.imagePath ?? "";
     if (!path) return null;
     return {
@@ -112,29 +96,22 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
 
 function markDropTarget(target: ImageSectionDropTarget): void {
   if (!activeDrag || sameDropTarget(dropPreview?.target ?? null, target)) return;
-  clearDropPreview();
+  const canTransitionPreviewInPlace = dropPreview?.target.surface.participant === target.surface.participant
+    && activeDrag.source.participant === target.surface.participant;
+  clearDropPreview(!canTransitionPreviewInPlace);
   if (target.surface !== activeDrag.source) target.surface.setDragging(true);
   target.surface.containerEl.addClass("is-image-drag-target");
 
-  const placeholder = createDropPlaceholder(activeDrag.item);
-  let highlightedItem: HTMLElement | null = null;
-
-  if (target.item) {
-    highlightedItem = target.item;
-    target.item.addClass("is-selected");
-    if (target.placement === "before") target.item.before(placeholder);
-    else target.item.after(placeholder);
-  } else {
-    const column = shortestColumn(target.surface.containerEl);
-    if (column) column.appendChild(placeholder);
-    else {
-      const empty = target.surface.containerEl.querySelector<HTMLElement>(".al-image-empty");
-      if (empty) empty.after(placeholder);
-      else target.surface.containerEl.appendChild(placeholder);
-    }
-  }
-
-  dropPreview = { target, placeholder, highlightedItem };
+  const highlightedItem = target.item;
+  highlightedItem?.addClass("is-selected");
+  previewImageSectionAssetMove({
+    source: activeDrag.source.participant,
+    target: target.surface.participant,
+    path: activeDrag.path,
+    targetPath: target.path,
+    placement: target.placement,
+  });
+  dropPreview = { target, highlightedItem };
 }
 
 function updateDropTarget(surface: ImageSectionDragSurface, point: PointerDragPoint): void {
@@ -195,7 +172,7 @@ export function beginImageSectionPointerDrag(
       const drag = activeDrag?.source === surface ? activeDrag : null;
       if (!drag) return;
       surface.containerEl.removeClass("is-image-drag-source");
-      clearDropPreview();
+      clearDropPreview(false);
       surface.setDragging(false);
       activeDrag = null;
       if (!drag.target) return;

@@ -41,7 +41,6 @@ export const IMAGE_SECTION_MESSAGES = {
   columnsLabel: "圖片欄數",
   layoutFailed: "無法更新圖片排列：{error}",
   dragImage: "拖曳調整順序",
-  dropHere: "放在這裡",
   moveFailed: "無法移動圖片：{error}",
   crossNoteMoveUnsupported: "目前只能在同一篇筆記的圖片區塊之間拖移圖片。",
 } as const;

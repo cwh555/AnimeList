@@ -41,7 +41,6 @@ export const EN_IMAGE_SECTION_MESSAGES = {
   columnsLabel: "Image columns",
   layoutFailed: "Could not update image layout: {error}",
   dragImage: "Drag to reorder",
-  dropHere: "Drop here",
   moveFailed: "Could not move image: {error}",
   crossNoteMoveUnsupported: "Images can currently be dragged only between image sections in the same note.",
 } as const;
