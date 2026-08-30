@@ -37,7 +37,7 @@ const bundle = await import("node:fs/promises").then(({ readFile }) => readFile(
 const html = `<!doctype html><html><head><style>
   :root{--interactive-accent:#8b7cf6;--background-secondary:#222;--font-ui-small:13px}
   html,body{margin:0;width:100%;height:100%;background:#111}
-  #section{width:300px;margin:40px;padding:12px}
+  #section{width:440px;margin:40px;padding:12px}
   .al-image-gallery-viewport{display:flex;gap:12px}
   .al-image-item{width:120px;height:100px;background:#555;box-sizing:border-box}
   .is-image-drag-target{outline:2px solid #fff}
@@ -45,6 +45,7 @@ const html = `<!doctype html><html><head><style>
 <section id="section" class="animelist-image-section"><div class="al-image-gallery-viewport">
   <div id="a" class="al-image-item" data-image-path="a.jpg"></div>
   <div id="b" class="al-image-item" data-image-path="b.jpg"></div>
+  <div id="c" class="al-image-item" data-image-path="c.jpg"></div>
 </div></section>
 <script>
   window.createEl=(tag)=>document.createElement(tag);
@@ -59,15 +60,16 @@ for(const [name,fn] of Object.entries({
   const section=document.querySelector('#section');
   const a=document.querySelector('#a');
   const b=document.querySelector('#b');
+  const c=document.querySelector('#c');
   const gallery=section.querySelector('.al-image-gallery-viewport');
   const lifecycle=new AbortController();
-  let participantPaths=['a.jpg','b.jpg'];
+  let participantPaths=['a.jpg','b.jpg','c.jpg'];
   const participant={
     sourcePath:'HotPath.md',
     paths:()=>participantPaths,
     applyPaths:(paths)=>{
       participantPaths=[...paths];
-      const nodes=new Map([['a.jpg',a],['b.jpg',b]]);
+      const nodes=new Map([['a.jpg',a],['b.jpg',b],['c.jpg',c]]);
       gallery.replaceChildren(...participantPaths.map((path)=>nodes.get(path)));
     },
   };
@@ -124,9 +126,17 @@ for(const [name,fn] of Object.entries({
     clientX:x,clientY:y,button:0,buttons,
   });
   AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer2('pointerdown',start.x,start.y,1));
+  window.dispatchEvent(pointer2('pointermove',end.x,end.y,1));
+  await delay(10);
+  // Simulate the live masonry putting an unrelated card under the stationary
+  // pointer after the preview reflow. Targeting must stay anchored to the
+  // drag-start geometry instead of chasing the moving DOM.
+  const originalElementFromPoint=document.elementFromPoint.bind(document);
+  document.elementFromPoint=()=>c;
   for(let index=0;index<60;index+=1){
     window.dispatchEvent(pointer2('pointermove',end.x,end.y,1));
   }
+  document.elementFromPoint=originalElementFromPoint;
   await delay(20);
 
   const previewOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
@@ -134,14 +144,15 @@ for(const [name,fn] of Object.entries({
   const previewBRect=b.getBoundingClientRect();
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
-    previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===2
+    previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===3
       && !document.querySelector('.al-image-drop-placeholder'),
     targetMarked:section.classList.contains('is-image-drag-target') && a.classList.contains('is-selected'),
-    previewUsesFinalOrder:JSON.stringify(previewOrder)===JSON.stringify(['b.jpg','a.jpg']),
+    previewUsesFinalOrder:JSON.stringify(previewOrder)===JSON.stringify(['b.jpg','a.jpg','c.jpg']),
     movingOccupiesTargetSlot:Math.abs(previewBRect.left-aRect.left)<1,
     targetShiftsForward:previewARect.left>aRect.left,
-    cancelRestoresOriginalLayout:JSON.stringify(cancelPreviewOrder)===JSON.stringify(['b.jpg','a.jpg'])
-      && JSON.stringify(cancelRestoredOrder)===JSON.stringify(['a.jpg','b.jpg']),
+    stationaryPointerIgnoresReflowedCard:!c.classList.contains('is-selected') && a.classList.contains('is-selected'),
+    cancelRestoresOriginalLayout:JSON.stringify(cancelPreviewOrder)===JSON.stringify(['b.jpg','a.jpg','c.jpg'])
+      && JSON.stringify(cancelRestoredOrder)===JSON.stringify(['a.jpg','b.jpg','c.jpg']),
   };
 
   window.dispatchEvent(pointer2('pointerup',end.x,end.y,0));
