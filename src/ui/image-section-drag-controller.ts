@@ -28,11 +28,30 @@ interface ImageSectionDropTarget {
   placement: ImageSectionDropPlacement;
 }
 
+interface ImageSectionDragHitRegion {
+  item: HTMLElement;
+  path: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+interface ImageSectionDragGeometry {
+  sectionLeft: number;
+  sectionTop: number;
+  viewport: HTMLElement | null;
+  viewportScrollTop: number;
+  maxBottom: number;
+  regions: ImageSectionDragHitRegion[];
+}
+
 interface ActiveImageDrag {
   source: ImageSectionDragSurface;
   item: HTMLElement;
   path: string;
   target: ImageSectionDropTarget | null;
+  geometry: ImageSectionDragGeometry | null;
 }
 
 interface DropPreview {
@@ -51,6 +70,64 @@ function sameDropTarget(left: ImageSectionDropTarget | null, right: ImageSection
     && left.item === right.item
     && left.path === right.path
     && left.placement === right.placement;
+}
+
+function captureDragGeometry(surface: ImageSectionDragSurface, sourceItem: HTMLElement): ImageSectionDragGeometry {
+  const sectionRect = surface.containerEl.getBoundingClientRect();
+  const viewport = surface.containerEl.querySelector<HTMLElement>(".al-image-gallery-viewport");
+  const regions = [...surface.containerEl.querySelectorAll<HTMLElement>(".al-image-item[data-image-path]")]
+    .filter((item) => item !== sourceItem)
+    .map((item) => {
+      const rect = item.getBoundingClientRect();
+      return {
+        item,
+        path: item.dataset.imagePath ?? "",
+        left: rect.left - sectionRect.left,
+        top: rect.top - sectionRect.top,
+        right: rect.right - sectionRect.left,
+        bottom: rect.bottom - sectionRect.top,
+      };
+    })
+    .filter((region) => Boolean(region.path));
+  return {
+    sectionLeft: sectionRect.left,
+    sectionTop: sectionRect.top,
+    viewport,
+    viewportScrollTop: viewport?.scrollTop ?? 0,
+    maxBottom: regions.reduce((maximum, region) => Math.max(maximum, region.bottom), 0),
+    regions,
+  };
+}
+
+function sameSectionSnapshotTarget(
+  drag: ActiveImageDrag,
+  targetSurface: ImageSectionDragSurface,
+  point: PointerDragPoint,
+): ImageSectionDropTarget | null | undefined {
+  const geometry = drag.geometry;
+  if (!geometry || targetSurface !== drag.source) return undefined;
+  const sectionRect = targetSurface.containerEl.getBoundingClientRect();
+  const scrollDelta = (geometry.viewport?.scrollTop ?? geometry.viewportScrollTop) - geometry.viewportScrollTop;
+  const localX = point.clientX - sectionRect.left;
+  const localY = point.clientY - sectionRect.top + scrollDelta;
+  const region = geometry.regions.find((candidate) => (
+    localX >= candidate.left && localX <= candidate.right
+      && localY >= candidate.top && localY <= candidate.bottom
+  ));
+  if (region) {
+    return {
+      surface: targetSurface,
+      item: region.item,
+      path: region.path,
+      placement: "before",
+    };
+  }
+
+  // Live masonry moves under the pointer while previewing. Keep the current
+  // target through inter-card gaps instead of allowing those shifted cards to
+  // retarget the drag. Only the trailing blank area means append.
+  if (localY <= geometry.maxBottom) return drag.target;
+  return { surface: targetSurface, item: null, path: null, placement: "append" };
 }
 
 function clearDropPreview(restoreLayout = true): void {
@@ -72,6 +149,11 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
   if (!section) return null;
   const targetSurface = dragSurfaces.get(section);
   if (!targetSurface) return null;
+
+  if (activeDrag) {
+    const snapshotTarget = sameSectionSnapshotTarget(activeDrag, targetSurface, point);
+    if (snapshotTarget !== undefined) return snapshotTarget;
+  }
 
   const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
   if (item && section.contains(item)) {
@@ -153,7 +235,7 @@ export function beginImageSectionPointerDrag(
   event: PointerEvent,
 ): void {
   if (!surface.canStart(item, event)) return;
-  activeDrag = { source: surface, item, path, target: null };
+  activeDrag = { source: surface, item, path, target: null, geometry: null };
   armPointerDrag({
     event,
     captureElement: item,
@@ -163,6 +245,7 @@ export function beginImageSectionPointerDrag(
       if (activeDrag?.source === surface) cancelSurfaceDrag(surface);
     },
     onStart: () => {
+      if (activeDrag?.source === surface) activeDrag.geometry = captureDragGeometry(surface, item);
       surface.setDragging(true);
       surface.containerEl.addClass("is-image-drag-source");
       surface.closeMenus();
