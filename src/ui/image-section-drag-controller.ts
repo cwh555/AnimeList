@@ -1,6 +1,12 @@
 import type { ImageSectionDropPlacement } from "../domain/image-section-order";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import {
+  beginImageSectionPointerFollow,
+  endImageSectionPointerFollow,
+  moveImageSectionPointerFollow,
+  type ImageSectionPointerFollow,
+} from "./image-section-drag-follow";
+import {
   clearImageSectionAssetMovePreview,
   previewImageSectionAssetMove,
   type ImageSectionMoveParticipant,
@@ -52,6 +58,7 @@ interface ActiveImageDrag {
   path: string;
   target: ImageSectionDropTarget | null;
   geometry: ImageSectionDragGeometry | null;
+  follow: ImageSectionPointerFollow | null;
 }
 
 interface DropPreview {
@@ -142,9 +149,21 @@ function clearDropPreview(restoreLayout = true): void {
   dropPreview = null;
 }
 
+function dragHitElement(document: Document, point: PointerDragPoint): HTMLElement | null {
+  const sourceItem = activeDrag?.item ?? null;
+  const hits = typeof document.elementsFromPoint === "function"
+    ? document.elementsFromPoint(point.clientX, point.clientY)
+    : [document.elementFromPoint(point.clientX, point.clientY)].filter((element): element is Element => Boolean(element));
+  for (const candidate of hits) {
+    if (sourceItem?.contains(candidate)) continue;
+    return candidate as HTMLElement;
+  }
+  return null;
+}
+
 function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint): ImageSectionDropTarget | null {
   const document = surface.containerEl.ownerDocument;
-  const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
+  const hit = dragHitElement(document, point);
   const section = hit?.closest<HTMLElement>(".animelist-image-section") ?? null;
   if (!section) return null;
   const targetSurface = dragSurfaces.get(section);
@@ -211,7 +230,9 @@ function updateDropTarget(surface: ImageSectionDragSurface, point: PointerDragPo
 function cancelSurfaceDrag(surface: ImageSectionDragSurface): void {
   const sourceWasActive = activeDrag?.source === surface;
   if (sourceWasActive) {
+    const drag = activeDrag;
     clearDropPreview();
+    endImageSectionPointerFollow(drag.follow);
     activeDrag = null;
     surface.setDragging(false);
   } else if (dropPreview?.target.surface === surface) {
@@ -235,7 +256,8 @@ export function beginImageSectionPointerDrag(
   event: PointerEvent,
 ): void {
   if (!surface.canStart(item, event)) return;
-  activeDrag = { source: surface, item, path, target: null, geometry: null };
+  const startPoint = { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType };
+  activeDrag = { source: surface, item, path, target: null, geometry: null, follow: null };
   armPointerDrag({
     event,
     captureElement: item,
@@ -245,12 +267,18 @@ export function beginImageSectionPointerDrag(
       if (activeDrag?.source === surface) cancelSurfaceDrag(surface);
     },
     onStart: () => {
-      if (activeDrag?.source === surface) activeDrag.geometry = captureDragGeometry(surface, item);
+      if (activeDrag?.source === surface) {
+        activeDrag.geometry = captureDragGeometry(surface, item);
+        activeDrag.follow = beginImageSectionPointerFollow(item, startPoint);
+      }
       surface.setDragging(true);
       surface.containerEl.addClass("is-image-drag-source");
       surface.closeMenus();
     },
-    onMove: (point) => updateDropTarget(surface, point),
+    onMove: (point) => {
+      updateDropTarget(surface, point);
+      if (activeDrag?.source === surface) moveImageSectionPointerFollow(activeDrag.follow, point);
+    },
     onDrop: () => {
       const drag = activeDrag?.source === surface ? activeDrag : null;
       if (!drag) return;
@@ -258,13 +286,15 @@ export function beginImageSectionPointerDrag(
       clearDropPreview(false);
       surface.setDragging(false);
       activeDrag = null;
-      if (!drag.target) return;
-      drag.target.surface.drop(
-        drag.source.participant,
-        drag.path,
-        drag.target.path,
-        drag.target.placement,
-      );
+      if (drag.target) {
+        drag.target.surface.drop(
+          drag.source.participant,
+          drag.path,
+          drag.target.path,
+          drag.target.placement,
+        );
+      }
+      endImageSectionPointerFollow(drag.follow);
     },
     onCancel: () => cancelSurfaceDrag(surface),
   });
