@@ -108,7 +108,8 @@ for(const [name,fn] of Object.entries({
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
     repeatedMovesReuseSinglePreview:document.querySelectorAll('.al-image-drop-placeholder').length===1,
     targetMarked:section.classList.contains('is-image-drag-target') && b.classList.contains('is-selected'),
-    placeholderShowsFinalSlot:Boolean(placeholder) && placeholder.previousElementSibling===b,
+    placeholderShowsTargetSlot:Boolean(placeholder) && placeholder.nextElementSibling===b,
+    targetIsPushedAside:b.getBoundingClientRect().left>bRect.left,
     placeholderUsesCardFootprint:Boolean(placeholder) && placeholder.getBoundingClientRect().height>=aRect.height-1,
     placeholderExplainsDrop:Boolean(placeholder?.textContent?.includes('放在這裡')),
   };
@@ -116,7 +117,7 @@ for(const [name,fn] of Object.entries({
   window.dispatchEvent(pointer('pointerup',end.x,end.y,0));
   await delay(20);
   Object.assign(details,{
-    dropDeliveredOnce:dropCount===1 && droppedTarget==='b.jpg' && droppedPlacement==='after',
+    dropDeliveredOnce:dropCount===1 && droppedTarget==='b.jpg' && droppedPlacement==='before',
     cleanupRemovesPreview:!section.classList.contains('is-image-drag-target')
       && !document.querySelector('.al-image-drop-placeholder') && !b.classList.contains('is-selected'),
     dragLifecycleCloses:dragStates.length>=2 && dragStates[0]===true && dragStates.at(-1)===false,

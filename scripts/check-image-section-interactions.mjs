@@ -243,7 +243,7 @@ let renderer=null;
  details.persistenceDoesNotRelayoutSettledGallery=window.__masonryReplaceCalls===masonryRelayoutsAfterOptimisticDrop
    && masonryRelayoutsAfterOptimisticDrop===masonryRelayoutsBeforeDrop;
  const moved=section.querySelector('.al-image-item[data-image-path="a.jpg"]');
- details.touchGalleryReorderOptimistic=logicalOrder(section).join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
+ details.touchGalleryReorderOptimistic=logicalOrder(section).join(",")==="b.jpg,a.jpg,c.jpg,d.jpg,e.jpg,f.jpg";
  details.galleryNodesArePreserved=moved===moving && moved.querySelector('img')===movingImage;
  details.reorderPreservesExpandedState=section.querySelector('.al-image-gallery-viewport').classList.contains('is-expanded');
  details.reorderPreservesPreferredColumns=section.querySelectorAll('.al-image-masonry-column').length===2
@@ -274,7 +274,7 @@ let renderer=null;
  details.dragReleaseDoesNotOpenLightbox=(window.__modalOpenCount||0)===modalCountBeforeDropClick;
  await delay(20);
  details.touchGalleryReorderPersisted=moveCalls===0 && journalWrites>=1
-   && logicalOrder(section).join(",")==="b.jpg,c.jpg,a.jpg,d.jpg,e.jpg,f.jpg";
+   && logicalOrder(section).join(",")==="b.jpg,a.jpg,c.jpg,d.jpg,e.jpg,f.jpg";
 
  const mouseMoving=section.querySelector('.al-image-item[data-image-path="b.jpg"]');
  const mouseTarget=section.querySelector('.al-image-item[data-image-path="d.jpg"]');

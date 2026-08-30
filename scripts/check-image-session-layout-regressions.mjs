@@ -146,11 +146,12 @@ const host={app:{}};
  details.shortestColumnUsesDecodedImageHeight=imagesReady
    && JSON.stringify(bucketPaths)===JSON.stringify([['tall.jpg'],['square-1.jpg','square-2.jpg','square-3.jpg']]);
 
- const moving=section.querySelector('.al-image-item[data-image-path="square-1.jpg"]');
+ const moving=section.querySelector('.al-image-item[data-image-path="square-2.jpg"]');
  const handle=moving?.querySelector('.al-image-drag-handle');
- const target=section.querySelector('.al-image-item[data-image-path="square-2.jpg"]');
+ const target=section.querySelector('.al-image-item[data-image-path="square-1.jpg"]');
  if(!moving||!handle||!target) throw new Error('drag fixture cards unavailable');
  const from=center(handle), targetRect=target.getBoundingClientRect();
+ const targetTopBefore=targetRect.top;
  const to={x:targetRect.left+targetRect.width/2,y:targetRect.top+targetRect.height*0.75};
  const movingHeight=moving.getBoundingClientRect().height;
  touch(handle,'pointerdown',from.x,from.y,91);
@@ -160,18 +161,21 @@ const host={app:{}};
  details.dragPreviewShowsRealSlot=Boolean(placeholder)
    && placeholder.textContent.includes('放在這裡')
    && placeholder.getBoundingClientRect().height>=movingHeight-2
-   && placeholder.previousElementSibling===target
-   && target.classList.contains('is-selected');
+   && placeholder.nextElementSibling===target
+   && target.classList.contains('is-selected')
+   && target.getBoundingClientRect().top>targetTopBefore;
 
  const tallImage=section.querySelector('.al-image-item[data-image-path="tall.jpg"] img');
  tallImage?.dispatchEvent(new Event('load'));
  await delay(40);
  details.dragPreviewSurvivesImageRelayoutSignal=section.querySelector('.al-image-drop-placeholder')===placeholder
-   && placeholder?.previousElementSibling===target;
+   && placeholder?.nextElementSibling===target;
 
  touch(moving,'pointerup',to.x,to.y,91);
  await delay(50);
  details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && !target.classList.contains('is-selected');
+ const pendingOrder=journalRecords.get('Regression.md')?.sections?.[0]?.paths ?? [];
+ details.dropMovesSourceIntoTargetSlot=JSON.stringify(pendingOrder)===JSON.stringify(['tall.jpg','square-2.jpg','square-1.jpg','square-3.jpg']);
 
  const lightbox=new AnimeListImageSessionRegression.ImageLightboxModal(
    host.app,
