@@ -12,7 +12,7 @@ import {
   normalizeImageSectionColumns,
   parseImageSectionColumns,
 } from "../domain/image-section-layout";
-import { imageSectionShortestColumnBuckets } from "../domain/image-section-masonry";
+import { imageSectionMasonryPlan } from "../domain/image-section-masonry";
 import type { ImageSectionDropPlacement, ImageSectionStateUpdate } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
@@ -453,14 +453,15 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout();
   }
 
-  private estimatedImageHeight(path: string, columnWidth: number): number {
+  private estimatedImageAspectRatio(path: string): number {
     const item = this.imageElements.get(path);
     const image = item?.querySelector<HTMLImageElement>("img");
     if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
-      return columnWidth * image.naturalHeight / image.naturalWidth;
+      return image.naturalWidth / image.naturalHeight;
     }
-    const itemHeight = item?.getBoundingClientRect().height ?? 0;
-    return itemHeight > 0 ? itemHeight : columnWidth;
+    const rect = item?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) return rect.width / rect.height;
+    return 1;
   }
 
   private async handleInternalImageDrop(
@@ -632,19 +633,34 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
         const galleryWidth = gallery.getBoundingClientRect().width;
         const availableWidth = Math.max(1, galleryWidth - gap * Math.max(0, columns - 1));
         const columnWidth = availableWidth / columns;
-        const buckets = imageSectionShortestColumnBuckets(
+        const plan = imageSectionMasonryPlan(
           this.galleryPaths,
           columns,
-          (path) => this.estimatedImageHeight(path, columnWidth),
+          columnWidth,
+          (path) => this.estimatedImageAspectRatio(path),
           gap,
         );
-        buckets.forEach((bucket, index) => {
-          const column = columnElements[index];
-          for (const path of bucket) {
-            const item = this.imageElements.get(path);
-            if (item) column.appendChild(item);
-          }
-        });
+        gallery.style.setProperty("height", `${plan.height}px`);
+        gallery.style.setProperty("position", plan.placements.length ? "relative" : "static");
+        for (const column of columnElements) {
+          column.style.setProperty("display", columns > 0 ? "contents" : "flex");
+        }
+        for (const placement of plan.placements) {
+          const item = this.imageElements.get(placement.item);
+          const column = columnElements[placement.column];
+          if (!item || !column) continue;
+          item.dataset.masonryColumn = String(placement.column);
+          item.dataset.masonrySpan = String(placement.span);
+          item.style.setProperty("position", placement.span > 0 ? "absolute" : "relative");
+          item.style.setProperty("box-sizing", placement.width > 0 ? "border-box" : "content-box");
+          item.style.setProperty("left", `${placement.left}px`);
+          item.style.setProperty("top", `${placement.top}px`);
+          item.style.setProperty("width", `${placement.width}px`);
+          item.style.setProperty("height", `${placement.height}px`);
+          const image = item.querySelector<HTMLImageElement>("img");
+          if (image) image.style.setProperty("height", placement.height > 0 ? "100%" : "auto");
+          column.appendChild(item);
+        }
       });
       window.requestAnimationFrame(updateToggle);
     };
