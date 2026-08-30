@@ -20,6 +20,16 @@ await build({
   format: "iife",
   globalName: "AnimeListImageDragHotPath",
   target: "es2022",
+  plugins: [{
+    name: "obsidian-browser-stub",
+    setup(buildContext) {
+      buildContext.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "stub" }));
+      buildContext.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
+        loader: "js",
+        contents: `export function setIcon() {}`,
+      }));
+    },
+  }],
 });
 
 const bundle = await import("node:fs/promises").then(({ readFile }) => readFile(`${output}/bundle.js`, "utf8"));
@@ -37,7 +47,7 @@ const html = `<!doctype html><html><head><style>
 </div></section>
 <script>
   window.createEl=(tag)=>document.createElement(tag);
-  for(const [name,fn] of Object.entries({
+for(const [name,fn] of Object.entries({
     addClass:function(...names){this.classList.add(...names)},
     removeClass:function(...names){this.classList.remove(...names)},
     toggleClass:function(name,force){this.classList.toggle(name,force)},
@@ -97,7 +107,7 @@ const html = `<!doctype html><html><head><style>
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
     repeatedMovesReuseSinglePreview:document.querySelectorAll('.al-image-drop-placeholder').length===1,
-    targetMarked:section.classList.contains('is-image-drag-target') && Boolean(b.style.outline),
+    targetMarked:section.classList.contains('is-image-drag-target') && b.classList.contains('is-selected'),
     placeholderShowsFinalSlot:Boolean(placeholder) && placeholder.previousElementSibling===b,
     placeholderUsesCardFootprint:Boolean(placeholder) && placeholder.getBoundingClientRect().height>=aRect.height-1,
     placeholderExplainsDrop:Boolean(placeholder?.textContent?.includes('放在這裡')),
@@ -108,7 +118,7 @@ const html = `<!doctype html><html><head><style>
   Object.assign(details,{
     dropDeliveredOnce:dropCount===1 && droppedTarget==='b.jpg' && droppedPlacement==='after',
     cleanupRemovesPreview:!section.classList.contains('is-image-drag-target')
-      && !document.querySelector('.al-image-drop-placeholder') && b.style.outline==='',
+      && !document.querySelector('.al-image-drop-placeholder') && !b.classList.contains('is-selected'),
     dragLifecycleCloses:dragStates.length>=2 && dragStates[0]===true && dragStates.at(-1)===false,
   });
   document.body.dataset.details=JSON.stringify({

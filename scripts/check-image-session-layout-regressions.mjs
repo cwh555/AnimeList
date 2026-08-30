@@ -89,6 +89,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:
 </style></head><body data-result="pending"><section id="section"></section>
 <script>
 Object.defineProperty(document,"startViewTransition",{value:undefined,configurable:true});
+window.matchMedia=()=>({matches:true,media:'(prefers-reduced-motion: reduce)',addEventListener(){},removeEventListener(){}});
 window.createEl=(tag)=>document.createElement(tag);
 for(const [name,fn] of Object.entries({
  addClass:function(...names){this.classList.add(...names)},
@@ -127,7 +128,8 @@ const journal={
  async remove(sourcePath){journalRecords.delete(sourcePath)},
 };
 const orderSession=new AnimeListImageSessionRegression.ImageSectionOrderSession(journal,service);
-const context={sourcePath:'Regression.md',getSectionInfo:()=>({lineStart:0,lineEnd:current.length+1,text:'\\`\\`\\`animelist-images columns=2\\n'+source()+'\\n\\`\\`\\`'})};
+const fence=String.fromCharCode(96).repeat(3);
+const context={sourcePath:'Regression.md',getSectionInfo:()=>({lineStart:0,lineEnd:current.length+1,text:fence+'animelist-images columns=2\\n'+source()+'\\n'+fence})};
 const host={app:{}};
 (async()=>{
  await orderSession.initialize();
@@ -146,7 +148,7 @@ const host={app:{}};
 
  const moving=section.querySelector('.al-image-item[data-image-path="square-1.jpg"]');
  const handle=moving?.querySelector('.al-image-drag-handle');
- const target=section.querySelector('.al-image-item[data-image-path="square-3.jpg"]');
+ const target=section.querySelector('.al-image-item[data-image-path="square-2.jpg"]');
  if(!moving||!handle||!target) throw new Error('drag fixture cards unavailable');
  const from=center(handle), targetRect=target.getBoundingClientRect();
  const to={x:targetRect.left+targetRect.width/2,y:targetRect.top+targetRect.height*0.75};
@@ -159,7 +161,7 @@ const host={app:{}};
    && placeholder.textContent.includes('放在這裡')
    && placeholder.getBoundingClientRect().height>=movingHeight-2
    && placeholder.previousElementSibling===target
-   && Boolean(target.style.outline);
+   && target.classList.contains('is-selected');
 
  const tallImage=section.querySelector('.al-image-item[data-image-path="tall.jpg"] img');
  tallImage?.dispatchEvent(new Event('load'));
@@ -169,7 +171,7 @@ const host={app:{}};
 
  touch(moving,'pointerup',to.x,to.y,91);
  await delay(50);
- details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && target.style.outline==='';
+ details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && !target.classList.contains('is-selected');
 
  const lightbox=new AnimeListImageSessionRegression.ImageLightboxModal(
    host.app,
