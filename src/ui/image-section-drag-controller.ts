@@ -79,11 +79,6 @@ function clearDropPreview(): void {
   dropPreview = null;
 }
 
-function placementFor(item: HTMLElement, clientY: number): ImageSectionDropPlacement {
-  const rect = item.getBoundingClientRect();
-  return clientY < rect.top + rect.height / 2 ? "before" : "after";
-}
-
 function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint): ImageSectionDropTarget | null {
   const document = surface.containerEl.ownerDocument;
   const hit = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
@@ -91,6 +86,9 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
   if (!section) return null;
   const targetSurface = dragSurfaces.get(section);
   if (!targetSurface) return null;
+
+  const placeholder = hit?.closest<HTMLElement>(".al-image-drop-placeholder") ?? null;
+  if (placeholder && dropPreview?.placeholder === placeholder) return dropPreview.target;
 
   const item = hit?.closest<HTMLElement>(".al-image-item[data-image-path]") ?? null;
   if (item && section.contains(item)) {
@@ -100,7 +98,7 @@ function dropTargetFor(surface: ImageSectionDragSurface, point: PointerDragPoint
       surface: targetSurface,
       item,
       path,
-      placement: placementFor(item, point.clientY),
+      placement: "before",
     };
   }
 
