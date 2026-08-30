@@ -7,7 +7,11 @@ import {
   parseImageSectionColumns,
   setImageSectionColumns,
 } from "../src/domain/image-section-layout";
-import { imageSectionShortestColumnBuckets } from "../src/domain/image-section-masonry";
+import {
+  imageSectionMasonryPlan,
+  imageSectionMasonrySpan,
+  imageSectionShortestColumnBuckets,
+} from "../src/domain/image-section-masonry";
 import {
   planImageSectionPathMove,
   reorderImageSectionPaths,
@@ -64,6 +68,31 @@ describe("image section layout model", () => {
       ["tall"],
       ["square-1", "square-2", "square-3"],
     ]);
+  });
+
+  it("lets occasional landscape images span two contiguous columns without widening a landscape-heavy gallery", () => {
+    assert.equal(imageSectionMasonrySpan(16 / 9, 4), 2);
+    assert.equal(imageSectionMasonrySpan(4 / 3, 4), 1);
+
+    const mixed = [
+      { name: "portrait", ratio: 2 / 3 },
+      { name: "square-1", ratio: 1 },
+      { name: "wide", ratio: 16 / 9 },
+      { name: "square-2", ratio: 1 },
+    ];
+    const mixedPlan = imageSectionMasonryPlan(mixed, 4, 100, (item) => item.ratio, 8);
+    const wide = mixedPlan.placements.find((placement) => placement.item.name === "wide");
+    assert.equal(wide?.span, 2);
+    assert.equal(wide?.width, 208);
+
+    const landscapeHeavy = [
+      { name: "wide-1", ratio: 5 / 3 },
+      { name: "wide-2", ratio: 16 / 9 },
+      { name: "wide-3", ratio: 2 },
+      { name: "square", ratio: 1 },
+    ];
+    const landscapePlan = imageSectionMasonryPlan(landscapeHeavy, 4, 100, (item) => item.ratio, 8);
+    assert.deepEqual(landscapePlan.placements.map((placement) => placement.span), [1, 1, 1, 1]);
   });
 });
 

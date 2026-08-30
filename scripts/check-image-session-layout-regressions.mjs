@@ -79,6 +79,7 @@ const [bundle, styles] = await Promise.all([
 const svgData = (width, height, fill) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="${fill}"/></svg>`)}`;
 const tallPixel = svgData(200, 600, "#666");
 const squarePixel = svgData(300, 300, "#777");
+const widePixel = svgData(640, 360, "#888");
 
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 :root{--background-primary:#111;--background-secondary:#222;--background-secondary-alt:#282828;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#7777dd;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-error:#e66;--font-ui-small:13px;}
@@ -114,12 +115,12 @@ const sameRects=(left,right,epsilon=1.5)=>Object.keys(left).length===Object.keys
    return Boolean(other) && ['left','top','width','height'].every((key)=>Math.abs(rect[key]-other[key])<=epsilon);
  });
 const touch=(target,type,x,y,id)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:id,pointerType:'touch',isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==='pointerup'?0:1}));
-const initial=['tall.jpg','square-1.jpg','square-2.jpg','square-3.jpg'];
+const initial=['tall.jpg','square-1.jpg','square-2.jpg','square-3.jpg','wide.jpg'];
 let current=[...initial];
 const source=()=>current.map((entry)=>'- '+entry).join('\\n');
 const stateFor=(paths)=>({source:paths.map((entry)=>'- '+entry).join('\\n'),lineStart:0,lineEnd:paths.length+1});
 const service={
- resolve:(entry)=>({resourcePath:(entry==='tall.jpg'?'${tallPixel}':'${squarePixel}')+'#'+entry}),
+ resolve:(entry)=>({resourcePath:(entry==='tall.jpg'?'${tallPixel}':entry==='wide.jpg'?'${widePixel}':'${squarePixel}')+'#'+entry}),
  setColumns:async()=>stateFor(current),
  setSectionOrders:async(_note,replacements)=>{
    current=[...replacements[0].paths];
@@ -147,13 +148,27 @@ const host={app:{}};
  renderer.onload();
  const details={};
 
- const imagesReady=await waitFor(()=>[...section.querySelectorAll('.al-image-item img')].length===4 && [...section.querySelectorAll('.al-image-item img')].every((image)=>image.complete&&image.naturalWidth>0));
- await delay(80);
+ const imagesReady=await waitFor(()=>[...section.querySelectorAll('.al-image-item img')].length===initial.length && [...section.querySelectorAll('.al-image-item img')].every((image)=>image.complete&&image.naturalWidth>0));
+ await delay(260);
  const expand=section.querySelector('.al-image-expand-button');
  if(expand && !expand.hidden) { expand.click(); await delay(30); }
- const bucketPaths=[...section.querySelectorAll('.al-image-masonry-column')].map((column)=>[...column.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath));
+ const placements=Object.fromEntries([...section.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>[
+   item.dataset.imagePath,
+   {column:Number(item.dataset.masonryColumn),span:Number(item.dataset.masonrySpan),rect:item.getBoundingClientRect()},
+ ]));
  details.shortestColumnUsesDecodedImageHeight=imagesReady
-   && JSON.stringify(bucketPaths)===JSON.stringify([['tall.jpg'],['square-1.jpg','square-2.jpg','square-3.jpg']]);
+   && placements['tall.jpg']?.column===0
+   && placements['square-1.jpg']?.column===1
+   && placements['square-2.jpg']?.column===1
+   && placements['square-3.jpg']?.column===1;
+ const widePlacement=placements['wide.jpg'];
+ const squarePlacement=placements['square-1.jpg'];
+ const galleryRect=section.querySelector('.al-image-masonry').getBoundingClientRect();
+ details.minorityLandscapeSpansTwoColumns=widePlacement?.span===2
+   && widePlacement.column===0
+   && widePlacement.rect.width>squarePlacement.rect.width*1.9
+   && widePlacement.rect.left>=galleryRect.left-1.5
+   && widePlacement.rect.right<=galleryRect.right+1.5;
 
  const moving=section.querySelector('.al-image-item[data-image-path="square-2.jpg"]');
  const handle=moving?.querySelector('.al-image-drag-handle');
@@ -168,11 +183,9 @@ const host={app:{}};
  details.dragPreviewUsesFlipMotion=[...section.querySelectorAll('.al-image-item[data-image-path]')].some((item)=>item.dataset.layoutMotion==='active');
  await delay(230);
  const previewRects=rectMap(section);
- const previewBuckets=[...section.querySelectorAll('.al-image-masonry-column')].map((column)=>[...column.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath));
  details.dragPreviewIsFinalLayout=section.querySelectorAll('.al-image-item[data-image-path]').length===initial.length
    && !section.querySelector('.al-image-drop-placeholder')
    && target.classList.contains('is-selected')
-   && JSON.stringify(previewBuckets)===JSON.stringify([['tall.jpg'],['square-2.jpg','square-1.jpg','square-3.jpg']])
    && Math.abs(previewRects['square-2.jpg'].top-initialRects['square-1.jpg'].top)<=1.5
    && previewRects['square-1.jpg'].top>initialRects['square-1.jpg'].top;
 
@@ -189,7 +202,7 @@ const host={app:{}};
  details.dragPreviewMatchesDroppedLayout=sameRects(previewRects,finalRects);
  details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && !target.classList.contains('is-selected');
  const pendingOrder=journalRecords.get('Regression.md')?.sections?.[0]?.paths ?? [];
- details.dropMovesSourceIntoTargetSlot=JSON.stringify(pendingOrder)===JSON.stringify(['tall.jpg','square-2.jpg','square-1.jpg','square-3.jpg']);
+ details.dropMovesSourceIntoTargetSlot=JSON.stringify(pendingOrder)===JSON.stringify(['tall.jpg','square-2.jpg','square-1.jpg','square-3.jpg','wide.jpg']);
 
  const lightbox=new AnimeListImageSessionRegression.ImageLightboxModal(
    host.app,
@@ -227,7 +240,7 @@ const host={app:{}};
  document.body.dataset.details=JSON.stringify({
    ...details,
    viewport:{width:innerWidth,height:innerHeight},
-   bucketPaths,
+   placements:Object.fromEntries(Object.entries(placements).map(([path,value])=>[path,{column:value.column,span:value.span,width:value.rect.width,height:value.rect.height}])),
    lightbox:{modalRect,stageRect,imageRect,counterRect},
  });
  document.body.dataset.result=Object.values(details).every(Boolean)?'pass':'fail';
