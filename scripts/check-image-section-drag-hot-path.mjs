@@ -41,11 +41,22 @@ const html = `<!doctype html><html><head><style>
   .al-image-gallery-viewport{display:flex;gap:12px}
   .al-image-item{width:120px;height:100px;background:#555;box-sizing:border-box}
   .is-image-drag-target{outline:2px solid #fff}
+  #boundary-section{position:relative;width:500px;height:150px;margin:40px;padding:12px}
+  #boundary-gallery{position:relative;width:460px;height:120px}
+  #boundary-gallery .al-image-item{position:absolute}
+  #boundary-a{left:0;top:0}
+  #boundary-c{left:128px;top:0}
+  #boundary-source{left:320px;top:0}
 </style></head><body data-result="pending">
 <section id="section" class="animelist-image-section"><div class="al-image-gallery-viewport">
   <div id="a" class="al-image-item" data-image-path="a.jpg"></div>
   <div id="b" class="al-image-item" data-image-path="b.jpg"></div>
   <div id="c" class="al-image-item" data-image-path="c.jpg"></div>
+</div></section>
+<section id="boundary-section" class="animelist-image-section"><div id="boundary-gallery" class="al-image-gallery-viewport">
+  <div id="boundary-a" class="al-image-item" data-image-path="boundary-a.jpg"></div>
+  <div id="boundary-c" class="al-image-item" data-image-path="boundary-c.jpg"></div>
+  <div id="boundary-source" class="al-image-item" data-image-path="boundary-source.jpg"></div>
 </div></section>
 <script>
   window.createEl=(tag)=>document.createElement(tag);
@@ -93,6 +104,37 @@ for(const [name,fn] of Object.entries({
   };
   AnimeListImageDragHotPath.registerImageSectionDragSurface(surface);
 
+  const boundarySection=document.querySelector('#boundary-section');
+  const boundaryGallery=document.querySelector('#boundary-gallery');
+  const boundaryA=document.querySelector('#boundary-a');
+  const boundaryC=document.querySelector('#boundary-c');
+  const boundarySource=document.querySelector('#boundary-source');
+  let boundaryPaths=['boundary-a.jpg','boundary-c.jpg','boundary-source.jpg'];
+  const boundaryNodes=new Map([
+    ['boundary-a.jpg',boundaryA],
+    ['boundary-c.jpg',boundaryC],
+    ['boundary-source.jpg',boundarySource],
+  ]);
+  const boundaryParticipant={
+    sourcePath:'Boundary.md',
+    paths:()=>boundaryPaths,
+    applyPaths:(paths)=>{
+      boundaryPaths=[...paths];
+      boundaryGallery.replaceChildren(...boundaryPaths.map((path)=>boundaryNodes.get(path)));
+    },
+  };
+  let boundaryDropCount=0;
+  const boundarySurface={
+    containerEl:boundarySection,
+    participant:boundaryParticipant,
+    signal:lifecycle.signal,
+    canStart:()=>true,
+    closeMenus:()=>{},
+    setDragging:()=>{},
+    drop:()=>{ boundaryDropCount+=1; },
+  };
+  AnimeListImageDragHotPath.registerImageSectionDragSurface(boundarySurface);
+
   let documentQuerySelectorAllCalls=0;
   const originalDocumentQuerySelectorAll=Document.prototype.querySelectorAll;
   Document.prototype.querySelectorAll=function(...args){
@@ -110,7 +152,6 @@ for(const [name,fn] of Object.entries({
     clientX:x,clientY:y,button:0,buttons,
   });
 
-  // First verify that a cancelled live preview returns the exact original order.
   AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer('pointerdown',start.x,start.y,1));
   window.dispatchEvent(pointer('pointermove',end.x,end.y,1));
   const touchFollowRect=b.getBoundingClientRect();
@@ -123,7 +164,6 @@ for(const [name,fn] of Object.entries({
   await delay(20);
   const cancelRestoredOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
 
-  // Then run the hot repeated-move path from a clean preview state and drop.
   const pointerId2=72;
   const pointer2=(type,x,y,buttons)=>new PointerEvent(type,{
     bubbles:true,cancelable:true,pointerId:pointerId2,pointerType:'touch',isPrimary:true,
@@ -142,9 +182,6 @@ for(const [name,fn] of Object.entries({
     Math.abs(mouseFollowRect.left+mouseFollowRect.width/2-follow.x)<1
     && Math.abs(mouseFollowRect.top+mouseFollowRect.height/2-follow.y)<1;
   await delay(10);
-  // Simulate the live masonry putting an unrelated card under the stationary
-  // pointer after the preview reflow. Targeting must stay anchored to the
-  // drag-start geometry instead of chasing the moving DOM.
   const originalElementsFromPoint=document.elementsFromPoint.bind(document);
   document.elementsFromPoint=()=>[c,section,document.body,document.documentElement];
   for(let index=0;index<60;index+=1){
@@ -157,7 +194,7 @@ for(const [name,fn] of Object.entries({
   const previewARect=a.getBoundingClientRect();
   const previewBRect=b.getBoundingClientRect();
   const [previewTranslateX=0,previewTranslateY=0]=b.style.getPropertyValue('translate')
-    .split(/\\s+/).filter(Boolean).map((value)=>Number.parseFloat(value)||0);
+    .split(/\s+/).filter(Boolean).map((value)=>Number.parseFloat(value)||0);
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
     previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===3
@@ -178,7 +215,85 @@ for(const [name,fn] of Object.entries({
 
   window.dispatchEvent(mousePointer2('pointerup',follow.x,follow.y,0));
   await delay(20);
+
+  const boundaryPointerId=73;
+  const boundaryPointer=(type,x,y,buttons)=>new PointerEvent(type,{
+    bubbles:true,cancelable:true,pointerId:boundaryPointerId,pointerType:'mouse',isPrimary:true,
+    clientX:x,clientY:y,button:0,buttons,
+  });
+  const boundarySourceRect=boundarySource.getBoundingClientRect();
+  const boundaryARect=boundaryA.getBoundingClientRect();
+  const boundaryCRect=boundaryC.getBoundingClientRect();
+  const boundaryStart={x:boundarySourceRect.left+boundarySourceRect.width/2,y:boundarySourceRect.top+boundarySourceRect.height/2};
+  const boundaryACenter={x:boundaryARect.left+boundaryARect.width/2,y:boundaryARect.top+boundaryARect.height/2};
+  AnimeListImageDragHotPath.beginImageSectionPointerDrag(
+    boundarySurface,boundarySource,'boundary-source.jpg',
+    boundaryPointer('pointerdown',boundaryStart.x,boundaryStart.y,1),
+  );
+  window.dispatchEvent(boundaryPointer('pointermove',boundaryACenter.x,boundaryACenter.y,1));
+
+  const selectedBoundaryTarget=()=>boundaryA.classList.contains('is-selected')?'a':(boundaryC.classList.contains('is-selected')?'c':'none');
+  const cardBoundaryTargets=[];
+  for(let index=0;index<30;index+=1){
+    const x=index%2===0?boundaryCRect.left+2:boundaryARect.right-2;
+    window.dispatchEvent(boundaryPointer('pointermove',x,boundaryACenter.y,1));
+    cardBoundaryTargets.push(selectedBoundaryTarget());
+  }
+  const cardBoundaryStable=cardBoundaryTargets.every((target)=>target==='a');
+
+  window.dispatchEvent(boundaryPointer('pointermove',boundaryCRect.left+30,boundaryACenter.y,1));
+  const deepCrossingSwitchesTarget=selectedBoundaryTarget()==='c';
+  const reverseBoundaryTargets=[];
+  for(let index=0;index<30;index+=1){
+    const x=index%2===0?boundaryARect.right-2:boundaryCRect.left+2;
+    window.dispatchEvent(boundaryPointer('pointermove',x,boundaryACenter.y,1));
+    reverseBoundaryTargets.push(selectedBoundaryTarget());
+  }
+  const reverseBoundaryStable=reverseBoundaryTargets.every((target)=>target==='c');
+  window.dispatchEvent(boundaryPointer('pointermove',boundaryARect.right-30,boundaryACenter.y,1));
+  const deepReturnSwitchesBack=selectedBoundaryTarget()==='a';
+
+  const boundarySectionRect=boundarySection.getBoundingClientRect();
+  const outerBoundaryTargets=[];
+  for(let index=0;index<20;index+=1){
+    const x=index%2===0?boundarySectionRect.left-2:boundarySectionRect.left+2;
+    window.dispatchEvent(boundaryPointer('pointermove',x,boundaryACenter.y,1));
+    outerBoundaryTargets.push(selectedBoundaryTarget());
+  }
+  const outerBoundaryStable=outerBoundaryTargets.every((target)=>target==='a');
+
+  const appendBoundaryTargets=[];
+  for(let index=0;index<20;index+=1){
+    const y=index%2===0?boundaryARect.bottom+2:boundaryARect.bottom-2;
+    window.dispatchEvent(boundaryPointer('pointermove',boundaryACenter.x,y,1));
+    appendBoundaryTargets.push(selectedBoundaryTarget());
+  }
+  const appendBoundaryStable=appendBoundaryTargets.every((target)=>target==='a');
+  window.dispatchEvent(boundaryPointer('pointermove',boundaryACenter.x,boundaryARect.bottom+30,1));
+  const deepAppendActivates=!boundaryA.classList.contains('is-selected') && !boundaryC.classList.contains('is-selected');
+  const appendReturnTargets=[];
+  for(let index=0;index<20;index+=1){
+    const y=index%2===0?boundaryARect.bottom-2:boundaryARect.bottom+2;
+    window.dispatchEvent(boundaryPointer('pointermove',boundaryACenter.x,y,1));
+    appendReturnTargets.push(selectedBoundaryTarget());
+  }
+  const appendReturnBoundaryStable=appendReturnTargets.every((target)=>target==='none');
+  window.dispatchEvent(boundaryPointer('pointermove',boundaryACenter.x,boundaryARect.top+50,1));
+  const deepAppendReturnReacquires=selectedBoundaryTarget()==='a';
+  window.dispatchEvent(boundaryPointer('pointerup',boundaryACenter.x,boundaryARect.top+50,0));
+  await delay(20);
+
   Object.assign(details,{
+    cardBoundaryStable,
+    deepCrossingSwitchesTarget,
+    reverseBoundaryStable,
+    deepReturnSwitchesBack,
+    outerBoundaryStable,
+    appendBoundaryStable,
+    deepAppendActivates,
+    appendReturnBoundaryStable,
+    deepAppendReturnReacquires,
+    boundaryDropDeliveredOnce:boundaryDropCount===1,
     dropDeliveredOnce:dropCount===1 && droppedTarget==='a.jpg' && droppedPlacement==='before',
     cleanupRemovesPreview:!section.classList.contains('is-image-drag-target')
       && !document.querySelector('.al-image-drop-placeholder') && !a.classList.contains('is-selected')
@@ -192,6 +307,11 @@ for(const [name,fn] of Object.entries({
     droppedTarget,
     droppedPlacement,
     dragStates,
+    cardBoundaryTargets,
+    reverseBoundaryTargets,
+    outerBoundaryTargets,
+    appendBoundaryTargets,
+    appendReturnTargets,
   });
   document.body.dataset.result=Object.values(details).every(Boolean)?'pass':'fail';
   lifecycle.abort();
