@@ -152,6 +152,7 @@ for(const [name,fn] of Object.entries({
     clientX:x,clientY:y,button:0,buttons,
   });
 
+  // First verify that a cancelled live preview returns the exact original order.
   AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer('pointerdown',start.x,start.y,1));
   window.dispatchEvent(pointer('pointermove',end.x,end.y,1));
   const touchFollowRect=b.getBoundingClientRect();
@@ -164,6 +165,7 @@ for(const [name,fn] of Object.entries({
   await delay(20);
   const cancelRestoredOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
 
+  // Then run the hot repeated-move path from a clean preview state and drop.
   const pointerId2=72;
   const pointer2=(type,x,y,buttons)=>new PointerEvent(type,{
     bubbles:true,cancelable:true,pointerId:pointerId2,pointerType:'touch',isPrimary:true,
@@ -182,6 +184,9 @@ for(const [name,fn] of Object.entries({
     Math.abs(mouseFollowRect.left+mouseFollowRect.width/2-follow.x)<1
     && Math.abs(mouseFollowRect.top+mouseFollowRect.height/2-follow.y)<1;
   await delay(10);
+  // Simulate the live masonry putting an unrelated card under the stationary
+  // pointer after the preview reflow. Targeting must stay anchored to the
+  // drag-start geometry instead of chasing the moving DOM.
   const originalElementsFromPoint=document.elementsFromPoint.bind(document);
   document.elementsFromPoint=()=>[c,section,document.body,document.documentElement];
   for(let index=0;index<60;index+=1){
@@ -216,6 +221,8 @@ for(const [name,fn] of Object.entries({
   window.dispatchEvent(mousePointer2('pointerup',follow.x,follow.y,0));
   await delay(20);
 
+  // Stress the exact failure mode users hit near card/section/append boundaries.
+  // A few pixels of jitter must not make the preview alternate between targets.
   const boundaryPointerId=73;
   const boundaryPointer=(type,x,y,buttons)=>new PointerEvent(type,{
     bubbles:true,cancelable:true,pointerId:boundaryPointerId,pointerType:'mouse',isPrimary:true,
