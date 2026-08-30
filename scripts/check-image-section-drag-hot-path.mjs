@@ -199,7 +199,7 @@ for(const [name,fn] of Object.entries({
   const previewARect=a.getBoundingClientRect();
   const previewBRect=b.getBoundingClientRect();
   const [previewTranslateX=0,previewTranslateY=0]=b.style.getPropertyValue('translate')
-    .split(/\s+/).filter(Boolean).map((value)=>Number.parseFloat(value)||0);
+    .split(/\\s+/).filter(Boolean).map((value)=>Number.parseFloat(value)||0);
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
     previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===3
