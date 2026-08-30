@@ -113,6 +113,10 @@ for(const [name,fn] of Object.entries({
   // First verify that a cancelled live preview returns the exact original order.
   AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer('pointerdown',start.x,start.y,1));
   window.dispatchEvent(pointer('pointermove',end.x,end.y,1));
+  const touchFollowRect=b.getBoundingClientRect();
+  const touchSourceFollowsPointer=
+    Math.abs(touchFollowRect.left+touchFollowRect.width/2-end.x)<1
+    && Math.abs(touchFollowRect.top+touchFollowRect.height/2-end.y)<1;
   await delay(20);
   const cancelPreviewOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
   window.dispatchEvent(pointer('pointercancel',end.x,end.y,0));
@@ -125,42 +129,60 @@ for(const [name,fn] of Object.entries({
     bubbles:true,cancelable:true,pointerId:pointerId2,pointerType:'touch',isPrimary:true,
     clientX:x,clientY:y,button:0,buttons,
   });
-  AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer2('pointerdown',start.x,start.y,1));
-  window.dispatchEvent(pointer2('pointermove',end.x,end.y,1));
+  const mousePointer2=(type,x,y,buttons)=>new PointerEvent(type,{
+    bubbles:true,cancelable:true,pointerId:pointerId2,pointerType:'mouse',isPrimary:true,
+    clientX:x,clientY:y,button:0,buttons,
+  });
+  AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',mousePointer2('pointerdown',start.x,start.y,1));
+  window.dispatchEvent(mousePointer2('pointermove',end.x,end.y,1));
+  const follow={x:end.x+18,y:end.y-8};
+  window.dispatchEvent(mousePointer2('pointermove',follow.x,follow.y,1));
+  const mouseFollowRect=b.getBoundingClientRect();
+  const mouseSourceFollowsPointerWithoutFrameDelay=
+    Math.abs(mouseFollowRect.left+mouseFollowRect.width/2-follow.x)<1
+    && Math.abs(mouseFollowRect.top+mouseFollowRect.height/2-follow.y)<1;
   await delay(10);
   // Simulate the live masonry putting an unrelated card under the stationary
   // pointer after the preview reflow. Targeting must stay anchored to the
   // drag-start geometry instead of chasing the moving DOM.
-  const originalElementFromPoint=document.elementFromPoint.bind(document);
-  document.elementFromPoint=()=>c;
+  const originalElementsFromPoint=document.elementsFromPoint.bind(document);
+  document.elementsFromPoint=()=>[c,section,document.body,document.documentElement];
   for(let index=0;index<60;index+=1){
-    window.dispatchEvent(pointer2('pointermove',end.x,end.y,1));
+    window.dispatchEvent(mousePointer2('pointermove',follow.x,follow.y,1));
   }
-  document.elementFromPoint=originalElementFromPoint;
+  document.elementsFromPoint=originalElementsFromPoint;
   await delay(20);
 
   const previewOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
   const previewARect=a.getBoundingClientRect();
   const previewBRect=b.getBoundingClientRect();
+  const [previewTranslateX=0,previewTranslateY=0]=b.style.getPropertyValue('translate')
+    .split(/\\s+/).filter(Boolean).map((value)=>Number.parseFloat(value)||0);
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
     previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===3
       && !document.querySelector('.al-image-drop-placeholder'),
     targetMarked:section.classList.contains('is-image-drag-target') && a.classList.contains('is-selected'),
     previewUsesFinalOrder:JSON.stringify(previewOrder)===JSON.stringify(['b.jpg','a.jpg','c.jpg']),
-    movingOccupiesTargetSlot:Math.abs(previewBRect.left-aRect.left)<1,
+    movingOccupiesTargetSlot:Math.abs((previewBRect.left-previewTranslateX)-aRect.left)<1
+      && Math.abs((previewBRect.top-previewTranslateY)-aRect.top)<1,
     targetShiftsForward:previewARect.left>aRect.left,
     stationaryPointerIgnoresReflowedCard:!c.classList.contains('is-selected') && a.classList.contains('is-selected'),
     cancelRestoresOriginalLayout:JSON.stringify(cancelPreviewOrder)===JSON.stringify(['b.jpg','a.jpg','c.jpg'])
       && JSON.stringify(cancelRestoredOrder)===JSON.stringify(['a.jpg','b.jpg','c.jpg']),
+    touchSourceFollowsPointer,
+    mouseSourceFollowsPointerWithoutFrameDelay,
+    followUsesOriginalCardOnly:!document.querySelector('.al-image-drag-overlay')
+      && gallery.querySelectorAll('.al-image-item[data-image-path]').length===3,
   };
 
-  window.dispatchEvent(pointer2('pointerup',end.x,end.y,0));
+  window.dispatchEvent(mousePointer2('pointerup',follow.x,follow.y,0));
   await delay(20);
   Object.assign(details,{
     dropDeliveredOnce:dropCount===1 && droppedTarget==='a.jpg' && droppedPlacement==='before',
     cleanupRemovesPreview:!section.classList.contains('is-image-drag-target')
-      && !document.querySelector('.al-image-drop-placeholder') && !a.classList.contains('is-selected'),
+      && !document.querySelector('.al-image-drop-placeholder') && !a.classList.contains('is-selected')
+      && !b.style.getPropertyValue('translate'),
     dragLifecycleCloses:dragStates.length>=4 && dragStates[0]===true && dragStates.at(-1)===false,
   });
   document.body.dataset.details=JSON.stringify({

@@ -109,6 +109,13 @@ const rectMap=(root)=>Object.fromEntries([...root.querySelectorAll('.al-image-it
  const rect=item.getBoundingClientRect();
  return [item.dataset.imagePath,{left:rect.left,top:rect.top,width:rect.width,height:rect.height}];
 }));
+const layoutRectMap=(root)=>Object.fromEntries([...root.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>{
+ const rect=item.getBoundingClientRect();
+ const parts=item.style.getPropertyValue('translate').trim().split(' ').filter(Boolean);
+ const translateX=Number.parseFloat(parts[0]||'0')||0;
+ const translateY=Number.parseFloat(parts[1]||'0')||0;
+ return [item.dataset.imagePath,{left:rect.left-translateX,top:rect.top-translateY,width:rect.width,height:rect.height}];
+}));
 const sameRects=(left,right,epsilon=1.5)=>Object.keys(left).length===Object.keys(right).length
  && Object.entries(left).every(([path,rect])=>{
    const other=right[path];
@@ -183,11 +190,12 @@ const host={app:{}};
  details.dragPreviewUsesFlipMotion=[...section.querySelectorAll('.al-image-item[data-image-path]')].some((item)=>item.dataset.layoutMotion==='active');
  await delay(230);
  const previewRects=rectMap(section);
+ const previewLayoutRects=layoutRectMap(section);
  details.dragPreviewIsFinalLayout=section.querySelectorAll('.al-image-item[data-image-path]').length===initial.length
    && !section.querySelector('.al-image-drop-placeholder')
    && target.classList.contains('is-selected')
-   && Math.abs(previewRects['square-2.jpg'].top-initialRects['square-1.jpg'].top)<=1.5
-   && previewRects['square-1.jpg'].top>initialRects['square-1.jpg'].top;
+   && Math.abs(previewLayoutRects['square-2.jpg'].top-initialRects['square-1.jpg'].top)<=1.5
+   && previewLayoutRects['square-1.jpg'].top>initialRects['square-1.jpg'].top;
 
  const tallImage=section.querySelector('.al-image-item[data-image-path="tall.jpg"] img');
  tallImage?.dispatchEvent(new Event('load'));
@@ -199,7 +207,7 @@ const host={app:{}};
  await waitFor(()=>Boolean(journalRecords.get('Regression.md')?.sections?.[0]?.paths),1500);
  await delay(230);
  const finalRects=rectMap(section);
- details.dragPreviewMatchesDroppedLayout=sameRects(previewRects,finalRects);
+ details.dragPreviewMatchesDroppedLayout=sameRects(previewLayoutRects,finalRects);
  details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && !target.classList.contains('is-selected');
  const pendingOrder=journalRecords.get('Regression.md')?.sections?.[0]?.paths ?? [];
  details.dropMovesSourceIntoTargetSlot=JSON.stringify(pendingOrder)===JSON.stringify(['tall.jpg','square-2.jpg','square-1.jpg','square-3.jpg','wide.jpg']);
