@@ -26,7 +26,8 @@ await build({
       buildContext.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "stub" }));
       buildContext.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
         loader: "js",
-        contents: `export function setIcon() {}`,
+        contents: `export function setIcon() {}
+          export function normalizePath(value) { return String(value || ""); }`,
       }));
     },
   }],
@@ -58,8 +59,18 @@ for(const [name,fn] of Object.entries({
   const section=document.querySelector('#section');
   const a=document.querySelector('#a');
   const b=document.querySelector('#b');
+  const gallery=section.querySelector('.al-image-gallery-viewport');
   const lifecycle=new AbortController();
-  const participant={};
+  let participantPaths=['a.jpg','b.jpg'];
+  const participant={
+    sourcePath:'HotPath.md',
+    paths:()=>participantPaths,
+    applyPaths:(paths)=>{
+      participantPaths=[...paths];
+      const nodes=new Map([['a.jpg',a],['b.jpg',b]]);
+      gallery.replaceChildren(...participantPaths.map((path)=>nodes.get(path)));
+    },
+  };
   let dropCount=0;
   let droppedTarget='';
   let droppedPlacement='';
@@ -89,38 +100,57 @@ for(const [name,fn] of Object.entries({
 
   const aRect=a.getBoundingClientRect();
   const bRect=b.getBoundingClientRect();
-  const start={x:aRect.left+aRect.width/2,y:aRect.top+aRect.height/2};
-  const end={x:bRect.left+bRect.width/2,y:bRect.top+bRect.height*0.75};
+  const start={x:bRect.left+bRect.width/2,y:bRect.top+bRect.height/2};
+  const end={x:aRect.left+aRect.width/2,y:aRect.top+aRect.height*0.75};
   const pointerId=71;
   const pointer=(type,x,y,buttons)=>new PointerEvent(type,{
     bubbles:true,cancelable:true,pointerId,pointerType:'touch',isPrimary:true,
     clientX:x,clientY:y,button:0,buttons,
   });
 
-  AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,a,'a.jpg',pointer('pointerdown',start.x,start.y,1));
+  // First verify that a cancelled live preview returns the exact original order.
+  AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer('pointerdown',start.x,start.y,1));
+  window.dispatchEvent(pointer('pointermove',end.x,end.y,1));
+  await delay(20);
+  const cancelPreviewOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
+  window.dispatchEvent(pointer('pointercancel',end.x,end.y,0));
+  await delay(20);
+  const cancelRestoredOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
+
+  // Then run the hot repeated-move path from a clean preview state and drop.
+  const pointerId2=72;
+  const pointer2=(type,x,y,buttons)=>new PointerEvent(type,{
+    bubbles:true,cancelable:true,pointerId:pointerId2,pointerType:'touch',isPrimary:true,
+    clientX:x,clientY:y,button:0,buttons,
+  });
+  AnimeListImageDragHotPath.beginImageSectionPointerDrag(surface,b,'b.jpg',pointer2('pointerdown',start.x,start.y,1));
   for(let index=0;index<60;index+=1){
-    window.dispatchEvent(pointer('pointermove',end.x,end.y,1));
+    window.dispatchEvent(pointer2('pointermove',end.x,end.y,1));
   }
   await delay(20);
 
-  const placeholder=document.querySelector('.al-image-drop-placeholder');
+  const previewOrder=[...gallery.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath);
+  const previewARect=a.getBoundingClientRect();
+  const previewBRect=b.getBoundingClientRect();
   const details={
     repeatedMovesAvoidDocumentWideIndicatorScans:documentQuerySelectorAllCalls===0,
-    repeatedMovesReuseSinglePreview:document.querySelectorAll('.al-image-drop-placeholder').length===1,
-    targetMarked:section.classList.contains('is-image-drag-target') && b.classList.contains('is-selected'),
-    placeholderShowsTargetSlot:Boolean(placeholder) && placeholder.nextElementSibling===b,
-    targetIsPushedAside:b.getBoundingClientRect().left>bRect.left,
-    placeholderUsesCardFootprint:Boolean(placeholder) && placeholder.getBoundingClientRect().height>=aRect.height-1,
-    placeholderExplainsDrop:Boolean(placeholder?.textContent?.includes('放在這裡')),
+    previewKeepsRealCardCount:gallery.querySelectorAll('.al-image-item[data-image-path]').length===2
+      && !document.querySelector('.al-image-drop-placeholder'),
+    targetMarked:section.classList.contains('is-image-drag-target') && a.classList.contains('is-selected'),
+    previewUsesFinalOrder:JSON.stringify(previewOrder)===JSON.stringify(['b.jpg','a.jpg']),
+    movingOccupiesTargetSlot:Math.abs(previewBRect.left-aRect.left)<1,
+    targetShiftsForward:previewARect.left>aRect.left,
+    cancelRestoresOriginalLayout:JSON.stringify(cancelPreviewOrder)===JSON.stringify(['b.jpg','a.jpg'])
+      && JSON.stringify(cancelRestoredOrder)===JSON.stringify(['a.jpg','b.jpg']),
   };
 
-  window.dispatchEvent(pointer('pointerup',end.x,end.y,0));
+  window.dispatchEvent(pointer2('pointerup',end.x,end.y,0));
   await delay(20);
   Object.assign(details,{
-    dropDeliveredOnce:dropCount===1 && droppedTarget==='b.jpg' && droppedPlacement==='before',
+    dropDeliveredOnce:dropCount===1 && droppedTarget==='a.jpg' && droppedPlacement==='before',
     cleanupRemovesPreview:!section.classList.contains('is-image-drag-target')
-      && !document.querySelector('.al-image-drop-placeholder') && !b.classList.contains('is-selected'),
-    dragLifecycleCloses:dragStates.length>=2 && dragStates[0]===true && dragStates.at(-1)===false,
+      && !document.querySelector('.al-image-drop-placeholder') && !a.classList.contains('is-selected'),
+    dragLifecycleCloses:dragStates.length>=4 && dragStates[0]===true && dragStates.at(-1)===false,
   });
   document.body.dataset.details=JSON.stringify({
     ...details,

@@ -89,7 +89,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:
 </style></head><body data-result="pending"><section id="section"></section>
 <script>
 Object.defineProperty(document,"startViewTransition",{value:undefined,configurable:true});
-window.matchMedia=()=>({matches:true,media:'(prefers-reduced-motion: reduce)',addEventListener(){},removeEventListener(){}});
+window.matchMedia=(query)=>({matches:false,media:query,addEventListener(){},removeEventListener(){}});
 window.createEl=(tag)=>document.createElement(tag);
 for(const [name,fn] of Object.entries({
  addClass:function(...names){this.classList.add(...names)},
@@ -104,6 +104,15 @@ const waitFor=async(predicate,timeout=1500)=>{
  return false;
 };
 const center=(element)=>{const rect=element.getBoundingClientRect();return{x:rect.left+rect.width/2,y:rect.top+rect.height/2}};
+const rectMap=(root)=>Object.fromEntries([...root.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>{
+ const rect=item.getBoundingClientRect();
+ return [item.dataset.imagePath,{left:rect.left,top:rect.top,width:rect.width,height:rect.height}];
+}));
+const sameRects=(left,right,epsilon=1.5)=>Object.keys(left).length===Object.keys(right).length
+ && Object.entries(left).every(([path,rect])=>{
+   const other=right[path];
+   return Boolean(other) && ['left','top','width','height'].every((key)=>Math.abs(rect[key]-other[key])<=epsilon);
+ });
 const touch=(target,type,x,y,id)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:id,pointerType:'touch',isPrimary:true,clientX:x,clientY:y,button:0,buttons:type==='pointerup'?0:1}));
 const initial=['tall.jpg','square-1.jpg','square-2.jpg','square-3.jpg'];
 let current=[...initial];
@@ -150,29 +159,34 @@ const host={app:{}};
  const handle=moving?.querySelector('.al-image-drag-handle');
  const target=section.querySelector('.al-image-item[data-image-path="square-1.jpg"]');
  if(!moving||!handle||!target) throw new Error('drag fixture cards unavailable');
+ const initialRects=rectMap(section);
  const from=center(handle), targetRect=target.getBoundingClientRect();
- const targetTopBefore=targetRect.top;
  const to={x:targetRect.left+targetRect.width/2,y:targetRect.top+targetRect.height*0.75};
- const movingHeight=moving.getBoundingClientRect().height;
  touch(handle,'pointerdown',from.x,from.y,91);
  touch(moving,'pointermove',to.x,to.y,91);
- await delay(25);
- const placeholder=section.querySelector('.al-image-drop-placeholder');
- details.dragPreviewShowsRealSlot=Boolean(placeholder)
-   && placeholder.textContent.includes('放在這裡')
-   && placeholder.getBoundingClientRect().height>=movingHeight-2
-   && placeholder.nextElementSibling===target
+ await delay(20);
+ details.dragPreviewUsesFlipMotion=[...section.querySelectorAll('.al-image-item[data-image-path]')].some((item)=>item.dataset.layoutMotion==='active');
+ await delay(230);
+ const previewRects=rectMap(section);
+ const previewBuckets=[...section.querySelectorAll('.al-image-masonry-column')].map((column)=>[...column.querySelectorAll('.al-image-item[data-image-path]')].map((item)=>item.dataset.imagePath));
+ details.dragPreviewIsFinalLayout=section.querySelectorAll('.al-image-item[data-image-path]').length===initial.length
+   && !section.querySelector('.al-image-drop-placeholder')
    && target.classList.contains('is-selected')
-   && target.getBoundingClientRect().top>targetTopBefore;
+   && JSON.stringify(previewBuckets)===JSON.stringify([['tall.jpg'],['square-2.jpg','square-1.jpg','square-3.jpg']])
+   && Math.abs(previewRects['square-2.jpg'].top-initialRects['square-1.jpg'].top)<=1.5
+   && previewRects['square-1.jpg'].top>initialRects['square-1.jpg'].top;
 
  const tallImage=section.querySelector('.al-image-item[data-image-path="tall.jpg"] img');
  tallImage?.dispatchEvent(new Event('load'));
  await delay(40);
- details.dragPreviewSurvivesImageRelayoutSignal=section.querySelector('.al-image-drop-placeholder')===placeholder
-   && placeholder?.nextElementSibling===target;
+ const previewAfterLoadRects=rectMap(section);
+ details.dragPreviewSurvivesImageRelayoutSignal=sameRects(previewRects,previewAfterLoadRects);
 
  touch(moving,'pointerup',to.x,to.y,91);
- await delay(50);
+ await waitFor(()=>Boolean(journalRecords.get('Regression.md')?.sections?.[0]?.paths),1500);
+ await delay(230);
+ const finalRects=rectMap(section);
+ details.dragPreviewMatchesDroppedLayout=sameRects(previewRects,finalRects);
  details.dragPreviewCleansAfterDrop=!section.querySelector('.al-image-drop-placeholder') && !target.classList.contains('is-selected');
  const pendingOrder=journalRecords.get('Regression.md')?.sections?.[0]?.paths ?? [];
  details.dropMovesSourceIntoTargetSlot=JSON.stringify(pendingOrder)===JSON.stringify(['tall.jpg','square-2.jpg','square-1.jpg','square-3.jpg']);
