@@ -46,11 +46,6 @@ export class ImageLightboxModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("animelist-image-lightbox");
-    this.modalEl.style.height = "min(92dvh, calc(100dvh - 24px))";
-    this.modalEl.style.maxHeight = "calc(100dvh - 24px)";
-    this.contentEl.style.height = "100%";
-    this.contentEl.style.minHeight = "0";
-    this.contentEl.style.boxSizing = "border-box";
     this.modalEl.addEventListener("keydown", this.handleKeydown);
     window.addEventListener("resize", this.handleViewportResize);
     this.buildShell();
@@ -79,18 +74,25 @@ export class ImageLightboxModal extends Modal {
   }
 
   private fitStageToModal(): void {
-    if (!this.stage || !this.counter) return;
+    if (!this.stage || !this.image || !this.counter) return;
+    const modalHeight = this.modalEl.getBoundingClientRect().height;
     const contentHeight = this.contentEl.getBoundingClientRect().height;
-    if (contentHeight <= 0) return;
+    if (modalHeight <= 0 || contentHeight <= 0) return;
     const contentStyle = window.getComputedStyle(this.contentEl);
     const paddingTop = Number.parseFloat(contentStyle.paddingTop) || 0;
     const paddingBottom = Number.parseFloat(contentStyle.paddingBottom) || 0;
     const gap = Number.parseFloat(contentStyle.rowGap || contentStyle.gap) || 0;
     const counterHeight = this.counter.getBoundingClientRect().height;
-    const available = Math.max(120, contentHeight - paddingTop - paddingBottom - gap - counterHeight);
-    this.stage.style.height = `${available}px`;
-    this.stage.style.minHeight = "0";
-    this.stage.style.maxHeight = `${available}px`;
+    const modalChrome = Math.max(0, modalHeight - contentHeight);
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const safeViewportHeight = Math.max(120, viewportHeight - 24);
+    const available = Math.max(120,
+      safeViewportHeight - modalChrome - paddingTop - paddingBottom - gap - counterHeight,
+    );
+    const fittedHeight = `${available}px`;
+    this.stage.style.setProperty("height", fittedHeight);
+    this.stage.style.setProperty("max-height", fittedHeight);
+    this.image.style.setProperty("max-height", fittedHeight);
   }
 
   private readonly handleKeydown = (event: KeyboardEvent): void => {
@@ -133,14 +135,7 @@ export class ImageLightboxModal extends Modal {
   private buildShell(): void {
     this.contentEl.replaceChildren();
     this.stage = makeEl("div", "al-image-lightbox-stage");
-    this.stage.style.flex = "1 1 auto";
-    this.stage.style.minHeight = "0";
-    this.stage.style.maxHeight = "none";
-    this.stage.style.boxSizing = "border-box";
-    this.stage.style.padding = "clamp(8px, 1.8vh, 18px)";
     this.image = makeEl("img", "al-image-lightbox-image");
-    this.image.style.maxWidth = "100%";
-    this.image.style.maxHeight = "100%";
     this.image.alt = "";
     this.image.draggable = false;
     this.image.hidden = true;
@@ -204,7 +199,6 @@ export class ImageLightboxModal extends Modal {
     this.stage.addEventListener("pointercancel", endPan);
 
     this.counter = makeEl("div", "al-image-lightbox-counter");
-    this.counter.style.flex = "0 0 auto";
     this.contentEl.append(this.stage, this.counter);
   }
 

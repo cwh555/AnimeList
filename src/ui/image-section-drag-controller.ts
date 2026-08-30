@@ -2,6 +2,7 @@ import type { ImageSectionDropPlacement } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { armPointerDrag, type PointerDragPoint } from "./pointer-drag";
 import type { ImageSectionMoveParticipant } from "./image-section-move-coordinator";
+import { makeEl } from "./ui-helpers";
 
 export interface ImageSectionDragSurface {
   containerEl: HTMLElement;
@@ -36,8 +37,6 @@ interface DropPreview {
   target: ImageSectionDropTarget;
   placeholder: HTMLElement;
   highlightedItem: HTMLElement | null;
-  previousOutline: string;
-  previousOutlineOffset: string;
 }
 
 const dragSurfaces = new WeakMap<HTMLElement, ImageSectionDragSurface>();
@@ -63,35 +62,18 @@ function shortestColumn(container: HTMLElement): HTMLElement | null {
 
 function createDropPlaceholder(sourceItem: HTMLElement): HTMLElement {
   const rect = sourceItem.getBoundingClientRect();
-  const placeholder = createEl("div");
-  placeholder.className = "al-image-item al-image-drop-placeholder";
+  const placeholder = makeEl("div", "al-image-item al-image-drop-placeholder is-selected");
   placeholder.setAttribute("aria-hidden", "true");
-  placeholder.style.display = "grid";
-  placeholder.style.minHeight = `${Math.max(72, Math.round(rect.height))}px`;
-  placeholder.style.placeItems = "center";
-  placeholder.style.padding = "12px";
-  placeholder.style.border = "2px dashed var(--interactive-accent)";
-  placeholder.style.color = "var(--interactive-accent)";
-  placeholder.style.background = "color-mix(in srgb,var(--interactive-accent) 9%,var(--background-secondary))";
-  placeholder.style.boxShadow = "inset 0 0 0 1px color-mix(in srgb,var(--interactive-accent) 14%,transparent)";
-  placeholder.style.fontSize = "var(--font-ui-small)";
-  placeholder.style.fontWeight = "700";
-  placeholder.style.textAlign = "center";
-  placeholder.style.pointerEvents = "none";
-  const label = createEl("span");
-  label.textContent = imageSectionText("dropHere");
-  placeholder.appendChild(label);
+  placeholder.style.setProperty("height", `${Math.max(72, Math.round(rect.height))}px`);
+  placeholder.appendChild(makeEl("div", "al-image-missing", imageSectionText("dropHere")));
   return placeholder;
 }
 
 function clearDropPreview(): void {
   if (!dropPreview) return;
-  const { target, placeholder, highlightedItem, previousOutline, previousOutlineOffset } = dropPreview;
+  const { target, placeholder, highlightedItem } = dropPreview;
   placeholder.remove();
-  if (highlightedItem) {
-    highlightedItem.style.outline = previousOutline;
-    highlightedItem.style.outlineOffset = previousOutlineOffset;
-  }
+  highlightedItem?.removeClass("is-selected");
   target.surface.containerEl.removeClass("is-image-drag-target");
   if (activeDrag?.source !== target.surface) target.surface.setDragging(false);
   dropPreview = null;
@@ -138,15 +120,10 @@ function markDropTarget(target: ImageSectionDropTarget): void {
 
   const placeholder = createDropPlaceholder(activeDrag.item);
   let highlightedItem: HTMLElement | null = null;
-  let previousOutline = "";
-  let previousOutlineOffset = "";
 
   if (target.item) {
     highlightedItem = target.item;
-    previousOutline = target.item.style.outline;
-    previousOutlineOffset = target.item.style.outlineOffset;
-    target.item.style.outline = "2px solid color-mix(in srgb,var(--interactive-accent) 76%,transparent)";
-    target.item.style.outlineOffset = "2px";
+    target.item.addClass("is-selected");
     if (target.placement === "before") target.item.before(placeholder);
     else target.item.after(placeholder);
   } else {
@@ -159,7 +136,7 @@ function markDropTarget(target: ImageSectionDropTarget): void {
     }
   }
 
-  dropPreview = { target, placeholder, highlightedItem, previousOutline, previousOutlineOffset };
+  dropPreview = { target, placeholder, highlightedItem };
 }
 
 function updateDropTarget(surface: ImageSectionDragSurface, point: PointerDragPoint): void {
