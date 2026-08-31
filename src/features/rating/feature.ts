@@ -14,11 +14,11 @@ export const ratingFeature = defineFeature<AnimeListFeatureHost>({
   id: "rating",
   contributions: [{
     kind: "media-form",
-    configure({ fields, registerCleanup }): void {
+    configure({ fields, onDispose }): void {
       fields.score.min = String(MIN_RATING);
       fields.score.max = String(MAX_RATING);
       fields.score.step = String(RATING_INCREMENT);
-      registerCleanup(installNumberInputWheelGuard(fields.score));
+      onDispose(installNumberInputWheelGuard(fields.score));
     },
     prepareSubmit({ fields, form }): void {
       const raw = fields.score.value.trim();
