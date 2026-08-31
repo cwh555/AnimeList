@@ -22,9 +22,10 @@ export class MediaNoteFilenameCleanupModal extends Modal {
 
     this.contentEl.createEl("p", {
       cls: "al-modal-hint",
-      text: "Older versions of the plugin could leave a note filename unchanged after its title was edited. Review the proposed renames before applying them.",
+      text: "A note can stay in the AnimeList Library even when its Markdown filename differs from its title. Use this optional review when you want older or manually renamed notes to match their title frontmatter again.",
     });
     const rules = this.contentEl.createEl("ul", { cls: "al-version-cleanup-rules" });
+    appendRule(rules, "Manual filename changes are accepted by AnimeList and are not changed automatically by ordinary Library refreshes or unrelated edits.");
     appendRule(rules, "Only AnimeList media notes in your configured Library folders are scanned.");
     appendRule(rules, "Each note stays in its current folder; only the Markdown filename can change.");
     appendRule(rules, "The filename is derived from the note's existing title frontmatter using the same safe naming rules as newly created notes.");
