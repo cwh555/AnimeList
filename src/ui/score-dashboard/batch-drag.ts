@@ -16,6 +16,7 @@ import {
 import { renderScoreDashboard, type ScoreDashboardUiAdapters, type ScoreDashboardUiState } from "./renderer";
 import { applyScoreDashboardDomChanges, refreshScoreDashboardDomSummary } from "./dom-move";
 import type { MediaItem } from "../../types";
+import { installCoverImageLoading } from "../cover-image-loading";
 
 const controllers = new WeakMap<HTMLElement, AbortController>();
 
@@ -58,6 +59,11 @@ export function renderScoreDashboardWithBatchDrag(
     const controller = new AbortController();
     controllers.set(container, controller);
     const options = { signal: controller.signal };
+    const coverLoading = installCoverImageLoading(container, {
+      selector: "img.al-score-poster-image",
+      eagerCount: 12,
+    });
+    controller.signal.addEventListener("abort", () => coverLoading.disconnect(), { once: true });
     const shell = container.querySelector<HTMLElement>(".al-score-dashboard");
     const batchButton = container.querySelector<HTMLButtonElement>(
       ".al-score-dashboard-action-group .al-score-tool-button:last-child",
@@ -156,7 +162,10 @@ export function renderScoreDashboardWithBatchDrag(
     }, { ...options, capture: true });
 
     container.addEventListener("click", () => {
-      queueMicrotask(syncDraggablePosters);
+      queueMicrotask(() => {
+        syncDraggablePosters();
+        coverLoading.sync();
+      });
       scheduleTouchBatchInvariant();
     }, options);
 
