@@ -62,7 +62,7 @@ V1 still does not expose an Import UI or write imported notes. It does include a
 
 Text export shares the same completion-event source used by Timeline. Manga and novel serial completions are split into individual events, and the `work` template value uses Timeline's localized serial-entry title. For example, the work value becomes `葬送的芙莉蓮 — 第 13 卷` rather than losing the unit and label.
 
-Text output is controlled by a safe, per-event template. The default template is localized and keeps the required completion time and work name. In Traditional Chinese it is:
+Text output is controlled by a safe, per-event template. The default template remains a useful completion-history layout, but no specific variable is mandatory. In Traditional Chinese the default is:
 
 ```text
 {$完成時間}
@@ -70,13 +70,21 @@ Text output is controlled by a safe, per-event template. The default template is
   作品類型：{$作品類型}
 ```
 
-A user can replace it with a one-line layout such as:
+A user can replace it with any supported subset, such as a one-line layout:
 
 ```text
 ({$作品類型}) {$作品名稱} : {$完成時間}
 ```
 
-The variable buttons insert supported tokens at the caret. Available values include completion time, Timeline-style work name, base series name, media type, serial unit, original title, score, progress, started time, status, favorite, and genres/tags.
+or a score-only export:
+
+```text
+{$評分}
+```
+
+The variable buttons insert supported tokens at the caret. Available values include completion time, Timeline-style work name, base series name, media type, serial unit, original title, score, progress, started time, status, the active special-label state, and genres/tags.
+
+The special-label variable follows **Settings → Special label mode**. In Favorite mode its visible variable name is the localized Favorite label (for example `{$最愛}` in Traditional Chinese). In Masterpiece mode the visible variable name is the localized Masterpiece label (currently `{$masterpiece}` in Traditional Chinese). Previously valid Favorite/Masterpiece token names remain accepted as aliases when the setting is changed, so switching modes does not invalidate an existing template.
 
 ### Template safety rules
 
@@ -85,7 +93,7 @@ The Text template is deliberately **not** a shell, JavaScript, expression langua
 - template length is capped at 4096 characters;
 - at most 64 variable references are accepted;
 - unknown or unclosed variables make the template invalid;
-- completion time and work name are required, preserving the minimum Timeline information;
+- any supported subset of variables is allowed; no Timeline field is mandatory;
 - inserted values are never parsed again, so a title containing `{$評分}` remains literal text;
 - no variable can alter the export path or filename;
 - `\{$` emits a literal `{$` opener.
@@ -101,8 +109,9 @@ Text is a human-readable report and is not intended to be reversible. Future Imp
 3. Switch format and media type/status filters repeatedly. Controls/focus must stay stable with no full-modal flash while record/event counts and preview update.
 4. Switch to Text and edit the template continuously. Typing and variable insertion must keep the same editor/preview DOM nodes and must not flash or reset focus.
 5. Try `({$作品類型}) {$作品名稱} : {$完成時間}` and confirm manga/novel events still include Timeline unit labels such as `第 13 卷` / `第 42 話`.
-6. Remove `{$完成時間}` or enter an unknown variable. Copy and Save must disable until the template is valid again.
-7. Confirm the desktop modal uses a controls column + larger preview column; at narrow/mobile width the sections stack cleanly without horizontal overflow.
-8. Copy and paste into a text editor; the full output must be copied even when preview is truncated.
-9. Use **Save export file** and confirm the displayed destination matches the created file under `<Library root>/Exports/` with `.animelist.json` / `.txt` extension.
-10. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
+6. Replace the template with only `{$評分}` (or another supported subset). Copy and Save must remain enabled. Enter an unknown variable such as `{$不存在}` and confirm Copy / Save disable until the template is valid again.
+7. Switch Special label mode between Favorite and Masterpiece, reopen Export, and confirm the special-label variable button follows the active mode (`{$最愛}` / `{$masterpiece}` in Traditional Chinese). Existing templates using the previous name should remain valid.
+8. Confirm the desktop modal uses a controls column + larger preview column; at narrow/mobile width the sections stack cleanly without horizontal overflow.
+9. Copy and paste into a text editor; the full output must be copied even when preview is truncated.
+10. Use **Save export file** and confirm the displayed destination matches the created file under `<Library root>/Exports/` with `.animelist.json` / `.txt` extension.
+11. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
