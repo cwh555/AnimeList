@@ -106,6 +106,7 @@ export interface LibraryTextExportRow {
   startedAt: string;
   status: MediaStatus;
   favorite: boolean;
+  masterpieceLabels: string[];
   genres: string[];
 }
 
@@ -152,6 +153,7 @@ export function buildLibraryTextExportRows(items: readonly MediaItem[]): Library
       startedAt: event.startedAt,
       status: event.item.status,
       favorite: event.item.favorite,
+      masterpieceLabels: [...(event.item.masterpieceLabels ?? [])],
       genres: [...event.item.genres],
     }))
     .sort((left, right) => (
