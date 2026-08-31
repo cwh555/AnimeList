@@ -1,3 +1,4 @@
+import type { SpecialLabelMode } from "../domain/masterpiece-labels";
 import type {
   LibraryExportFormat,
   LibraryExportMediaFilter,
@@ -40,6 +41,7 @@ export function createLibraryExportOptions(
   scope: LibraryExportScope,
   templateValue: string,
   templateIssues: readonly string[],
+  specialLabelMode: SpecialLabelMode,
   callbacks: LibraryExportOptionsCallbacks,
 ): LibraryExportOptionsView {
   const root = makeEl("div", "al-library-export-controls");
@@ -191,7 +193,7 @@ export function createLibraryExportOptions(
     gap: "6px",
     marginTop: "6px",
   });
-  for (const variable of libraryTextTemplateVariableOptions()) {
+  for (const variable of libraryTextTemplateVariableOptions(specialLabelMode)) {
     const button = makeEl("button", "al-secondary-button al-library-export-template-variable", variable.token);
     button.type = "button";
     button.title = variable.label;

@@ -42,6 +42,7 @@ export interface MediaItem {
   unit: string;
   score: number | null;
   favorite: boolean;
+  masterpieceLabels?: string[];
   year: number | string;
   genres: string[];
   mediaTags?: string[];
