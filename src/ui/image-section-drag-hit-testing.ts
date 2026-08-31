@@ -10,6 +10,7 @@ export interface ImageSectionDragHitGeometry<T> {
   width: number;
   height: number;
   maxBottom: number;
+  terminalRegionValue?: T | null;
   regions: ImageSectionDragHitRegion<T>[];
 }
 
@@ -95,6 +96,36 @@ function sameValue<T>(left: T, right: T, equals: (left: T, right: T) => boolean)
   return equals(left, right);
 }
 
+function terminalRegionDecision<T>(
+  geometry: ImageSectionDragHitGeometry<T>,
+  candidate: ImageSectionDragHitRegion<T>,
+  y: number,
+  currentRegion: ImageSectionDragHitRegion<T> | null,
+  currentIsAppend: boolean,
+  equals: (left: T, right: T) => boolean,
+): ImageSectionDragHitDecision<T> | null {
+  const terminalValue = geometry.terminalRegionValue;
+  if (terminalValue === null || terminalValue === undefined) return null;
+  if (!sameValue(candidate.value, terminalValue, equals)) return null;
+
+  const midpoint = (candidate.top + candidate.bottom) / 2;
+  const inset = boundaryInset(dimension(candidate, "y"));
+  const appendActivationY = midpoint + inset;
+  const beforeActivationY = midpoint - inset;
+  const currentIsTerminal = Boolean(currentRegion && sameValue(currentRegion.value, terminalValue, equals));
+
+  // The terminal card owns the otherwise unreachable final insertion slot.
+  // Entering its lower core means append; when append is already active, keep
+  // it through the midpoint dead zone so a stationary pointer cannot flap back
+  // to "before terminal" after the masonry preview reflows.
+  if (currentIsAppend) {
+    return y <= beforeActivationY ? null : { kind: "hold" };
+  }
+  if (y >= appendActivationY) return { kind: "append" };
+  if (currentIsTerminal) return { kind: "region", region: candidate };
+  return null;
+}
+
 export function resolveImageSectionDragHit<T>(
   options: ResolveImageSectionDragHitOptions<T>,
 ): ImageSectionDragHitDecision<T> {
@@ -107,6 +138,15 @@ export function resolveImageSectionDragHit<T>(
   const margin = retentionMargin(currentRegion, geometry.regions);
 
   if (candidate) {
+    const terminalDecision = terminalRegionDecision(
+      geometry,
+      candidate,
+      y,
+      currentRegion,
+      currentIsAppend,
+      equals,
+    );
+    if (terminalDecision) return terminalDecision;
     if (currentRegion && sameValue(candidate.value, currentRegion.value, equals)) {
       return { kind: "region", region: candidate };
     }

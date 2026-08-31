@@ -79,6 +79,10 @@ function sameDropTarget(left: ImageSectionDropTarget | null, right: ImageSection
 function captureDragGeometry(surface: ImageSectionDragSurface, sourceItem: HTMLElement): ImageSectionDragGeometry {
   const sectionRect = surface.containerEl.getBoundingClientRect();
   const viewport = surface.containerEl.querySelector<HTMLElement>(".al-image-gallery-viewport");
+  const sourcePath = sourceItem.dataset.imagePath ?? "";
+  const terminalRegionValue = [...surface.participant.paths()]
+    .filter((path) => path !== sourcePath)
+    .at(-1) ?? null;
   const regions = [...surface.containerEl.querySelectorAll<HTMLElement>(".al-image-item[data-image-path]")]
     .filter((item) => item !== sourceItem)
     .map((item) => {
@@ -99,6 +103,7 @@ function captureDragGeometry(surface: ImageSectionDragSurface, sourceItem: HTMLE
     viewport,
     viewportScrollTop: viewport?.scrollTop ?? 0,
     maxBottom: regions.reduce((maximum, region) => Math.max(maximum, region.bottom), 0),
+    terminalRegionValue,
     regions,
   };
 }

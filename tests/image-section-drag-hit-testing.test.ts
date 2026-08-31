@@ -6,6 +6,7 @@ const horizontalGeometry: ImageSectionDragHitGeometry<string> = {
   width: 500,
   height: 150,
   maxBottom: 100,
+  terminalRegionValue: "c",
   regions: [
     { value: "a", left: 0, top: 0, right: 120, bottom: 100 },
     { value: "c", left: 128, top: 0, right: 248, bottom: 100 },
@@ -32,7 +33,7 @@ describe("Image Section drag hit hysteresis", () => {
 
   it("applies the same dead zone to vertical masonry neighbours", () => {
     const geometry: ImageSectionDragHitGeometry<string> = {
-      width: 160, height: 240, maxBottom: 208,
+      width: 160, height: 240, maxBottom: 208, terminalRegionValue: "bottom",
       regions: [
         { value: "top", left: 0, top: 0, right: 120, bottom: 100 },
         { value: "bottom", left: 0, top: 108, right: 120, bottom: 208 },
@@ -54,6 +55,27 @@ describe("Image Section drag hit hysteresis", () => {
     });
     assert.equal(up.kind, "region");
     if (up.kind === "region") assert.equal(up.region.value, "top");
+  });
+
+  it("exposes the final insertion slot through the terminal card with hysteresis", () => {
+    const beforeTerminal = resolveImageSectionDragHit({
+      geometry: horizontalGeometry, x: 188, y: 50, currentRegionValue: "a", currentIsAppend: false,
+    });
+    assert.equal(beforeTerminal.kind, "region");
+    if (beforeTerminal.kind === "region") assert.equal(beforeTerminal.region.value, "c");
+
+    assert.deepEqual(resolveImageSectionDragHit({
+      geometry: horizontalGeometry, x: 188, y: 80, currentRegionValue: "c", currentIsAppend: false,
+    }), { kind: "append" });
+    assert.deepEqual(resolveImageSectionDragHit({
+      geometry: horizontalGeometry, x: 188, y: 52, currentRegionValue: null, currentIsAppend: true,
+    }), { kind: "hold" });
+
+    const returnToTerminal = resolveImageSectionDragHit({
+      geometry: horizontalGeometry, x: 188, y: 25, currentRegionValue: null, currentIsAppend: true,
+    });
+    assert.equal(returnToTerminal.kind, "region");
+    if (returnToTerminal.kind === "region") assert.equal(returnToTerminal.region.value, "c");
   });
 
   it("stabilizes section and append boundaries while preserving intentional leave, append, and return transitions", () => {
