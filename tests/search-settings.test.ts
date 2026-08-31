@@ -40,6 +40,7 @@ function createHost() {
     async loadData(): Promise<unknown> { return {}; },
     async saveSettings(): Promise<void> {},
     async initializeLibrary(): Promise<void> {},
+    async cleanupGarbageFiles() { return { removedManagedFiles: 0, removedJournalFiles: 0, removedCacheFiles: 0 }; },
     refreshViews(): void {},
   };
 }
@@ -165,6 +166,7 @@ describe("search language settings", () => {
     assert.deepEqual(tab.getSettingsPageSections("updates-cleanup").map((section) => section.heading), []);
     assert.deepEqual(tab.getSettingsPageSections("maintenance").map((section) => section.heading), [
       "Library setup",
+      "Storage cleanup",
     ]);
   });
 
@@ -175,4 +177,42 @@ describe("search language settings", () => {
     assert.equal(settingsPageForKey("features", "End"), "updates-cleanup");
     assert.equal(settingsPageForKey("features", "Enter"), null);
   });
+  it("runs the garbage-file cleanup action from Maintenance", async () => {
+    let cleanupCalls = 0;
+    const host = createHost();
+    host.cleanupGarbageFiles = async () => {
+      cleanupCalls += 1;
+      return { removedManagedFiles: 2, removedJournalFiles: 1, removedCacheFiles: 3 };
+    };
+    const tab = new AnimeListSettingTab(new App(), host);
+    const section = tab.getSettingsPageSections("maintenance").find((value) => value.heading === "Storage cleanup");
+    const definition = section?.definitions.find((value) => value.name === "Garbage files");
+    assert.ok(definition?.render);
+
+    let label = "";
+    let click: (() => Promise<void>) | null = null;
+    const buttonEl = { disabled: false };
+    const setting = {
+      addButton(callback: (button: {
+        buttonEl: { disabled: boolean };
+        setButtonText(value: string): unknown;
+        onClick(handler: () => Promise<void>): unknown;
+      }) => void) {
+        const button = {
+          buttonEl,
+          setButtonText(value: string) { label = value; return this; },
+          onClick(handler: () => Promise<void>) { click = handler; return this; },
+        };
+        callback(button);
+        return this;
+      },
+    };
+    definition.render(setting as never);
+    assert.equal(label, "Clean garbage files");
+    assert.ok(click);
+    await click();
+    assert.equal(cleanupCalls, 1);
+    assert.equal(buttonEl.disabled, false);
+  });
+
 });

@@ -198,4 +198,51 @@ describe("media note service", () => {
     assert.match(createdMarkdown, /^progress: "第 7 話"$/m);
   });
 
+  it("rolls back a downloaded cover when Markdown creation fails", async () => {
+    const cover = new TFile();
+    cover.path = "AnimeList/Covers/manga/failed.png";
+    const trashed: string[] = [];
+    const app = {
+      vault: {
+        async createBinary() { return cover; },
+        getAbstractFileByPath(path: string) { return path === cover.path ? cover : null; },
+        async create() { throw new Error("disk write failed"); },
+      },
+      fileManager: {
+        async trashFile(target: TFile) { trashed.push(target.path); },
+      },
+    } as unknown as App;
+    const repository = { findBySource() { return undefined; } } as unknown as MediaRepository;
+    const storage = {
+      scanFolders() { return ["AnimeList"]; },
+      mediaFolder() { return "AnimeList/Manga"; },
+      async ensureFolder() {},
+      async uniqueFilePath(_folder: string, _title: string, extension: string) {
+        return extension === "png" ? cover.path : "AnimeList/Manga/Failed.md";
+      },
+      async readTemplate() { return ""; },
+    } as unknown as LibraryStorage;
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    const service = new MediaNoteService(
+      app,
+      () => settings,
+      repository,
+      storage,
+      { async optimizeFile() {} },
+      { async openMediaFile() {}, refreshViews() {} },
+    );
+    const result: ExternalMediaResult = {
+      ...externalResult(), provider: "manual", sourceId: "", sourceUrl: "", mediaType: "manga", format: "manga", unit: "chapter",
+    };
+
+    await assert.rejects(
+      () => service.create(result, { ...noteForm("Failed"), unit: "chapter" }, {
+        name: "cover.png", contentType: "image/png", data: new Uint8Array([1, 2]).buffer,
+      }),
+      /disk write failed/,
+    );
+    assert.deepEqual(trashed, [cover.path]);
+  });
+
 });

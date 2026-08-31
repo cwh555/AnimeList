@@ -26,7 +26,12 @@ function adapterHarness(): { adapter: DataAdapter; files: Map<string, ArrayBuffe
     },
     async readBinary(path) { return files.get(path)?.slice(0) ?? new ArrayBuffer(0); },
     async writeBinary(path, data) { files.set(path, data.slice(0)); },
-    async remove(path) { files.delete(path); directories.delete(path); },
+    async rename(path, newPath) {
+      const value = files.get(path);
+      if (value) { files.delete(path); files.set(newPath, value); return; }
+      if (directories.delete(path)) directories.add(newPath);
+    },
+    async remove() { throw new Error("permanent remove must not be used"); },
     getResourcePath(path) { return path; },
   };
   return { adapter, files, directories };
@@ -65,6 +70,7 @@ describe("image section order journal", () => {
     assert.deepEqual(reloaded[0]?.sections[0]?.paths, ["b.jpg", "c.jpg", "a.jpg"]);
 
     await journal.remove(sourcePath);
-    assert.equal(harness.files.size, 0);
+    assert.equal(harness.files.has(path), false);
+    assert.equal([...harness.files.keys()].some((entry) => entry.startsWith(".trash/AnimeList/Internal/image-order/")), true);
   });
 });

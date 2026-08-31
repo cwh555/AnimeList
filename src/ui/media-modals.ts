@@ -10,6 +10,7 @@ import { compatibleGenres, compatibleSourceGenres } from "../data/media-frontmat
 import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
+import type { MediaFormContext } from "./media-form-contracts";
 import { renderMediaClassificationFields, renderStoredMediaClassificationFields } from "./media-classification-fields";
 import { createLabeledField, createMediaEditorFields, createMediaFormContext, createSelect, createTextInput, mediaFormValues } from "./media-form-controls";
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
@@ -44,6 +45,7 @@ export class AddMediaModal extends Modal {
   warnings: string[] = [];
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
+  private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
 
   constructor(plugin: AnimeListUiHost, initialType: MediaType = "anime") {
     super(plugin.app);
@@ -57,12 +59,24 @@ export class AddMediaModal extends Modal {
   }
 
   onClose(): void {
+    this.disposeActiveForm();
     if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
     this.manualCoverPreviewUrl = null;
     this.manualCoverFile = null;
   }
 
+  private activateForm(context: MediaFormContext<AnimeListUiHost>): void {
+    this.disposeActiveForm();
+    this.activeFormContext = context;
+  }
+
+  private disposeActiveForm(): void {
+    this.activeFormContext?.dispose();
+    this.activeFormContext = null;
+  }
+
   renderSearch(): void {
+    this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
     heading.className = "al-modal-heading";
@@ -192,6 +206,7 @@ export class AddMediaModal extends Modal {
   }
 
   private async renderManualDetails(mediaType: MediaType, state: ManualMediaFormState = {}): Promise<void> {
+    this.disposeActiveForm();
     this.mediaType = mediaType;
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
@@ -303,6 +318,7 @@ export class AddMediaModal extends Modal {
       frontmatter: {},
       fields,
     });
+    this.activateForm(context);
     this.plugin.configureMediaForm(context);
 
     type.addEventListener("change", () => {
@@ -358,6 +374,7 @@ export class AddMediaModal extends Modal {
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {
+    this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
     back.type = "button";
@@ -436,6 +453,7 @@ export class AddMediaModal extends Modal {
       frontmatter: {},
       fields,
     });
+    this.activateForm(context);
     this.plugin.configureMediaForm(context);
 
     const sourceNote = createDiv();
@@ -515,6 +533,8 @@ export class ConfirmDeleteModal extends Modal {
 }
 
 export class EditMediaModal extends Modal {
+  private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
+
   constructor(
     private readonly plugin: AnimeListUiHost,
     private readonly file: TFile,
@@ -527,7 +547,14 @@ export class EditMediaModal extends Modal {
     this.render();
   }
 
+  onClose(): void {
+    this.activeFormContext?.dispose();
+    this.activeFormContext = null;
+  }
+
   private render(): void {
+    this.activeFormContext?.dispose();
+    this.activeFormContext = null;
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
@@ -610,6 +637,7 @@ export class EditMediaModal extends Modal {
       frontmatter,
       fields,
     });
+    this.activeFormContext = context;
     this.plugin.configureMediaForm(context);
 
     const actions = createDiv();

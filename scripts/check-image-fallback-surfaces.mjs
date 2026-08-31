@@ -155,7 +155,7 @@ for(const [name,fn] of Object.entries({
  const editor=document.createElement('section'); editor.className='al-volume-editor'; editor.innerHTML='<div class="al-volume-row"><div class="al-volume-row-fields"><input type="text" value="1"></div></div>'; root.appendChild(editor);
  const reading={entries:[{label:'1',cover:broken}],editor,originalTitle:'Serial',listeners:new Set()};
  const formState=new Map([[AnimeListImageFallbacks.READING_EDITOR_STATE_KEY,reading]]);
- const form={state:formState,mediaType:'manga',result:{originalTitle:'Serial',searchTitles:[]},frontmatter:{},host:{resolveMediaCoverPath:(cover)=>cover,settings:{googleBooksApiKey:''}},form:{file:{path:'Manga/Serial.md'}}};
+ const form={state:formState,mediaType:'manga',result:{originalTitle:'Serial',searchTitles:[]},frontmatter:{},host:{resolveMediaCoverPath:(cover)=>cover,releaseDownloadedCover:()=>{},settings:{googleBooksApiKey:''}},form:{file:{path:'Manga/Serial.md'}},onDispose:()=>()=>{}};
  const serialContribution=AnimeListImageFallbacks.serialEntryCoversFeature.contributions.find((entry)=>entry.kind==='media-form'); serialContribution.configure(form); const serialImg=editor.querySelector('.al-serial-cover-button img'); serialImg?.dispatchEvent(new Event('error'));
  details.serialEditorFallback=!editor.querySelector('.al-serial-cover-button img') && !!editor.querySelector('.al-serial-cover-button [data-icon="image-off"]');
  details.serialEditorStatus=editor.querySelector('.al-serial-cover-status')?.textContent?.trim().length>0;
