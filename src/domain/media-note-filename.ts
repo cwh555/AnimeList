@@ -1,7 +1,7 @@
 import { sanitizePathPart } from "./value-normalization";
 
-export function mediaNoteFilenameForTitle(title: unknown): string {
-  return `${sanitizePathPart(String(title ?? ""))}.md`;
+export function mediaNoteFilenameForTitle(title: string): string {
+  return `${sanitizePathPart(title)}.md`;
 }
 
 export function mediaNoteFolder(path: string): string {
@@ -14,11 +14,11 @@ export function mediaNoteFilename(path: string): string {
   return index >= 0 ? path.slice(index + 1) : path;
 }
 
-export function isMediaNoteFilenameAligned(path: string, title: unknown): boolean {
+export function isMediaNoteFilenameAligned(path: string, title: string): boolean {
   return mediaNoteFilename(path) === mediaNoteFilenameForTitle(title);
 }
 
-export function mediaTitleChanged(previousTitle: unknown, nextTitle: unknown): boolean {
+export function mediaTitleChanged(previousTitle: unknown, nextTitle: string): boolean {
   if (typeof previousTitle !== "string") return false;
-  return previousTitle.trim() !== String(nextTitle ?? "").trim();
+  return previousTitle.trim() !== nextTitle.trim();
 }
