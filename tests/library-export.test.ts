@@ -11,7 +11,10 @@ import {
   sortLibraryExportRecords,
 } from "../src/domain/library-export";
 import { libraryExportRecordFromItem } from "../src/data/library-export-service";
-import { formatLibraryTextExport } from "../src/features/library-export/format";
+import {
+  compileLibraryTextExportTemplate,
+  formatLibraryTextExport,
+} from "../src/features/library-export/format";
 
 function file(path: string): TFile {
   const value = new TFile();
@@ -139,6 +142,44 @@ describe("library export", () => {
       "(漫畫) Serial — 第 2 卷 : 2026-01-12 | 9",
       "",
       "(動畫) Anime Done : 2026-02-10 | 8.5",
+      "",
+    ].join("\n"));
+  });
+
+  it("renders Favorite only on favorite works and Masterpiece as its actual labels", () => {
+    const plain = item(file("AnimeList/Anime/plain.md"), "Plain");
+    Object.assign(plain, { status: "completed", completedAt: "2026-03-01", score: 8 });
+    const favorite = item(file("AnimeList/Anime/favorite.md"), "Favorite Work");
+    Object.assign(favorite, { status: "completed", completedAt: "2026-03-02", favorite: true, score: 9 });
+    const masterpiece = item(file("AnimeList/Anime/masterpiece.md"), "Masterpiece Work");
+    Object.assign(masterpiece, {
+      status: "completed",
+      completedAt: "2026-03-03",
+      favorite: true,
+      masterpieceLabels: ["角色塑造", "世界觀"],
+      score: 10,
+    });
+
+    const rows = buildLibraryTextExportRows([plain, favorite, masterpiece]);
+    const favoriteTemplate = "{$作品名稱} | {$最愛}";
+    const favoriteCompilation = compileLibraryTextExportTemplate(favoriteTemplate, "favorite");
+    assert.equal(formatLibraryTextExport(rows, favoriteTemplate, favoriteCompilation, "favorite"), [
+      "Plain |",
+      "",
+      "Favorite Work | 最愛",
+      "",
+      "Masterpiece Work | 最愛",
+      "",
+    ].join("\n"));
+
+    const masterpieceTemplate = "{$作品名稱} | {$masterpiece}";
+    const masterpieceCompilation = compileLibraryTextExportTemplate(masterpieceTemplate, "masterpiece");
+    assert.equal(formatLibraryTextExport(rows, masterpieceTemplate, masterpieceCompilation, "masterpiece"), [
+      "Plain |",
+      "",
+      "Favorite Work | masterpiece",
+      "",
+      "Masterpiece Work | 角色塑造, 世界觀",
       "",
     ].join("\n"));
   });
