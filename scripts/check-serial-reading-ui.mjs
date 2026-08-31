@@ -64,13 +64,12 @@ assert.doesNotMatch(progressEditorSource, /MutationObserver|Modal\.prototype|pro
 assert.match(segmentedDateSource, /SEGMENTED_DATE_PARTS/);
 assert.doesNotMatch(segmentedDateSource, /type\s*=\s*"date"/);
 
-// The whole candidate card is the only action. There is no Select affordance or
-// secondary Apply button/state; clicking a card downloads, commits, and closes.
+// The whole candidate card is the only action. Direct-apply load/commit/close behavior
+// is covered by tests/serial-entry-cover.test.ts rather than source-text call ordering here.
 assert.match(pickerSource, /container\.createEl\("button",\s*\{[\s\S]*al-search-result/);
 assert.match(pickerSource, /row\.type\s*=\s*"button"/);
 assert.match(pickerSource, /row\.addEventListener\("click",\s*options\.onChoose\)/);
 assert.doesNotMatch(pickerSource, /al-search-result-use|selectLabel|aria-selected/);
-assert.match(coverFeatureSource, /directlyApplySerialCover\([\s\S]*downloadSelectedSerialCover[\s\S]*this\.applyCover[\s\S]*this\.close\(\)/);
 assert.doesNotMatch(coverFeatureSource, /applyButton|SerialCoverSelection|this\.selection/);
 assert.doesNotMatch(pluginEntrySource, /installSerialCoverPickerEvents/);
 

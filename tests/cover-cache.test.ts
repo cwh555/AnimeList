@@ -51,6 +51,63 @@ describe("cover thumbnail cache", () => {
     ]);
   });
 
+  it("moves cache evictions to vault trash instead of permanently removing files", async () => {
+    const root = ".obsidian/plugins/animelist/cache/covers";
+    const source = `${root}/orphan-320.webp`;
+    const files = new Set([source]);
+    const directories = new Set([root]);
+    const renames: Array<{ from: string; to: string }> = [];
+    const app = {
+      vault: {
+        configDir: ".obsidian",
+        adapter: {
+          async exists(path: string) { return files.has(path) || directories.has(path); },
+          async mkdir(path: string) { directories.add(path); },
+          async list(path: string) {
+            return path === root ? { files: [...files].filter((entry) => entry.startsWith(`${root}/`)), folders: [] } : { files: [], folders: [] };
+          },
+          async rename(from: string, to: string) { files.delete(from); files.add(to); renames.push({ from, to }); },
+          async remove() { throw new Error("permanent remove must not be used"); },
+          getResourcePath(path: string) { return path; },
+        },
+      },
+    } as unknown as App;
+    const cache = new CoverThumbnailCache(app, "animelist");
+
+    const removed = await cache.clear();
+
+    assert.equal(removed, 1);
+    assert.deepEqual(renames.map((entry) => entry.from), [source]);
+    assert.equal(renames[0]?.to.startsWith(".trash/AnimeList/Internal/thumbnail-cache/"), true);
+    assert.equal(files.has(source), false);
+  });
+
+  it("keeps cache files and reports zero when recoverable trash movement is unavailable", async () => {
+    const root = ".obsidian/plugins/animelist/cache/covers";
+    const source = `${root}/orphan-320.webp`;
+    const files = new Set([source]);
+    const app = {
+      vault: {
+        configDir: ".obsidian",
+        adapter: {
+          async exists(path: string) { return files.has(path) || path === root; },
+          async mkdir() {},
+          async list(path: string) {
+            return path === root ? { files: [source], folders: [] } : { files: [], folders: [] };
+          },
+          async remove() { throw new Error("permanent remove must not be used"); },
+          getResourcePath(path: string) { return path; },
+        },
+      },
+    } as unknown as App;
+    const cache = new CoverThumbnailCache(app, "animelist");
+
+    const removed = await cache.clear();
+
+    assert.equal(removed, 0);
+    assert.equal(files.has(source), true);
+  });
+
   it("does not expire valid complete groups by age alone", () => {
     const removals = planCoverCacheCleanup([
       record("cache/valid-24.webp", 10, 1),

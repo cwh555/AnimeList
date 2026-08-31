@@ -50,6 +50,8 @@ export interface MediaFormContext<Host extends MediaFormHost> {
   frontmatter: Record<string, unknown>;
   fields: MediaFormFields;
   state: Map<string, unknown>;
+  onDispose(disposer: () => void): () => void;
+  dispose(): void;
 }
 
 export interface MediaFormSubmitContext<Host extends MediaFormHost>

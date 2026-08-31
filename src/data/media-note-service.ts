@@ -106,22 +106,32 @@ export class MediaNoteService {
       }
     }
 
-    const folder = this.storage.mediaFolder(result.mediaType);
-    if (folder) await this.storage.ensureFolder(folder);
-    const path = await this.storage.uniqueFilePath(folder, form.title || result.title, "md");
-    const templateContent = await this.storage.readTemplate(form.templatePath);
-    const unit = defaultProgressUnit(result.mediaType, form.unit);
-    const preparedForm: MediaNoteForm = {
-      ...form,
-      status: normalizeMediaStatus(form.status),
-      unit,
-      volumeLog: result.mediaType !== "anime" && isReadingProgressUnit(unit)
-        ? normalizeSerialLog(form.volumeLog, unit)
-        : [],
-    };
-    const markdown = buildMediaMarkdown(result, preparedForm, coverPath, templateContent);
-    const file = await this.app.vault.create(path, markdown);
-    this.callbacks.refreshViews();
-    return file;
+    try {
+      const folder = this.storage.mediaFolder(result.mediaType);
+      if (folder) await this.storage.ensureFolder(folder);
+      const path = await this.storage.uniqueFilePath(folder, form.title || result.title, "md");
+      const templateContent = await this.storage.readTemplate(form.templatePath);
+      const unit = defaultProgressUnit(result.mediaType, form.unit);
+      const preparedForm: MediaNoteForm = {
+        ...form,
+        status: normalizeMediaStatus(form.status),
+        unit,
+        volumeLog: result.mediaType !== "anime" && isReadingProgressUnit(unit)
+          ? normalizeSerialLog(form.volumeLog, unit)
+          : [],
+      };
+      const markdown = buildMediaMarkdown(result, preparedForm, coverPath, templateContent);
+      const file = await this.app.vault.create(path, markdown);
+      this.callbacks.refreshViews();
+      return file;
+    } catch (error) {
+      if (coverPath) {
+        const cover = this.app.vault.getAbstractFileByPath(coverPath);
+        if (cover instanceof TFile) {
+          try { await this.app.fileManager.trashFile(cover); } catch { /* best-effort rollback */ }
+        }
+      }
+      throw error;
+    }
   }
 }

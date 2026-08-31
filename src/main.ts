@@ -260,6 +260,12 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     this.refreshViews();
   }
 
+  async cleanupGarbageFiles(): ReturnType<AnimeListApplicationServices["cleanupGarbageFiles"]> {
+    const result = await this.services().cleanupGarbageFiles();
+    this.refreshViews();
+    return result;
+  }
+
   async setFavoriteDirect(path: string, next: boolean): Promise<void> {
     await this.services().setFavorite(path, next);
     new Notice(uiText(next ? "notice.favoriteAdded" : "notice.favoriteRemoved"));
@@ -311,6 +317,7 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.services().uniqueFilePath(folder, baseName, extension); }
   getImageThumbnailSources(file: TFile): CoverSources | undefined { return this.services().getImageThumbnailSources(file); }
   async downloadCover(result: ExternalMediaResult): Promise<string> { return this.services().downloadCover(result); }
+  releaseDownloadedCover(path: string): void { this.services().releaseDownloadedCover(path); }
   async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
     return this.services().createMediaNote(result, form, coverAsset);
   }

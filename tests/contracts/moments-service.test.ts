@@ -32,7 +32,9 @@ function harness(markdown: string) {
       getFirstLinkpathDest(path: string) { return files.get(path) ?? null; },
     },
     vault: {
+      getRoot() { return { children: [...files.values()] }; },
       getAbstractFileByPath(path: string) { return files.get(path) ?? null; },
+      async cachedRead(target: TFile) { return data.get(target.path) ?? ""; },
       getResourcePath(target: TFile) { return `app://${target.path}`; },
       async read(target: TFile) { return data.get(target.path) ?? ""; },
       async readBinary(target: TFile) { return binaries.get(target.path)?.slice(0) ?? new ArrayBuffer(target.stat.size); },

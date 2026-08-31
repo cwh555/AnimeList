@@ -515,6 +515,8 @@ interface CreateMediaFormContextInput {
 export function createMediaFormContext({
   mode, plugin, modalEl, formEl, mediaType, result, file, frontmatter, fields,
 }: CreateMediaFormContextInput): MediaFormContext<AnimeListUiHost> {
+  const disposers = new Set<() => void>();
+  let disposed = false;
   return {
     mode,
     host: plugin,
@@ -526,5 +528,19 @@ export function createMediaFormContext({
     frontmatter,
     fields,
     state: new Map(),
+    onDispose(disposer) {
+      if (disposed) {
+        disposer();
+        return () => undefined;
+      }
+      disposers.add(disposer);
+      return () => disposers.delete(disposer);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const disposer of [...disposers]) disposer();
+      disposers.clear();
+    },
   };
 }

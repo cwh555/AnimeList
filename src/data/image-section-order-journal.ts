@@ -1,5 +1,6 @@
 import { normalizePath, type DataAdapter } from "obsidian";
 import { normalizeImageSectionPath } from "../domain/image-section";
+import { moveAdapterFileToVaultTrash } from "./vault-trash";
 
 export interface ImageSectionOrderJournalSection {
   id: string;
@@ -136,6 +137,6 @@ export class ImageSectionOrderJournal implements ImageSectionOrderJournalStore {
 
   async remove(sourcePath: string): Promise<void> {
     const path = this.pathFor(sourcePath);
-    if (await this.adapter.exists(path)) await this.adapter.remove(path);
+    await moveAdapterFileToVaultTrash(this.adapter, path, "image-order");
   }
 }

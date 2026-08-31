@@ -9,6 +9,8 @@ import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
+import { MediaAssetGarbageCollector } from "../data/media-asset-garbage-collector";
+import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
@@ -32,6 +34,9 @@ export class AnimeListApplicationServices {
   private noteService?: MediaNoteService;
   private updateService?: MediaUpdateService;
   private specialLabelService?: SpecialLabelStateService;
+  private assetGarbageCollector?: MediaAssetGarbageCollector;
+  private garbageCleanupTimer: number | null = null;
+  private readonly leasedCoverPaths = new Set<string>();
 
   constructor(
     private readonly app: App,
@@ -47,11 +52,15 @@ export class AnimeListApplicationServices {
     this.mediaRepository = new MediaRepository(this.app, (file) => this.coverCache?.getDeferredSources(file));
     this.coverCache.scheduleCleanup();
     this.imageThumbnailCache.scheduleCleanup();
+    this.scheduleGarbageCleanup(30_000);
   }
 
   dispose(): void {
     this.coverCache?.dispose();
     this.imageThumbnailCache?.dispose();
+    if (this.garbageCleanupTimer !== null) window.clearTimeout(this.garbageCleanupTimer);
+    this.garbageCleanupTimer = null;
+    this.leasedCoverPaths.clear();
   }
 
   private libraryStorage(): LibraryStorage {
@@ -113,6 +122,25 @@ export class AnimeListApplicationServices {
     return this.specialLabelService;
   }
 
+  private garbageCollector(): MediaAssetGarbageCollector {
+    this.assetGarbageCollector ??= new MediaAssetGarbageCollector(
+      this.app,
+      this.pluginId,
+      this.settings,
+    );
+    return this.assetGarbageCollector;
+  }
+
+  private scheduleGarbageCleanup(delayMs = 250): void {
+    if (this.garbageCleanupTimer !== null) window.clearTimeout(this.garbageCleanupTimer);
+    this.garbageCleanupTimer = window.setTimeout(() => {
+      this.garbageCleanupTimer = null;
+      void this.cleanupGarbageFiles().catch((error: unknown) => {
+        console.warn("AnimeList garbage-file cleanup failed", error);
+      });
+    }, Math.max(0, Math.trunc(delayMs)));
+  }
+
   getManagedMediaFolder(mediaType: MediaType): string { return this.libraryStorage().managedMediaFolder(mediaType); }
   getMediaFolder(mediaType: MediaType): string { return this.libraryStorage().mediaFolder(mediaType); }
   getScanFolders(): string[] { return this.libraryStorage().scanFolders(); }
@@ -132,6 +160,7 @@ export class AnimeListApplicationServices {
   }
 
   handleLibraryDelete(path: string, isFile: boolean): boolean {
+    if (isFile && path.toLocaleLowerCase().endsWith(".md")) this.scheduleGarbageCleanup();
     if (!this.isLibraryRelevantPath(path)) return false;
     const roots = this.getScanFolders();
     const mediaPath = roots.some((root) => pathBelongsToLibraryRoot(path, root));
@@ -192,11 +221,38 @@ export class AnimeListApplicationServices {
     return this.coverCache.clear();
   }
 
+  async cleanupGarbageFiles(): Promise<MediaAssetCleanupResult> {
+    if (!this.coverCache || !this.imageThumbnailCache) throw new Error("Image caches are not initialized");
+    const execution = await this.garbageCollector().cleanup(this.leasedCoverPaths);
+    const referenced = execution.references.referencedFiles;
+    const [coverCacheRemoved, imageCacheRemoved] = await Promise.all([
+      this.coverCache.cleanupForFiles(referenced),
+      this.imageThumbnailCache.cleanupForFiles(referenced),
+    ]);
+    for (const path of [...this.leasedCoverPaths]) {
+      if (execution.references.referencedPaths.has(path)) this.leasedCoverPaths.delete(path);
+    }
+    return {
+      ...execution.result,
+      removedCacheFiles: coverCacheRemoved + imageCacheRemoved,
+    };
+  }
+
+  releaseDownloadedCover(pathValue: string): void {
+    const path = pathValue.trim();
+    if (!path) return;
+    this.leasedCoverPaths.delete(path);
+    this.scheduleGarbageCleanup();
+  }
+
   async setFavorite(path: string, next: boolean): Promise<void> { await this.specialLabels().setFavorite(path, next); }
   async updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void> {
     await this.specialLabels().update(path, { favorite, masterpieceLabels: labels });
   }
-  async deleteMediaFile(file: TFile): Promise<void> { await this.app.fileManager.trashFile(file); }
+  async deleteMediaFile(file: TFile): Promise<void> {
+    await this.app.fileManager.trashFile(file);
+    this.scheduleGarbageCleanup();
+  }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.externalMediaSearch().search(mediaType, query); }
@@ -223,21 +279,32 @@ export class AnimeListApplicationServices {
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
-  async downloadCover(result: ExternalMediaResult): Promise<string> { return this.mediaNotes().downloadCover(result); }
-  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
-    if (result.provider === MANUAL_MEDIA_PROVIDER) return this.mediaNotes().create(result, form, coverAsset);
-    if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
-      return this.mediaNotes().create(result, form);
-    }
-    const enriched = await this.enrichExternalMedia(result);
-    const originalGenres = result.genres ?? [];
-    const formGenres = form.genres ?? [];
-    const genresWereUnchanged = formGenres.length === originalGenres.length
-      && formGenres.every((genre, index) => genre === originalGenres[index]);
-    const preparedForm = genresWereUnchanged && enriched.genres.length
-      ? { ...form, genres: enriched.genres }
-      : form;
-    return this.mediaNotes().create(enriched, preparedForm, coverAsset);
+  async downloadCover(result: ExternalMediaResult): Promise<string> {
+    const path = await this.mediaNotes().downloadCover(result);
+    if (path) this.leasedCoverPaths.add(path);
+    return path;
   }
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> { await this.mediaUpdates().update(file, mediaType, form); }
+  async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
+    try {
+      if (result.provider === MANUAL_MEDIA_PROVIDER) return await this.mediaNotes().create(result, form, coverAsset);
+      if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
+        return await this.mediaNotes().create(result, form);
+      }
+      const enriched = await this.enrichExternalMedia(result);
+      const originalGenres = result.genres ?? [];
+      const formGenres = form.genres ?? [];
+      const genresWereUnchanged = formGenres.length === originalGenres.length
+        && formGenres.every((genre, index) => genre === originalGenres[index]);
+      const preparedForm = genresWereUnchanged && enriched.genres.length
+        ? { ...form, genres: enriched.genres }
+        : form;
+      return await this.mediaNotes().create(enriched, preparedForm, coverAsset);
+    } finally {
+      this.scheduleGarbageCleanup();
+    }
+  }
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
+    await this.mediaUpdates().update(file, mediaType, form);
+    this.scheduleGarbageCleanup();
+  }
 }

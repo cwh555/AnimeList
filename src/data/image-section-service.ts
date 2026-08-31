@@ -26,6 +26,7 @@ import {
 import { allManagedImageReferences } from "../domain/media-image-references";
 import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
 import { visualImageFingerprint } from "./image-raster";
+import { MediaAssetReferenceService } from "./media-asset-reference-service";
 
 export interface ImageSectionHost {
   app: App;
@@ -239,6 +240,10 @@ export class ImageSectionService {
     const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
     const cover = normalizeImageSectionPath(normalizedCoverPath(frontmatter.cover));
     const referencedAfterUpdate = new Set(allManagedImageReferences(markdownAfterUpdate));
+    const vaultReferences = await new MediaAssetReferenceService(
+      this.host.app,
+      () => this.host.settings,
+    ).collect();
     const root = imageSectionRootFromCoverFolder(this.host.settings.coverFolder);
     let trashError: unknown = null;
     for (const pathValue of pathValues) {
@@ -246,6 +251,7 @@ export class ImageSectionService {
       if (!path || /^https?:\/\//i.test(path) || referencedAfterUpdate.has(path) || cover === path) continue;
       const resolved = this.resolve(path, sourcePath);
       if (!resolved.file || !isManagedPath(resolved.file.path, root)) continue;
+      if (vaultReferences.referencedPaths.has(normalizePath(resolved.file.path).replace(/^\/+/, ""))) continue;
       try {
         await this.host.app.fileManager.trashFile(resolved.file);
         this.fingerprintCache.delete(resolved.file.path);

@@ -751,7 +751,7 @@ describe("Obsidian community review compliance", () => {
     const sections = new AnimeListSettingTab(new App(), host).getSettingSections();
     assert.deepEqual(
       sections.map((section) => section.heading ?? ""),
-      ["", UI_TEXT["settings.timeline.heading"], "Search languages", UI_TEXT["settings.providers.heading"], UI_TEXT["settings.setup.heading"]],
+      ["", UI_TEXT["settings.timeline.heading"], "Search languages", UI_TEXT["settings.providers.heading"], UI_TEXT["settings.setup.heading"], "Storage cleanup"],
     );
   });
 

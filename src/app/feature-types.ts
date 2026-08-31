@@ -47,6 +47,7 @@ export interface AnimeListFeatureHost extends Pick<
   updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
+  releaseDownloadedCover(path: string): void;
   searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage>;
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]>;

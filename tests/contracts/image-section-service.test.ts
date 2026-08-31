@@ -31,7 +31,9 @@ function harness(markdown: string) {
       getFirstLinkpathDest(path: string) { return files.get(path) ?? null; },
     },
     vault: {
+      getRoot() { return { children: [...files.values()] }; },
       getAbstractFileByPath(path: string) { return files.get(path) ?? null; },
+      async cachedRead(target: TFile) { return data.get(target.path) ?? ""; },
       getResourcePath(target: TFile) { return `app://${target.path}`; },
       async createBinary(path: string, bytes: ArrayBuffer) {
         const created = file(path);

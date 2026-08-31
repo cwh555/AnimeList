@@ -38,6 +38,7 @@ export interface AnimeListSettingsHost {
   saveSettings(): Promise<void>;
   initializeLibrary(copyTemplates?: boolean): Promise<void>;
   refreshViews(): void;
+  cleanupGarbageFiles(): Promise<{ removedManagedFiles: number; removedJournalFiles: number; removedCacheFiles: number }>;
   setInterfaceLanguage?(preference: LanguagePreference): Promise<void>;
   getFeatureSettingsSections?(): SettingsSection[];
 }
@@ -190,6 +191,16 @@ export class AnimeListSettingTab extends PluginSettingTab {
           page: "maintenance",
           heading: uiText("settings.setup.heading"),
           definitions: base.slice(10),
+        },
+        {
+          page: "maintenance",
+          heading: "Storage cleanup",
+          description: "Remove AnimeList-managed files that are no longer referenced anywhere in the vault.",
+          definitions: [{
+            name: "Garbage files",
+            desc: "Safely moves unreferenced AnimeList covers and image assets to the Obsidian trash, and removes stale plugin cache/state files.",
+            render: (setting) => this.renderGarbageCleanup(setting),
+          }],
         },
       ];
       const featureSections = (this.plugin.getFeatureSettingsSections?.() ?? []).map((section) => ({
@@ -471,6 +482,24 @@ export class AnimeListSettingTab extends PluginSettingTab {
       toggle.setValue(this.plugin.settings.providers[key]).onChange(async (value) => {
         this.plugin.settings.providers[key] = value;
         await this.plugin.saveSettings();
+      });
+    });
+  }
+
+  private renderGarbageCleanup(setting: Setting): void {
+    setting.addButton((button) => {
+      button.setButtonText("Clean garbage files").onClick(async () => {
+        button.buttonEl.disabled = true;
+        try {
+          const result = await this.plugin.cleanupGarbageFiles();
+          const removed = result.removedManagedFiles + result.removedJournalFiles + result.removedCacheFiles;
+          new Notice(`Removed ${removed} garbage file${removed === 1 ? "" : "s"}.`);
+        } catch (error) {
+          console.error("AnimeList garbage-file cleanup failed", error);
+          new Notice("Could not clean garbage files. Check the console for details.");
+        } finally {
+          button.buttonEl.disabled = false;
+        }
       });
     });
   }
