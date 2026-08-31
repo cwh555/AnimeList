@@ -1,4 +1,4 @@
-import type { Editor } from "obsidian";
+import { TFile, type Editor } from "obsidian";
 import type { AnimeListFeature, AnimeListFeatureHost } from "../../app/feature-types";
 import { imageSectionServiceForHost } from "../../data/image-section-service";
 import { ImageSectionOrderJournal } from "../../data/image-section-order-journal";
@@ -37,6 +37,10 @@ export const imageSectionFeature: AnimeListFeature<AnimeListFeatureHost> = {
       const orderSession = new ImageSectionOrderSession(journal, service);
       await orderSession.initialize();
       host.register(() => orderSession.dispose());
+      host.registerEvent(host.app.vault.on("rename", (file, oldPath) => {
+        if (!(file instanceof TFile) || typeof oldPath !== "string") return;
+        orderSession.renameSource(oldPath, file.path);
+      }));
       host.registerMarkdownCodeBlockProcessor(IMAGE_SECTION_LANGUAGE, (source, element, context) => {
         context.addChild(new ImageSectionRenderChild(element, host, service, orderSession, source, context));
       });

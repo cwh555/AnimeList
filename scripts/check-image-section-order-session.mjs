@@ -57,10 +57,10 @@ const makeJournal=()=>{
   snapshot(){return [...records.values()].map(clone)},
  };
 };
-const participant=(canonical,line=10)=>{
+const participant=(canonical,line=10,sourcePath='Demo.md')=>{
  let paths=[...canonical]; let owned=true;
  return {
-  sourcePath:'Demo.md',containerEl:document.body,
+  sourcePath,containerEl:document.body,
   canonicalPaths:()=>canonical,paths:()=>paths,locator:()=>({source:canonical.map((p)=>'- '+p).join('\\n'),lineStart:line}),
   ownsContainer:()=>owned,applyPaths:(next)=>{paths=[...next]},layoutMotion:()=>Promise.resolve(),
   current:()=>[...paths],setOwned:(value)=>{owned=value},
@@ -95,6 +95,33 @@ const participant=(canonical,line=10)=>{
  await delay(720);
  details.hiddenSourceFlushesCanonicalOnce=canonicalWrites===1 && committed[0]?.paths.join(',')===finalOrder && journal.snapshot().length===0;
  session.dispose();
+
+ const renameJournal=makeJournal();
+ const renameCommits=[];
+ const renameSession=new AnimeListOrderSession.ImageSectionOrderSession(renameJournal,{
+  async commitPendingSectionOrders(sourcePath,pending){renameCommits.push({sourcePath,pending:clone(pending)})},
+ });
+ await renameSession.initialize();
+ const renamedParticipant=participant(['a.jpg','b.jpg','c.jpg'],10,'AnimeList/Anime/Old.md');
+ renamedParticipant.applyPaths(renameSession.register(renamedParticipant));
+ await AnimeListOrderSession.moveImageSectionAsset({
+  orderSession:renameSession,source:renamedParticipant,target:renamedParticipant,
+  path:'c.jpg',targetPath:'a.jpg',placement:'before',
+ });
+ const renamedDesired=renamedParticipant.current().join(',');
+ details.renameStartsWithOldJournal=renameJournal.snapshot().length===1 && renameJournal.snapshot()[0]?.sourcePath==='AnimeList/Anime/Old.md';
+ renameSession.renameSource('AnimeList/Anime/Old.md','AnimeList/Anime/Manual name.md');
+ await delay(30);
+ const relocated=renameJournal.snapshot();
+ details.renameRelocatesPendingJournal=relocated.length===1 && relocated[0]?.sourcePath==='AnimeList/Anime/Manual name.md';
+ details.renameKeepsPendingVisibleOrder=renamedParticipant.current().join(',')===renamedDesired;
+ renameSession.unregister(renamedParticipant);
+ await delay(720);
+ details.oldSourceParticipantFlushesToRenamedNote=renameCommits.length===1
+  && renameCommits[0]?.sourcePath==='AnimeList/Anime/Manual name.md'
+  && renameCommits[0]?.pending[0]?.paths.join(',')===renamedDesired;
+ details.renameLeavesNoStaleJournal=renameJournal.snapshot().length===0;
+ renameSession.dispose();
 
  const crashJournal=makeJournal();
  const crashCommitter={async commitPendingSectionOrders(){throw new Error('should-not-flush-visible')}};

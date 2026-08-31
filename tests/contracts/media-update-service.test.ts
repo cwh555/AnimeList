@@ -22,6 +22,12 @@ function animeForm(): MediaNoteForm {
   };
 }
 
+function setFilePath(file: TFile, path: string): void {
+  file.path = path;
+  file.basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
+  file.extension = "md";
+}
+
 describe("media update service", () => {
   it("updates editable fields while preserving unknown frontmatter and note body", async () => {
     const file = new TFile();
@@ -212,5 +218,103 @@ describe("media update service", () => {
     assert.deepEqual(frontmatter.genres, ["old-personal-tag"]);
     assert.deepEqual(frontmatter.media_tags, ["School"]);
     assert.deepEqual(frontmatter.tags, ["obsidian-tag"]);
+  });
+
+  it("renames the note in place when the stored title is actually changed", async () => {
+    const file = new TFile();
+    setFilePath(file, "AnimeList/Anime/Old title.md");
+    const frontmatter: Record<string, unknown> = { media_type: "anime", title: "Old title" };
+    const renames: string[] = [];
+    let refreshes = 0;
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getAbstractFileByPath: () => null },
+      fileManager: {
+        renameFile: async (target: TFile, path: string) => { renames.push(path); setFilePath(target, path); },
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.title = "New / title";
+
+    await new MediaUpdateService(app, { refreshViews: () => { refreshes += 1; } }).update(file, "anime", form);
+
+    assert.deepEqual(renames, ["AnimeList/Anime/New title.md"]);
+    assert.equal(file.path, "AnimeList/Anime/New title.md");
+    assert.equal(frontmatter.title, "New / title");
+    assert.equal(refreshes, 1);
+  });
+
+  it("uses the same collision suffix policy as note creation", async () => {
+    const file = new TFile();
+    setFilePath(file, "AnimeList/Anime/Old.md");
+    const occupied = new TFile();
+    setFilePath(occupied, "AnimeList/Anime/New title.md");
+    const frontmatter: Record<string, unknown> = { media_type: "anime", title: "Old" };
+    const renames: string[] = [];
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getAbstractFileByPath: (path: string) => path === occupied.path ? occupied : null },
+      fileManager: {
+        renameFile: async (target: TFile, path: string) => { renames.push(path); setFilePath(target, path); },
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.title = "New title";
+
+    await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
+
+    assert.deepEqual(renames, ["AnimeList/Anime/New title (2).md"]);
+  });
+
+  it("does not silently migrate an old mismatched filename when this edit did not change title", async () => {
+    const file = new TFile();
+    setFilePath(file, "AnimeList/Anime/Very old filename.md");
+    const frontmatter: Record<string, unknown> = { media_type: "anime", title: "Current title" };
+    let renameCalls = 0;
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getAbstractFileByPath: () => null },
+      fileManager: {
+        renameFile: async () => { renameCalls += 1; },
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.title = "Current title";
+
+    await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
+
+    assert.equal(renameCalls, 0);
+    assert.equal(file.path, "AnimeList/Anime/Very old filename.md");
+  });
+
+  it("rolls the filename back if frontmatter persistence fails after a title rename", async () => {
+    const file = new TFile();
+    setFilePath(file, "AnimeList/Anime/Old title.md");
+    const frontmatter: Record<string, unknown> = { media_type: "anime", title: "Old title" };
+    const renames: string[] = [];
+    let refreshes = 0;
+    const app = {
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      vault: { getAbstractFileByPath: () => null },
+      fileManager: {
+        renameFile: async (target: TFile, path: string) => { renames.push(path); setFilePath(target, path); },
+        processFrontMatter: async () => { throw new Error("write failed"); },
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.title = "New title";
+
+    await assert.rejects(
+      new MediaUpdateService(app, { refreshViews: () => { refreshes += 1; } }).update(file, "anime", form),
+      /write failed/,
+    );
+
+    assert.deepEqual(renames, ["AnimeList/Anime/New title.md", "AnimeList/Anime/Old title.md"]);
+    assert.equal(file.path, "AnimeList/Anime/Old title.md");
+    assert.equal(frontmatter.title, "Old title");
+    assert.equal(refreshes, 0);
   });
 });

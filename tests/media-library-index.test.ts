@@ -14,6 +14,12 @@ function file(path: string): TFile {
   return value;
 }
 
+function renameFile(source: TFile, path: string): void {
+  source.path = path;
+  source.name = path.split("/").at(-1) ?? path;
+  source.basename = source.name.replace(/\.md$/, "");
+}
+
 function item(source: TFile, title: string): MediaItem {
   return {
     title,
@@ -80,6 +86,71 @@ describe("media library index", () => {
     index.remove(second.path);
     assert.deepEqual(index.snapshot(["AnimeList"]).map((entry) => entry.title), ["Updated"]);
     assert.equal(reads, 3);
+  });
+
+  it("keeps a known media note in the library while Obsidian metadata catches up after a manual rename", () => {
+    const source = file("AnimeList/Anime/original.md");
+    const anime = new TFolder();
+    anime.path = "AnimeList/Anime";
+    anime.children = [source];
+    const root = new TFolder();
+    root.path = "AnimeList";
+    root.children = [anime];
+    const app = {
+      vault: { getAbstractFileByPath: (path: string) => path === "AnimeList" ? root : null },
+    } as unknown as App;
+    let metadataReady = true;
+    let reads = 0;
+    const repository = {
+      read(fileValue: TFile) {
+        reads += 1;
+        return metadataReady ? item(fileValue, "Stored title") : null;
+      },
+    } as unknown as MediaRepository;
+    const index = new MediaLibraryIndex(app, repository);
+
+    assert.deepEqual(index.snapshot(["AnimeList"]), [item(source, "Stored title")]);
+    assert.equal(reads, 1);
+
+    const oldPath = source.path;
+    renameFile(source, "AnimeList/Anime/manual-name.md");
+    metadataReady = false;
+    index.rename(oldPath, source, ["AnimeList"]);
+
+    const duringRename = index.snapshot(["AnimeList"]);
+    assert.equal(reads, 1, "rename must not depend on metadataCache being ready at the new path");
+    assert.equal(duringRename.length, 1);
+    assert.equal(duringRename[0]?.title, "Stored title");
+    assert.equal(duringRename[0]?.filePath, "AnimeList/Anime/manual-name.md");
+
+    metadataReady = true;
+    index.update(source, ["AnimeList"]);
+    assert.equal(reads, 2);
+    assert.equal(index.snapshot(["AnimeList"])[0]?.filePath, "AnimeList/Anime/manual-name.md");
+  });
+
+  it("removes an indexed note only when a rename moves it outside configured roots", () => {
+    const source = file("AnimeList/Anime/inside.md");
+    const anime = new TFolder();
+    anime.path = "AnimeList/Anime";
+    anime.children = [source];
+    const root = new TFolder();
+    root.path = "AnimeList";
+    root.children = [anime];
+    const app = {
+      vault: { getAbstractFileByPath: (path: string) => path === "AnimeList" ? root : null },
+    } as unknown as App;
+    const repository = {
+      read(fileValue: TFile) { return item(fileValue, "Inside"); },
+    } as unknown as MediaRepository;
+    const index = new MediaLibraryIndex(app, repository);
+
+    index.snapshot(["AnimeList"]);
+    const oldPath = source.path;
+    renameFile(source, "Archive/inside.md");
+    index.rename(oldPath, source, ["AnimeList"]);
+
+    assert.deepEqual(index.snapshot(["AnimeList"]), []);
   });
 
   it("rebuilds only when roots change or the index is explicitly invalidated", () => {
