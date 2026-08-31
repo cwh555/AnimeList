@@ -22,7 +22,7 @@ export class MediaUpdateService {
 
   async update(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
     const nextTitle = validatedTitle(mediaType, form);
-    const previousTitle = this.app.metadataCache.getFileCache(file)?.frontmatter?.title;
+    const previousTitle = this.app.metadataCache?.getFileCache(file)?.frontmatter?.title;
     const originalPath = file.path;
     let renamed = false;
 
