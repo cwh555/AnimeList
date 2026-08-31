@@ -38,7 +38,11 @@ await build({
       buildContext.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "stub" }));
       buildContext.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
         contents: `
+          export class App {}
+          export class TAbstractFile {}
+          export class TFile extends TAbstractFile {}
           export class Notice { constructor() {} }
+          export function normalizePath(value) { return String(value ?? ""); }
           export function setIcon() {}
         `,
         loader: "js",
