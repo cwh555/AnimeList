@@ -75,7 +75,12 @@ export class LibraryExportModal extends Modal {
     const rows = buildLibraryTextExportRows(items);
     const compilation = compileLibraryTextExportTemplate(this.state.textTemplate, this.specialLabelMode);
     return {
-      content: formatLibraryTextExport(rows, this.state.textTemplate, compilation),
+      content: formatLibraryTextExport(
+        rows,
+        this.state.textTemplate,
+        compilation,
+        this.specialLabelMode,
+      ),
       count: rows.length,
     };
   }
