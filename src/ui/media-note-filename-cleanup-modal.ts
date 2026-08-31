@@ -22,7 +22,7 @@ export class MediaNoteFilenameCleanupModal extends Modal {
 
     this.contentEl.createEl("p", {
       cls: "al-modal-hint",
-      text: "Older AnimeList versions could leave a note filename unchanged after its title was edited. Review the proposed renames before applying them.",
+      text: "Older versions of the plugin could leave a note filename unchanged after its title was edited. Review the proposed renames before applying them.",
     });
     const rules = this.contentEl.createEl("ul", { cls: "al-version-cleanup-rules" });
     appendRule(rules, "Only AnimeList media notes in your configured Library folders are scanned.");
