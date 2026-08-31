@@ -226,6 +226,8 @@ try {
         const flow = window.ratingEmptyFlows.edit;
         flow.fields.status.value = "completed";
         flow.fields.status.dispatchEvent(new Event("change", { bubbles: true }));
+        const requiredWhileCompleted = flow.fields.score.required === true
+          && flow.fields.score.getAttribute("aria-required") === "true";
         flow.fields.score.value = "";
         flow.fields.score.dispatchEvent(new Event("input", { bubbles: true }));
         const snapshot = AnimeListRatingEmpty.mediaFormValues(flow.context);
@@ -240,9 +242,10 @@ try {
         flow.fields.status.value = "ongoing";
         flow.fields.status.dispatchEvent(new Event("change", { bubbles: true }));
         return JSON.stringify({
-          requiredWhileCompleted: flow.fields.score.getAttribute("aria-required") === "false" ? false : true,
+          requiredWhileCompleted,
           rejected,
-          optionalAfterLeavingCompleted: flow.fields.score.required === false,
+          optionalAfterLeavingCompleted: flow.fields.score.required === false
+            && flow.fields.score.getAttribute("aria-required") === "false",
         });
       })()`));
 
