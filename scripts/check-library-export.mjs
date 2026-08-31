@@ -62,7 +62,16 @@ const [bundle, styles] = await Promise.all([
   readFile(path.join(root, "styles.css"), "utf8"),
 ]);
 
-const item = ({ title, mediaType, completedAt, unit, volumeLog = [], score = 9, favorite = false }) => ({
+const item = ({
+  title,
+  mediaType,
+  completedAt,
+  unit,
+  volumeLog = [],
+  score = 9,
+  favorite = false,
+  masterpieceLabels = [],
+}) => ({
   title,
   originalTitle: title + " original",
   mediaType,
@@ -74,6 +83,7 @@ const item = ({ title, mediaType, completedAt, unit, volumeLog = [], score = 9, 
   unit,
   score,
   favorite,
+  masterpieceLabels,
   year: 2026,
   genres: ["Drama"],
   people: [],
@@ -105,8 +115,24 @@ for(const [name,fn] of Object.entries({
 (async()=>{
 try {
   const items = [
-    ${JSON.stringify(item({title:"Anime Done",mediaType:"anime",completedAt:"2026-02-10",unit:"episode",favorite:true}))},
-    ${JSON.stringify(item({title:"葬送的芙莉蓮",mediaType:"manga",completedAt:"2026-06-20",unit:"volume",volumeLog:[{label:"13",startedAt:"2026-05-01",completedAt:"2026-05-03"},{label:"14",startedAt:"2026-06-10",completedAt:"2026-06-12"}]}))},
+    ${JSON.stringify(item({
+      title:"Anime Done",
+      mediaType:"anime",
+      completedAt:"2026-02-10",
+      unit:"episode",
+      favorite:true,
+      masterpieceLabels:["角色塑造","世界觀"],
+    }))},
+    ${JSON.stringify(item({
+      title:"葬送的芙莉蓮",
+      mediaType:"manga",
+      completedAt:"2026-06-20",
+      unit:"volume",
+      volumeLog:[
+        {label:"13",startedAt:"2026-05-01",completedAt:"2026-05-03"},
+        {label:"14",startedAt:"2026-06-10",completedAt:"2026-06-12"},
+      ],
+    }))},
   ];
   const creates = [];
   const host = {
@@ -164,15 +190,29 @@ try {
   scopeSelects[0].dispatchEvent(new Event("change", { bubbles:true }));
   template.value = "{$評分}";
   template.dispatchEvent(new Event("input", { bubbles:true }));
-  const scoreOnlyTemplateAllowed = !templateError?.textContent && !saveButton?.disabled && !copyButton?.disabled
-    && preview.value.includes("9");
+  const missingWorkBlocksActions = !!templateError?.textContent?.includes("作品名稱")
+    && saveButton?.disabled && copyButton?.disabled;
 
-  template.value = "{$最愛}";
+  template.value = "{$作品名稱} | {$評分}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const optionalFieldsRemainFlexible = !templateError?.textContent
+    && !saveButton?.disabled && !copyButton?.disabled
+    && preview.value.includes("Anime Done | 9");
+
+  template.value = "{$作品名稱} | {$masterpiece}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const masterpiecePreview = preview.value;
+  const masterpieceShowsActualLabels = masterpiecePreview.includes("Anime Done | 角色塑造, 世界觀");
+  const unmarkedMasterpieceStaysBlank = masterpiecePreview.includes("葬送的芙莉蓮 — 第 13 卷 |")
+    && !masterpiecePreview.includes("葬送的芙莉蓮 — 第 13 卷 | masterpiece");
+
+  template.value = "{$作品名稱} | {$最愛}";
   template.dispatchEvent(new Event("input", { bubbles:true }));
   const oldFavoriteTokenSurvivesMasterpieceMode = !templateError?.textContent
-    && !saveButton?.disabled && !copyButton?.disabled && preview.value.includes("是");
+    && !saveButton?.disabled && !copyButton?.disabled
+    && preview.value.includes("Anime Done | 角色塑造, 世界觀");
 
-  template.value = "{$不存在}";
+  template.value = "{$作品名稱} {$不存在}";
   template.dispatchEvent(new Event("input", { bubbles:true }));
   const unknownVariableBlocksActions = !!templateError?.textContent?.includes("未知變數")
     && saveButton?.disabled && copyButton?.disabled;
@@ -204,8 +244,11 @@ try {
     noCheckboxFieldPicker: content.querySelectorAll(".al-library-export-checkbox input").length === 0,
     templateVisibleInTextMode: templateSection && !templateSection.hidden,
     customTemplateRendersTimelineUnits: previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 13 卷 : 2026-05-03") && previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 14 卷 : 2026-06-12"),
-    scoreOnlyTemplateAllowed,
+    missingWorkBlocksActions,
+    optionalFieldsRemainFlexible,
     modeAwareSpecialLabelVariable: specialLabelVariable?.textContent.trim() === "{$masterpiece}",
+    masterpieceShowsActualLabels,
+    unmarkedMasterpieceStaysBlank,
     oldFavoriteTokenSurvivesMasterpieceMode,
     unknownVariableBlocksActions,
     variableInsertKeepsFocus,
@@ -230,14 +273,14 @@ try {
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "desktop"),
-    testName: "Library Export flexible mode-aware custom template and save-file layout",
+    testName: "Library Export required-work and mode-aware special-label layout",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 1100, height: 850, deviceScaleFactor: 1 },
   });
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "mobile"),
-    testName: "Library Export flexible custom template remains stable on mobile",
+    testName: "Library Export required-work custom template remains stable on mobile",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   });
