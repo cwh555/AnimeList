@@ -99,6 +99,81 @@ describe("media update service", () => {
     assert.equal(frontmatter.metadata_updated_at, undefined);
   });
 
+  it("removes an existing score when a non-completed work is saved unrated", async () => {
+    const file = new TFile();
+    file.path = "AnimeList/Anime/example.md";
+    const frontmatter: Record<string, unknown> = {
+      media_type: "anime",
+      title: "Updated title",
+      status: "ongoing",
+      score: 8.5,
+    };
+    const app = {
+      fileManager: {
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.score = "";
+
+    await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
+
+    assert.equal("score" in frontmatter, false);
+  });
+
+  it("keeps an explicit zero score distinct from an empty rating", async () => {
+    const file = new TFile();
+    file.path = "AnimeList/Anime/example.md";
+    const frontmatter: Record<string, unknown> = {
+      media_type: "anime",
+      title: "Updated title",
+      status: "ongoing",
+      score: 8.5,
+    };
+    const app = {
+      fileManager: {
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => update(frontmatter),
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.score = 0;
+
+    await new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form);
+
+    assert.equal(frontmatter.score, 0);
+  });
+
+  it("requires a score only for completed works", async () => {
+    const file = new TFile();
+    file.path = "AnimeList/Anime/example.md";
+    const frontmatter: Record<string, unknown> = {
+      media_type: "anime",
+      title: "Updated title",
+      status: "ongoing",
+      score: 8.5,
+    };
+    let processCalls = 0;
+    const app = {
+      fileManager: {
+        processFrontMatter: async (_file: TFile, update: (value: Record<string, unknown>) => void) => {
+          processCalls += 1;
+          update(frontmatter);
+        },
+      },
+    } as unknown as App;
+    const form = animeForm();
+    form.status = "completed";
+    form.completedAt = "2026-08-31";
+    form.score = "";
+
+    await assert.rejects(
+      new MediaUpdateService(app, { refreshViews: () => undefined }).update(file, "anime", form),
+    );
+
+    assert.equal(processCalls, 0);
+    assert.equal(frontmatter.score, 8.5);
+  });
+
   it("does not refresh after validation rejects an invalid edit", async () => {
     const file = new TFile();
     file.path = "AnimeList/Anime/example.md";

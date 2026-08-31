@@ -11,7 +11,12 @@ function emitInput(input: HTMLInputElement): void {
 }
 
 function syncAccessibleValue(input: HTMLInputElement): void {
-  const value = Number(input.value);
+  const text = input.value.trim();
+  if (!text) {
+    input.removeAttribute("aria-valuenow");
+    return;
+  }
+  const value = Number(text);
   if (Number.isFinite(value) && value >= MIN_RATING && value <= MAX_RATING) {
     input.setAttribute("aria-valuenow", String(value));
   } else {

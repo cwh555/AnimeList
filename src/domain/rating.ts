@@ -14,12 +14,17 @@ function isHalfPointRating(value: number): boolean {
   return Number.isInteger(value / RATING_INCREMENT);
 }
 
+export function isEmptyRating(value: unknown): boolean {
+  return value == null || (typeof value === "string" && value.trim() === "");
+}
+
 export function normalizeRating(value: unknown): RatingNormalizationResult {
-  if (value == null || value === "") {
+  if (isEmptyRating(value)) {
     return { kind: "empty", value: null, changed: false };
   }
 
-  const numericValue = Number(value);
+  const candidate = typeof value === "string" ? value.trim() : value;
+  const numericValue = Number(candidate);
   if (!Number.isFinite(numericValue)) {
     return { kind: "invalid", value: null, changed: false };
   }
