@@ -43,6 +43,7 @@ export async function runChromiumDatasetTest({
   requireEnvironment = "ANIMELIST_REQUIRE_CHROMIUM",
   viewport,
   resultTimeoutMs = 3600,
+  interact,
 }) {
   const browser = await findChromium();
   if (!browser) {
@@ -143,6 +144,7 @@ export async function runChromiumDatasetTest({
       frameId: frameTree.frameTree.frame.id,
       html,
     });
+    if (interact) await interact({ send, sleep });
 
     let dataset = {};
     const resultPollIntervalMs = 30;
