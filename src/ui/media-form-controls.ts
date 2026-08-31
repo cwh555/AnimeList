@@ -132,7 +132,6 @@ export function createDateInput(value = ""): MediaFormDateControl {
   return root;
 }
 
-
 export function createCompletionDateInput(value = ""): MediaFormDateControl {
   const root = createDiv() as MediaFormDateControl;
   root.className = "al-completion-date-control";
@@ -389,12 +388,9 @@ export function createMediaEditorFields({
   const score = createLabeledField(
     parent,
     uiText("add.scoreLabel"),
-    createTextInput("number", formValue(values.score)),
+    createTextInput("text", formValue(values.score)),
     uiText("add.scoreHint", { status: completedStatusLabel(mediaType) }),
   );
-  score.min = "0";
-  score.max = "10";
-  score.step = "0.5";
   bindScoreRequirement(status, score, mediaType);
 
   const startedAt = createLabeledField(
