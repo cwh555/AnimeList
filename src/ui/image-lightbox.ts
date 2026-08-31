@@ -31,6 +31,7 @@ export class ImageLightboxModal extends Modal {
   private panY = 0;
   private pan: { id: number; x: number; y: number; startX: number; startY: number } | null = null;
   private syncToken = 0;
+  private fitFrame = 0;
   private readonly preloadResults = new Map<string, Promise<boolean>>();
 
   constructor(
@@ -46,15 +47,52 @@ export class ImageLightboxModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass("animelist-image-lightbox");
     this.modalEl.addEventListener("keydown", this.handleKeydown);
+    window.addEventListener("resize", this.handleViewportResize);
     this.buildShell();
     this.syncEntry();
+    this.scheduleStageFit();
   }
 
   onClose(): void {
     this.syncToken += 1;
     this.preloadResults.clear();
+    if (this.fitFrame) window.cancelAnimationFrame(this.fitFrame);
+    this.fitFrame = 0;
+    window.removeEventListener("resize", this.handleViewportResize);
     this.modalEl.removeEventListener("keydown", this.handleKeydown);
     this.contentEl.replaceChildren();
+  }
+
+  private readonly handleViewportResize = (): void => this.scheduleStageFit();
+
+  private scheduleStageFit(): void {
+    if (this.fitFrame) window.cancelAnimationFrame(this.fitFrame);
+    this.fitFrame = window.requestAnimationFrame(() => {
+      this.fitFrame = 0;
+      this.fitStageToModal();
+    });
+  }
+
+  private fitStageToModal(): void {
+    if (!this.stage || !this.image || !this.counter) return;
+    const modalHeight = this.modalEl.getBoundingClientRect().height;
+    const contentHeight = this.contentEl.getBoundingClientRect().height;
+    if (modalHeight <= 0 || contentHeight <= 0) return;
+    const contentStyle = window.getComputedStyle(this.contentEl);
+    const paddingTop = Number.parseFloat(contentStyle.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(contentStyle.paddingBottom) || 0;
+    const gap = Number.parseFloat(contentStyle.rowGap || contentStyle.gap) || 0;
+    const counterHeight = this.counter.getBoundingClientRect().height;
+    const modalChrome = Math.max(0, modalHeight - contentHeight);
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const safeViewportHeight = Math.max(120, viewportHeight - 24);
+    const available = Math.max(120,
+      safeViewportHeight - modalChrome - paddingTop - paddingBottom - gap - counterHeight,
+    );
+    const fittedHeight = `${available}px`;
+    this.stage.style.setProperty("height", fittedHeight);
+    this.stage.style.setProperty("max-height", fittedHeight);
+    this.image.style.setProperty("max-height", fittedHeight);
   }
 
   private readonly handleKeydown = (event: KeyboardEvent): void => {
@@ -101,6 +139,7 @@ export class ImageLightboxModal extends Modal {
     this.image.alt = "";
     this.image.draggable = false;
     this.image.hidden = true;
+    this.image.addEventListener("load", () => this.scheduleStageFit());
     this.image.addEventListener("error", () => {
       if (!this.image || !this.missing) return;
       this.image.hidden = true;
@@ -209,6 +248,7 @@ export class ImageLightboxModal extends Modal {
     const resolved = this.service.resolve(entry.path, entry.sourcePath);
     this.counter.textContent = `${targetIndex + 1} / ${this.entries.length}`;
     this.applyTransform();
+    this.scheduleStageFit();
 
     if (!resolved.resourcePath) {
       this.stage?.removeAttribute("aria-busy");
@@ -234,6 +274,7 @@ export class ImageLightboxModal extends Modal {
       this.image.src = resourcePath;
       this.image.hidden = false;
       this.missing.hidden = true;
+      this.scheduleStageFit();
     });
     this.preloadAdjacent();
   }

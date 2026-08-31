@@ -33,6 +33,7 @@ export const TEST_TARGETS = [
   { path: "tests/contracts/image-gallery-service.test.ts", kind: "test", suite: "contract", features: ["image-gallery", "image-sections", "markdown", "library"] },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-drag-hit-testing.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-section-order-journal.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },

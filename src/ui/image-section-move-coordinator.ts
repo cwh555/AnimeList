@@ -23,8 +23,7 @@ export interface ImageSectionMoveParticipant extends ImageSectionOrderParticipan
   setDragSource?(active: boolean): void;
 }
 
-export interface ImageSectionMoveRequest {
-  orderSession: ImageSectionOrderSession;
+export interface ImageSectionMovePreviewRequest {
   source: ImageSectionMoveParticipant;
   target: ImageSectionMoveParticipant;
   path: string;
@@ -32,12 +31,70 @@ export interface ImageSectionMoveRequest {
   placement: ImageSectionDropPlacement;
 }
 
+export interface ImageSectionMoveRequest extends ImageSectionMovePreviewRequest {
+  orderSession: ImageSectionOrderSession;
+}
+
+interface SameSectionMovePreview {
+  pathsBefore: string[];
+  pathsPreview: string[];
+}
+
+const sameSectionMovePreviews = new WeakMap<ImageSectionMoveParticipant, SameSectionMovePreview>();
+
+function samePaths(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((path, index) => path === right[index]);
+}
+
+export function previewImageSectionAssetMove(request: ImageSectionMovePreviewRequest): void {
+  const { source, target, path, targetPath, placement } = request;
+  if (source.sourcePath !== target.sourcePath || source !== target) return;
+
+  const existing = sameSectionMovePreviews.get(source);
+  const pathsBefore = existing ? [...existing.pathsBefore] : [...source.paths()];
+  const plan = planImageSectionPathMove(
+    pathsBefore,
+    pathsBefore,
+    path,
+    targetPath ?? "",
+    placement,
+    true,
+  );
+
+  if (!plan.changed) {
+    if (existing) {
+      source.applyPaths(pathsBefore, true);
+      sameSectionMovePreviews.delete(source);
+    }
+    return;
+  }
+  if (existing && samePaths(existing.pathsPreview, plan.targetPaths)) return;
+
+  source.applyPaths(plan.targetPaths, false);
+  sameSectionMovePreviews.set(source, {
+    pathsBefore,
+    pathsPreview: [...plan.targetPaths],
+  });
+}
+
+export function clearImageSectionAssetMovePreview(
+  source: ImageSectionMoveParticipant,
+  target: ImageSectionMoveParticipant,
+): void {
+  if (source !== target) return;
+  const preview = sameSectionMovePreviews.get(source);
+  if (!preview) return;
+  sameSectionMovePreviews.delete(source);
+  source.applyPaths(preview.pathsBefore, true);
+}
+
 export async function moveImageSectionAsset(request: ImageSectionMoveRequest): Promise<ImageSectionMoveOutcome> {
   const { orderSession, source, target, path, targetPath, placement } = request;
   if (source.sourcePath !== target.sourcePath) return { status: "unsupported" };
 
   const sameSection = source === target;
-  const sourceBefore = [...source.paths()];
+  const preview = sameSection ? sameSectionMovePreviews.get(source) : undefined;
+  const sourceBefore = preview ? [...preview.pathsBefore] : [...source.paths()];
   const targetBefore = sameSection ? sourceBefore : [...target.paths()];
   const plan = planImageSectionPathMove(
     sourceBefore,
@@ -48,7 +105,11 @@ export async function moveImageSectionAsset(request: ImageSectionMoveRequest): P
     sameSection,
   );
 
-  if (!plan.changed) return { status: "unchanged" };
+  if (sameSection) sameSectionMovePreviews.delete(source);
+  if (!plan.changed) {
+    if (preview && !samePaths(source.paths(), sourceBefore)) source.applyPaths(sourceBefore, true);
+    return { status: "unchanged" };
+  }
 
   source.applyPaths(plan.sourcePaths, true);
   if (!sameSection) target.applyPaths(plan.targetPaths, false);
