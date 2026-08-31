@@ -20,6 +20,7 @@ export type LibraryTextTemplateVariableId = (typeof LIBRARY_TEXT_TEMPLATE_VARIAB
 
 export interface LibraryTextTemplateCatalog {
   names: Readonly<Record<LibraryTextTemplateVariableId, string>>;
+  aliases?: Partial<Record<LibraryTextTemplateVariableId, readonly string[]>>;
 }
 
 export type LibraryTextTemplateIssueCode =
@@ -27,9 +28,7 @@ export type LibraryTextTemplateIssueCode =
   | "template-too-long"
   | "unclosed-variable"
   | "unknown-variable"
-  | "too-many-variables"
-  | "missing-completed-at"
-  | "missing-work";
+  | "too-many-variables";
 
 export interface LibraryTextTemplateIssue {
   code: LibraryTextTemplateIssueCode;
@@ -55,6 +54,7 @@ function variableLookup(catalog: LibraryTextTemplateCatalog): Map<string, Librar
   for (const id of LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS) {
     lookup.set(id, id);
     lookup.set(catalog.names[id], id);
+    for (const alias of catalog.aliases?.[id] ?? []) lookup.set(alias, id);
   }
   return lookup;
 }
@@ -116,9 +116,6 @@ export function compileLibraryTextTemplate(
     }
     cursor = end + 1;
   }
-
-  if (!variables.has("completedAt")) issues.push({ code: "missing-completed-at" });
-  if (!variables.has("work")) issues.push({ code: "missing-work" });
 
   return {
     template,
