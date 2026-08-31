@@ -172,9 +172,11 @@ describe("legacy update: duplicate default note covers", () => {
       "Remove duplicate note covers",
       "Upgrade legacy metadata",
     ]);
-    assert.match(String(section.definitions[0].desc), /Older AnimeList versions/);
-    assert.match(String(section.definitions[0].desc), /same folder/);
-    assert.match(String(section.definitions[0].desc), /frontmatter are not rewritten/);
+    const filenameDescription = String(section.definitions[0].desc);
+    assert.match(filenameDescription, /filenames changed manually/);
+    assert.match(filenameDescription, /remain valid in the Library/);
+    assert.match(filenameDescription, /same folder/);
+    assert.match(filenameDescription, /frontmatter are not rewritten/);
     assert.equal(legacy.heading, "Legacy metadata cleanup");
   });
 });
