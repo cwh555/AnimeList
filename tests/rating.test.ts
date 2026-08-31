@@ -37,11 +37,20 @@ describe("rating domain", () => {
     assert.equal(stepRating(10, 1), 10);
     assert.equal(stepRating(0, -1), 0);
     assert.equal(stepRating("", 1), null);
+    assert.equal(stepRating("   ", 1), null);
     assert.equal(stepRating("invalid", -1), null);
   });
 
-  it("leaves empty, invalid, and out-of-range values for existing validation", () => {
+  it("keeps blank ratings empty while preserving an explicit zero", () => {
     assert.deepEqual(normalizeRating(""), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating("   "), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating("\t\n"), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating(" 0 "), {
+      kind: "valid", value: 0, changed: false, original: 0,
+    });
+  });
+
+  it("leaves invalid and out-of-range values for existing validation", () => {
     assert.deepEqual(normalizeRating("not-a-number"), { kind: "invalid", value: null, changed: false });
     assert.deepEqual(normalizeRating(-0.1), { kind: "out-of-range", value: -0.1, changed: false });
     assert.deepEqual(normalizeRating(10.1), { kind: "out-of-range", value: 10.1, changed: false });
