@@ -44,7 +44,7 @@ function values(overrides: Partial<Record<LibraryTextTemplateVariableId, string>
 }
 
 describe("library text template", () => {
-  it("supports localized bash-like substitutions while requiring time and Timeline-style work", () => {
+  it("supports localized bash-like substitutions", () => {
     const compiled = compileLibraryTextTemplate(
       "({$作品類型}) {$作品名稱} : {$完成時間}",
       catalog,
@@ -54,6 +54,26 @@ describe("library text template", () => {
       renderLibraryTextTemplate(compiled, values()),
       "(漫畫) 葬送的芙莉蓮 — 第 13 卷 : 2026-05-03",
     );
+  });
+
+  it("allows any supported subset of variables without forcing Timeline fields", () => {
+    const scoreOnly = compileLibraryTextTemplate("{$評分}", catalog);
+    assert.equal(scoreOnly.valid, true);
+    assert.equal(renderLibraryTextTemplate(scoreOnly, values()), "9");
+
+    const literalOnly = compileLibraryTextTemplate("固定文字", catalog);
+    assert.equal(literalOnly.valid, true);
+    assert.equal(renderLibraryTextTemplate(literalOnly, values()), "固定文字");
+  });
+
+  it("accepts typed aliases so renamed display variables remain compatible", () => {
+    const aliasedCatalog: LibraryTextTemplateCatalog = {
+      ...catalog,
+      aliases: { favorite: ["masterpiece"] },
+    };
+    const compiled = compileLibraryTextTemplate("{$masterpiece}", aliasedCatalog);
+    assert.equal(compiled.valid, true);
+    assert.equal(renderLibraryTextTemplate(compiled, values({ favorite: "是" })), "是");
   });
 
   it("never recursively evaluates substituted values and supports an escaped literal opener", () => {
@@ -69,20 +89,16 @@ describe("library text template", () => {
   });
 
   it("rejects unsafe or ambiguous templates before export", () => {
-    const missingWork = compileLibraryTextTemplate("{$完成時間}", catalog);
-    assert.equal(missingWork.valid, false);
-    assert.ok(missingWork.issues.some((issue) => issue.code === "missing-work"));
-
-    const unknown = compileLibraryTextTemplate("{$完成時間} {$作品名稱} {$rm -rf}", catalog);
+    const unknown = compileLibraryTextTemplate("{$rm -rf}", catalog);
     assert.equal(unknown.valid, false);
     assert.deepEqual(unknown.issues.find((issue) => issue.code === "unknown-variable")?.variable, "rm -rf");
 
-    const unclosed = compileLibraryTextTemplate("{$完成時間} {$作品名稱", catalog);
+    const unclosed = compileLibraryTextTemplate("{$作品名稱", catalog);
     assert.equal(unclosed.valid, false);
     assert.ok(unclosed.issues.some((issue) => issue.code === "unclosed-variable"));
 
     const tooLong = compileLibraryTextTemplate(
-      `{$完成時間} {$作品名稱}${"x".repeat(LIBRARY_TEXT_TEMPLATE_MAX_LENGTH)}`,
+      `{$完成時間}${"x".repeat(LIBRARY_TEXT_TEMPLATE_MAX_LENGTH)}`,
       catalog,
     );
     assert.equal(tooLong.valid, false);
