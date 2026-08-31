@@ -1,5 +1,8 @@
 import type { LibraryTextExportRow } from "../../domain/library-export";
-import type { SpecialLabelMode } from "../../domain/masterpiece-labels";
+import {
+  labelsForMasterpieceEnable,
+  type SpecialLabelMode,
+} from "../../domain/masterpiece-labels";
 import {
   LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS,
   compileLibraryTextTemplate,
@@ -98,6 +101,7 @@ export function libraryTextTemplateIssueMessage(issue: LibraryTextTemplateIssue)
     case "unclosed-variable": return libraryExportText("templateErrorUnclosed");
     case "unknown-variable": return libraryExportText("templateErrorUnknown", { variable: issue.variable ?? "" });
     case "too-many-variables": return libraryExportText("templateErrorTooManyVariables");
+    case "missing-work": return libraryExportText("templateErrorMissingWork");
   }
 }
 
@@ -126,7 +130,16 @@ function progressValue(row: LibraryTextExportRow): string {
     : libraryExportText("progressCurrentOnly", { current: row.progressCurrent, unit });
 }
 
-function templateValues(row: LibraryTextExportRow): Record<LibraryTextTemplateVariableId, string> {
+function specialLabelValue(row: LibraryTextExportRow, specialLabelMode: SpecialLabelMode): string {
+  if (!row.favorite) return "";
+  if (specialLabelMode === "masterpiece") return labelsForMasterpieceEnable(row.masterpieceLabels).join(", ");
+  return specialLabelName("favorite");
+}
+
+function templateValues(
+  row: LibraryTextExportRow,
+  specialLabelMode: SpecialLabelMode,
+): Record<LibraryTextTemplateVariableId, string> {
   return {
     completedAt: row.time,
     work: eventWorkTitle(row),
@@ -138,7 +151,7 @@ function templateValues(row: LibraryTextExportRow): Record<LibraryTextTemplateVa
     progress: progressValue(row),
     startedAt: row.startedAt,
     status: mediaStatusLabel(row.status, row.mediaType),
-    favorite: libraryExportText(row.favorite ? "yes" : "no"),
+    favorite: specialLabelValue(row, specialLabelMode),
     genres: row.genres.join(", "),
   };
 }
@@ -147,8 +160,11 @@ export function formatLibraryTextExport(
   rows: readonly LibraryTextExportRow[],
   template: string,
   compilation = compileLibraryTextExportTemplate(template),
+  specialLabelMode: SpecialLabelMode = "favorite",
 ): string {
   if (!compilation.valid) return "";
-  const blocks = rows.map((row) => renderLibraryTextTemplate(compilation, templateValues(row)).trimEnd());
+  const blocks = rows.map((row) => (
+    renderLibraryTextTemplate(compilation, templateValues(row, specialLabelMode)).trimEnd()
+  ));
   return blocks.length ? `${blocks.join("\n\n")}\n` : "";
 }
