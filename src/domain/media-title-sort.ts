@@ -51,8 +51,8 @@ function chineseOrdinalValue(value: string): number | null {
   return total + (digit ?? 0);
 }
 
-export function naturalMediaTitleKey(value: unknown): string {
-  return String(value ?? "")
+export function naturalMediaTitleKey(value: string | null | undefined): string {
+  return (value ?? "")
     .normalize("NFKC")
     .replace(STRUCTURAL_ORDINAL, (match, numeral: string) => {
       const number = chineseOrdinalValue(numeral);
@@ -65,11 +65,16 @@ export function naturalMediaTitleKey(value: unknown): string {
  * ordinals such as 第一季 / 第十卷 are compared numerically, while ordinary
  * title text keeps locale-aware Traditional Chinese/Japanese collation.
  */
-export function compareMediaTitles(left: unknown, right: unknown): number {
+export function compareMediaTitles(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): number {
+  const leftText = left ?? "";
+  const rightText = right ?? "";
   const normalizedOrder = mediaTitleCollator.compare(
-    naturalMediaTitleKey(left),
-    naturalMediaTitleKey(right),
+    naturalMediaTitleKey(leftText),
+    naturalMediaTitleKey(rightText),
   );
   if (normalizedOrder) return normalizedOrder;
-  return mediaTitleCollator.compare(String(left ?? ""), String(right ?? ""));
+  return mediaTitleCollator.compare(leftText, rightText);
 }
