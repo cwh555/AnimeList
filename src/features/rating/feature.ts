@@ -8,15 +8,17 @@ import {
   formatRating,
   normalizeRating,
 } from "../../domain/rating";
+import { installNumberInputWheelGuard } from "../../ui/number-input-wheel-guard";
 
 export const ratingFeature = defineFeature<AnimeListFeatureHost>({
   id: "rating",
   contributions: [{
     kind: "media-form",
-    configure({ fields }): void {
+    configure({ fields, registerCleanup }): void {
       fields.score.min = String(MIN_RATING);
       fields.score.max = String(MAX_RATING);
       fields.score.step = String(RATING_INCREMENT);
+      registerCleanup(installNumberInputWheelGuard(fields.score));
     },
     prepareSubmit({ fields, form }): void {
       const raw = fields.score.value.trim();
