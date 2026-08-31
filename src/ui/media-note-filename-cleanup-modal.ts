@@ -22,7 +22,7 @@ export class MediaNoteFilenameCleanupModal extends Modal {
 
     this.contentEl.createEl("p", {
       cls: "al-modal-hint",
-      text: "A note can stay in the AnimeList Library even when its Markdown filename differs from its title. Use this optional review when you want older or manually renamed notes to match their title frontmatter again.",
+      text: "A note can stay in the library even when its Markdown filename differs from its title. Use this optional review when you want older or manually renamed notes to match their title frontmatter again.",
     });
     const rules = this.contentEl.createEl("ul", { cls: "al-version-cleanup-rules" });
     appendRule(rules, "Manual filename changes are accepted by AnimeList and are not changed automatically by ordinary Library refreshes or unrelated edits.");
