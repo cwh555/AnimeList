@@ -15,7 +15,7 @@ export function createVersionCleanupSettingsSection(
     description: "Review and apply one-time compatibility cleanups required by newer AnimeList versions.",
     definitions: [{
       name: "Sync note filenames with titles",
-      desc: "Older AnimeList versions could keep the old Markdown filename after a title edit. Preview safe renames for AnimeList media notes; notes stay in the same folder, content/frontmatter are not rewritten, and filename conflicts use a suffix such as ‘ (2)’.",
+      desc: "AnimeList keeps filenames aligned when a title is edited through AnimeList, but older notes or filenames changed manually can differ. Manual filename changes remain valid in the Library; use this action only when you want to preview and reconcile those names with title frontmatter. Notes stay in the same folder, content/frontmatter are not rewritten, and filename conflicts use a suffix such as ‘ (2)’.",
       render: (setting: Setting) => {
         setting.addButton((button) => {
           button.setButtonText("Review renames");
