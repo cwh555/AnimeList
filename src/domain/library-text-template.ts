@@ -28,7 +28,8 @@ export type LibraryTextTemplateIssueCode =
   | "template-too-long"
   | "unclosed-variable"
   | "unknown-variable"
-  | "too-many-variables";
+  | "too-many-variables"
+  | "missing-work";
 
 export interface LibraryTextTemplateIssue {
   code: LibraryTextTemplateIssueCode;
@@ -116,6 +117,8 @@ export function compileLibraryTextTemplate(
     }
     cursor = end + 1;
   }
+
+  if (!variables.has("work")) issues.push({ code: "missing-work" });
 
   return {
     template,
