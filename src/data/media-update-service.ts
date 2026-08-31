@@ -11,7 +11,8 @@ export interface MediaUpdateCallbacks {
 function validatedTitle(mediaType: MediaType, form: MediaNoteForm): string {
   const probe: Record<string, unknown> = {};
   applyEditableMediaForm(probe, mediaType, form);
-  return String(probe.title ?? "");
+  if (typeof probe.title !== "string") throw new Error("Validated media title is missing");
+  return probe.title;
 }
 
 export class MediaUpdateService {
