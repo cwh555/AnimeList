@@ -1,33 +1,27 @@
 import { Notice } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
 import { ratingFeatureText } from "./text";
-import {
-  MAX_RATING,
-  MIN_RATING,
-  RATING_INCREMENT,
-  formatRating,
-  normalizeRating,
-} from "../../domain/rating";
+import { formatRating, normalizeRating } from "../../domain/rating";
+import { installRatingInputBehavior } from "../../ui/rating-input";
 
 export const ratingFeature = defineFeature<AnimeListFeatureHost>({
   id: "rating",
   contributions: [{
     kind: "media-form",
-    configure({ fields }): void {
-      fields.score.min = String(MIN_RATING);
-      fields.score.max = String(MAX_RATING);
-      fields.score.step = String(RATING_INCREMENT);
+    configure(context): void {
+      context.onDispose(installRatingInputBehavior(context.fields.score));
     },
     prepareSubmit({ fields, form }): void {
-      const raw = fields.score.value.trim();
-      if (!raw) {
+      // mediaFormValues() is the authoritative snapshot. Never read the live DOM
+      // again here: later UI events must not change what this submit persists.
+      const result = normalizeRating(form.score);
+      if (result.kind === "empty") {
         form.score = null;
         return;
       }
-      const result = normalizeRating(raw);
       if (result.kind === "invalid") return;
       form.score = result.value;
-      if (!result.changed) return;
+      if (result.kind !== "valid" || !result.changed) return;
       fields.score.value = formatRating(result.value);
       new Notice(ratingFeatureText("adjusted", {
         original: result.original,

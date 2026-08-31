@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatRating, normalizeRating } from "../src/domain/rating";
+import { formatRating, normalizeRating, stepRating } from "../src/domain/rating";
 
 describe("rating domain", () => {
   it("keeps ratings that already use half-point increments", () => {
@@ -28,6 +28,16 @@ describe("rating domain", () => {
     assert.deepEqual(normalizeRating("9.9"), {
       kind: "valid", value: 10, changed: true, original: 9.9,
     });
+  });
+
+  it("steps ratings explicitly in half-point increments and clamps the range", () => {
+    assert.equal(stepRating("9", 1), 9.5);
+    assert.equal(stepRating("9", -1), 8.5);
+    assert.equal(stepRating("7.2", 1), 7.5);
+    assert.equal(stepRating(10, 1), 10);
+    assert.equal(stepRating(0, -1), 0);
+    assert.equal(stepRating("", 1), null);
+    assert.equal(stepRating("invalid", -1), null);
   });
 
   it("leaves empty, invalid, and out-of-range values for existing validation", () => {

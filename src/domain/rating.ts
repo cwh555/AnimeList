@@ -8,6 +8,8 @@ export type RatingNormalizationResult =
   | { kind: "out-of-range"; value: number; changed: false }
   | { kind: "valid"; value: number; changed: boolean; original: number };
 
+export type RatingStepDirection = -1 | 1;
+
 function isHalfPointRating(value: number): boolean {
   return Number.isInteger(value / RATING_INCREMENT);
 }
@@ -33,6 +35,13 @@ export function normalizeRating(value: unknown): RatingNormalizationResult {
     changed: !isHalfPointRating(numericValue),
     original: numericValue,
   };
+}
+
+export function stepRating(value: unknown, direction: RatingStepDirection): number | null {
+  const normalized = normalizeRating(value);
+  if (normalized.kind !== "valid") return null;
+  const stepped = normalized.value + direction * RATING_INCREMENT;
+  return Math.min(MAX_RATING, Math.max(MIN_RATING, Number(stepped.toFixed(1))));
 }
 
 export function formatRating(value: number): string {
