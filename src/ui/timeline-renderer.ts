@@ -1,6 +1,7 @@
 import type { LibraryMediaFilter } from "./library-contracts";
 import type { TimelineMediaEntry } from "../types";
 import { compareVolumeLabels, normalizeVolumeLabel } from "../domain/progress/novel-progress";
+import { compareMediaTitles } from "../domain/media-title-sort";
 import { expandTimelineEntries } from "./timeline-entry-expansion";
 import { MAX_TIMELINE_DAY_SPACING, MAX_TIMELINE_VIEW_SCALE, MIN_TIMELINE_DAY_SPACING, MIN_TIMELINE_VIEW_SCALE, calculateDefaultTimelineView, preserveTimelineAxisScreenY } from "../domain/timeline/scale";
 import { centerLatestTimelineAxis } from "../domain/timeline/corrections";
@@ -11,8 +12,6 @@ import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 import { animateLayoutChange } from "./layout-motion";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
-
-const timelineTitleCollator = new Intl.Collator("zh-Hant", { numeric: true, sensitivity: "base" });
 
 export { TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 
@@ -43,7 +42,7 @@ export function timelineStemGeometry(
 export function compareTimelineEntries(left: TimelineMediaEntry, right: TimelineMediaEntry): number {
   const leftSeries = String(left?.seriesTitle || left?.title || "");
   const rightSeries = String(right?.seriesTitle || right?.title || "");
-  const seriesOrder = timelineTitleCollator.compare(leftSeries, rightSeries);
+  const seriesOrder = compareMediaTitles(leftSeries, rightSeries);
   if (seriesOrder) return seriesOrder;
   const leftVolume = normalizeVolumeLabel(left?.volumeLabel);
   const rightVolume = normalizeVolumeLabel(right?.volumeLabel);
@@ -52,7 +51,7 @@ export function compareTimelineEntries(left: TimelineMediaEntry, right: Timeline
     if (volumeOrder) return volumeOrder;
   } else if (leftVolume) return 1;
   else if (rightVolume) return -1;
-  return timelineTitleCollator.compare(String(left?.title || ""), String(right?.title || ""));
+  return compareMediaTitles(left?.title, right?.title);
 }
 
 interface TimedTimelineEntry extends TimelineMediaEntry {
