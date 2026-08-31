@@ -22,8 +22,10 @@ export function numeric(value: unknown, fallback = 0): number {
 }
 
 export function optionalScore(value: unknown): number | null {
-  if (value == null || value === "") return null;
-  const parsed = Number(value);
+  if (value == null) return null;
+  const candidate = typeof value === "string" ? value.trim() : value;
+  if (candidate === "") return null;
+  const parsed = Number(candidate);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
