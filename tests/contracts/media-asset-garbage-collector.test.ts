@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { TFile } from "obsidian";
 import { createDefaultSettings } from "../../src/app/settings-model";
 import { MediaAssetGarbageCollector } from "../../src/data/media-asset-garbage-collector";
+import { MediaAssetReferenceService } from "../../src/data/media-asset-reference-service";
 
 function file(path: string): TFile {
   const value = new TFile();
@@ -84,5 +85,40 @@ describe("media asset garbage collector", () => {
     assert.equal(result.result.removedManagedFiles, 2);
     assert.equal(result.result.removedJournalFiles, 2);
     assert.equal(result.references.referencedPaths.has(shared.path), true);
+  });
+
+  it("reads explicit full-vault references with bounded parallelism", async () => {
+    const notes = Array.from({ length: 20 }, (_, index) => file(`Notes/${index}.md`));
+    const shared = file("AnimeList/Images/anime/demo-bangumi-1/shared.png");
+    const files = new Map<string, TFile>([[shared.path, shared], ...notes.map((note) => [note.path, note] as const)]);
+    let reads = 0;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const app: any = {
+      metadataCache: {
+        getFileCache() { return null; },
+        getFirstLinkpathDest(target: string) { return files.get(target) ?? null; },
+      },
+      vault: {
+        getRoot() { return { children: notes }; },
+        getAbstractFileByPath(path: string) { return files.get(path) ?? null; },
+        async cachedRead() {
+          reads += 1;
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          inFlight -= 1;
+          return `![[${shared.path}]]`;
+        },
+      },
+    };
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    const references = await new MediaAssetReferenceService(app, () => settings).collect();
+
+    assert.equal(reads, notes.length);
+    assert.equal(maxInFlight > 1, true);
+    assert.equal(maxInFlight <= 8, true);
+    assert.equal(references.referencedPaths.has(shared.path), true);
   });
 });
