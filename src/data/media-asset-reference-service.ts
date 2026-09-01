@@ -4,6 +4,8 @@ import { managedMediaAssetKind, normalizeMediaAssetPath } from "../domain/media-
 import { extractFrontmatterCoverTargets, extractMarkdownAssetTargets } from "../domain/media-asset-references";
 import { getAllMarkdownFiles } from "./vault-scope";
 
+const REFERENCE_READ_CONCURRENCY = 8;
+
 export interface MediaAssetReferenceSnapshot {
   referencedPaths: Set<string>;
   referencedFiles: TFile[];
@@ -19,18 +21,26 @@ export class MediaAssetReferenceService {
 
   async collect(): Promise<MediaAssetReferenceSnapshot> {
     const referencedPaths = new Set<string>();
-    for (const note of getAllMarkdownFiles(this.app)) {
-      const markdown = await this.app.vault.cachedRead(note);
-      const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;
-      const targets = new Set([
-        ...extractMarkdownAssetTargets(markdown),
-        ...extractFrontmatterCoverTargets(frontmatter),
-      ]);
-      for (const target of targets) {
-        const file = this.resolveTarget(target, note.path);
-        if (file) referencedPaths.add(normalizeMediaAssetPath(file.path));
+    const notes = getAllMarkdownFiles(this.app);
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < notes.length) {
+        const note = notes[cursor++];
+        if (!note) continue;
+        const markdown = await this.app.vault.cachedRead(note);
+        const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;
+        const targets = new Set([
+          ...extractMarkdownAssetTargets(markdown),
+          ...extractFrontmatterCoverTargets(frontmatter),
+        ]);
+        for (const target of targets) {
+          const file = this.resolveTarget(target, note.path);
+          if (file) referencedPaths.add(normalizeMediaAssetPath(file.path));
+        }
       }
-    }
+    };
+    const workerCount = Math.min(REFERENCE_READ_CONCURRENCY, notes.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
     const referencedFiles: TFile[] = [];
     const coverFiles: TFile[] = [];

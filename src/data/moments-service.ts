@@ -189,9 +189,7 @@ export class MomentsService {
     const next = current.map((moment, position) => position === index ? nextMoment : moment);
     const note = this.noteFile(sourcePath);
     try {
-      const updated = await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
-      const removed = previous.images.filter((path) => !stored.paths.includes(path));
-      await this.images.trashUnreferencedManagedPaths(sourcePath, updated, removed);
+      await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
       return { source: serializeMomentsSource(next), moment: nextMoment, duplicatesSkipped: stored.duplicatesSkipped };
     } catch (error) {
       await this.images.rollbackStoredPaths(stored.addedPaths);
@@ -208,11 +206,9 @@ export class MomentsService {
     this.assertUsableIds(current);
     const matches = current.filter((moment) => moment.id === momentId);
     if (matches.length !== 1) throw new Error("Could not safely locate this moment");
-    const target = matches[0];
     const next = current.filter((moment) => moment.id !== momentId);
     const note = this.noteFile(sourcePath);
-    const updated = await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
-    await this.images.trashUnreferencedManagedPaths(sourcePath, updated, target.images);
+    await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
     return serializeMomentsSource(next);
   }
 
