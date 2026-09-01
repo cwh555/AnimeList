@@ -22,6 +22,7 @@ function harness(markdown: string) {
   const trashed: string[] = [];
   const binaries = new Map<string, ArrayBuffer>();
   const thumbnailRequests: string[] = [];
+  let cachedReads = 0;
   let frontmatter: Record<string, unknown> = {
     title: "Demo", media_type: "anime", source_provider: "bangumi", source_id: "42",
   };
@@ -33,7 +34,7 @@ function harness(markdown: string) {
     vault: {
       getRoot() { return { children: [...files.values()] }; },
       getAbstractFileByPath(path: string) { return files.get(path) ?? null; },
-      async cachedRead(target: TFile) { return data.get(target.path) ?? ""; },
+      async cachedRead(target: TFile) { cachedReads += 1; return data.get(target.path) ?? ""; },
       getResourcePath(target: TFile) { return `app://${target.path}`; },
       async createBinary(path: string, bytes: ArrayBuffer) {
         const created = file(path);
@@ -66,7 +67,11 @@ function harness(markdown: string) {
     getImageThumbnailSources(target: TFile) { thumbnailRequests.push(target.path); return undefined; },
     refreshViews() {},
   });
-  return { service, note, files, data, binaries, thumbnailRequests, trashed, getFrontmatter: () => frontmatter };
+  return {
+    service, note, files, data, binaries, thumbnailRequests, trashed,
+    getFrontmatter: () => frontmatter,
+    getCachedReads: () => cachedReads,
+  };
 }
 
 describe("image section storage service", () => {
@@ -173,7 +178,6 @@ describe("image section storage service", () => {
     assert.match(h.data.get(h.note.path) ?? "", new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   });
 
-
   it("does not trash a managed file while a moments section still references it", async () => {
     const path = "AnimeList/Images/anime/demo-bangumi-42/shared.jpg";
     const h = harness([
@@ -189,7 +193,7 @@ describe("image section storage service", () => {
     assert.match(h.data.get(h.note.path) ?? "", /m_shared123/);
   });
 
-  it("batch-removes selected images and moves only safe managed files through Obsidian trash", async () => {
+  it("batch-removes selected image references without scanning or trashing managed assets", async () => {
     const firstPath = "AnimeList/Images/anime/demo-bangumi-42/first.jpg";
     const secondPath = "AnimeList/Images/anime/demo-bangumi-42/second.jpg";
     const coverPath = "AnimeList/Images/anime/demo-bangumi-42/cover.jpg";
@@ -205,14 +209,14 @@ describe("image section storage service", () => {
     const block = findImageSectionBlocks(h.data.get(h.note.path) ?? "")[0];
     await h.service.removeMany(h.note.path, block, [firstPath, secondPath, coverPath, sharedPath]);
 
-    assert.deepEqual(h.trashed.sort(), [firstPath, secondPath].sort());
+    assert.deepEqual(h.trashed, []);
+    assert.equal(h.getCachedReads(), 0);
     const updated = h.data.get(h.note.path) ?? "";
     assert.doesNotMatch(updated, new RegExp(firstPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(updated, new RegExp(secondPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(updated, new RegExp(sharedPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.equal(h.getFrontmatter().cover, coverPath);
-    assert.equal(h.files.has(coverPath), true);
-    assert.equal(h.files.has(sharedPath), true);
+    for (const path of [firstPath, secondPath, coverPath, sharedPath]) assert.equal(h.files.has(path), true);
   });
 
   it("sets a gallery image as cover and protects that file from deletion", async () => {
@@ -225,6 +229,7 @@ describe("image section storage service", () => {
     await h.service.remove(h.note.path, block, path);
     assert.deepEqual(h.trashed, []);
   });
+
   it("persists per-section column metadata without changing image order or unrelated Markdown", async () => {
     const h = harness([
       "# Demo",
@@ -347,5 +352,4 @@ describe("image section storage service", () => {
     assert.match(updated, /## One\n```animelist-images\n- a\.jpg\n- c\.jpg\n```/);
     assert.match(updated, /## Two\n```animelist-images\n- external\.jpg\n```/);
   });
-
 });
