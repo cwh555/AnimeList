@@ -7,6 +7,10 @@ import {
   type LibraryExportFormat,
   type LibraryExportScope,
 } from "../domain/library-export";
+import {
+  normalizeSpecialLabelMode,
+  type SpecialLabelMode,
+} from "../domain/masterpiece-labels";
 import { LibraryExportService } from "../data/library-export-service";
 import {
   compileLibraryTextExportTemplate,
@@ -32,6 +36,7 @@ interface LibraryExportModalState {
 
 export class LibraryExportModal extends Modal {
   private readonly service: LibraryExportService;
+  private readonly specialLabelMode: SpecialLabelMode;
   private readonly exportedAt = new Date().toISOString();
   private readonly state: LibraryExportModalState = {
     format: "json",
@@ -47,6 +52,7 @@ export class LibraryExportModal extends Modal {
   constructor(private readonly host: AnimeListFeatureHost) {
     super(host.app);
     this.service = new LibraryExportService(host);
+    this.specialLabelMode = normalizeSpecialLabelMode(host.settings.specialLabelMode);
   }
 
   onOpen(): void {
@@ -67,16 +73,22 @@ export class LibraryExportModal extends Modal {
       return { content: this.service.createJson(items, this.exportedAt), count: items.length };
     }
     const rows = buildLibraryTextExportRows(items);
-    const compilation = compileLibraryTextExportTemplate(this.state.textTemplate);
+    const compilation = compileLibraryTextExportTemplate(this.state.textTemplate, this.specialLabelMode);
     return {
-      content: formatLibraryTextExport(rows, this.state.textTemplate, compilation),
+      content: formatLibraryTextExport(
+        rows,
+        this.state.textTemplate,
+        compilation,
+        this.specialLabelMode,
+      ),
       count: rows.length,
     };
   }
 
   private templateIssueMessages(): string[] {
     if (this.state.format !== "text") return [];
-    return compileLibraryTextExportTemplate(this.state.textTemplate).issues.map(libraryTextTemplateIssueMessage);
+    return compileLibraryTextExportTemplate(this.state.textTemplate, this.specialLabelMode)
+      .issues.map(libraryTextTemplateIssueMessage);
   }
 
   private syncView(): void {
@@ -132,6 +144,7 @@ export class LibraryExportModal extends Modal {
       this.state.scope,
       this.state.textTemplate,
       initialIssues,
+      this.specialLabelMode,
       {
         onFormatChange: (format) => {
           if (this.state.format === format) return;

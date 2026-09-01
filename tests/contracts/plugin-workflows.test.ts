@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { App, TFile } from "obsidian";
 import AnimeListPlugin from "../../src/main";
+import { AnimeListApplicationServices } from "../../src/app/anime-list-application";
 import { createDefaultSettings } from "../../src/app/settings-model";
 import type { MediaItem } from "../../src/types";
 import { libraryExportFeature } from "../../src/features/library-export/feature";
@@ -143,6 +144,29 @@ describe("plugin UI workflows", () => {
     assert.equal(action?.id, "export-library");
     assert.equal(action?.icon, "download");
     assert.equal(libraryExportFeature.contributions.some((contribution) => contribution.kind === "workspace-page"), false);
+  });
+
+  it("keeps full managed-media cleanup explicit on interaction paths", async () => {
+    const settings = createDefaultSettings();
+    const trashed: string[] = [];
+    const app = {
+      fileManager: {
+        async trashFile(file: TFile) { trashed.push(file.path); },
+      },
+    } as unknown as App;
+    const application = new AnimeListApplicationServices(
+      app,
+      "animelist",
+      () => settings,
+      { async openMediaFile() {}, refreshViews() {} },
+    );
+    const target = new TFile();
+    target.path = "AnimeList/Anime/example.md";
+
+    application.releaseDownloadedCover("AnimeList/Covers/anime/unused.jpg");
+    await application.deleteMediaFile(target);
+
+    assert.deepEqual(trashed, [target.path]);
   });
 
 });

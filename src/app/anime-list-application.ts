@@ -9,6 +9,8 @@ import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
+import { MediaAssetGarbageCollector } from "../data/media-asset-garbage-collector";
+import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
@@ -32,6 +34,8 @@ export class AnimeListApplicationServices {
   private noteService?: MediaNoteService;
   private updateService?: MediaUpdateService;
   private specialLabelService?: SpecialLabelStateService;
+  private assetGarbageCollector?: MediaAssetGarbageCollector;
+  private readonly leasedCoverPaths = new Set<string>();
 
   constructor(
     private readonly app: App,
@@ -52,6 +56,7 @@ export class AnimeListApplicationServices {
   dispose(): void {
     this.coverCache?.dispose();
     this.imageThumbnailCache?.dispose();
+    this.leasedCoverPaths.clear();
   }
 
   private libraryStorage(): LibraryStorage {
@@ -111,6 +116,15 @@ export class AnimeListApplicationServices {
       { refreshViews: () => this.callbacks.refreshViews() },
     );
     return this.specialLabelService;
+  }
+
+  private garbageCollector(): MediaAssetGarbageCollector {
+    this.assetGarbageCollector ??= new MediaAssetGarbageCollector(
+      this.app,
+      this.pluginId,
+      this.settings,
+    );
+    return this.assetGarbageCollector;
   }
 
   getManagedMediaFolder(mediaType: MediaType): string { return this.libraryStorage().managedMediaFolder(mediaType); }
@@ -192,11 +206,36 @@ export class AnimeListApplicationServices {
     return this.coverCache.clear();
   }
 
+  async cleanupGarbageFiles(): Promise<MediaAssetCleanupResult> {
+    if (!this.coverCache || !this.imageThumbnailCache) throw new Error("Image caches are not initialized");
+    const execution = await this.garbageCollector().cleanup(this.leasedCoverPaths);
+    const referenced = execution.references.referencedFiles;
+    const [coverCacheRemoved, imageCacheRemoved] = await Promise.all([
+      this.coverCache.cleanupForFiles(referenced),
+      this.imageThumbnailCache.cleanupForFiles(referenced),
+    ]);
+    for (const path of [...this.leasedCoverPaths]) {
+      if (execution.references.referencedPaths.has(path)) this.leasedCoverPaths.delete(path);
+    }
+    return {
+      ...execution.result,
+      removedCacheFiles: coverCacheRemoved + imageCacheRemoved,
+    };
+  }
+
+  releaseDownloadedCover(pathValue: string): void {
+    const path = pathValue.trim();
+    if (!path) return;
+    this.leasedCoverPaths.delete(path);
+  }
+
   async setFavorite(path: string, next: boolean): Promise<void> { await this.specialLabels().setFavorite(path, next); }
   async updateSpecialLabelState(path: string, favorite: boolean, labels: string[]): Promise<void> {
     await this.specialLabels().update(path, { favorite, masterpieceLabels: labels });
   }
-  async deleteMediaFile(file: TFile): Promise<void> { await this.app.fileManager.trashFile(file); }
+  async deleteMediaFile(file: TFile): Promise<void> {
+    await this.app.fileManager.trashFile(file);
+  }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.externalMediaSearch().search(mediaType, query); }
@@ -223,7 +262,11 @@ export class AnimeListApplicationServices {
   async ensureFolder(path: string): Promise<void> { await this.libraryStorage().ensureFolder(path); }
   findExistingBySource(provider: string, sourceId: string): TFile | undefined { return this.repository().findBySource(this.getScanFolders(), provider, sourceId); }
   async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> { return this.libraryStorage().uniqueFilePath(folder, baseName, extension); }
-  async downloadCover(result: ExternalMediaResult): Promise<string> { return this.mediaNotes().downloadCover(result); }
+  async downloadCover(result: ExternalMediaResult): Promise<string> {
+    const path = await this.mediaNotes().downloadCover(result);
+    if (path) this.leasedCoverPaths.add(path);
+    return path;
+  }
   async createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
     if (result.provider === MANUAL_MEDIA_PROVIDER) return this.mediaNotes().create(result, form, coverAsset);
     if (result.sourceId && this.repository().findBySource(this.getScanFolders(), result.provider, result.sourceId)) {
@@ -239,5 +282,7 @@ export class AnimeListApplicationServices {
       : form;
     return this.mediaNotes().create(enriched, preparedForm, coverAsset);
   }
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> { await this.mediaUpdates().update(file, mediaType, form); }
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
+    await this.mediaUpdates().update(file, mediaType, form);
+  }
 }

@@ -37,14 +37,14 @@ function values(overrides: Partial<Record<LibraryTextTemplateVariableId, string>
     progress: "13 卷",
     startedAt: "2026-05-01",
     status: "已完成",
-    favorite: "是",
+    favorite: "最愛",
     genres: "奇幻, 冒險",
     ...overrides,
   } satisfies Record<LibraryTextTemplateVariableId, string>;
 }
 
 describe("library text template", () => {
-  it("supports localized bash-like substitutions while requiring time and Timeline-style work", () => {
+  it("supports localized bash-like substitutions", () => {
     const compiled = compileLibraryTextTemplate(
       "({$作品類型}) {$作品名稱} : {$完成時間}",
       catalog,
@@ -53,6 +53,33 @@ describe("library text template", () => {
     assert.equal(
       renderLibraryTextTemplate(compiled, values()),
       "(漫畫) 葬送的芙莉蓮 — 第 13 卷 : 2026-05-03",
+    );
+  });
+
+  it("requires work but keeps every other supported field optional", () => {
+    const workAndScore = compileLibraryTextTemplate("{$作品名稱} {$評分}", catalog);
+    assert.equal(workAndScore.valid, true);
+    assert.equal(renderLibraryTextTemplate(workAndScore, values()), "葬送的芙莉蓮 — 第 13 卷 9");
+
+    const scoreOnly = compileLibraryTextTemplate("{$評分}", catalog);
+    assert.equal(scoreOnly.valid, false);
+    assert.ok(scoreOnly.issues.some((issue) => issue.code === "missing-work"));
+
+    const literalOnly = compileLibraryTextTemplate("固定文字", catalog);
+    assert.equal(literalOnly.valid, false);
+    assert.ok(literalOnly.issues.some((issue) => issue.code === "missing-work"));
+  });
+
+  it("accepts typed aliases so renamed display variables remain compatible", () => {
+    const aliasedCatalog: LibraryTextTemplateCatalog = {
+      ...catalog,
+      aliases: { favorite: ["masterpiece"] },
+    };
+    const compiled = compileLibraryTextTemplate("{$作品名稱} {$masterpiece}", aliasedCatalog);
+    assert.equal(compiled.valid, true);
+    assert.equal(
+      renderLibraryTextTemplate(compiled, values({ favorite: "character writing" })),
+      "葬送的芙莉蓮 — 第 13 卷 character writing",
     );
   });
 
@@ -69,20 +96,16 @@ describe("library text template", () => {
   });
 
   it("rejects unsafe or ambiguous templates before export", () => {
-    const missingWork = compileLibraryTextTemplate("{$完成時間}", catalog);
-    assert.equal(missingWork.valid, false);
-    assert.ok(missingWork.issues.some((issue) => issue.code === "missing-work"));
-
-    const unknown = compileLibraryTextTemplate("{$完成時間} {$作品名稱} {$rm -rf}", catalog);
+    const unknown = compileLibraryTextTemplate("{$作品名稱} {$rm -rf}", catalog);
     assert.equal(unknown.valid, false);
     assert.deepEqual(unknown.issues.find((issue) => issue.code === "unknown-variable")?.variable, "rm -rf");
 
-    const unclosed = compileLibraryTextTemplate("{$完成時間} {$作品名稱", catalog);
+    const unclosed = compileLibraryTextTemplate("{$作品名稱} {$評分", catalog);
     assert.equal(unclosed.valid, false);
     assert.ok(unclosed.issues.some((issue) => issue.code === "unclosed-variable"));
 
     const tooLong = compileLibraryTextTemplate(
-      `{$完成時間} {$作品名稱}${"x".repeat(LIBRARY_TEXT_TEMPLATE_MAX_LENGTH)}`,
+      `{$作品名稱}${"x".repeat(LIBRARY_TEXT_TEMPLATE_MAX_LENGTH)}`,
       catalog,
     );
     assert.equal(tooLong.valid, false);

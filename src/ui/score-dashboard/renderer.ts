@@ -28,6 +28,7 @@ import type { MediaItem } from "../../types";
 import type { ScoreDashboardMediaType } from "../../domain/score-dashboard/model";
 import { applyScoreDashboardDomChanges } from "./dom-move";
 import { animateLayoutChange } from "../layout-motion";
+import { isolateHorizontalSwipeSurface } from "../mobile-swipe-isolation";
 
 export interface ScoreDashboardUiState {
   type: ScoreDashboardMediaType;
@@ -141,7 +142,7 @@ export function renderScoreDashboard(
   header.append(copy, summary);
 
   const controls = create("div", "al-score-dashboard-controls");
-  const typeTabs = create("nav", "al-score-dashboard-tabs");
+  const typeTabs = isolateHorizontalSwipeSurface(create("nav", "al-score-dashboard-tabs"));
   const actionGroup = create("div", "al-score-dashboard-action-group");
   const unratedButton = create("button", "al-score-tool-button");
   unratedButton.type = "button";
@@ -446,7 +447,7 @@ export function renderScoreDashboard(
 
     const label = create("div", "al-score-lane-label", score == null ? "—" : score.toFixed(1));
     if (score != null) label.style.setProperty("--al-score-color", scoreColor(score));
-    const posters = create("div", "al-score-lane-posters");
+    const posters = isolateHorizontalSwipeSurface(create("div", "al-score-lane-posters"));
     if (mountPosters) {
       if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
       else posters.appendChild(create("span", "al-score-lane-empty", text.emptyLane));

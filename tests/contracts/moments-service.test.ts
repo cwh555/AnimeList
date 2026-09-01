@@ -22,6 +22,7 @@ function harness(markdown: string) {
   const data = new Map<string, string>([[note.path, markdown]]);
   const binaries = new Map<string, ArrayBuffer>();
   const trashed: string[] = [];
+  let cachedReads = 0;
   let frontmatter: Record<string, unknown> = {
     title: "Demo", media_type: "anime", source_provider: "bangumi", source_id: "42",
   };
@@ -32,7 +33,9 @@ function harness(markdown: string) {
       getFirstLinkpathDest(path: string) { return files.get(path) ?? null; },
     },
     vault: {
+      getRoot() { return { children: [...files.values()] }; },
       getAbstractFileByPath(path: string) { return files.get(path) ?? null; },
+      async cachedRead(target: TFile) { cachedReads += 1; return data.get(target.path) ?? ""; },
       getResourcePath(target: TFile) { return `app://${target.path}`; },
       async read(target: TFile) { return data.get(target.path) ?? ""; },
       async readBinary(target: TFile) { return binaries.get(target.path)?.slice(0) ?? new ArrayBuffer(target.stat.size); },
@@ -65,7 +68,16 @@ function harness(markdown: string) {
     refreshViews() {},
   });
   const service = new MomentsService({ app } as any, imageService);
-  return { note, files, data, binaries, trashed, service, imageService };
+  return {
+    note,
+    files,
+    data,
+    binaries,
+    trashed,
+    service,
+    imageService,
+    get cachedReads() { return cachedReads; },
+  };
 }
 
 describe("moments storage service", () => {
@@ -93,6 +105,7 @@ describe("moments storage service", () => {
 
     const nextBlock = findMomentsBlocks(h.data.get(h.note.path) ?? "")[0];
     const id = added.moment?.id ?? "";
+    const removedPath = added.moment?.images[1] ?? "";
     const edited = await h.service.editMoment(h.note.path, nextBlock, id, {
       text: "更新後的文字",
       source: "第 2 話",
@@ -108,7 +121,9 @@ describe("moments storage service", () => {
     assert.equal(edited.moment?.position, "23:59");
     assert.deepEqual(edited.moment?.tags, ["重編輯"]);
     assert.equal(edited.moment?.images.length, 2);
-    assert.equal(h.trashed.length, 1);
+    assert.equal(h.trashed.length, 0);
+    assert.equal(h.cachedReads, 0);
+    assert.equal(h.files.has(removedPath), true);
     assert.equal(parseMomentsSource(edited.source)[0].id, id);
   });
 
@@ -149,6 +164,8 @@ describe("moments storage service", () => {
     const first = findMomentsBlocks(source)[0];
     await h.service.deleteMoment(h.note.path, first, "m_first123");
     assert.deepEqual(h.trashed, []);
+    assert.equal(h.cachedReads, 0);
+    assert.equal(h.files.has(shared), true);
     assert.match(h.data.get(h.note.path) ?? "", /m_second123/);
   });
 

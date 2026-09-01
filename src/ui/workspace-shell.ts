@@ -3,6 +3,7 @@ import type { LibrarySection } from "../domain/settings-types";
 import { uiText } from "../ui-text";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { appendIconLabel, makeEl, setAnimeListIcon } from "./ui-helpers";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 import { disconnectWorkspaceWindowSize, observeWorkspaceWindowSize } from "./workspace-responsive";
 
 export interface WorkspaceShellOptions {
@@ -17,6 +18,8 @@ export interface WorkspaceShellResult {
   pageActions: HTMLElement;
   activePage: WorkspacePageDefinition;
 }
+
+const MAX_DIRECT_WORKSPACE_ACTIONS = 2;
 
 function orderedPages(pages: readonly WorkspacePageDefinition[]): WorkspacePageDefinition[] {
   return [...pages].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
@@ -48,6 +51,55 @@ function shellSignature(
   });
 }
 
+function appendDirectAction(
+  parent: HTMLElement,
+  action: WorkspaceMenuAction,
+  state: { options: WorkspaceShellOptions },
+): void {
+  const direct = makeEl("button", "al-secondary-button al-workspace-action");
+  direct.type = "button";
+  direct.title = action.label;
+  direct.dataset.actionId = action.id;
+  if (action.icon) appendIconLabel(direct, action.icon, action.label);
+  else direct.textContent = action.label;
+  direct.addEventListener("click", () => {
+    const current = state.options.actions?.find((candidate) => candidate.id === action.id);
+    if (current) void current.run();
+  });
+  parent.appendChild(direct);
+}
+
+function appendOverflowActions(
+  parent: HTMLElement,
+  overflowActions: readonly WorkspaceMenuAction[],
+  state: { options: WorkspaceShellOptions },
+): void {
+  if (!overflowActions.length) return;
+  const more = makeEl("button", "al-workspace-more");
+  more.type = "button";
+  const moreLabel = uiText("detail.more");
+  more.title = moreLabel;
+  more.setAttribute("aria-label", moreLabel);
+  setAnimeListIcon(more, "ellipsis");
+  more.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = new Menu();
+    for (const action of overflowActions) {
+      menu.addItem((item) => {
+        item.setTitle(action.label);
+        if (action.icon) item.setIcon(action.icon);
+        item.onClick(() => {
+          const current = state.options.actions?.find((candidate) => candidate.id === action.id);
+          if (current) void current.run();
+        });
+      });
+    }
+    menu.showAtMouseEvent(event);
+  });
+  parent.appendChild(more);
+}
+
 export function renderAnimeListWorkspaceShell(
   container: HTMLElement,
   options: WorkspaceShellOptions,
@@ -75,47 +127,14 @@ export function renderAnimeListWorkspaceShell(
   brand.appendChild(makeEl("strong", "al-workspace-title", "AnimeList"));
 
   const actions = makeEl("div", "al-workspace-header-actions");
-  if (menuActions.length === 1) {
-    const action = menuActions[0];
-    const direct = makeEl("button", "al-secondary-button al-workspace-action");
-    direct.type = "button";
-    direct.title = action.label;
-    if (action.icon) appendIconLabel(direct, action.icon, action.label);
-    else direct.textContent = action.label;
-    direct.addEventListener("click", () => {
-      const current = state.options.actions?.find((candidate) => candidate.id === action.id);
-      if (current) void current.run();
-    });
-    actions.appendChild(direct);
-  } else if (menuActions.length > 1) {
-    const more = makeEl("button", "al-workspace-more");
-    more.type = "button";
-    const moreLabel = uiText("detail.more");
-    more.title = moreLabel;
-    more.setAttribute("aria-label", moreLabel);
-    setAnimeListIcon(more, "ellipsis");
-    more.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const menu = new Menu();
-      for (const action of menuActions) {
-        menu.addItem((item) => {
-          item.setTitle(action.label);
-          if (action.icon) item.setIcon(action.icon);
-          item.onClick(() => {
-            const current = state.options.actions?.find((candidate) => candidate.id === action.id);
-            if (current) void current.run();
-          });
-        });
-      }
-      menu.showAtMouseEvent(event);
-    });
-    actions.appendChild(more);
-  }
+  const directActions = menuActions.slice(0, MAX_DIRECT_WORKSPACE_ACTIONS);
+  const overflowActions = menuActions.slice(MAX_DIRECT_WORKSPACE_ACTIONS);
+  for (const action of directActions) appendDirectAction(actions, action, state);
+  appendOverflowActions(actions, overflowActions, state);
   header.append(brand, actions);
 
   const navRow = makeEl("div", "al-workspace-nav-row");
-  const nav = makeEl("nav", "al-workspace-nav");
+  const nav = isolateHorizontalSwipeSurface(makeEl("nav", "al-workspace-nav"));
   nav.setAttribute("aria-label", "Primary navigation");
   for (const page of pages) {
     const button = makeEl("button", `al-workspace-tab${page.id === activePage.id ? " is-active" : ""}`);

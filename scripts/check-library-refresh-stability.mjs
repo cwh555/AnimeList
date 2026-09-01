@@ -155,6 +155,14 @@ try {
   await frames();
   details.libraryBrokenCoverFallsBack=!!app.querySelector('.al-card .al-cover-missing') && app.querySelectorAll('.al-card img.al-cover').length===18;
   const stableCover=app.querySelector('.al-card[data-path="AnimeList/work-2.md"] img.al-cover');
+  if (stableCover && (!stableCover.complete || stableCover.naturalWidth <= 0)) {
+    await new Promise((resolve) => {
+      stableCover.addEventListener('load', resolve, { once:true });
+      setTimeout(resolve, 500);
+    });
+  }
+  details.stableCoverInitiallyRevealed=!!stableCover && stableCover.complete && stableCover.naturalWidth>0
+    && stableCover.classList.contains('is-loaded');
   let stableCoverSrcMutations=0;
   const stableCoverObserver=new MutationObserver((records)=>{
     stableCoverSrcMutations+=records.filter((record)=>record.type==='attributes' && (record.attributeName==='src' || record.attributeName==='srcset')).length;
@@ -187,7 +195,10 @@ try {
   details.noLiveDomGrowth=maxDomDelta<=4;
   details.maxScrollDrift=maxScrollDrift;
   stableCoverObserver.disconnect();
-  details.stableCoverIdentitySurvivesRefresh=app.querySelector('.al-card[data-path="AnimeList/work-2.md"] img.al-cover')===stableCover;
+  const stableCoverAfterRefresh=app.querySelector('.al-card[data-path="AnimeList/work-2.md"] img.al-cover');
+  details.stableCoverIdentitySurvivesRefresh=stableCoverAfterRefresh===stableCover;
+  details.stableCoverRevealSurvivesRefresh=stableCoverAfterRefresh===stableCover
+    && stableCoverAfterRefresh?.classList.contains('is-loaded')===true;
   details.sameCoverSourceIsNotReassigned=stableCoverSrcMutations===0;
   details.maxDomDelta=maxDomDelta;
 

@@ -9,6 +9,7 @@ import { renderTimelineWorkspace } from "./timeline-workspace-renderer";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { renderAnimeListWorkspaceShell } from "./workspace-shell";
 import { captureScrollPosition } from "./viewport-anchor";
+import { installCoverImageLoading } from "./cover-image-loading";
 
 export const ANIMELIST_VIEW_TYPE = "animelist-library";
 const DISPLAY_NAME = "AnimeList";
@@ -82,6 +83,11 @@ export class AnimeListView extends ItemView {
           addItem: (mediaType) => this.host.openAddModal(mediaType),
         });
         let layoutControl: LibraryLayoutControl | null = null;
+        const coverLoading = installCoverImageLoading(container, {
+          selector: "img.al-cover",
+          revealClass: "is-loaded",
+        });
+        context.signal.addEventListener("abort", () => coverLoading.disconnect(), { once: true });
         this.host.renderLibrary(container, items, {
           presentation: "workspace",
           initialState: this.host.settings.uiState,
@@ -94,6 +100,7 @@ export class AnimeListView extends ItemView {
           addItem: (mediaType) => this.host.openAddModal(mediaType),
           editItem: (path) => this.host.openEditModal(path),
           toggleFavorite: (path, next) => this.host.setFavorite(path, next),
+          afterRender: () => coverLoading.sync(),
         });
         layoutControl = installLibraryLayoutControl(container, {
           initialState: this.host.settings.uiState,

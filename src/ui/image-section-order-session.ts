@@ -56,6 +56,8 @@ interface NoteState {
   flushView: Window | null;
   flushingCanonical: boolean;
   sectionSerial: number;
+  renamedJournalPaths: Set<string>;
+  cleaningRenamedJournals: boolean;
 }
 
 const ABSENCE_FLUSH_DELAY_MS = 600;
@@ -106,6 +108,7 @@ function matchingSection(
 
 export class ImageSectionOrderSession {
   private readonly notes = new Map<string, NoteState>();
+  private readonly pathAliases = new Map<string, string>();
   private readonly participantSections = new WeakMap<ImageSectionOrderParticipant, string>();
   private disposed = false;
 
@@ -131,6 +134,39 @@ export class ImageSectionOrderSession {
         waiter.resolve({ status: "failed", error: new Error("Image section order session disposed") });
       }
     }
+    this.pathAliases.clear();
+  }
+
+  renameSource(oldPath: string, newPath: string): void {
+    const previousPath = this.resolveSourcePath(oldPath);
+    const nextPath = this.resolveSourcePath(newPath);
+    if (!previousPath || !nextPath || previousPath === nextPath) return;
+    const state = this.notes.get(previousPath);
+    if (!state) return;
+
+    const destination = this.notes.get(nextPath);
+    if (destination && destination !== state) {
+      console.warn("AnimeList image order state already exists at renamed note path; keeping the active source state", {
+        oldPath: previousPath,
+        newPath: nextPath,
+      });
+      this.notes.delete(nextPath);
+    }
+
+    this.notes.delete(previousPath);
+    this.notes.set(nextPath, state);
+    this.pathAliases.set(previousPath, nextPath);
+    state.sourcePath = nextPath;
+    state.renamedJournalPaths.add(previousPath);
+
+    if (state.record) {
+      state.record.sourcePath = nextPath;
+      state.record.updatedAt = Date.now();
+      state.version += 1;
+      this.schedulePersist(state);
+    } else {
+      this.cleanupRenamedJournals(state);
+    }
   }
 
   register(participant: ImageSectionOrderParticipant): readonly string[] {
@@ -153,7 +189,7 @@ export class ImageSectionOrderSession {
   }
 
   unregister(participant: ImageSectionOrderParticipant): void {
-    const state = this.notes.get(participant.sourcePath);
+    const state = this.stateForExistingPath(participant.sourcePath);
     if (!state) return;
     state.participants.delete(participant);
     if (state.participants.size > 0 || !state.record?.sections.length || this.disposed) return;
@@ -161,13 +197,13 @@ export class ImageSectionOrderSession {
     const view = participant.containerEl.ownerDocument.defaultView;
     state.flushView = view;
     if (!view) {
-      void this.flushSource(participant.sourcePath);
+      void this.flushSource(state.sourcePath);
       return;
     }
     state.flushTimer = view.setTimeout(() => {
       state.flushTimer = null;
       state.flushView = null;
-      void this.flushSource(participant.sourcePath);
+      void this.flushSource(state.sourcePath);
     }, ABSENCE_FLUSH_DELAY_MS);
   }
 
@@ -186,7 +222,7 @@ export class ImageSectionOrderSession {
   }
 
   acceptCanonicalMutation(participant: ImageSectionOrderParticipant): void {
-    const state = this.notes.get(participant.sourcePath);
+    const state = this.stateForExistingPath(participant.sourcePath);
     if (!state?.record) return;
     const id = this.participantSections.get(participant);
     const section = id ? state.record.sections.find((entry) => entry.id === id) ?? null : matchingSection(
@@ -198,12 +234,13 @@ export class ImageSectionOrderSession {
     this.removeSection(state, section.id);
     this.participantSections.delete(participant);
     state.durable = cloneRecord(state.record);
+    if (state.durable) state.durable.sourcePath = state.sourcePath;
     state.persistedVersion = state.version;
     this.persistCanonicalCleanup(state);
   }
 
   async flushSource(sourcePath: string): Promise<void> {
-    const state = this.notes.get(sourcePath);
+    const state = this.stateForExistingPath(sourcePath);
     if (!state || state.flushingCanonical || state.participants.size > 0 || !state.record?.sections.length) return;
     await this.persistLatest(state);
     if (state.participants.size > 0 || !state.durable?.sections.length) return;
@@ -214,12 +251,13 @@ export class ImageSectionOrderSession {
         expectedPaths: [...section.expectedPaths],
         paths: [...section.paths],
       }));
-      await this.committer.commitPendingSectionOrders(sourcePath, pending);
-      await this.journal.remove(sourcePath);
+      await this.committer.commitPendingSectionOrders(state.sourcePath, pending);
+      await this.journal.remove(state.sourcePath);
       state.record = null;
       state.durable = null;
       state.version += 1;
       state.persistedVersion = state.version;
+      this.cleanupRenamedJournals(state);
     } catch (error) {
       console.warn("AnimeList image order flush failed; pending order kept for retry", error);
     } finally {
@@ -242,14 +280,31 @@ export class ImageSectionOrderSession {
       flushView: null,
       flushingCanonical: false,
       sectionSerial: record?.sections.length ?? 0,
+      renamedJournalPaths: new Set(),
+      cleaningRenamedJournals: false,
     };
   }
 
+  private resolveSourcePath(sourcePath: string): string {
+    let current = sourcePath;
+    const visited = new Set<string>();
+    while (this.pathAliases.has(current) && !visited.has(current)) {
+      visited.add(current);
+      current = this.pathAliases.get(current) ?? current;
+    }
+    return current;
+  }
+
+  private stateForExistingPath(sourcePath: string): NoteState | undefined {
+    return this.notes.get(this.resolveSourcePath(sourcePath));
+  }
+
   private stateFor(sourcePath: string): NoteState {
-    let state = this.notes.get(sourcePath);
+    const resolvedPath = this.resolveSourcePath(sourcePath);
+    let state = this.notes.get(resolvedPath);
     if (!state) {
-      state = this.createState(sourcePath, null);
-      this.notes.set(sourcePath, state);
+      state = this.createState(resolvedPath, null);
+      this.notes.set(resolvedPath, state);
     }
     return state;
   }
@@ -286,7 +341,10 @@ export class ImageSectionOrderSession {
       this.removeSection(state, section.id);
       this.participantSections.delete(participant);
     }
-    if (state.record) state.record.updatedAt = Date.now();
+    if (state.record) {
+      state.record.sourcePath = state.sourcePath;
+      state.record.updatedAt = Date.now();
+    }
   }
 
   private removeSection(state: NoteState, id: string): void {
@@ -306,10 +364,14 @@ export class ImageSectionOrderSession {
 
   private async persistLatest(state: NoteState): Promise<void> {
     if (state.writing) return;
-    if (state.persistedVersion >= state.version) return;
+    if (state.persistedVersion >= state.version) {
+      this.cleanupRenamedJournals(state);
+      return;
+    }
     state.writing = true;
     const snapshotVersion = state.version;
     const snapshot = cloneRecord(state.record);
+    if (snapshot) snapshot.sourcePath = state.sourcePath;
     try {
       if (snapshot?.sections.length) await this.journal.write(snapshot);
       else await this.journal.remove(state.sourcePath);
@@ -320,12 +382,14 @@ export class ImageSectionOrderSession {
       for (const waiter of completed) waiter.resolve({ status: "moved" });
     } catch (error) {
       state.record = cloneRecord(state.durable);
+      if (state.record) state.record.sourcePath = state.sourcePath;
       state.version = state.persistedVersion;
       this.rollbackParticipants(state);
       for (const waiter of state.waiters.splice(0)) waiter.resolve({ status: "failed", error });
     } finally {
       state.writing = false;
       if (state.persistedVersion < state.version) this.schedulePersist(state);
+      else this.cleanupRenamedJournals(state);
     }
   }
 
@@ -340,8 +404,28 @@ export class ImageSectionOrderSession {
 
   private persistCanonicalCleanup(state: NoteState): void {
     const snapshot = cloneRecord(state.record);
-    void (snapshot?.sections.length ? this.journal.write(snapshot) : this.journal.remove(state.sourcePath)).catch((error) => {
+    if (snapshot) snapshot.sourcePath = state.sourcePath;
+    void (snapshot?.sections.length ? this.journal.write(snapshot) : this.journal.remove(state.sourcePath)).then(() => {
+      this.cleanupRenamedJournals(state);
+    }).catch((error) => {
       console.warn("AnimeList image order journal cleanup failed", error);
+    });
+  }
+
+  private cleanupRenamedJournals(state: NoteState): void {
+    if (state.cleaningRenamedJournals || state.writing || state.writeScheduled || state.persistedVersion < state.version) return;
+    const paths = [...state.renamedJournalPaths].filter((path) => path !== state.sourcePath);
+    if (!paths.length) return;
+    state.cleaningRenamedJournals = true;
+    void Promise.all(paths.map(async (path) => {
+      try {
+        await this.journal.remove(path);
+        state.renamedJournalPaths.delete(path);
+      } catch (error) {
+        console.warn("AnimeList could not retire an old image order journal after note rename", error);
+      }
+    })).finally(() => {
+      state.cleaningRenamedJournals = false;
     });
   }
 }

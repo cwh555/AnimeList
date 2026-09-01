@@ -19,10 +19,6 @@ import type { LibraryRenderAdapters, LibraryRenderContext } from "../../ui/libra
 import type { MediaFormContext } from "../../ui/media-form-contracts";
 import { animateLayoutChange } from "../../ui/layout-motion";
 
-interface MediaItemWithMasterpiece extends MediaItem {
-  masterpieceLabels?: string[];
-}
-
 const mediaDecorationCache = new MasterpieceDecorationCache();
 
 function modeOf(plugin: AnimeListFeatureHost): SpecialLabelMode {
@@ -30,7 +26,7 @@ function modeOf(plugin: AnimeListFeatureHost): SpecialLabelMode {
 }
 
 function labelsOf(item: MediaItem): string[] {
-  return normalizeMasterpieceLabels((item as MediaItemWithMasterpiece).masterpieceLabels);
+  return normalizeMasterpieceLabels(item.masterpieceLabels);
 }
 
 function labelsFromFrontmatter(frontmatter: Record<string, unknown> | undefined): string[] {
@@ -264,7 +260,7 @@ export const masterpieceFeature = defineFeature<AnimeListFeatureHost>({
         const frontmatter = file instanceof TFile
           ? plugin.app.metadataCache.getFileCache(file)?.frontmatter
           : undefined;
-        return { ...item, masterpieceLabels: labelsFromFrontmatter(frontmatter) } as MediaItem;
+        return { ...item, masterpieceLabels: labelsFromFrontmatter(frontmatter) };
       });
     },
   }, {

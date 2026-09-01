@@ -11,10 +11,12 @@ import { ConfirmDeleteModal } from "./media-modals";
 import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel, setAnimeListIcon } from "./ui-helpers";
 import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
+import { installCoverImageLoading, type CoverImageLoadingController } from "./cover-image-loading";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
   private viewMode: LibraryViewMode;
+  private coverLoading: CoverImageLoadingController | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -56,6 +58,8 @@ export class AnimeListRenderChild extends MarkdownRenderChild {
 
   onunload(): void {
     if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
+    this.coverLoading?.disconnect();
+    this.coverLoading = null;
   }
 
   collectItems(): MediaItem[] {
@@ -63,6 +67,12 @@ export class AnimeListRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
+    if (!this.coverLoading) {
+      this.coverLoading = installCoverImageLoading(this.containerEl, {
+        selector: "img.al-cover",
+        revealClass: "is-loaded",
+      });
+    }
     this.plugin.renderLibrary(this.containerEl, this.collectItems(), {
       openFile: (path: string) => void this.plugin.app.workspace.openLinkText(path, this.sourcePath),
       addItem: (initialType: MediaType) => this.plugin.openAddModal(initialType),
@@ -74,6 +84,7 @@ export class AnimeListRenderChild extends MarkdownRenderChild {
         this.viewMode = view;
         this.plugin.libraryViewModes.set(this.sourcePath, view);
       },
+      afterRender: () => this.coverLoading?.sync(),
     });
   }
 }

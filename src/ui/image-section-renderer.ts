@@ -9,10 +9,10 @@ import {
 } from "../domain/image-section";
 import {
   DEFAULT_IMAGE_SECTION_COLUMNS,
-  imageSectionColumnBuckets,
   normalizeImageSectionColumns,
   parseImageSectionColumns,
 } from "../domain/image-section-layout";
+import { imageSectionMasonryPlan } from "../domain/image-section-masonry";
 import type { ImageSectionDropPlacement, ImageSectionStateUpdate } from "../domain/image-section-order";
 import { imageSectionText } from "../features/image-sections/text";
 import { AddImageSectionModal, DeleteImageSectionModal } from "./image-section-modal";
@@ -74,6 +74,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
   private readonly imageNodeCache = new Map<string, { signature: string; image: HTMLImageElement }>();
   private galleryViewport: HTMLElement | null = null;
   private layoutPreservation: { preferredColumns: number; preserveUntil: number } | null = null;
+  private galleryDragActive = false;
+  private pendingGalleryGeometryRelayout = false;
   private mounted = false;
   private readonly lifecycleEvents = new AbortController();
   private readonly moveParticipant: ImageSectionMoveParticipant;
@@ -111,6 +113,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       signal: this.lifecycleEvents.signal,
       canStart: (item, event) => this.canStartImagePointerDrag(item, event),
       closeMenus: () => this.closeMenus(),
+      setDragging: (active) => this.setGalleryDragActive(active),
       drop: (sourceParticipant, path, targetPath, placement) => {
         void this.handleInternalImageDrop(sourceParticipant, path, targetPath, placement);
       },
@@ -191,6 +194,8 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout = null;
     this.galleryViewport = null;
     this.galleryPaths = [];
+    this.galleryDragActive = false;
+    this.pendingGalleryGeometryRelayout = false;
     this.imageElements.clear();
     this.imageNodeCache.clear();
     if (imageSectionRenderers.get(this.containerEl) === this) imageSectionRenderers.delete(this.containerEl);
@@ -432,6 +437,32 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout();
   }
 
+  private setGalleryDragActive(active: boolean): void {
+    this.galleryDragActive = active;
+    if (active || !this.pendingGalleryGeometryRelayout) return;
+    this.pendingGalleryGeometryRelayout = false;
+    this.galleryRelayout?.();
+  }
+
+  private requestGalleryGeometryRelayout(): void {
+    if (!this.ownsContainer() || !this.galleryRelayout) return;
+    if (this.galleryDragActive) {
+      this.pendingGalleryGeometryRelayout = true;
+      return;
+    }
+    this.galleryRelayout();
+  }
+
+  private estimatedImageAspectRatio(path: string): number {
+    const item = this.imageElements.get(path);
+    const image = item?.querySelector<HTMLImageElement>("img");
+    if (image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+      return image.naturalWidth / image.naturalHeight;
+    }
+    const rect = item?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) return rect.width / rect.height;
+    return 1;
+  }
 
   private async handleInternalImageDrop(
     source: ImageSectionMoveParticipant,
@@ -482,8 +513,12 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       if (!image) {
         image = makeEl("img");
         const created = image;
+        created.addEventListener("load", () => this.requestGalleryGeometryRelayout());
         bindImageFallback(created, imageSectionMissingNode, {
-          onError: () => this.imageNodeCache.delete(path),
+          onError: () => {
+            this.imageNodeCache.delete(path);
+            this.requestGalleryGeometryRelayout();
+          },
         });
         this.imageNodeCache.set(path, { signature, image });
       }
@@ -593,20 +628,46 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
           columnElements = Array.from({ length: columns }, () => makeEl("div", "al-image-masonry-column"));
           gallery.replaceChildren(...columnElements);
         }
-        const buckets = imageSectionColumnBuckets(this.galleryPaths, columns);
-        buckets.forEach((bucket, index) => {
-          const column = columnElements[index];
-          for (const path of bucket) {
-            const item = this.imageElements.get(path);
-            if (item) column.appendChild(item);
-          }
-        });
+        const style = window.getComputedStyle(gallery);
+        const gap = Number.parseFloat(style.columnGap || style.gap) || 0;
+        const galleryWidth = gallery.getBoundingClientRect().width;
+        const availableWidth = Math.max(1, galleryWidth - gap * Math.max(0, columns - 1));
+        const columnWidth = availableWidth / columns;
+        const plan = imageSectionMasonryPlan(
+          this.galleryPaths,
+          columns,
+          columnWidth,
+          (path) => this.estimatedImageAspectRatio(path),
+          gap,
+        );
+        gallery.style.setProperty("height", `${plan.height}px`);
+        gallery.style.setProperty("position", plan.placements.length ? "relative" : "static");
+        for (const column of columnElements) {
+          column.style.setProperty("display", columns > 0 ? "contents" : "flex");
+        }
+        for (const placement of plan.placements) {
+          const item = this.imageElements.get(placement.item);
+          const column = columnElements[placement.column];
+          if (!item || !column) continue;
+          item.dataset.masonryColumn = String(placement.column);
+          item.dataset.masonrySpan = String(placement.span);
+          item.style.setProperty("position", placement.span > 0 ? "absolute" : "relative");
+          item.style.setProperty("box-sizing", placement.width > 0 ? "border-box" : "content-box");
+          item.style.setProperty("left", `${placement.left}px`);
+          item.style.setProperty("top", `${placement.top}px`);
+          item.style.setProperty("width", `${placement.width}px`);
+          item.style.setProperty("height", `${placement.height}px`);
+          const image = item.querySelector<HTMLImageElement>("img");
+          if (image) image.style.setProperty("height", placement.height > 0 ? "100%" : "auto");
+          column.appendChild(item);
+        }
       });
       window.requestAnimationFrame(updateToggle);
     };
+    viewport.appendChild(gallery);
+    this.containerEl.appendChild(viewport);
     this.galleryRelayout = relayout;
     relayout();
-    viewport.appendChild(gallery);
 
     const toggle = makeEl("button", "al-image-expand-button");
     toggle.type = "button";
@@ -647,7 +708,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
       if (!image.complete) image.addEventListener("load", updateToggle, { once: true });
     }
     window.requestAnimationFrame(updateToggle);
-    this.containerEl.append(viewport, toggle);
+    this.containerEl.appendChild(toggle);
   }
 
   private bindDropAndPaste(): void {
@@ -812,6 +873,7 @@ export class ImageSectionRenderChild extends MarkdownRenderChild {
     this.galleryRelayout = null;
     this.galleryViewport = null;
     this.galleryPaths = [];
+    this.pendingGalleryGeometryRelayout = false;
     this.imageElements.clear();
     this.containerEl.replaceChildren();
     this.containerEl.addClass("animelist-image-section");

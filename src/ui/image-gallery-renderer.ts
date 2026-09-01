@@ -14,6 +14,7 @@ import { uiText } from "../ui-text";
 import { makeEl, setAnimeListIcon } from "./ui-helpers";
 import { animateLayoutChange, transitionSurface } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 export interface ImageGalleryUiState {
   mode: "all" | "works";
@@ -299,7 +300,7 @@ export function renderImageGallery(
   const summary = makeEl("div", "al-gallery-page-summary");
   header.append(copy, summary);
 
-  const modeTabs = makeEl("nav", "al-gallery-mode-tabs");
+  const modeTabs = isolateHorizontalSwipeSurface(makeEl("nav", "al-gallery-mode-tabs"));
   modeTabs.setAttribute("aria-label", imageGalleryText("title"));
   const allMode = makeEl("button", "al-gallery-mode-tab");
   const allModeIcon = makeEl("span", "al-gallery-mode-icon");
@@ -313,7 +314,7 @@ export function renderImageGallery(
   modeTabs.append(allMode, worksMode);
 
   const filters = makeEl("div", "al-gallery-filters");
-  const typeFilters = makeEl("div", "al-gallery-type-filters");
+  const typeFilters = isolateHorizontalSwipeSurface(makeEl("div", "al-gallery-type-filters"));
   const typeButtons = new Map<ImageGalleryMediaFilter, HTMLButtonElement>();
   (["all", "anime", "manga", "novel"] as const).forEach((type) => {
     const button = makeEl("button", "al-gallery-type-filter", typeLabel(type));
@@ -392,7 +393,7 @@ export function renderImageGallery(
       detailHead.append(back, detailCopy, source);
       content.appendChild(detailHead);
 
-      const sessions = makeEl("div", "al-gallery-session-filters");
+      const sessions = isolateHorizontalSwipeSurface(makeEl("div", "al-gallery-session-filters"));
       const allSessions = makeEl("button", `al-gallery-session-filter${state.sessionIndex === null ? " is-active" : ""}`, imageGalleryText("allSessions"));
       allSessions.type = "button";
       allSessions.addEventListener("click", () => {

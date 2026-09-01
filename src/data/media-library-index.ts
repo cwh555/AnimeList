@@ -45,8 +45,30 @@ export class MediaLibraryIndex {
   }
 
   rename(oldPath: string, file: TFile | null, roots: string[]): void {
-    this.remove(oldPath);
-    if (file) this.update(file, roots);
+    if (!this.initialized) return;
+    const key = rootsKey(roots);
+    if (this.activeRootsKey !== key) {
+      this.invalidate();
+      return;
+    }
+
+    const previous = this.items.get(oldPath);
+    this.items.delete(oldPath);
+    if (!file || !roots.some((root) => pathBelongsToLibraryRoot(file.path, root))) return;
+
+    if (previous) {
+      // A vault rename changes identity-by-path, not the note's media data. Keep
+      // the already verified item alive immediately instead of re-reading the
+      // metadata cache during the rename callback: Obsidian may move the TFile
+      // before its metadata cache entry is available at the new path.
+      this.items.set(file.path, { ...previous, filePath: file.path });
+      return;
+    }
+
+    // The renamed file was not part of the initialized index (for example a
+    // note moved into a configured root). Rebuild from the canonical vault on
+    // the next snapshot rather than treating rename-event metadata as final.
+    this.invalidate();
   }
 
   invalidate(): void {

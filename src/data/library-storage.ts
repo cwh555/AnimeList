@@ -6,9 +6,9 @@ import {
 } from "../app/builtin-templates";
 import type { AnimeListSettings } from "../domain/settings-types";
 import type { MediaType, TemplateOption } from "../domain/media-types";
-import { sanitizePathPart } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
 import { getScopedMarkdownFiles } from "./vault-scope";
+import { uniqueVaultFilePath, type UniqueVaultFilePathOptions } from "./vault-file-path";
 
 export type SettingsProvider = () => AnimeListSettings;
 
@@ -121,19 +121,12 @@ export class LibraryStorage {
     return file instanceof TFile ? this.app.vault.cachedRead(file) : "";
   }
 
-  async uniqueFilePath(folder: string, baseName: string, extension: string): Promise<string> {
-    const cleanName = sanitizePathPart(baseName);
-    const candidatePath = (suffix = "") => normalizePath(
-      folder
-        ? `${folder}/${cleanName}${suffix}.${extension}`
-        : `${cleanName}${suffix}.${extension}`,
-    );
-    let candidate = candidatePath();
-    let index = 2;
-    while (this.app.vault.getAbstractFileByPath(candidate)) {
-      candidate = candidatePath(` (${index})`);
-      index += 1;
-    }
-    return candidate;
+  async uniqueFilePath(
+    folder: string,
+    baseName: string,
+    extension: string,
+    options: UniqueVaultFilePathOptions = {},
+  ): Promise<string> {
+    return uniqueVaultFilePath(this.app.vault, folder, baseName, extension, options);
   }
 }

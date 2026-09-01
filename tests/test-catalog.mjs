@@ -29,10 +29,14 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/media-asset-cleanup.test.ts", kind: "test", suite: "unit", features: ["covers", "image-sections", "moments", "markdown"] },
+  { path: "tests/vault-trash.test.ts", kind: "test", suite: "unit", features: ["covers", "image-sections"] },
+  { path: "tests/media-form-lifecycle.test.ts", kind: "test", suite: "unit", features: ["serial-covers", "settings"] },
   { path: "tests/image-gallery.test.ts", kind: "test", suite: "unit", features: ["image-gallery", "image-sections", "markdown"] },
   { path: "tests/contracts/image-gallery-service.test.ts", kind: "test", suite: "contract", features: ["image-gallery", "image-sections", "markdown", "library"] },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
+  { path: "tests/image-section-drag-hit-testing.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-section-order-journal.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-context-menu.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
   { path: "tests/image-clipboard.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },
@@ -74,6 +78,7 @@ export const TEST_TARGETS = [
   { path: "tests/library-progressive-render.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/library-layout.test.ts", kind: "test", suite: "unit", features: ["library", "settings"] },
   { path: "tests/workspace-responsive.test.ts", kind: "test", suite: "unit", features: ["library", "timeline", "score-dashboard", "image-gallery", "styles"] },
+  { path: "tests/mobile-swipe-isolation.test.ts", kind: "test", suite: "unit", features: ["library", "timeline", "score-dashboard", "image-gallery", "moments", "settings", "styles"] },
   { path: "tests/library-filters.test.ts", kind: "test", suite: "unit", features: ["library"] },
   { path: "tests/studio-identity.test.ts", kind: "test", suite: "unit", features: ["library", "search"] },
   { path: "tests/user-tag-catalog.test.ts", kind: "test", suite: "unit", features: ["tags"] },
@@ -101,6 +106,7 @@ export const TEST_TARGETS = [
 
   { path: "tests/contracts/media-note-compatibility.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress"] },
   { path: "tests/contracts/media-note-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "library", "covers"] },
+  { path: "tests/contracts/media-asset-garbage-collector.test.ts", kind: "test", suite: "contract", features: ["covers", "image-sections", "moments", "markdown"] },
   { path: "tests/contracts/media-update-service.test.ts", kind: "test", suite: "contract", features: ["markdown", "progress", "library"] },
   { path: "tests/contracts/user-tag-library-service.test.ts", kind: "test", suite: "contract", features: ["tags", "settings", "markdown"] },
   { path: "tests/contracts/external-media-service.test.ts", kind: "test", suite: "contract", features: ["search"] },

@@ -1,6 +1,7 @@
 import type { MediaItem } from "../types";
 import { compareLibraryCompletion } from "../domain/library-sort";
 import { isUnknownCompletionDate } from "../domain/completion-date";
+import { compareMediaTitles } from "../domain/media-title-sort";
 import { normalizeGenres } from "../domain/media-metadata";
 import { collectLibraryFilterOptions, libraryFilterCount, libraryItemMatchesFilters, normalizeLibraryFilters, reconcileLibraryFilters, type LibraryFilters } from "../domain/library-filters";
 import { mediaStatusMatches, normalizeMediaStatus, normalizeStatusFilter } from "../domain/media-status";
@@ -11,6 +12,7 @@ import { LIBRARY_CARD_BATCH_SIZE, ProgressiveRenderWindow, type LibraryRenderBat
 import { MEDIA_UI_LABELS, appendIconLabel, asArray, itemStatusLabel, makeEl, mediaReleaseStatusLabel, mediaUnitLabel, numeric, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { animateLayoutChange } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 export function libraryCoverSizes(view: LibraryViewMode): string {
   if (view === "list") return "116px";
@@ -65,6 +67,16 @@ export const AnimeListUI: LibraryRenderer = (() => {
       { progress: current, unit },
     ).trim();
     return uiText("library.notStarted");
+  };
+
+  const footerTimeText = (item: MediaItem): string => {
+    if (item.status !== "completed") return item.updatedLabel || "";
+    const completedAt = item.completedAt.trim();
+    return uiText("library.completedAt", {
+      date: completedAt && !isUnknownCompletionDate(completedAt)
+        ? completedAt
+        : uiText("date.unknown"),
+    });
   };
 
   const statusMatch = (item: MediaItem, filter: string, adapters: LibraryRenderAdapters): boolean => {
@@ -183,7 +195,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       shell.appendChild(summary);
     }
 
-    const nav = makeEl("nav", "al-type-tabs");
+    const nav = isolateHorizontalSwipeSurface(makeEl("nav", "al-type-tabs"));
     const typeButtons = new Map<LibraryMediaFilter, HTMLButtonElement>();
     ([
       ["all", uiText("library.tabAll")],
@@ -290,7 +302,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
     toolbar.append(searchWrap, filterButton, sortWrap, views);
     shell.appendChild(toolbar);
 
-    const statusBar = makeEl("div", "al-status-bar");
+    const statusBar = isolateHorizontalSwipeSurface(makeEl("div", "al-status-bar"));
     const statusButtons = new Map<string, HTMLButtonElement>();
     const renderStatusButtons = (): void => {
       statusButtons.clear();
@@ -456,7 +468,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
       body.appendChild(progress);
       const footer = makeEl("div", "al-card-footer");
       footer.append(
-        makeEl("span", "al-updated", item.updatedLabel || ""),
+        makeEl("span", "al-updated", footerTimeText(item)),
         makeEl("span", "al-score", item.score == null ? uiText("library.unrated") : `★ ${item.score.toFixed(1)}`),
       );
       body.appendChild(footer);
@@ -502,7 +514,7 @@ export const AnimeListUI: LibraryRenderer = (() => {
         "completed-asc": (a, b) => compareLibraryCompletion(a, b, "asc"),
         "year-desc": (a, b) => numeric(b.year) - numeric(a.year),
         "year-asc": (a, b) => numeric(a.year) - numeric(b.year),
-        "title-asc": (a, b) => a.title.localeCompare(b.title, "zh-Hant"),
+        "title-asc": (a, b) => compareMediaTitles(a.title, b.title),
         "progress-desc": (a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1),
       };
       filtered.sort(sorters[state.sort] || sorters["completed-desc"]);

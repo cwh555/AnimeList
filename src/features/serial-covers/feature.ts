@@ -35,6 +35,22 @@ interface EditorContext extends SerialCoverLookupContext {
   autoQueue: SerialCoverLoadQueue;
   autoStatus: Map<string, AutomaticCoverStatus>;
   rowRenders: Map<HTMLInputElement, () => void>;
+  leasedPaths: Set<string>;
+  disposed: boolean;
+}
+
+async function downloadEditorCover(
+  context: EditorContext,
+  candidate: RankedSerialCoverCandidate,
+  manual: boolean,
+): Promise<StoredSerialCover> {
+  const cover = await downloadSelectedSerialCover(context.host, context, candidate, manual);
+  if (context.disposed) {
+    context.host.releaseDownloadedCover(cover.cover);
+    throw new Error("Serial cover editor is closed");
+  }
+  context.leasedPaths.add(cover.cover);
+  return cover;
 }
 
 function storedCover(entry: NovelVolumeEntry): StoredSerialCover | null {
@@ -83,7 +99,7 @@ class CoverSelector extends Modal {
   private query: string;
 
   constructor(
-    private readonly host: AnimeListFeatureHost,
+    host: AnimeListFeatureHost,
     private readonly context: EditorContext,
     private readonly label: string,
     candidates: RankedSerialCoverCandidate[],
@@ -135,7 +151,7 @@ class CoverSelector extends Modal {
       const operation = directlyApplySerialCover(
         this.directApply,
         candidate,
-        (selected) => downloadSelectedSerialCover(this.host, this.context, selected, true),
+        (selected) => downloadEditorCover(this.context, selected, true),
         this.applyCover,
         () => this.close(),
       );
@@ -193,14 +209,22 @@ function scheduleAutomaticCover(context: EditorContext, label: string): void {
     refreshRows(context);
     return loadConfidentSerialCover(context.host, context, label);
   }).then((cover) => {
+    if (context.disposed) {
+      if (cover?.cover) context.host.releaseDownloadedCover(cover.cover);
+      return;
+    }
     if (cover) {
+      context.leasedPaths.add(cover.cover);
       context.covers.set(label, cover);
       context.autoStatus.delete(label);
     } else context.autoStatus.set(label, "not-found");
   }).catch((error: unknown) => {
+    if (context.disposed) return;
     console.error(`AnimeList serial cover automatic lookup failed for ${label}`, error);
     context.autoStatus.set(label, "failed");
-  }).finally(() => refreshRows(context));
+  }).finally(() => {
+    if (!context.disposed) refreshRows(context);
+  });
 }
 
 function configureRow(context: EditorContext, row: HTMLElement): void {
@@ -319,13 +343,23 @@ function configureSerialEditor(form: MediaFormContext<AnimeListFeatureHost>): vo
     autoQueue: new SerialCoverLoadQueue(),
     autoStatus: new Map(),
     rowRenders: new Map(),
+    leasedPaths: new Set(),
+    disposed: false,
   };
   for (const entry of reading.entries) {
     const stored = storedCover(entry);
     if (stored) context.covers.set(entry.label, stored);
   }
   form.state.set(SERIAL_COVER_EDITOR_STATE_KEY, context);
-  reading.listeners.add(() => configureRows(context));
+  const refresh = (): void => configureRows(context);
+  reading.listeners.add(refresh);
+  form.onDispose(() => {
+    context.disposed = true;
+    reading.listeners.delete(refresh);
+    context.rowRenders.clear();
+    for (const path of context.leasedPaths) context.host.releaseDownloadedCover(path);
+    context.leasedPaths.clear();
+  });
   configureRows(context);
 }
 

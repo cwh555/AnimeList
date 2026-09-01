@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatRating, normalizeRating } from "../src/domain/rating";
+import { formatRating, normalizeRating, stepRating } from "../src/domain/rating";
+import { optionalScore } from "../src/domain/value-normalization";
 
 describe("rating domain", () => {
   it("keeps ratings that already use half-point increments", () => {
@@ -30,8 +31,30 @@ describe("rating domain", () => {
     });
   });
 
-  it("leaves empty, invalid, and out-of-range values for existing validation", () => {
+  it("steps ratings explicitly in half-point increments and clamps the range", () => {
+    assert.equal(stepRating("9", 1), 9.5);
+    assert.equal(stepRating("9", -1), 8.5);
+    assert.equal(stepRating("7.2", 1), 7.5);
+    assert.equal(stepRating(10, 1), 10);
+    assert.equal(stepRating(0, -1), 0);
+    assert.equal(stepRating("", 1), null);
+    assert.equal(stepRating("   ", 1), null);
+    assert.equal(stepRating("invalid", -1), null);
+  });
+
+  it("keeps blank ratings empty while preserving an explicit zero", () => {
     assert.deepEqual(normalizeRating(""), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating("   "), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating("\t\n"), { kind: "empty", value: null, changed: false });
+    assert.deepEqual(normalizeRating(" 0 "), {
+      kind: "valid", value: 0, changed: false, original: 0,
+    });
+    assert.equal(optionalScore(""), null);
+    assert.equal(optionalScore("   "), null);
+    assert.equal(optionalScore(" 0 "), 0);
+  });
+
+  it("leaves invalid and out-of-range values for existing validation", () => {
     assert.deepEqual(normalizeRating("not-a-number"), { kind: "invalid", value: null, changed: false });
     assert.deepEqual(normalizeRating(-0.1), { kind: "out-of-range", value: -0.1, changed: false });
     assert.deepEqual(normalizeRating(10.1), { kind: "out-of-range", value: 10.1, changed: false });

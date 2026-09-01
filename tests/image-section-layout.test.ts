@@ -8,6 +8,11 @@ import {
   setImageSectionColumns,
 } from "../src/domain/image-section-layout";
 import {
+  imageSectionMasonryPlan,
+  imageSectionMasonrySpan,
+  imageSectionShortestColumnBuckets,
+} from "../src/domain/image-section-masonry";
+import {
   planImageSectionPathMove,
   reorderImageSectionPaths,
   replaceImageSectionOrders,
@@ -49,6 +54,45 @@ describe("image section layout model", () => {
     assert.deepEqual(imageSectionColumnBuckets([1, 2, 3, 4, 5, 6], 4), [
       [1, 5], [2, 6], [3], [4],
     ]);
+  });
+
+  it("places each masonry item into the currently shortest estimated column", () => {
+    const items = [
+      { name: "tall", height: 3 },
+      { name: "square-1", height: 1 },
+      { name: "square-2", height: 1 },
+      { name: "square-3", height: 1 },
+    ];
+    const buckets = imageSectionShortestColumnBuckets(items, 2, (item) => item.height, 0.1);
+    assert.deepEqual(buckets.map((bucket) => bucket.map((item) => item.name)), [
+      ["tall"],
+      ["square-1", "square-2", "square-3"],
+    ]);
+  });
+
+  it("lets occasional landscape images span two contiguous columns without widening a landscape-heavy gallery", () => {
+    assert.equal(imageSectionMasonrySpan(16 / 9, 4), 2);
+    assert.equal(imageSectionMasonrySpan(4 / 3, 4), 1);
+
+    const mixed = [
+      { name: "portrait", ratio: 2 / 3 },
+      { name: "square-1", ratio: 1 },
+      { name: "wide", ratio: 16 / 9 },
+      { name: "square-2", ratio: 1 },
+    ];
+    const mixedPlan = imageSectionMasonryPlan(mixed, 4, 100, (item) => item.ratio, 8);
+    const wide = mixedPlan.placements.find((placement) => placement.item.name === "wide");
+    assert.equal(wide?.span, 2);
+    assert.equal(wide?.width, 208);
+
+    const landscapeHeavy = [
+      { name: "wide-1", ratio: 5 / 3 },
+      { name: "wide-2", ratio: 16 / 9 },
+      { name: "wide-3", ratio: 2 },
+      { name: "square", ratio: 1 },
+    ];
+    const landscapePlan = imageSectionMasonryPlan(landscapeHeavy, 4, 100, (item) => item.ratio, 8);
+    assert.deepEqual(landscapePlan.placements.map((placement) => placement.span), [1, 1, 1, 1]);
   });
 });
 

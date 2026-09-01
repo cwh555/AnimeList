@@ -9,6 +9,10 @@ import {
   applyDuplicateDefaultCoverCleanup,
   planDuplicateDefaultCoverCleanup,
 } from "../../src/data/version-cleanup-service";
+import {
+  applyMediaNoteFilenameCleanup,
+  planMediaNoteFilenameCleanup,
+} from "../../src/data/media-note-filename-cleanup";
 import { createVersionCleanupSettingsSection } from "../../src/features/version-cleanup/settings";
 import { createLegacyMetadataSettingsSection } from "../../src/features/legacy-metadata-cleanup/settings";
 
@@ -73,6 +77,46 @@ function fakeApp(entries: Array<{ path: string; markdown: string; frontmatter: R
   };
 }
 
+function filenameCleanupApp(entries: Array<{ path: string; frontmatter: Record<string, unknown> }>) {
+  const files = entries.map((entry) => {
+    const file = new TFile();
+    file.path = entry.path;
+    file.basename = entry.path.split("/").pop()?.replace(/\.md$/, "") ?? entry.path;
+    file.extension = "md";
+    return file;
+  });
+  const frontmatter = new Map<TFile, Record<string, unknown>>(
+    files.map((file, index) => [file, entries[index].frontmatter]),
+  );
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  const folder = new TFolder();
+  folder.path = "AnimeList/Anime";
+  folder.children = files;
+  const renames: Array<{ from: string; to: string }> = [];
+  let modifyCalls = 0;
+  const app = {
+    vault: {
+      getRoot: () => ({ children: [] }),
+      getAbstractFileByPath: (path: string) => path === folder.path ? folder : byPath.get(path) ?? null,
+      modify: async () => { modifyCalls += 1; },
+    },
+    metadataCache: {
+      getFileCache: (file: TFile) => ({ frontmatter: frontmatter.get(file) }),
+    },
+    fileManager: {
+      renameFile: async (file: TFile, targetPath: string) => {
+        const oldPath = file.path;
+        byPath.delete(oldPath);
+        file.path = targetPath;
+        file.basename = targetPath.split("/").pop()?.replace(/\.md$/, "") ?? targetPath;
+        byPath.set(targetPath, file);
+        renames.push({ from: oldPath, to: targetPath });
+      },
+    },
+  } as any;
+  return { app, files, frontmatter, renames, getModifyCalls: () => modifyCalls };
+}
+
 describe("legacy update: duplicate default note covers", () => {
   it("targets only the exact old generated cover immediately after animelist-detail", () => {
     const { markdown, frontmatter } = legacyNote();
@@ -119,14 +163,72 @@ describe("legacy update: duplicate default note covers", () => {
 
   it("groups version migrations together on the rightmost Updates & cleanup page", () => {
     const host = { app: {}, getScanFolders: () => [], refreshViews() {} } as any;
-    const section = createVersionCleanupSettingsSection(host, () => {});
+    const section = createVersionCleanupSettingsSection(host, () => {}, () => {});
     const legacy = createLegacyMetadataSettingsSection(host, () => {});
     assert.equal(section.page, "updates-cleanup");
     assert.equal(section.heading, "Version updates");
     assert.deepEqual(section.definitions.map((definition) => definition.name), [
+      "Sync note filenames with titles",
       "Remove duplicate note covers",
       "Upgrade legacy metadata",
     ]);
+    const filenameDescription = String(section.definitions[0].desc);
+    assert.match(filenameDescription, /filenames changed manually/);
+    assert.match(filenameDescription, /remain valid in the Library/);
+    assert.match(filenameDescription, /same folder/);
+    assert.match(filenameDescription, /frontmatter are not rewritten/);
     assert.equal(legacy.heading, "Legacy metadata cleanup");
+  });
+});
+
+describe("legacy update: media note filenames", () => {
+  it("plans collision-safe same-folder renames and never rewrites note content", async () => {
+    const store = filenameCleanupApp([
+      { path: "AnimeList/Anime/Old Frieren.md", frontmatter: { media_type: "anime", title: "Frieren" } },
+      { path: "AnimeList/Anime/Already.md", frontmatter: { media_type: "anime", title: "Already" } },
+      { path: "AnimeList/Anime/Old Duplicate.md", frontmatter: { media_type: "anime", title: "Already" } },
+      { path: "AnimeList/Anime/ordinary.md", frontmatter: { title: "Not AnimeList" } },
+    ]);
+
+    const plan = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"]);
+    assert.equal(plan.scanned, 3);
+    assert.deepEqual(plan.items, [
+      { path: "AnimeList/Anime/Old Duplicate.md", title: "Already", targetPath: "AnimeList/Anime/Already (2).md" },
+      { path: "AnimeList/Anime/Old Frieren.md", title: "Frieren", targetPath: "AnimeList/Anime/Frieren.md" },
+    ]);
+
+    const result = await applyMediaNoteFilenameCleanup(store.app, plan);
+    assert.equal(result.renamed, 2);
+    assert.equal(result.skipped, 0);
+    assert.equal(result.failed, 0);
+    assert.deepEqual(store.renames, [
+      { from: "AnimeList/Anime/Old Duplicate.md", to: "AnimeList/Anime/Already (2).md" },
+      { from: "AnimeList/Anime/Old Frieren.md", to: "AnimeList/Anime/Frieren.md" },
+    ]);
+    assert.equal(store.getModifyCalls(), 0);
+  });
+
+  it("revalidates reviewed title and destination before applying a legacy rename", async () => {
+    const store = filenameCleanupApp([
+      { path: "AnimeList/Anime/Old.md", frontmatter: { media_type: "anime", title: "New" } },
+    ]);
+    const plan = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"]);
+    assert.equal(plan.items.length, 1);
+    store.frontmatter.get(store.files[0])!.title = "Changed after review";
+
+    const result = await applyMediaNoteFilenameCleanup(store.app, plan);
+    assert.equal(result.renamed, 0);
+    assert.equal(result.skipped, 1);
+    assert.deepEqual(store.renames, []);
+  });
+
+  it("treats an existing collision suffix as already safe instead of renaming repeatedly", () => {
+    const store = filenameCleanupApp([
+      { path: "AnimeList/Anime/Same.md", frontmatter: { media_type: "anime", title: "Same" } },
+      { path: "AnimeList/Anime/Same (2).md", frontmatter: { media_type: "anime", title: "Same" } },
+    ]);
+    const plan = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"]);
+    assert.equal(plan.scanned, 2);
+    assert.deepEqual(plan.items, []);
   });
 });

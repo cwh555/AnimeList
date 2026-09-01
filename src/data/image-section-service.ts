@@ -1,4 +1,4 @@
-import { Notice, TFile, normalizePath, requestUrl, type App } from "obsidian";
+import { Notice, TFile, requestUrl, type App } from "obsidian";
 import type { CoverSources } from "../types";
 import type { AnimeListSettings } from "../domain/settings-types";
 import {
@@ -7,7 +7,6 @@ import {
   imageContentTypeForPath,
   imageExtensionFor,
   imageSectionFolderForNote,
-  imageSectionRootFromCoverFolder,
   locateImageSectionBlock,
   normalizeImageSectionPath,
   parseImageSectionSource,
@@ -23,8 +22,7 @@ import {
   type ImageSectionPendingOrder,
   type ImageSectionStateUpdate,
 } from "../domain/image-section-order";
-import { allManagedImageReferences } from "../domain/media-image-references";
-import { mediaTypeOf, normalizedCoverPath, stringValue } from "../domain/value-normalization";
+import { mediaTypeOf, stringValue } from "../domain/value-normalization";
 import { visualImageFingerprint } from "./image-raster";
 
 export interface ImageSectionHost {
@@ -66,12 +64,6 @@ export interface ResolvedImageSectionAsset {
 function findSectionState(markdown: string, locator: ImageSectionLocator): ImageSectionStateUpdate {
   const block = locateImageSectionBlock(markdown, locator);
   return { source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd };
-}
-
-function isManagedPath(path: string, root: string): boolean {
-  const cleanPath = normalizePath(path).replace(/^\/+/, "");
-  const cleanRoot = normalizePath(root).replace(/^\/+|\/+$/g, "");
-  return cleanPath === cleanRoot || cleanPath.startsWith(`${cleanRoot}/`);
 }
 
 function remoteFilename(url: string): string {
@@ -230,32 +222,6 @@ export class ImageSectionService {
     await this.trashCreatedFiles(files);
   }
 
-  async trashUnreferencedManagedPaths(
-    sourcePath: string,
-    markdownAfterUpdate: string,
-    pathValues: readonly unknown[],
-  ): Promise<void> {
-    const note = this.noteFile(sourcePath);
-    const frontmatter = this.host.app.metadataCache.getFileCache(note)?.frontmatter ?? {};
-    const cover = normalizeImageSectionPath(normalizedCoverPath(frontmatter.cover));
-    const referencedAfterUpdate = new Set(allManagedImageReferences(markdownAfterUpdate));
-    const root = imageSectionRootFromCoverFolder(this.host.settings.coverFolder);
-    let trashError: unknown = null;
-    for (const pathValue of pathValues) {
-      const path = normalizeImageSectionPath(pathValue);
-      if (!path || /^https?:\/\//i.test(path) || referencedAfterUpdate.has(path) || cover === path) continue;
-      const resolved = this.resolve(path, sourcePath);
-      if (!resolved.file || !isManagedPath(resolved.file.path, root)) continue;
-      try {
-        await this.host.app.fileManager.trashFile(resolved.file);
-        this.fingerprintCache.delete(resolved.file.path);
-      } catch (error) {
-        trashError ??= error;
-      }
-    }
-    if (trashError) throw trashError;
-  }
-
   async addAssets(
     sourcePath: string,
     locator: ImageSectionLocator,
@@ -350,11 +316,13 @@ export class ImageSectionService {
     if (targets.size === 0) return serializeImageSectionPaths(current);
 
     const nextPaths = current.filter((entry) => !targets.has(entry));
-    const updated = await this.host.app.vault.process(
+    await this.host.app.vault.process(
       note,
       (markdown) => replaceImageSectionPaths(markdown, locator, nextPaths),
     );
-    await this.trashUnreferencedManagedPaths(sourcePath, updated, [...targets]);
+    // Physical managed assets are reclaimed by the explicit Storage cleanup workflow.
+    // This keeps interactive removal O(1) with respect to vault size and avoids deleting
+    // an asset that may still be referenced by another Markdown note or AnimeList block.
     return serializeImageSectionPaths(nextPaths);
   }
 

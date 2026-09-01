@@ -58,6 +58,17 @@ const html = `<!doctype html>
     window.createEl = (tag) => document.createElement(tag);
     window.createDiv = () => document.createElement("div");
     window.createSpan = () => document.createElement("span");
+    window.__coverObservers = [];
+    window.IntersectionObserver = class {
+      constructor(callback, options) {
+        this.callback = callback; this.options = options; this.targets = new Set();
+        window.__coverObservers.push(this);
+      }
+      observe(target) { this.targets.add(target); }
+      unobserve(target) { this.targets.delete(target); }
+      disconnect() { this.targets.clear(); }
+      trigger(target) { this.callback([{ isIntersecting:true, target }], this); }
+    };
   </script>
   <script>${bundle}</script>
   <script>
@@ -69,7 +80,10 @@ const html = `<!doctype html>
       progress:0, total:0, unit:"", score, favorite:false, year:"", genres:[], people:[], platforms:[],
       sourceUrls:[], cover, filePath:title + ".md", updated:0, updatedLabel:"", startedAt:"", completedAt:"", volumeLog:[],
     });
-    const items = [item("Alpha", 9.5), item("Beta", 9.0), item("Delta", 8.5, "manga"), item("Gamma", null)];
+    const items = [
+      item("Alpha", 9.5), item("Beta", 9.0), item("Delta", 8.5, "manga"), item("Gamma", null),
+      ...Array.from({length:14}, (_, index) => item("Filler" + String(index + 1).padStart(2, "0"), 7.5)),
+    ];
     const applied = [];
     const opened = [];
     const dashboard = document.querySelector("#dashboard");
@@ -99,6 +113,17 @@ const html = `<!doctype html>
 
     (async () => {
       const details = {};
+
+      await delay(30);
+      const eagerImages = [...dashboard.querySelectorAll('.al-score-poster-image')].filter((image) => image.loading === 'eager');
+      const lazyImage = [...dashboard.querySelectorAll('.al-score-poster-image')].find((image) => image.loading === 'lazy');
+      const coverObserver = window.__coverObservers.at(-1);
+      details.coverLoadingWindowIsBounded=eagerImages.length===12 && !!lazyImage
+        && coverObserver?.targets.has(lazyImage)===true;
+      coverObserver?.trigger(lazyImage);
+      await delay(10);
+      details.nearViewportCoverPromotesBeforeScroll=lazyImage?.loading==='eager'
+        && coverObserver?.targets.has(lazyImage)===false;
 
       const gammaInitial = poster("Delta.md");
       gammaInitial?.querySelector('img')?.dispatchEvent(new Event('error'));

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.2 - 2026-09-01
+
+### Changed
+
+- Refined Library Text export so the work name remains required while other fields stay optional; Favorite appears only on favorite works and Masterpiece exports the work's actual category labels.
+- Kept **Release updates** and **Export** directly visible as the first two workspace actions, using the overflow menu only for additional actions.
+- Synced media-note filenames when titles are edited while preserving manually renamed notes in the Library; older filename/title mismatches can be reviewed explicitly from **Updates & cleanup**.
+
+### Fixed
+
+- Stabilized score entry and persistence across Add/Edit forms, including accidental native number-input wheel changes; non-completed works can remain unrated, completed works still require a score, and explicit `0` remains distinct from an empty score.
+- Showed completion time for completed Library items, retained modified time for other statuses, and added natural title ordering for works completed on the same day in Library and Timeline views.
+- Improved Image Session layout and drag placement, managed-media cleanup, Library filter behavior, cover loading/refresh stability, and mobile horizontal-swipe isolation.
+- Removed redundant Masterpiece type assertions reported by static analysis without changing runtime behavior.
+
+### Compatibility
+
+- The media schema remains version 6. Existing Markdown/frontmatter remains compatible; filename reconciliation and managed-media cleanup stay explicit/review-first where migration is required.
+
 ## 1.5.1 - 2026-08-29
 
 ### Fixed
@@ -75,7 +94,7 @@
 
 ### Compatibility and migration
 
-- The media schema remains version 6. Existing 1.3.1 notes remain readable and there is no automatic startup media migration for 1.4.0.
+- The media schema remains version 6. Existing 1.3.1 notes remain readable and there is no automatic startup migration for 1.4.0.
 - `animelist-images` and `animelist-moments` are ordinary fenced Markdown blocks; multiple independent blocks may appear in one note and unrelated Markdown/frontmatter is preserved when one block is edited.
 - Release tracking fields are additive and never repurpose `progress`, `progress_unit`, `volume_log`, personal status, rating, or note-body content.
 - Interface-language changes do not rewrite media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, note bodies, or templates.

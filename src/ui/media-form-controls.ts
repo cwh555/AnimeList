@@ -132,7 +132,6 @@ export function createDateInput(value = ""): MediaFormDateControl {
   return root;
 }
 
-
 export function createCompletionDateInput(value = ""): MediaFormDateControl {
   const root = createDiv() as MediaFormDateControl;
   root.className = "al-completion-date-control";
@@ -389,12 +388,9 @@ export function createMediaEditorFields({
   const score = createLabeledField(
     parent,
     uiText("add.scoreLabel"),
-    createTextInput("number", formValue(values.score)),
+    createTextInput("text", formValue(values.score)),
     uiText("add.scoreHint", { status: completedStatusLabel(mediaType) }),
   );
-  score.min = "0";
-  score.max = "10";
-  score.step = "0.5";
   bindScoreRequirement(status, score, mediaType);
 
   const startedAt = createLabeledField(
@@ -515,6 +511,8 @@ interface CreateMediaFormContextInput {
 export function createMediaFormContext({
   mode, plugin, modalEl, formEl, mediaType, result, file, frontmatter, fields,
 }: CreateMediaFormContextInput): MediaFormContext<AnimeListUiHost> {
+  const disposers = new Set<() => void>();
+  let disposed = false;
   return {
     mode,
     host: plugin,
@@ -526,5 +524,19 @@ export function createMediaFormContext({
     frontmatter,
     fields,
     state: new Map(),
+    onDispose(disposer) {
+      if (disposed) {
+        disposer();
+        return () => undefined;
+      }
+      disposers.add(disposer);
+      return () => disposers.delete(disposer);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const disposer of [...disposers]) disposer();
+      disposers.clear();
+    },
   };
 }

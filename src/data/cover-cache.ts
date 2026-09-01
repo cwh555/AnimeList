@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import { normalizePath } from "obsidian";
 import type { CoverSources } from "../types";
 import { decodeRasterImage, encodeRasterImage } from "./image-raster";
+import { moveAdapterFileToVaultTrash } from "./vault-trash";
 
 export const COVER_THUMBNAIL_WIDTHS = [24, 320, 640] as const;
 export const COVER_CACHE_POLICY = {
@@ -276,7 +277,8 @@ export class CoverThumbnailCache {
     let removed = 0;
     for (const path of listing.files) {
       if (!path.toLocaleLowerCase().endsWith(".webp")) continue;
-      await this.app.vault.adapter.remove(path);
+      const moved = await moveAdapterFileToVaultTrash(this.app.vault.adapter, path, "thumbnail-cache");
+      if (!moved) continue;
       this.files.delete(normalizePath(path));
       removed += 1;
     }
@@ -351,11 +353,14 @@ export class CoverThumbnailCache {
       records.push({ path: normalized, size: stat.size, mtime: stat.mtime });
     }
     const removals = planCoverCacheCleanup(records, validGroupKeys);
+    let removed = 0;
     for (const path of removals) {
-      await this.app.vault.adapter.remove(path);
+      const moved = await moveAdapterFileToVaultTrash(this.app.vault.adapter, path, "thumbnail-cache");
+      if (!moved) continue;
       this.files.delete(path);
+      removed += 1;
     }
-    return removals.length;
+    return removed;
   }
 
   private async generate(file: TFile, idle: boolean): Promise<CoverSources> {
@@ -377,11 +382,11 @@ export class CoverThumbnailCache {
     } catch (error) {
       for (const path of created) {
         try {
-          await this.app.vault.adapter.remove(path);
+          const moved = await moveAdapterFileToVaultTrash(this.app.vault.adapter, path, "thumbnail-cache");
+          if (moved) this.files.delete(path);
         } catch {
           // Best-effort rollback; source-aware cleanup removes any remaining partial group.
         }
-        this.files.delete(path);
       }
       throw error;
     } finally {

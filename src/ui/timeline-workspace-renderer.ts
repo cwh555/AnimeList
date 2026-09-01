@@ -28,6 +28,7 @@ import { assignTimelineLanes, compareTimelineEntries, filterTimelineEntries, tim
 import { timelineWorkspaceText } from "../features/timeline/text";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 interface TimedTimelineEntry extends TimelineMediaEntry { completedTime: number; }
 
@@ -110,7 +111,7 @@ export function renderTimelineWorkspace(
   const root = makeEl("div", "al-timeline-workspace");
   const summary = makeEl("div", "al-timeline-workspace-summary");
   const controls = makeEl("div", "al-timeline-workspace-controls");
-  const modeGroup = makeEl("div", "al-timeline-view-modes");
+  const modeGroup = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-view-modes"));
   modeGroup.setAttribute("role", "group");
   modeGroup.setAttribute("aria-label", timelineWorkspaceText("timeline.viewModeLabel"));
   const scaleMode = makeEl("button", "al-timeline-view-mode", timelineWorkspaceText("timeline.viewScale"));
@@ -119,7 +120,7 @@ export function renderTimelineWorkspace(
   historyMode.type = "button";
   modeGroup.append(scaleMode, historyMode);
 
-  const typeGroup = makeEl("div", "al-timeline-type-filters");
+  const typeGroup = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-type-filters"));
   typeGroup.setAttribute("role", "group");
   typeGroup.setAttribute("aria-label", timelineWorkspaceText("timeline.mediaFilterLabel"));
   const typeLabels: Record<LibraryMediaFilter, string> = {
@@ -235,7 +236,7 @@ export function renderTimelineWorkspace(
       makeEl("strong", "", timelineWorkspaceText("timeline.undatedTitle")),
       makeEl("span", "", timelineWorkspaceText("timeline.undatedDescription")),
     );
-    const rail = makeEl("div", "al-timeline-undated-rail");
+    const rail = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-undated-rail"));
     for (const item of currentUndatedItems) {
       rail.appendChild(createTimelinePosterCard(item, {
         dateLabel: timelineWorkspaceText("timeline.undatedTitle"),

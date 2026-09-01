@@ -1,5 +1,9 @@
 import type { LibraryTextExportRow } from "../../domain/library-export";
 import {
+  labelsForMasterpieceEnable,
+  type SpecialLabelMode,
+} from "../../domain/masterpiece-labels";
+import {
   LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS,
   compileLibraryTextTemplate,
   renderLibraryTextTemplate,
@@ -9,10 +13,11 @@ import {
   type LibraryTextTemplateVariableId,
 } from "../../domain/library-text-template";
 import { isReadingProgressUnit } from "../../domain/progress-units";
-import { timelineEntryCopy } from "../progress/timeline-entry-text";
-import { progressUnitLabel } from "../progress/text";
 import { mediaStatusLabel } from "../../ui-text";
 import { MEDIA_UI_LABELS, mediaUnitLabel } from "../../ui/ui-helpers";
+import { specialLabelName } from "../masterpiece/text";
+import { timelineEntryCopy } from "../progress/timeline-entry-text";
+import { progressUnitLabel } from "../progress/text";
 import { libraryExportText } from "./text";
 
 const VARIABLE_TEXT_KEYS: Readonly<Record<LibraryTextTemplateVariableId,
@@ -48,17 +53,29 @@ export interface LibraryTextTemplateVariableOption {
   token: string;
 }
 
-function templateCatalog(): LibraryTextTemplateCatalog {
+function templateCatalog(specialLabelMode: SpecialLabelMode = "favorite"): LibraryTextTemplateCatalog {
+  const names = Object.fromEntries(LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS.map((id) => [
+    id,
+    libraryExportText(VARIABLE_TEXT_KEYS[id]),
+  ])) as Record<LibraryTextTemplateVariableId, string>;
+  names.favorite = specialLabelName(specialLabelMode);
+
+  const specialLabelAliases = [
+    libraryExportText("templateVarFavorite"),
+    specialLabelName("favorite"),
+    specialLabelName("masterpiece"),
+  ].filter((value, index, values) => value !== names.favorite && values.indexOf(value) === index);
+
   return {
-    names: Object.fromEntries(LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS.map((id) => [
-      id,
-      libraryExportText(VARIABLE_TEXT_KEYS[id]),
-    ])) as Record<LibraryTextTemplateVariableId, string>,
+    names,
+    aliases: { favorite: specialLabelAliases },
   };
 }
 
-export function libraryTextTemplateVariableOptions(): LibraryTextTemplateVariableOption[] {
-  const catalog = templateCatalog();
+export function libraryTextTemplateVariableOptions(
+  specialLabelMode: SpecialLabelMode = "favorite",
+): LibraryTextTemplateVariableOption[] {
+  const catalog = templateCatalog(specialLabelMode);
   return LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS.map((id) => ({
     id,
     label: catalog.names[id],
@@ -70,8 +87,11 @@ export function defaultLibraryTextExportTemplate(): string {
   return libraryExportText("templateDefault");
 }
 
-export function compileLibraryTextExportTemplate(template: string): LibraryTextTemplateCompilation {
-  return compileLibraryTextTemplate(template, templateCatalog());
+export function compileLibraryTextExportTemplate(
+  template: string,
+  specialLabelMode: SpecialLabelMode = "favorite",
+): LibraryTextTemplateCompilation {
+  return compileLibraryTextTemplate(template, templateCatalog(specialLabelMode));
 }
 
 export function libraryTextTemplateIssueMessage(issue: LibraryTextTemplateIssue): string {
@@ -81,7 +101,6 @@ export function libraryTextTemplateIssueMessage(issue: LibraryTextTemplateIssue)
     case "unclosed-variable": return libraryExportText("templateErrorUnclosed");
     case "unknown-variable": return libraryExportText("templateErrorUnknown", { variable: issue.variable ?? "" });
     case "too-many-variables": return libraryExportText("templateErrorTooManyVariables");
-    case "missing-completed-at": return libraryExportText("templateErrorMissingCompletedAt");
     case "missing-work": return libraryExportText("templateErrorMissingWork");
   }
 }
@@ -111,7 +130,16 @@ function progressValue(row: LibraryTextExportRow): string {
     : libraryExportText("progressCurrentOnly", { current: row.progressCurrent, unit });
 }
 
-function templateValues(row: LibraryTextExportRow): Record<LibraryTextTemplateVariableId, string> {
+function specialLabelValue(row: LibraryTextExportRow, specialLabelMode: SpecialLabelMode): string {
+  if (!row.favorite) return "";
+  if (specialLabelMode === "masterpiece") return labelsForMasterpieceEnable(row.masterpieceLabels).join(", ");
+  return specialLabelName("favorite");
+}
+
+function templateValues(
+  row: LibraryTextExportRow,
+  specialLabelMode: SpecialLabelMode,
+): Record<LibraryTextTemplateVariableId, string> {
   return {
     completedAt: row.time,
     work: eventWorkTitle(row),
@@ -123,7 +151,7 @@ function templateValues(row: LibraryTextExportRow): Record<LibraryTextTemplateVa
     progress: progressValue(row),
     startedAt: row.startedAt,
     status: mediaStatusLabel(row.status, row.mediaType),
-    favorite: libraryExportText(row.favorite ? "yes" : "no"),
+    favorite: specialLabelValue(row, specialLabelMode),
     genres: row.genres.join(", "),
   };
 }
@@ -132,8 +160,11 @@ export function formatLibraryTextExport(
   rows: readonly LibraryTextExportRow[],
   template: string,
   compilation = compileLibraryTextExportTemplate(template),
+  specialLabelMode: SpecialLabelMode = "favorite",
 ): string {
   if (!compilation.valid) return "";
-  const blocks = rows.map((row) => renderLibraryTextTemplate(compilation, templateValues(row)).trimEnd());
+  const blocks = rows.map((row) => (
+    renderLibraryTextTemplate(compilation, templateValues(row, specialLabelMode)).trimEnd()
+  ));
   return blocks.length ? `${blocks.join("\n\n")}\n` : "";
 }

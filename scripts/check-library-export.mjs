@@ -62,7 +62,16 @@ const [bundle, styles] = await Promise.all([
   readFile(path.join(root, "styles.css"), "utf8"),
 ]);
 
-const item = ({ title, mediaType, completedAt, unit, volumeLog = [], score = 9 }) => ({
+const item = ({
+  title,
+  mediaType,
+  completedAt,
+  unit,
+  volumeLog = [],
+  score = 9,
+  favorite = false,
+  masterpieceLabels = [],
+}) => ({
   title,
   originalTitle: title + " original",
   mediaType,
@@ -73,7 +82,8 @@ const item = ({ title, mediaType, completedAt, unit, volumeLog = [], score = 9 }
   total: mediaType === "anime" ? 12 : 0,
   unit,
   score,
-  favorite: false,
+  favorite,
+  masterpieceLabels,
   year: 2026,
   genres: ["Drama"],
   people: [],
@@ -105,8 +115,24 @@ for(const [name,fn] of Object.entries({
 (async()=>{
 try {
   const items = [
-    ${JSON.stringify(item({title:"Anime Done",mediaType:"anime",completedAt:"2026-02-10",unit:"episode"}))},
-    ${JSON.stringify(item({title:"葬送的芙莉蓮",mediaType:"manga",completedAt:"2026-06-20",unit:"volume",volumeLog:[{label:"13",startedAt:"2026-05-01",completedAt:"2026-05-03"},{label:"14",startedAt:"2026-06-10",completedAt:"2026-06-12"}]}))},
+    ${JSON.stringify(item({
+      title:"Anime Done",
+      mediaType:"anime",
+      completedAt:"2026-02-10",
+      unit:"episode",
+      favorite:true,
+      masterpieceLabels:["角色塑造","世界觀"],
+    }))},
+    ${JSON.stringify(item({
+      title:"葬送的芙莉蓮",
+      mediaType:"manga",
+      completedAt:"2026-06-20",
+      unit:"volume",
+      volumeLog:[
+        {label:"13",startedAt:"2026-05-01",completedAt:"2026-05-03"},
+        {label:"14",startedAt:"2026-06-10",completedAt:"2026-06-12"},
+      ],
+    }))},
   ];
   const creates = [];
   const host = {
@@ -117,7 +143,7 @@ try {
       },
       metadataCache: { getFileCache(){ return null; } },
     },
-    settings: { libraryRoot: "AnimeList" },
+    settings: { libraryRoot: "AnimeList", specialLabelMode: "masterpiece" },
     collectMediaItems(){ return items; },
     async ensureFolder(){},
     async uniqueFilePath(folder, base, extension){ return folder + "/" + base + "." + extension; },
@@ -147,7 +173,9 @@ try {
   const saveButton = [...content.querySelectorAll("button")].find((button)=>button.textContent.trim()==="儲存匯出檔");
   const copyButton = [...content.querySelectorAll("button")].find((button)=>button.textContent.trim()==="複製");
   const saveLocation = content.querySelector(".al-library-export-save-location")?.textContent || "";
-  const scoreVariable = [...content.querySelectorAll(".al-library-export-template-variable")].find((button)=>button.textContent.includes("評分"));
+  const variableButtons = [...content.querySelectorAll(".al-library-export-template-variable")];
+  const scoreVariable = variableButtons.find((button)=>button.textContent.includes("評分"));
+  const specialLabelVariable = variableButtons.find((button)=>button.textContent.includes("masterpiece"));
 
   template.focus();
   template.value = "({$作品類型}) {$作品名稱} : {$完成時間}";
@@ -158,9 +186,36 @@ try {
   scopeSelects[0].dispatchEvent(new Event("change", { bubbles:true }));
   const previewAfterManga = preview.value;
 
-  template.value = "{$作品名稱}";
+  scopeSelects[0].value = "all";
+  scopeSelects[0].dispatchEvent(new Event("change", { bubbles:true }));
+  template.value = "{$評分}";
   template.dispatchEvent(new Event("input", { bubbles:true }));
-  const invalidTemplateBlocksActions = !!templateError?.textContent?.includes("完成時間") && saveButton?.disabled && copyButton?.disabled;
+  const missingWorkBlocksActions = !!templateError?.textContent?.includes("作品名稱")
+    && saveButton?.disabled && copyButton?.disabled;
+
+  template.value = "{$作品名稱} | {$評分}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const optionalFieldsRemainFlexible = !templateError?.textContent
+    && !saveButton?.disabled && !copyButton?.disabled
+    && preview.value.includes("Anime Done | 9");
+
+  template.value = "{$作品名稱} | {$masterpiece}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const masterpiecePreview = preview.value;
+  const masterpieceShowsActualLabels = masterpiecePreview.includes("Anime Done | 角色塑造, 世界觀");
+  const unmarkedMasterpieceStaysBlank = masterpiecePreview.includes("葬送的芙莉蓮 — 第 13 卷 |")
+    && !masterpiecePreview.includes("葬送的芙莉蓮 — 第 13 卷 | masterpiece");
+
+  template.value = "{$作品名稱} | {$最愛}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const oldFavoriteTokenSurvivesMasterpieceMode = !templateError?.textContent
+    && !saveButton?.disabled && !copyButton?.disabled
+    && preview.value.includes("Anime Done | 角色塑造, 世界觀");
+
+  template.value = "{$作品名稱} {$不存在}";
+  template.dispatchEvent(new Event("input", { bubbles:true }));
+  const unknownVariableBlocksActions = !!templateError?.textContent?.includes("未知變數")
+    && saveButton?.disabled && copyButton?.disabled;
 
   template.value = "({$作品類型}) {$作品名稱} : {$完成時間}";
   template.dispatchEvent(new Event("input", { bubbles:true }));
@@ -189,7 +244,13 @@ try {
     noCheckboxFieldPicker: content.querySelectorAll(".al-library-export-checkbox input").length === 0,
     templateVisibleInTextMode: templateSection && !templateSection.hidden,
     customTemplateRendersTimelineUnits: previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 13 卷 : 2026-05-03") && previewAfterManga.includes("(漫畫) 葬送的芙莉蓮 — 第 14 卷 : 2026-06-12"),
-    invalidTemplateBlocksActions,
+    missingWorkBlocksActions,
+    optionalFieldsRemainFlexible,
+    modeAwareSpecialLabelVariable: specialLabelVariable?.textContent.trim() === "{$masterpiece}",
+    masterpieceShowsActualLabels,
+    unmarkedMasterpieceStaysBlank,
+    oldFavoriteTokenSurvivesMasterpieceMode,
+    unknownVariableBlocksActions,
     variableInsertKeepsFocus,
     saveActionExplainsDestination: saveLocation.includes("AnimeList/Exports/"),
     saveCreatesExportFileOnly: creates.length === 1 && creates[0].path.startsWith("AnimeList/Exports/AnimeList-") && creates[0].path.endsWith(".txt"),
@@ -212,14 +273,14 @@ try {
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "desktop"),
-    testName: "Library Export stable custom template and save-file layout",
+    testName: "Library Export required-work and mode-aware special-label layout",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 1100, height: 850, deviceScaleFactor: 1 },
   });
   await runChromiumDatasetTest({
     html,
     profile: path.join(profile, "mobile"),
-    testName: "Library Export custom template remains stable on mobile",
+    testName: "Library Export required-work custom template remains stable on mobile",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   });
