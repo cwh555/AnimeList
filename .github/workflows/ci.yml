@@ -18,14 +18,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Pack exact workspace for diagnostic verification
-        run: tar --exclude=.git --exclude=.tmp -czf /tmp/animelist-workspace.tgz .
-      - name: Upload exact workspace
-        uses: actions/upload-artifact@v4
-        with:
-          name: workspace-${{ github.sha }}
-          path: /tmp/animelist-workspace.tgz
-          retention-days: 1
       - name: Run full checks in UTC
         run: TZ=UTC npm run check
       - name: Run full tests in Asia/Taipei
@@ -34,6 +26,8 @@ jobs:
         run: npm run test:browser:date
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run media note Reading View rails in Chromium
+        run: ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-note-reading-rails.mjs
       - name: Run Score Dashboard mobile interactions in Chromium
         run: npm run test:browser:score-mobile
       - name: Run tag chip interactions in Chromium

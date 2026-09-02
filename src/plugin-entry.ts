@@ -18,6 +18,7 @@ import { serialEntryCoversFeature } from "./features/serial-covers/feature";
 import { serialCoverSettingsFeature } from "./features/serial-covers/settings";
 import { userTagSettingsFeature } from "./features/user-tags/settings";
 import { versionCleanupSettingsFeature } from "./features/version-cleanup/settings";
+import { noteReadingRailsFeature } from "./features/note-reading-rails/feature";
 
 registerBundledLocales();
 
@@ -39,6 +40,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   userTagSettingsFeature,
   masterpieceFeature,
   scoreDashboardFeature,
+  noteReadingRailsFeature,
 ];
 
 export default class AnimeListPluginEntry extends AnimeListPlugin {
