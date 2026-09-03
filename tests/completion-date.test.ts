@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { completionDateTimestamp, isUnknownCompletionDate, normalizeCompletionDate } from "../src/domain/completion-date";
 import { compareLibraryCompletion } from "../src/domain/library-sort";
-import { compareMediaTitles, naturalMediaTitleKey } from "../src/domain/media-title-sort";
+import { compareMediaTitles, naturalMediaTitleKey, structuralMediaTitleKey } from "../src/domain/media-title-sort";
 
 test("completion date accepts a real date or the explicit undated sentinel", () => {
   assert.equal(normalizeCompletionDate("2026-08-22"), "2026-08-22");
@@ -33,6 +33,38 @@ test("structural season and volume ordinals use natural title order", () => {
   assert.equal(compareMediaTitles("作品 第2季", "作品 第10季") < 0, true);
   assert.equal(compareMediaTitles("小說 第九卷", "小說 第十卷") < 0, true);
   assert.equal(naturalMediaTitleKey("作品 第二〇二六季"), "作品 第2026季");
+});
+
+test("explicit installments stay adjacent to the same base work before nearby titles", () => {
+  const titles = [
+    "作品 外傳",
+    "作品 第十季",
+    "作品 第二季",
+    "作品 第一季",
+    "另一作品",
+  ];
+  assert.deepEqual(
+    titles.sort(compareMediaTitles),
+    ["另一作品", "作品 第一季", "作品 第二季", "作品 第十季", "作品 外傳"],
+  );
+  assert.deepEqual(structuralMediaTitleKey("Show Season 10"), {
+    base: "Show",
+    kind: "season",
+    number: 10,
+    full: "Show Season 10",
+  });
+  assert.equal(compareMediaTitles("Show Season 2", "Show Season 10") < 0, true);
+  assert.equal(compareMediaTitles("作品 第2クール", "作品 第10クール") < 0, true);
+  assert.equal(compareMediaTitles("小說 Volume 2", "小說 Volume 10") < 0, true);
+});
+
+test("ordinary digits inside a title are not treated as installment markers", () => {
+  assert.deepEqual(structuralMediaTitleKey("86―エイティシックス―"), {
+    base: "86―エイティシックス―",
+    kind: null,
+    number: null,
+    full: "86―エイティシックス―",
+  });
 });
 
 test("same-day completion ties use ascending natural title order in both date directions", () => {
