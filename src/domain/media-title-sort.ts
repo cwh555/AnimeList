@@ -137,9 +137,12 @@ export function structuralMediaTitleKey(value: string | null | undefined): Struc
  * Ordinary title text keeps locale-aware Traditional Chinese/Japanese
  * collation and is never reduced to a guessed franchise prefix.
  */
-export function compareMediaTitles(
+export type MediaInstallmentSortDirection = "asc" | "desc";
+
+export function compareMediaTitlesByInstallment(
   left: string | null | undefined,
   right: string | null | undefined,
+  installmentDirection: MediaInstallmentSortDirection = "asc",
 ): number {
   const leftText = left ?? "";
   const rightText = right ?? "";
@@ -155,10 +158,19 @@ export function compareMediaTitles(
     const kindOrder = INSTALLMENT_KIND_ORDER[leftKey.kind] - INSTALLMENT_KIND_ORDER[rightKey.kind];
     if (kindOrder) return kindOrder;
     const numberOrder = (leftKey.number ?? Number.POSITIVE_INFINITY) - (rightKey.number ?? Number.POSITIVE_INFINITY);
-    if (Number.isFinite(numberOrder) && numberOrder !== 0) return numberOrder;
+    if (Number.isFinite(numberOrder) && numberOrder !== 0) {
+      return installmentDirection === "desc" ? -numberOrder : numberOrder;
+    }
   }
 
   const normalizedOrder = mediaTitleCollator.compare(leftKey.full, rightKey.full);
   if (normalizedOrder) return normalizedOrder;
   return mediaTitleCollator.compare(leftText, rightText);
+}
+
+export function compareMediaTitles(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): number {
+  return compareMediaTitlesByInstallment(left, right, "asc");
 }
