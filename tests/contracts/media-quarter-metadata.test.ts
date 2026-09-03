@@ -5,7 +5,7 @@ import {
   normalizeAniListClassification,
   resolveMediaSeasonMetadata,
 } from "../../src/domain/media-classification";
-import { parseEditableMediaQuarter } from "../../src/domain/media-quarter";
+import { editableMediaQuarterText, parseEditableMediaQuarter, parseEditableMediaQuarterText } from "../../src/domain/media-quarter";
 import type { ExternalMediaResult, MediaNoteForm } from "../../src/domain/media-types";
 import { applyEditableMediaForm, buildMediaMarkdown } from "../../src/data/media-note-codec";
 import { cleanupLegacyMetadataNotes } from "../../src/data/legacy-metadata-cleanup";
@@ -113,6 +113,17 @@ describe("anime calendar quarter metadata", () => {
     assert.deepEqual(parseEditableMediaQuarter("", "2025"), { kind: "invalid" });
   });
 
+  it("uses one canonical YYYY Qn text contract for the editable top metadata field", () => {
+    assert.equal(editableMediaQuarterText("fall", 2022), "2022 Q4");
+    assert.deepEqual(parseEditableMediaQuarterText("2026 Q3"), {
+      kind: "valid",
+      season: "summer",
+      seasonYear: 2026,
+    });
+    assert.deepEqual(parseEditableMediaQuarterText("2026Q3"), { kind: "invalid" });
+    assert.deepEqual(parseEditableMediaQuarterText("26 Q3"), { kind: "invalid" });
+  });
+
   it("keeps UI quarter display aligned with calendar start month and hides year-only pseudo-quarters", () => {
     const result = animeResult({
       startDate: { year: 2025, month: 3, day: 31 },
@@ -185,6 +196,70 @@ describe("anime calendar quarter metadata", () => {
     assert.equal(frontmatter.season_year, 2026);
     assert.deepEqual(frontmatter.source_urls, ["https://example.com/source"]);
     assert.equal(frontmatter.custom_field, "keep-me");
+  });
+
+  it("lets manual format and studio values override provider metadata without touching unrelated fields", () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      title: "Quarter test",
+      media_type: "anime",
+      format: "tv",
+      studios: ["Provider Studio"],
+      status: "ongoing",
+      progress: 5,
+      progress_total: 12,
+      progress_unit: "episode",
+      favorite: false,
+      source_urls: ["https://example.com/source"],
+      custom_field: "keep-me",
+    };
+    applyEditableMediaForm(frontmatter, "anime", animeForm({
+      format: "movie",
+      studios: ["CloverWorks"],
+      progress: 6,
+      total: 12,
+    }));
+    assert.equal(frontmatter.format, "movie");
+    assert.deepEqual(frontmatter.studios, ["CloverWorks"]);
+    assert.deepEqual(frontmatter.source_urls, ["https://example.com/source"]);
+    assert.equal(frontmatter.custom_field, "keep-me");
+  });
+
+  it("does not rewrite format or studios when those edit controls were not changed", () => {
+    const frontmatter: Record<string, unknown> = {
+      schema_version: 6,
+      title: "Quarter test",
+      media_type: "anime",
+      format: "custom-provider-format",
+      studios: ["Provider Studio"],
+      status: "ongoing",
+      progress: 5,
+      progress_total: 12,
+      progress_unit: "episode",
+      favorite: false,
+    };
+    applyEditableMediaForm(frontmatter, "anime", animeForm({ progress: 6, total: 12 }));
+    assert.equal(frontmatter.format, "custom-provider-format");
+    assert.deepEqual(frontmatter.studios, ["Provider Studio"]);
+  });
+
+  it("writes manual format, studio, and quarter values into a newly collected provider result", () => {
+    const markdown = buildMediaMarkdown(
+      animeResult({ format: "tv", people: ["Provider Studio"] }),
+      animeForm({
+        format: "ova",
+        studios: ["CloverWorks"],
+        season: "Q2",
+        seasonYear: "2026",
+      }),
+      "",
+      "",
+    );
+    const yaml = noteFrontmatter(markdown);
+    assert.match(yaml, /^format: "ova"$/m);
+    assert.match(yaml, /^studios:\n  - "CloverWorks"$/m);
+    assert.match(yaml, /^season: "spring"$/m);
+    assert.match(yaml, /^season_year: 2026$/m);
   });
 
   it("rejects a partial manual quarter instead of writing malformed YAML", () => {

@@ -1,11 +1,11 @@
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
-import { resolveMediaSeasonMetadata, type MediaSeason } from "../../domain/media-classification";
+import { resolveMediaSeasonMetadata } from "../../domain/media-classification";
 import {
   editableMediaFormatValues,
   normalizeEditableMediaFormat,
   normalizeEditableStudios,
 } from "../../domain/media-editable-classification";
-import { parseEditableMediaQuarter } from "../../domain/media-quarter";
+import { editableMediaQuarterText, parseEditableMediaQuarterText } from "../../domain/media-quarter";
 import {
   compatibleSeasonMetadata,
   compatibleStudios,
@@ -13,57 +13,43 @@ import {
 import { storedMediaNeedsClassificationRefresh } from "../../data/stored-media-result";
 import type { ExternalMediaResult } from "../../domain/media-types";
 import type { MediaFormContext, MediaFormSubmitContext } from "../../ui/media-form-contracts";
-import { createLabeledField, createSelect, createTextInput } from "../../ui/media-form-controls";
+import { createSelect, createTextInput } from "../../ui/media-form-controls";
 import { mediaFormatLabel, uiText } from "../../ui-text";
 import { makeEl } from "../../ui/ui-helpers";
 
 const STATE_KEY = "media-classification-editor";
-const FALLBACK_QUARTER_STATE_KEY = "media-quarter-input-fallback";
 
 interface ClassificationEditorState {
   initialFormat: string;
   format: string;
   initialStudios: string[];
   studios: string[];
-  initialSeason: string;
-  season: string;
-  initialYear: string;
-  year: string;
+  initialQuarter: string;
+  quarter: string;
   formatDirty: boolean;
   studiosDirty: boolean;
   quarterDirty: boolean;
   formatControl: HTMLSelectElement;
   studiosControl: HTMLInputElement;
-  seasonControl: HTMLSelectElement;
-  yearControl: HTMLInputElement;
+  quarterControl: HTMLInputElement;
   refreshNote: HTMLElement | null;
 }
 
 interface AnimeClassificationDraft {
   format: string;
   studios: string[];
-  season: string;
-  year: string;
+  quarter: string;
 }
 
-interface FallbackQuarterState {
-  initialSeason: string;
-  initialYear: string;
-  season: string;
-  year: string;
-}
 
-function quarterFromResult(result: ExternalMediaResult): { season: string; year: string } {
+function quarterFromResult(result: ExternalMediaResult): string {
   const metadata = resolveMediaSeasonMetadata({
     season: result.classification?.season,
     seasonYear: result.classification?.seasonYear,
     startDate: result.startDate,
     fallbackYear: result.year,
   });
-  return {
-    season: metadata.season ?? "",
-    year: metadata.seasonYear === null ? "" : String(metadata.seasonYear),
-  };
+  return editableMediaQuarterText(metadata.season, metadata.seasonYear);
 }
 
 function initialDraft<Host extends AnimeListFeatureHost>(
@@ -74,39 +60,29 @@ function initialDraft<Host extends AnimeListFeatureHost>(
     return {
       format: normalizeEditableMediaFormat(context.frontmatter.format) || context.mediaType,
       studios: normalizeEditableStudios(compatibleStudios(context.frontmatter)),
-      season: quarter.season ?? "",
-      year: quarter.seasonYear === null ? "" : String(quarter.seasonYear),
+      quarter: editableMediaQuarterText(quarter.season, quarter.seasonYear),
     };
   }
 
   const result = context.result;
-  if (!result) return { format: context.mediaType, studios: [], season: "", year: "" };
+  if (!result) return { format: context.mediaType, studios: [], quarter: "" };
   const quarter = quarterFromResult(result);
   return {
     format: normalizeEditableMediaFormat(result.format) || context.mediaType,
     studios: normalizeEditableStudios(result.people),
-    season: quarter.season,
-    year: quarter.year,
+    quarter,
   };
-}
-
-function seasonOptions(): Array<[string, string]> {
-  const options: Array<[MediaSeason, string]> = [
-    ["winter", `Q1 (${uiText("season.winter")})`],
-    ["spring", `Q2 (${uiText("season.spring")})`],
-    ["summer", `Q3 (${uiText("season.summer")})`],
-    ["fall", `Q4 (${uiText("season.fall")})`],
-  ];
-  return [["", "—"], ...options];
 }
 
 function editorItem(label: string, control: HTMLElement): HTMLElement {
   const item = createDiv();
-  item.className = "al-media-metadata-item al-media-metadata-editor-item al-form-field";
+  item.className = "al-media-metadata-item al-media-metadata-editor-item";
   const labelEl = makeEl("div", "al-media-metadata-label", label);
   control.setAttribute("aria-label", label);
   const value = makeEl("div", "al-media-metadata-value al-media-metadata-editor-value");
-  value.appendChild(control);
+  const controlWrap = makeEl("div", "al-form-field");
+  controlWrap.appendChild(control);
+  value.appendChild(controlWrap);
   item.append(labelEl, value);
   return item;
 }
@@ -126,15 +102,9 @@ function renderEditor<Host extends AnimeListFeatureHost>(
   studios.placeholder = uiText("add.metadataStudio");
   studios.autocomplete = "off";
 
-  const year = createTextInput("text", draft.year);
-  year.inputMode = "numeric";
-  year.autocomplete = "off";
-  year.maxLength = 4;
-  year.placeholder = "YYYY";
-
-  const season = createSelect(seasonOptions(), draft.season);
-  const quarterControl = makeEl("div", "al-media-quarter-editor al-form-field");
-  quarterControl.append(year, season);
+  const quarter = createTextInput("text", draft.quarter);
+  quarter.autocomplete = "off";
+  quarter.maxLength = 7;
 
   const section = createDiv();
   section.className = "al-media-metadata-section al-media-metadata-editor";
@@ -144,7 +114,7 @@ function renderEditor<Host extends AnimeListFeatureHost>(
   grid.append(
     editorItem(uiText("add.metadataFormat"), format),
     editorItem(uiText("add.metadataStudio"), studios),
-    editorItem(uiText("add.metadataSeason"), quarterControl),
+    editorItem(uiText("add.metadataSeason"), quarter),
   );
   section.appendChild(grid);
   host.replaceChildren(section);
@@ -154,17 +124,14 @@ function renderEditor<Host extends AnimeListFeatureHost>(
     format: format.value,
     initialStudios: [...draft.studios],
     studios: [...draft.studios],
-    initialSeason: draft.season,
-    season: season.value,
-    initialYear: draft.year,
-    year: year.value,
+    initialQuarter: draft.quarter,
+    quarter: quarter.value,
     formatDirty: false,
     studiosDirty: false,
     quarterDirty: false,
     formatControl: format,
     studiosControl: studios,
-    seasonControl: season,
-    yearControl: year,
+    quarterControl: quarter,
     refreshNote: null,
   };
 
@@ -176,24 +143,17 @@ function renderEditor<Host extends AnimeListFeatureHost>(
     state.studiosDirty = true;
     state.studios = normalizeEditableStudios(studios.value);
   };
-  const updateYear = (): void => {
+  const updateQuarter = (): void => {
     state.quarterDirty = true;
-    year.value = year.value.replace(/\D/g, "").slice(0, 4);
-    state.year = year.value;
-  };
-  const updateSeason = (): void => {
-    state.quarterDirty = true;
-    state.season = season.value;
+    state.quarter = quarter.value.normalize("NFKC").toLocaleUpperCase();
   };
   format.addEventListener("change", updateFormat);
   studios.addEventListener("input", updateStudios);
-  year.addEventListener("input", updateYear);
-  season.addEventListener("change", updateSeason);
+  quarter.addEventListener("input", updateQuarter);
   context.onDispose(() => {
     format.removeEventListener("change", updateFormat);
     studios.removeEventListener("input", updateStudios);
-    year.removeEventListener("input", updateYear);
-    season.removeEventListener("change", updateSeason);
+    quarter.removeEventListener("input", updateQuarter);
   });
 
   context.state.set(STATE_KEY, state);
@@ -225,13 +185,10 @@ function applyRefreshedResult(state: ClassificationEditorState, result: External
 
   if (!state.quarterDirty) {
     const quarter = quarterFromResult(result);
-    if (quarter.season && quarter.year) {
-      state.initialSeason = quarter.season;
-      state.season = quarter.season;
-      state.seasonControl.value = quarter.season;
-      state.initialYear = quarter.year;
-      state.year = quarter.year;
-      state.yearControl.value = quarter.year;
+    if (quarter) {
+      state.initialQuarter = quarter;
+      state.quarter = quarter;
+      state.quarterControl.value = quarter;
     }
   }
 }
@@ -258,59 +215,11 @@ function refreshMissingMetadata<Host extends AnimeListFeatureHost>(
   });
 }
 
-function configureFallbackQuarter<Host extends AnimeListFeatureHost>(
-  context: MediaFormContext<Host>,
-): void {
-  const initial = initialDraft(context);
-  const year = createLabeledField(
-    context.formEl,
-    `${uiText("add.metadataSeason")} · ${uiText("date.year")}`,
-    createTextInput("text", initial.year),
-  );
-  year.inputMode = "numeric";
-  year.autocomplete = "off";
-  year.maxLength = 4;
-  year.placeholder = "YYYY";
-  const season = createLabeledField(
-    context.formEl,
-    uiText("add.metadataSeason"),
-    createSelect(seasonOptions(), initial.season),
-    "YYYY · Q1–Q4",
-  );
-
-  const yearField = year.closest<HTMLElement>(".al-form-field");
-  const seasonField = season.closest<HTMLElement>(".al-form-field");
-  const anchor = context.fields.genres.closest<HTMLElement>(".al-form-field");
-  if (anchor && yearField && seasonField) anchor.before(yearField, seasonField);
-
-  const state: FallbackQuarterState = {
-    initialSeason: initial.season,
-    initialYear: initial.year,
-    season: season.value,
-    year: year.value,
-  };
-  context.state.set(FALLBACK_QUARTER_STATE_KEY, state);
-  const updateYear = (): void => {
-    year.value = year.value.replace(/\D/g, "").slice(0, 4);
-    state.year = year.value;
-  };
-  const updateSeason = (): void => { state.season = season.value; };
-  year.addEventListener("input", updateYear);
-  season.addEventListener("change", updateSeason);
-  context.onDispose(() => {
-    year.removeEventListener("input", updateYear);
-    season.removeEventListener("change", updateSeason);
-  });
-}
-
 function configureClassificationEditor<Host extends AnimeListFeatureHost>(
   context: MediaFormContext<Host>,
 ): void {
   if (context.mediaType !== "anime") return;
-  if (!context.metadataHostEl) {
-    configureFallbackQuarter(context);
-    return;
-  }
+  if (!context.metadataHostEl) return;
   const state = renderEditor(context, initialDraft(context));
   if (state) refreshMissingMetadata(context, state);
 }
@@ -324,18 +233,7 @@ function prepareClassificationSubmit<Host extends AnimeListFeatureHost>(
 ): void {
   if (context.mediaType !== "anime") return;
   const state = context.state.get(STATE_KEY) as ClassificationEditorState | undefined;
-  if (!state) {
-    const fallback = context.state.get(FALLBACK_QUARTER_STATE_KEY) as FallbackQuarterState | undefined;
-    if (!fallback) return;
-    if (fallback.season === fallback.initialSeason && fallback.year === fallback.initialYear) return;
-    const quarter = parseEditableMediaQuarter(fallback.season, fallback.year);
-    if (quarter.kind !== "valid") {
-      throw new Error(`${uiText("add.metadataSeason")}: YYYY / Q1–Q4`);
-    }
-    context.form.season = quarter.season;
-    context.form.seasonYear = quarter.seasonYear;
-    return;
-  }
+  if (!state) return;
 
   if (state.format !== state.initialFormat) {
     const format = normalizeEditableMediaFormat(state.format);
@@ -347,10 +245,10 @@ function prepareClassificationSubmit<Host extends AnimeListFeatureHost>(
     context.form.studios = normalizeEditableStudios(state.studios);
   }
 
-  if (state.season !== state.initialSeason || state.year !== state.initialYear) {
-    const quarter = parseEditableMediaQuarter(state.season, state.year);
+  if (state.quarter !== state.initialQuarter) {
+    const quarter = parseEditableMediaQuarterText(state.quarter);
     if (quarter.kind !== "valid") {
-      throw new Error(`${uiText("add.metadataSeason")}: YYYY / Q1–Q4`);
+      throw new Error(`${uiText("add.metadataSeason")}: YYYY Q1–Q4`);
     }
     context.form.season = quarter.season;
     context.form.seasonYear = quarter.seasonYear;

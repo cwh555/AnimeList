@@ -7,7 +7,6 @@ import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeGenre } from "../domain/media-metadata";
 import { providerTagDisplayLabels } from "../i18n/provider-tag-localization";
 import { compatibleGenres, compatibleSourceGenres } from "../data/media-frontmatter-compat";
-import { storedMediaNeedsClassificationRefresh } from "../data/stored-media-result";
 import { mediaFormatLabel, mediaProviderLabel, uiText } from "../ui-text";
 import type { AnimeListUiHost } from "./plugin-host";
 import type { MediaFormContext } from "./media-form-contracts";
@@ -408,7 +407,10 @@ export class AddMediaModal extends Modal {
       this.plugin.enrichExternalMedia(result),
     ]);
     metadataLoading.remove();
-    renderMediaClassificationFields(this.contentEl, enrichedResult);
+    const metadataHost = createDiv();
+    metadataHost.className = "al-edit-metadata-host";
+    renderMediaClassificationFields(metadataHost, enrichedResult);
+    this.contentEl.appendChild(metadataHost);
 
     const form = createDiv();
     form.className = "al-media-form";
@@ -447,6 +449,7 @@ export class AddMediaModal extends Modal {
       plugin: this.plugin,
       modalEl: this.modalEl,
       formEl: form,
+      metadataHostEl: metadataHost,
       mediaType: enrichedResult.mediaType,
       result: enrichedResult,
       file: null,
@@ -575,20 +578,6 @@ export class EditMediaModal extends Modal {
     renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
     this.contentEl.appendChild(metadataHost);
 
-    const needsMetadataRefresh = storedMediaNeedsClassificationRefresh(frontmatter, mediaType);
-    if (needsMetadataRefresh) {
-      const loading = makeEl("small", "al-metadata-refresh-note", uiText("edit.metadataRefreshing"));
-      metadataHost.appendChild(loading);
-      void this.plugin.enrichStoredMedia(frontmatter, mediaType).then((enriched) => {
-        if (!this.contentEl.isConnected) return;
-        transitionSurface(metadataHost, () => metadataHost.replaceChildren());
-        renderMediaClassificationFields(metadataHost, enriched, true);
-      }).catch((error) => {
-        console.warn("AnimeList edit metadata refresh failed", error);
-        loading.textContent = uiText("edit.metadataRefreshUnavailable");
-      });
-    }
-
     const formHeading = createEl("h3");
     formHeading.className = "al-form-section-heading al-edit-form-heading";
     formHeading.textContent = uiText("edit.collectionData");
@@ -631,6 +620,7 @@ export class EditMediaModal extends Modal {
       plugin: this.plugin,
       modalEl: this.modalEl,
       formEl: form,
+      metadataHostEl: metadataHost,
       mediaType,
       result: null,
       file: this.file,

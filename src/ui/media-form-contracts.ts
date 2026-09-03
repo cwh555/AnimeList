@@ -44,6 +44,7 @@ export interface MediaFormContext<Host extends MediaFormHost> {
   host: Host;
   modalEl: HTMLElement;
   formEl: HTMLElement;
+  metadataHostEl: HTMLElement | null;
   mediaType: MediaType;
   result: ExternalMediaResult | null;
   file: TFile | null;

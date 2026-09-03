@@ -40,3 +40,26 @@ export function parseEditableMediaQuarter(
   if (!season || !/^[1-9]\d{3}$/.test(yearText)) return { kind: "invalid" };
   return { kind: "valid", season, seasonYear: Number(yearText) };
 }
+
+export function editableMediaQuarterText(
+  seasonValue: unknown,
+  seasonYearValue: unknown,
+): string {
+  const quarter = parseEditableMediaQuarter(seasonValue, seasonYearValue);
+  if (quarter.kind !== "valid") return "";
+  const number = quarter.season === "winter" ? 1
+    : quarter.season === "spring" ? 2
+      : quarter.season === "summer" ? 3
+        : 4;
+  return `${quarter.seasonYear} Q${number}`;
+}
+
+export function parseEditableMediaQuarterText(value: unknown): EditableMediaQuarter {
+  const text = typeof value === "string" || typeof value === "number"
+    ? String(value).normalize("NFKC").trim()
+    : "";
+  if (!text) return { kind: "empty" };
+  const match = /^([1-9]\d{3})\s+Q([1-4])$/i.exec(text);
+  if (!match) return { kind: "invalid" };
+  return parseEditableMediaQuarter(`Q${match[2]}`, match[1]);
+}
