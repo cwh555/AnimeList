@@ -1,4 +1,5 @@
 import { persistedMediaTags, resolveMediaSeasonMetadata } from "../domain/media-classification";
+import { parseEditableMediaQuarter } from "../domain/media-quarter";
 import { writeCompatibleGenres } from "./media-frontmatter-compat";
 import { normalizeMediaStatus } from "../domain/media-status";
 import { normalizeGenres } from "../domain/media-metadata";
@@ -124,6 +125,21 @@ export interface ValidatedMediaNoteForm {
   completedAt: string;
 }
 
+function editableAnimeQuarterOverride(
+  mediaType: MediaType,
+  form: MediaNoteForm,
+): { season: "winter" | "spring" | "summer" | "fall"; seasonYear: number } | null {
+  if (mediaType !== "anime") return null;
+  if (!Object.hasOwn(form, "season") && !Object.hasOwn(form, "seasonYear")) return null;
+  const quarter = parseEditableMediaQuarter(form.season, form.seasonYear);
+  if (quarter.kind === "invalid") {
+    throw new Error(`${uiText("add.metadataSeason")}: YYYY / Q1–Q4`);
+  }
+  return quarter.kind === "valid"
+    ? { season: quarter.season, seasonYear: quarter.seasonYear }
+    : null;
+}
+
 function validateMediaNoteFormForType(
   mediaType: MediaType,
   form: MediaNoteForm,
@@ -143,6 +159,7 @@ function validateMediaNoteFormForType(
   if (status === "completed" && !completedAt) {
     throw new Error(completedRequirementMessage(mediaType, uiText("field.completedAt")));
   }
+  editableAnimeQuarterOverride(mediaType, form);
   return { title, status, score, completedAt };
 }
 
@@ -162,6 +179,7 @@ export function applyEditableMediaForm(
   const unit = defaultProgressUnit(mediaType, form.unit);
   const total = mediaType === "anime" ? Math.max(0, numeric(form.total)) : 0;
   const progress = completedProgress(validated.status, total, form.progress, mediaType, unit);
+  const quarterOverride = editableAnimeQuarterOverride(mediaType, form);
 
   frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
   frontmatter.title = validated.title;
@@ -177,6 +195,10 @@ export function applyEditableMediaForm(
   frontmatter.progress_unit = unit;
   frontmatter.favorite = form.favorite === true;
   writeCompatibleGenres(frontmatter, [...(form.genres ?? []), ...(form.userTags ?? [])]);
+  if (quarterOverride) {
+    frontmatter.season = quarterOverride.season;
+    frontmatter.season_year = quarterOverride.seasonYear;
+  }
   if (validated.score != null) frontmatter.score = validated.score;
   else delete frontmatter.score;
   if (form.startedAt) frontmatter.started_at = form.startedAt;
@@ -247,7 +269,8 @@ export function buildMediaMarkdown(
   const classification = result.classification;
   yamlArray(lines, "media_tags", persistedMediaTags(classification));
   if (result.mediaType === "anime") {
-    const season = resolveMediaSeasonMetadata({
+    const manualQuarter = editableAnimeQuarterOverride(result.mediaType, form);
+    const season = manualQuarter ?? resolveMediaSeasonMetadata({
       season: classification?.season,
       seasonYear: classification?.seasonYear,
       startDate: result.startDate,
