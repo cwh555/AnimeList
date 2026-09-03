@@ -142,10 +142,19 @@ describe("anime calendar quarter metadata", () => {
     assert.match(yaml, /^season_year: 2025$/m);
   });
 
-  it("lets an explicit manual quarter override provider metadata", () => {
+  it("lets an explicit manual quarter override complete provider metadata", () => {
     const markdown = buildMediaMarkdown(animeResult({
       startDate: { year: 2025, month: 1, day: 4 },
-      classification: undefined,
+      classification: {
+        anilistId: "42",
+        genres: ["戀愛"],
+        tags: [],
+        season: "winter",
+        seasonYear: 2025,
+        studios: ["Studio"],
+        source: "original",
+        countryOfOrigin: "JP",
+      },
     }), animeForm({ season: "Q3", seasonYear: "2026" }), "", "");
     const yaml = noteFrontmatter(markdown);
     assert.match(yaml, /^season: "summer"$/m);
