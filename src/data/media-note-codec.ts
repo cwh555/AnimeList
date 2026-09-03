@@ -1,6 +1,7 @@
 import { persistedMediaTags, resolveMediaSeasonMetadata } from "../domain/media-classification";
+import { normalizeEditableMediaFormat, normalizeEditableStudios } from "../domain/media-editable-classification";
 import { parseEditableMediaQuarter } from "../domain/media-quarter";
-import { writeCompatibleGenres } from "./media-frontmatter-compat";
+import { writeCompatibleGenres, writeCompatibleStudios } from "./media-frontmatter-compat";
 import { normalizeMediaStatus } from "../domain/media-status";
 import { normalizeGenres } from "../domain/media-metadata";
 import type {
@@ -140,6 +141,21 @@ function editableAnimeQuarterOverride(
     : null;
 }
 
+function editableMediaFormatOverride(form: MediaNoteForm): string | null {
+  if (!Object.hasOwn(form, "format")) return null;
+  const format = normalizeEditableMediaFormat(form.format);
+  if (!format) throw new Error(`${uiText("add.metadataFormat")}: ${uiText("add.required")}`);
+  return format;
+}
+
+function editableAnimeStudiosOverride(
+  mediaType: MediaType,
+  form: MediaNoteForm,
+): string[] | null {
+  if (mediaType !== "anime" || !Object.hasOwn(form, "studios")) return null;
+  return normalizeEditableStudios(form.studios);
+}
+
 function validateMediaNoteFormForType(
   mediaType: MediaType,
   form: MediaNoteForm,
@@ -160,6 +176,8 @@ function validateMediaNoteFormForType(
     throw new Error(completedRequirementMessage(mediaType, uiText("field.completedAt")));
   }
   editableAnimeQuarterOverride(mediaType, form);
+  editableMediaFormatOverride(form);
+  editableAnimeStudiosOverride(mediaType, form);
   return { title, status, score, completedAt };
 }
 
@@ -180,9 +198,13 @@ export function applyEditableMediaForm(
   const total = mediaType === "anime" ? Math.max(0, numeric(form.total)) : 0;
   const progress = completedProgress(validated.status, total, form.progress, mediaType, unit);
   const quarterOverride = editableAnimeQuarterOverride(mediaType, form);
+  const formatOverride = editableMediaFormatOverride(form);
+  const studiosOverride = editableAnimeStudiosOverride(mediaType, form);
 
   frontmatter.schema_version = CURRENT_MEDIA_SCHEMA_VERSION;
   frontmatter.title = validated.title;
+  if (formatOverride !== null) frontmatter.format = formatOverride;
+  if (studiosOverride !== null) writeCompatibleStudios(frontmatter, studiosOverride);
   frontmatter.status = validated.status;
   if (mediaType === "anime") {
     frontmatter.progress_total = total;
@@ -230,6 +252,8 @@ export function buildMediaMarkdown(
     : 0;
   const unit = defaultProgressUnit(result.mediaType, form.unit || result.unit);
   const progress = completedProgress(status, total, form.progress, result.mediaType, unit);
+  const format = editableMediaFormatOverride(form) ?? result.format ?? result.mediaType;
+  const studios = editableAnimeStudiosOverride(result.mediaType, form) ?? result.people;
   const genres = normalizeGenres([...(form.genres ?? []), ...(form.userTags ?? [])], 32);
   const releaseStatus = result.mediaType === "anime"
     ? "unknown"
@@ -245,7 +269,7 @@ export function buildMediaMarkdown(
     lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   }
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
-  lines.push(`format: ${yamlScalar(result.format || result.mediaType)}`);
+  lines.push(`format: ${yamlScalar(format)}`);
   lines.push(`status: ${yamlScalar(status)}`);
   if (result.mediaType !== "anime") lines.push(`release_status: ${yamlScalar(releaseStatus)}`);
   lines.push(`progress: ${yamlScalar(progress)}`);
@@ -287,7 +311,7 @@ export function buildMediaMarkdown(
   if (classification?.source) lines.push(`source_material: ${yamlScalar(classification.source)}`);
   if (classification?.anilistId) lines.push(`anilist_id: ${yamlScalar(classification.anilistId)}`);
   yamlArray(lines, "title_aliases", result.searchTitles ?? []);
-  if (result.mediaType === "anime") yamlArray(lines, "studios", result.people);
+  if (result.mediaType === "anime") yamlArray(lines, "studios", studios);
   else yamlArray(lines, "authors", result.people);
   yamlArray(lines, "platforms", result.platforms);
   lines.push(`source_provider: ${yamlScalar(result.provider)}`);
