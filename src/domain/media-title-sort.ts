@@ -26,7 +26,7 @@ const CHINESE_UNITS: Readonly<Record<string, number>> = {
 };
 
 const STRUCTURAL_ORDINAL = /第([零〇一二兩两三四五六七八九十百千]+)(?=(?:季|期|部|卷|冊|册|章|話|话|集))/gu;
-const CJK_TRAILING_INSTALLMENT = /(?:[\s　]*[-–—·:：]?\s*)第?(\d+(?:\.5)?)(季|期|部|卷|巻|冊|册|章|話|话|集|クール)$/u;
+const CJK_TRAILING_INSTALLMENT = /(?:[\s\u3000]*[-–—·:：]?\s*)第?(\d+(?:\.5)?)(季|期|部|卷|巻|冊|册|章|話|话|集|クール)$/u;
 const EN_TRAILING_INSTALLMENT = /(?:[\s_-]+)(season|part|vol(?:ume)?)[\s._-]*(\d+(?:\.5)?)$/iu;
 const KO_TRAILING_INSTALLMENT = /(?:[\s_-]+)(\d+(?:\.5)?)(기|권)$/u;
 
