@@ -1,3 +1,5 @@
+import { compareTimelineHistoryEntries, type TimelineHistoryOrderable } from "./history-order";
+
 export const TIMELINE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface TimelineDensityPoint {
@@ -164,7 +166,7 @@ export function buildTimelineDensityCurve(
   return { points, bandwidthMs: median(samples.map((sample) => sample.bandwidth)) };
 }
 
-export function groupTimelineHistory<T extends { completedTime: number }>(items: readonly T[]): TimelineHistoryYear<T>[] {
+export function groupTimelineHistory<T extends { completedTime: number } & TimelineHistoryOrderable>(items: readonly T[]): TimelineHistoryYear<T>[] {
   const years = new Map<number, Map<number, T[]>>();
   for (const item of items) {
     if (!Number.isFinite(item.completedTime)) continue;
@@ -186,7 +188,9 @@ export function groupTimelineHistory<T extends { completedTime: number }>(items:
         .map(([month, monthItems]) => ({
           year,
           month,
-          items: [...monthItems].sort((left, right) => right.completedTime - left.completedTime),
+          items: [...monthItems].sort((left, right) => (
+            right.completedTime - left.completedTime || compareTimelineHistoryEntries(left, right)
+          )),
         })),
     }));
 }

@@ -63,6 +63,32 @@ describe("timeline workspace layout", () => {
     assert.equal(timelineDensityBandwidth([time, time, time]), DAY);
   });
 
+  it("orders same-day installments newest-first inside each work", () => {
+    const completedTime = new Date(2026, 5, 6).getTime();
+    const items = [
+      { title: "作品 第一季", completedTime },
+      { title: "作品 第十季", completedTime },
+      { title: "作品 第二季", completedTime },
+      { title: "作品 外傳", completedTime },
+    ];
+    const grouped = groupTimelineHistory(items);
+    assert.deepEqual(
+      grouped[0].months[0].items.map((item) => item.title),
+      ["作品 第十季", "作品 第二季", "作品 第一季", "作品 外傳"],
+    );
+
+    const volumes = [
+      { title: "小說 — 第 3 卷", seriesTitle: "小說", volumeLabel: "3", completedTime },
+      { title: "小說 — 第 10 卷", seriesTitle: "小說", volumeLabel: "10", completedTime },
+      { title: "小說 — 第 4 卷", seriesTitle: "小說", volumeLabel: "4", completedTime },
+    ];
+    const volumeGroup = groupTimelineHistory(volumes);
+    assert.deepEqual(
+      volumeGroup[0].months[0].items.map((item) => item.volumeLabel),
+      ["10", "4", "3"],
+    );
+  });
+
   it("groups history by descending year, month, and completion time", () => {
     const items = [
       { id: "a", completedTime: new Date(2025, 11, 1).getTime() },

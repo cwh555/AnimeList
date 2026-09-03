@@ -501,6 +501,7 @@ interface CreateMediaFormContextInput {
   plugin: AnimeListUiHost;
   modalEl: HTMLElement;
   formEl: HTMLElement;
+  metadataHostEl?: HTMLElement | null;
   mediaType: MediaType;
   result: ExternalMediaResult | null;
   file: TFile | null;
@@ -509,7 +510,7 @@ interface CreateMediaFormContextInput {
 }
 
 export function createMediaFormContext({
-  mode, plugin, modalEl, formEl, mediaType, result, file, frontmatter, fields,
+  mode, plugin, modalEl, formEl, metadataHostEl = null, mediaType, result, file, frontmatter, fields,
 }: CreateMediaFormContextInput): MediaFormContext<AnimeListUiHost> {
   const disposers = new Set<() => void>();
   let disposed = false;
@@ -518,6 +519,7 @@ export function createMediaFormContext({
     host: plugin,
     modalEl,
     formEl,
+    metadataHostEl,
     mediaType,
     result,
     file,

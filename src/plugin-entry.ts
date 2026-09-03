@@ -2,6 +2,7 @@ import type { AnimeListFeature, AnimeListFeatureHost } from "./app/feature-types
 import { registerBundledLocales } from "./i18n/locales";
 import { additionalProgressUnitsFeature } from "./features/progress/additional-progress-units";
 import AnimeListPlugin from "./main";
+import { mediaClassificationEditorFeature } from "./features/media-classification/feature";
 import { masterpieceFeature } from "./features/masterpiece/feature";
 import { imageSectionFeature } from "./features/image-sections/feature";
 import { imageGalleryFeature } from "./features/image-gallery/feature";
@@ -23,6 +24,7 @@ registerBundledLocales();
 
 const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   progressUiFeature,
+  mediaClassificationEditorFeature,
   searchPaginationFeature,
   searchEnhancementsFeature,
   ratingFeature,

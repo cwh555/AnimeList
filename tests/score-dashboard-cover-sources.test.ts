@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CoverSources, MediaItem } from "../src/types";
 import { prepareScoreDashboardCoverSources } from "../src/ui/score-dashboard/cover-sources";
-import { CoverThumbnailCache } from "../src/data/cover-cache";
+import { CoverThumbnailCache, coverCachePaths } from "../src/data/cover-cache";
 import { TFile, type App } from "obsidian";
 
 function mediaItem(coverSources?: CoverSources): MediaItem {
@@ -28,6 +28,31 @@ describe("score dashboard cover sources", () => {
     const [prepared] = prepareScoreDashboardCoverSources([item]);
     assert.equal(prepared, item);
     assert.equal(prepared.coverSources, ready);
+  });
+
+  it("does not expose the 24px cache image as a UI placeholder", async () => {
+    const file = coverFile();
+    const root = ".obsidian/plugins/animelist/cache/covers";
+    const paths = coverCachePaths(root, file.path, file.stat.mtime);
+    const files = new Set([paths.placeholder, paths.small, paths.large]);
+    const app = {
+      vault: {
+        configDir: ".obsidian",
+        adapter: {
+          getResourcePath: (path: string) => `app://${path}`,
+          list: async () => ({ files: [...files], folders: [] }),
+          exists: async () => true,
+          mkdir: async () => {},
+        },
+      },
+    } as unknown as App;
+    const cache = new CoverThumbnailCache(app, "animelist");
+    await cache.initialize();
+    const sources = cache.getSources(file);
+    assert.ok(sources);
+    assert.equal(sources.src, `app://${paths.small}`);
+    assert.equal(sources.srcset, `app://${paths.small} 320w, app://${paths.large} 640w`);
+    assert.equal(sources.placeholder, "");
   });
 
   it("uses the original lazy image path on a cache miss without enqueueing thumbnails", () => {

@@ -118,6 +118,10 @@ export interface MediaNoteForm {
   unit: string;
   score: number | string | null;
   favorite: boolean;
+  format?: string;
+  studios?: string[];
+  season?: string;
+  seasonYear?: number | string;
   startedAt: string;
   completedAt: string;
   genres: string[];
