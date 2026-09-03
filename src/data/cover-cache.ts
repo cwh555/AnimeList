@@ -288,10 +288,12 @@ export class CoverThumbnailCache {
   private readSources(file: TFile): CoverSources | undefined {
     const paths = coverCachePaths(this.root, file.path, file.stat.mtime);
     if (![paths.placeholder, paths.small, paths.large].every((path) => this.files.has(path))) return undefined;
-    const placeholder = this.app.vault.adapter.getResourcePath(paths.placeholder);
     const small = this.app.vault.adapter.getResourcePath(paths.small);
     const large = this.app.vault.adapter.getResourcePath(paths.large);
-    return { src: small, srcset: `${small} 320w, ${large} 640w`, placeholder };
+    // Keep the existing 24px cache file as part of the immutable cache group,
+    // but do not expose it as a UI placeholder: enlarging it behind a lazy
+    // cover produces the full-card blurred frame reported by users.
+    return { src: small, srcset: `${small} 320w, ${large} 640w`, placeholder: "" };
   }
 
   private hasCompleteGroup(file: TFile): boolean {
