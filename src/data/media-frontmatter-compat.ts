@@ -1,5 +1,6 @@
 import type { MediaSeason } from "../domain/media-classification";
 import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres } from "../domain/media-metadata";
+import { normalizeEditableStudios } from "../domain/media-editable-classification";
 import { asArray, stringValue } from "../domain/value-normalization";
 
 const LEGACY_SELECTED_TAG_KEYS = [
@@ -174,6 +175,17 @@ export function compatibleStudios(frontmatter: Record<string, unknown>): string[
   const explicit = normalizeAnimeStudios(valuesFor(frontmatter, LEGACY_STUDIO_KEYS));
   if (explicit.length) return explicit;
   return normalizeAnimeStudios(compatibleSourceGenres(frontmatter).filter(likelyLegacyStudio));
+}
+
+export function writeCompatibleStudios(
+  frontmatter: Record<string, unknown>,
+  values: unknown,
+): string[] {
+  const studios = normalizeEditableStudios(values);
+  if (studios.length) frontmatter.studios = studios;
+  else delete frontmatter.studios;
+  for (const key of LEGACY_STUDIO_KEYS) delete frontmatter[key];
+  return studios;
 }
 
 export interface LegacyClassificationMigration {
