@@ -243,6 +243,34 @@ const host={app:{}};
  details.lightboxModalStaysInsideViewport=modalRect.top>=-epsilon && modalRect.bottom<=innerHeight+epsilon;
  lightbox.close();
 
+ const navigationLightbox=new AnimeListImageSessionRegression.ImageLightboxModal(
+   host.app,
+   service,
+   AnimeListImageSessionRegression.imageLightboxEntries(context.sourcePath,['wide.jpg','square-1.jpg']),
+   0,
+ );
+ navigationLightbox.open();
+ const navigationReady=await waitFor(()=>{
+   const currentImage=document.querySelector('.al-image-lightbox-image');
+   return Boolean(currentImage && !currentImage.hidden && currentImage.complete && currentImage.naturalWidth>0);
+ });
+ await delay(80);
+ const navigationCanvas=document.querySelector('.al-image-lightbox-canvas');
+ const navigationImage=document.querySelector('.al-image-lightbox-image');
+ const previousButton=document.querySelector('.al-image-lightbox-nav.is-previous');
+ const nextButton=document.querySelector('.al-image-lightbox-nav.is-next');
+ if(!navigationCanvas||!navigationImage||!previousButton||!nextButton) throw new Error('navigation lightbox fixture unavailable');
+ const navigationCanvasRect=navigationCanvas.getBoundingClientRect();
+ const navigationImageRect=navigationImage.getBoundingClientRect();
+ const previousRect=previousButton.getBoundingClientRect();
+ const nextRect=nextButton.getBoundingClientRect();
+ details.lightboxControlsReserveImageViewport=navigationReady
+   && previousRect.right<=navigationCanvasRect.left+epsilon
+   && nextRect.left>=navigationCanvasRect.right-epsilon
+   && navigationImageRect.left>=navigationCanvasRect.left-epsilon
+   && navigationImageRect.right<=navigationCanvasRect.right+epsilon;
+ navigationLightbox.close();
+
  renderer.onunload();
  orderSession.dispose();
  document.body.dataset.details=JSON.stringify({
