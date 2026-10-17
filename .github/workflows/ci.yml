@@ -34,6 +34,8 @@ jobs:
         run: npm run test:browser:date
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run Lightbox layout and interaction regressions in Chromium
+        run: npm run test:browser:image-session-regressions
       - name: Run Score Dashboard mobile interactions in Chromium
         run: npm run test:browser:score-mobile
       - name: Run tag chip interactions in Chromium
