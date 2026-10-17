@@ -1,4 +1,5 @@
-import { Modal, setIcon } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { ReleaseTrackingService } from "../data/release-tracking-service";
 import type { MediaItem } from "../domain/media-types";
@@ -43,7 +44,7 @@ export interface ReleaseTrackingManagerModalOptions {
   onApplied(): Promise<void> | void;
 }
 
-export class ReleaseTrackingManagerModal extends Modal {
+export class ReleaseTrackingManagerModal extends AnimeListModal {
   private readonly items: MediaItem[];
   private readonly checked = new Map<string, boolean>();
   private readonly initialChecked = new Map<string, boolean>();

@@ -1,10 +1,10 @@
-import { Modal } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
 import type { MediaItem } from "../types";
 import { normalizeTimelineMaxStackDepth } from "../domain/timeline/scale";
 import type { AnimeListUiHost } from "./plugin-host";
 import { TimelineUI } from "./timeline-renderer";
 
-export class TimelineModal extends Modal {
+export class TimelineModal extends AnimeListModal {
   constructor(
     private readonly plugin: AnimeListUiHost,
     private readonly items: MediaItem[],

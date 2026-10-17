@@ -1,4 +1,5 @@
-import { Modal, Notice, type Plugin } from "obsidian";
+import { AnimeListModal } from "../animelist-modal";
+import { Notice, type Plugin } from "obsidian";
 import type {
   SerialCoverMigrationProgress,
   SerialCoverMigrationSummary,
@@ -51,7 +52,7 @@ function setMetric(metric: HTMLElement, value: number): void {
   metric.querySelector<HTMLElement>(".al-serial-cover-migration-metric-value")?.setText(String(value));
 }
 
-export class SerialCoverMigrationModal extends Modal {
+export class SerialCoverMigrationModal extends AnimeListModal {
   private controller: AbortController | null = null;
   private running = false;
 

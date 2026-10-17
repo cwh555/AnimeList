@@ -1,4 +1,5 @@
-import { Modal, setIcon } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { MediaItem } from "../domain/media-types";
 import type {
@@ -194,7 +195,7 @@ function resultSection(
   return section;
 }
 
-export class ReleaseTrackingResultsModal extends Modal {
+export class ReleaseTrackingResultsModal extends AnimeListModal {
   private summary: ReleaseRefreshSummary | null = null;
   private progress: ReleaseRefreshProgress | null = null;
   private busy = true;
@@ -452,7 +453,7 @@ function candidateRow(
   return row;
 }
 
-export class ReleaseTrackingMatchModal extends Modal {
+export class ReleaseTrackingMatchModal extends AnimeListModal {
   private requestId = 0;
   private busy = false;
   private candidates: ReleaseMatchCandidate[] = [];
