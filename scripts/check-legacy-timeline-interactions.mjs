@@ -64,6 +64,7 @@ AnimeListLegacyTimeline.TimelineUI.render(root,items,{openFile:()=>{}});
    && root.querySelector('.al-timeline-controls')?.getAttribute('data-ignore-swipe')==='true'
    && root.querySelector('.al-timeline-undated-rail')?.getAttribute('data-ignore-swipe')==='true'
    && !root.hasAttribute('data-ignore-swipe');
+ details.legacyDatedCanvasClaimsSwipe=root.querySelector('.al-timeline-viewport')?.getAttribute('data-ignore-swipe')==='true';
  const scene=root.querySelector('.al-timeline-scene');
  const datedCards=[...scene.querySelectorAll('.al-timeline-card')];
  const card=datedCards[1];
