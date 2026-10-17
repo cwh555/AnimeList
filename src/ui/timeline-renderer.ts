@@ -261,7 +261,7 @@ export const TimelineUI = (() => {
       return { items: unknownItems.length, totalItems: allItems.length + allUnknownItems.length, type: selectedType };
     }
 
-    const viewport = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-viewport"));
+    const viewport = makeEl("div", "al-timeline-viewport");
     const scene = makeEl("div", "al-timeline-scene");
     viewport.appendChild(scene);
     root.appendChild(viewport);

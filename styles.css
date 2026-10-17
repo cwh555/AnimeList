@@ -1892,27 +1892,6 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   gap: 8px;
 }
 
-/* Mobile Timeline gives AnimeList the central drag surface, while leaving
- * small unmarked start targets for Obsidian's native edge swipes. */
-.animelist-native-view .al-timeline-overview-host {
-  position: relative;
-  min-width: 0;
-  flex: 0 0 auto;
-}
-
-.is-mobile .animelist-native-view .al-timeline-scale-wrap { position: relative; }
-.is-mobile .animelist-native-view .al-native-swipe-edge {
-  position: absolute;
-  z-index: 5;
-  top: 0;
-  bottom: 0;
-  width: 24px;
-  pointer-events: auto;
-  touch-action: pan-x;
-}
-.is-mobile .animelist-native-view .al-native-swipe-edge.is-left { left: 0; }
-.is-mobile .animelist-native-view .al-native-swipe-edge.is-right { right: 0; }
-
 /* Short phone viewports can run out of vertical space when both Timeline
  * controls and unknown-date cards are present. Keep the actual pan surface
  * usable and scroll the Timeline body rather than the entire Obsidian leaf. */
@@ -6057,4 +6036,27 @@ button.al-moment-stack-strip:focus-visible {
   justify-content: flex-start;
   overflow-x: auto;
 }
+
+/* All AnimeList native views share the same mobile gesture ownership boundary.
+ * Physical side strips are siblings of the ignored content subtree. */
+.al-native-swipe-edge { display: none; }
+
+.is-mobile .animelist-native-view,
+.is-mobile .animelist-score-dashboard-view { position: relative; }
+
+.is-mobile .animelist-native-view > .al-native-swipe-edge,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge {
+  display: block;
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: auto;
+  touch-action: pan-x;
+}
+.is-mobile .animelist-native-view > .al-native-swipe-edge.is-left,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-left { left: 0; }
+.is-mobile .animelist-native-view > .al-native-swipe-edge.is-right,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-right { right: 0; }
 /* END GENERATED FEATURE STYLES */
