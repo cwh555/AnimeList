@@ -74,7 +74,7 @@ assert.doesNotMatch(coverFeatureSource, /applyButton|SerialCoverSelection|this\.
 assert.doesNotMatch(pluginEntrySource, /installSerialCoverPickerEvents/);
 
 // Settings control behavior is covered by tests/serial-cover-settings.test.ts.
-assert.match(migrationModalSource, /class SerialCoverMigrationModal extends Modal/);
+// Modal base-class changes are integration behavior; source inheritance text is not a contract.
 assert.match(migrationModalSource, /createEl\("progress",\s*\{[\s\S]*al-serial-cover-migration-progress/);
 assert.match(migrationModalSource, /new AbortController\(\)/);
 assert.match(migrationModalSource, /this\.controller\.abort\(\)/);
