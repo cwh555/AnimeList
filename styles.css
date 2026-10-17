@@ -1913,6 +1913,21 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .is-mobile .animelist-native-view .al-native-swipe-edge.is-left { left: 0; }
 .is-mobile .animelist-native-view .al-native-swipe-edge.is-right { right: 0; }
 
+/* Short phone viewports can run out of vertical space when both Timeline
+ * controls and unknown-date cards are present. Keep the actual pan surface
+ * usable and scroll the Timeline body rather than the entire Obsidian leaf. */
+@media (max-height: 760px) {
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-workspace-body {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap {
+    flex: 0 0 auto;
+    height: clamp(180px, 38dvh, 260px);
+    min-height: 180px;
+  }
+}
+
 /* Serial-reading UI overrides.
  * Kept separate from the established stylesheet so this feature branch remains
  * isolated and the production build can append the rules idempotently.
