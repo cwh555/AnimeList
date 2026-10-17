@@ -30,19 +30,15 @@ describe("mobile horizontal swipe ownership", () => {
   it("creates unmarked native edge targets beside the interaction surface", () => {
     const children: Array<{ className: string; attributes: Map<string, string> }> = [];
     const container = {
-      ownerDocument: {
-        createElement(tag: string) {
-          assert.equal(tag, "div");
-          const attributes = new Map<string, string>();
-          return {
-            className: "",
-            attributes,
-            setAttribute(name: string, value: string) { attributes.set(name, value); },
-          };
-        },
-      },
-      appendChild(child: { className: string; attributes: Map<string, string> }) {
+      createDiv() {
+        const attributes = new Map<string, string>();
+        const child = {
+          className: "",
+          attributes,
+          setAttribute(name: string, value: string) { attributes.set(name, value); },
+        };
         children.push(child);
+        return child;
       },
     } as unknown as HTMLElement;
     appendObsidianNativeSwipeEdges(container);
