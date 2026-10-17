@@ -63,6 +63,7 @@ html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family
 <script>${bundle}</script><script>
 const items=[${items}];
 const app=document.querySelector('#app');
+if(innerWidth<=700) document.body.classList.add('is-mobile');
 const page={id:'timeline',label:'Timeline',icon:'clock-3',order:20,render(el){AnimeListTimelineTest.renderTimelineWorkspace(el,items,{maxStackDepth:3,openFile:()=>{}})}};
 const result=AnimeListTimelineTest.renderAnimeListWorkspaceShell(app,{pages:[page],activeSection:'timeline',onSelect:()=>{}}); page.render(result.page);
 const click=(el,x)=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x||0}));
@@ -82,9 +83,48 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const overviewInitial=document.querySelector('.al-timeline-overview'); const overviewWindowInitial=document.querySelector('.al-timeline-overview-window'); const overviewInitialRect=overviewInitial.getBoundingClientRect(); const viewportInitialRect=viewport.getBoundingClientRect(); const appRect=app.getBoundingClientRect(); const overviewStyle=getComputedStyle(overviewInitial); const overviewWindowStyle=getComputedStyle(overviewWindowInitial);
  d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
- d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
+ d.overviewBelowCanvas=overviewInitial.parentElement?.classList.contains('al-timeline-overview-host')
+   && overviewInitial.parentElement.parentElement===document.querySelector('.al-timeline-workspace-body')
+   && overviewInitialRect.top>=viewportInitialRect.bottom-1;
  d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
+ const closestSwipeOwner=(target)=>target?.closest?.('[data-ignore-swipe]');
+ const elementAt=(x,y)=>document.elementFromPoint(x,y);
+ const viewportEdgeHost=viewport.parentElement;
+ const overviewEdgeHost=overviewInitial.parentElement;
+ const leftViewportEdge=viewportEdgeHost?.querySelector('.al-native-swipe-edge.is-left');
+ const rightViewportEdge=viewportEdgeHost?.querySelector('.al-native-swipe-edge.is-right');
+ const leftOverviewEdge=overviewEdgeHost?.querySelector('.al-native-swipe-edge.is-left');
+ const rightOverviewEdge=overviewEdgeHost?.querySelector('.al-native-swipe-edge.is-right');
+ const vp=viewport.getBoundingClientRect();
+ const ov=overviewEdgeHost.getBoundingClientRect();
+ const isMobile=document.body.classList.contains('is-mobile');
+ d.timelineSwipeOwnershipScoped=viewport.getAttribute('data-ignore-swipe')==='true'
+   && overviewInitial.getAttribute('data-ignore-swipe')==='true'
+   && !closestSwipeOwner(app) && !closestSwipeOwner(overviewEdgeHost)
+   && !!leftViewportEdge && !!rightViewportEdge && !!leftOverviewEdge && !!rightOverviewEdge;
+ if(isMobile) {
+   d.timelineMiddleClaimsSwipe=!!closestSwipeOwner(elementAt(vp.left+vp.width/2,vp.top+Math.min(12,vp.height/2)));
+   d.timelineLeftEdgeNative=elementAt(vp.left+12,vp.top+Math.min(12,vp.height/2))===leftViewportEdge
+     && !closestSwipeOwner(leftViewportEdge);
+   d.timelineRightEdgeNative=elementAt(vp.right-12,vp.top+Math.min(12,vp.height/2))===rightViewportEdge
+     && !closestSwipeOwner(rightViewportEdge);
+   d.overviewMiddleClaimsSwipe=!!closestSwipeOwner(elementAt(ov.left+ov.width/2,ov.top+ov.height/2));
+   d.overviewLeftEdgeNative=elementAt(ov.left+12,ov.top+ov.height/2)===leftOverviewEdge
+     && !closestSwipeOwner(leftOverviewEdge);
+   d.overviewRightEdgeNative=elementAt(ov.right-12,ov.top+ov.height/2)===rightOverviewEdge
+     && !closestSwipeOwner(rightOverviewEdge);
+   d.nativeEdgeZonesAreNarrow=['left','right'].every((side)=>{
+     const a=viewportEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
+     const b=overviewEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
+     return Math.abs(a.getBoundingClientRect().width-24)<=1
+       && Math.abs(b.getBoundingClientRect().width-24)<=1
+       && getComputedStyle(a).touchAction==='pan-x';
+   });
+ } else {
+   d.desktopSwipeEdgesInactive=getComputedStyle(leftViewportEdge).position!=='absolute'
+     && getComputedStyle(leftOverviewEdge).position!=='absolute';
+ }
  d.materialOverviewIndicator=parseFloat(overviewWindowStyle.borderTopWidth)<=0.1&&parseFloat(overviewWindowStyle.borderRadius)>=8&&overviewWindowStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewWindowStyle.backgroundColor!=='transparent';
  let cards=datedCards(); let axis=document.querySelector('.al-timeline-axis');
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
@@ -137,6 +177,7 @@ try {
     { width: 1000, height: 620 },
     { width: 820, height: 900 },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    { width: 320, height: 720, deviceScaleFactor: 2, mobile: true },
   ]) {
     await runChromiumDatasetTest({
       html,
