@@ -27,7 +27,8 @@ export function appendObsidianNativeSwipeEdges(container: HTMLElement): void {
   for (const side of ["left", "right"] as const) {
     const edge = makeEl("div", `al-native-swipe-edge is-${side}`);
     edge.setAttribute("aria-hidden", "true");
-    container.prepend(edge);
+    if (typeof container.prepend === "function") container.prepend(edge);
+    else container.appendChild(edge);
   }
 }
 
