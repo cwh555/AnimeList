@@ -117,6 +117,11 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
    d.overviewRightEdgeNative=elementAt(ov.right-12,ov.top+ov.height/2)===rightOverviewEdge
      && !closestSwipeOwner(rightOverviewEdge);
    if(innerWidth===320) {
+     const bodyElement=document.querySelector('.al-timeline-workspace-body');
+     d.shortPhoneCanvasRemainsUsable=vp.height>=179;
+     d.shortPhoneTimelineScrollsInternally=getComputedStyle(bodyElement).overflowY==='auto'
+       && getComputedStyle(bodyElement).overscrollBehaviorY==='contain'
+       && bodyElement.scrollHeight>bodyElement.clientHeight;
      const hit=(x,y)=>{const el=elementAt(x,y);return el?el.className||el.tagName:'null'};
      const vpY=vp.top+Math.min(12,vp.height/2);
      touchGeometryTrace={
