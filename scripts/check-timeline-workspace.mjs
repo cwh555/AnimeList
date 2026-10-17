@@ -100,6 +100,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const vp=viewport.getBoundingClientRect();
  const ov=overviewEdgeHost.getBoundingClientRect();
  const isMobile=document.body.classList.contains('is-mobile');
+ let touchGeometryTrace;
  d.timelineSwipeOwnershipScoped=viewport.getAttribute('data-ignore-swipe')==='true'
    && overviewInitial.getAttribute('data-ignore-swipe')==='true'
    && !closestSwipeOwner(app) && !closestSwipeOwner(overviewEdgeHost)
@@ -115,6 +116,19 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
      && !closestSwipeOwner(leftOverviewEdge);
    d.overviewRightEdgeNative=elementAt(ov.right-12,ov.top+ov.height/2)===rightOverviewEdge
      && !closestSwipeOwner(rightOverviewEdge);
+   if(innerWidth===320) {
+     const hit=(x,y)=>{const el=elementAt(x,y);return el?el.className||el.tagName:'null'};
+     const vpY=vp.top+Math.min(12,vp.height/2);
+     touchGeometryTrace={
+       viewport:{left:vp.left,right:vp.right,top:vp.top,bottom:vp.bottom,width:vp.width,height:vp.height},
+       wrap:{left:viewportEdgeHost.getBoundingClientRect().left,top:viewportEdgeHost.getBoundingClientRect().top,height:viewportEdgeHost.getBoundingClientRect().height},
+       controls:{top:document.querySelector('.al-timeline-workspace-controls').getBoundingClientRect().top,height:document.querySelector('.al-timeline-workspace-controls').getBoundingClientRect().height},
+       overview:{top:ov.top,height:ov.height},
+       middleHit:hit(vp.left+vp.width/2,vpY),leftHit:hit(vp.left+12,vpY),rightHit:hit(vp.right-12,vpY),
+       edgeStyle:getComputedStyle(leftViewportEdge).position,
+       overviewMiddleHit:hit(ov.left+ov.width/2,ov.top+ov.height/2),
+     };
+   }
    d.nativeEdgeZonesAreNarrow=['left','right'].every((side)=>{
      const a=viewportEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
      const b=overviewEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
@@ -167,7 +181,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.historyScrollContained=app.scrollHeight<=app.clientHeight+1&&document.querySelector('.al-timeline-workspace-body').scrollHeight>=document.querySelector('.al-timeline-workspace-body').clientHeight;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
- document.body.dataset.details=JSON.stringify(d); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
+ document.body.dataset.details=JSON.stringify({...d,...(touchGeometryTrace?{touchGeometryTrace}:{})}); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
 })().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result='fail'});
 </script></body></html>`;
 
