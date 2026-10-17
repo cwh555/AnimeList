@@ -23,7 +23,7 @@ export function isolateHorizontalSwipeSurface<T extends HTMLElement>(element: T)
  */
 export function appendObsidianNativeSwipeEdges(container: HTMLElement): void {
   for (const side of ["left", "right"] as const) {
-    const edge = container.ownerDocument.createElement("div");
+    const edge = container.createDiv();
     edge.className = `al-native-swipe-edge is-${side}`;
     edge.setAttribute("aria-hidden", "true");
     container.appendChild(edge);
