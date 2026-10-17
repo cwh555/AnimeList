@@ -213,6 +213,7 @@
   background: var(--al-m3-surface-container);
   box-shadow: none;
   cursor: pointer;
+  touch-action: pan-y;
 }
 .animelist-native-view .al-timeline-overview:focus-visible {
   outline: 2px solid var(--al-m3-primary);
