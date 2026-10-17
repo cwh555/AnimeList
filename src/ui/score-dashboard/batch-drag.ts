@@ -66,7 +66,10 @@ export function renderScoreDashboardWithBatchDrag(
     });
     controller.signal.addEventListener("abort", () => coverLoading.disconnect(), { once: true });
     const shell = container.querySelector<HTMLElement>(".al-score-dashboard");
-    if (container.classList.contains("animelist-score-dashboard-view") && shell) {
+    // The shared Workspace shell already owns every nested page; only the
+    // legacy standalone Score Dashboard needs an independent viewport boundary.
+    if (shell && container.classList.contains("animelist-score-dashboard-view")
+      && !container.closest?.(".al-workspace-shell")) {
       isolateAnimeListViewport(container, shell);
     }
     const batchButton = container.querySelector<HTMLButtonElement>(
