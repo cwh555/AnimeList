@@ -269,7 +269,42 @@ const host={app:{}};
    && nextRect.left>=navigationCanvasRect.right-epsilon
    && navigationImageRect.left>=navigationCanvasRect.left-epsilon
    && navigationImageRect.right<=navigationCanvasRect.right+epsilon;
+ const navigationMissing=document.querySelector('.al-image-lightbox-missing');
+ const navigationCounter=document.querySelector('.al-image-lightbox-counter');
+ if(!navigationMissing||!navigationCounter) throw new Error('lightbox visibility fixture unavailable');
+ details.lightboxLoadedImageHidesMissing=getComputedStyle(navigationMissing).display==='none'
+   && getComputedStyle(navigationImage).display!=='none';
+
+ nextButton.click();
+ details.lightboxNextButtonWorks=navigationCounter.textContent==='2 / 2';
+ navigationLightbox.modalEl.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
+ details.lightboxArrowKeyWorks=navigationCounter.textContent==='1 / 2';
+ navigationCanvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-500,bubbles:true,cancelable:true}));
+ details.lightboxZoomIsClipped=navigationLightbox.modalEl.querySelector('.al-image-lightbox-stage').classList.contains('is-zoomed')
+   && getComputedStyle(navigationCanvas).overflow==='hidden';
+ previousButton.dispatchEvent(new PointerEvent('pointerdown',{pointerId:180,button:0,bubbles:true}));
+ details.lightboxNavigationDoesNotStartPan=!navigationLightbox.modalEl.querySelector('.al-image-lightbox-stage').classList.contains('is-panning');
+ navigationCanvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:181,button:0,clientX:100,clientY:100,bubbles:true}));
+ navigationCanvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:181,button:0,clientX:140,clientY:124,bubbles:true}));
+ details.lightboxCanvasSupportsPan=navigationImage.style.transform.includes('translate(40px, 24px)');
+ navigationCanvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:181,button:0,bubbles:true}));
+ nextButton.click();
+ details.lightboxNavigationResetsZoom=!navigationLightbox.modalEl.querySelector('.al-image-lightbox-stage').classList.contains('is-zoomed')
+   && navigationImage.style.transform.includes('translate(0px, 0px)');
  navigationLightbox.close();
+
+ const missingService={...service,resolve:()=>({resourcePath:''})};
+ const missingLightbox=new AnimeListImageSessionRegression.ImageLightboxModal(
+   host.app,missingService,
+   AnimeListImageSessionRegression.imageLightboxEntries(context.sourcePath,['missing.jpg']),0,
+ );
+ missingLightbox.open();
+ const missingElement=document.querySelector('.al-image-lightbox-missing');
+ const missingImage=document.querySelector('.al-image-lightbox-image');
+ if(!missingElement||!missingImage) throw new Error('missing image fixture unavailable');
+ details.lightboxMissingFallbackVisible=getComputedStyle(missingElement).display!=='none'
+   && getComputedStyle(missingImage).display==='none';
+ missingLightbox.close();
 
  renderer.onunload();
  orderSession.dispose();
