@@ -8,15 +8,15 @@
 .is-mobile .animelist-native-view > .al-native-swipe-edge,
 .is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge {
   display: block;
-  position: absolute;
+  position: sticky;
   z-index: 10;
   top: 0;
-  bottom: 0;
   width: 24px;
+  height: 100%;
   pointer-events: auto;
   touch-action: pan-x;
 }
 .is-mobile .animelist-native-view > .al-native-swipe-edge.is-left,
-.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-left { left: 0; }
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-left { float: left; margin-right: -24px; }
 .is-mobile .animelist-native-view > .al-native-swipe-edge.is-right,
-.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-right { right: 0; }
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-right { float: right; margin-left: -24px; }

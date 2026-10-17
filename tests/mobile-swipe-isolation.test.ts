@@ -31,8 +31,8 @@ describe("mobile horizontal swipe ownership", () => {
   it("creates unmarked native edge targets beside the interaction surface", () => {
     const children: Array<{ className: string; attributes: Map<string, string> }> = [];
     const container = {
-      appendChild(child: { className: string; attributes: Map<string, string> }) {
-        children.push(child);
+      prepend(child: { className: string; attributes: Map<string, string> }) {
+        children.unshift(child);
       },
     } as unknown as HTMLElement;
     const previous = Object.getOwnPropertyDescriptor(globalThis, "createEl");
@@ -55,8 +55,8 @@ describe("mobile horizontal swipe ownership", () => {
       else Reflect.deleteProperty(globalThis, "createEl");
     }
     assert.deepEqual(children.map((child) => child.className), [
-      "al-native-swipe-edge is-left",
       "al-native-swipe-edge is-right",
+      "al-native-swipe-edge is-left",
     ]);
     assert.ok(children.every((child) => child.attributes.get("aria-hidden") === "true"));
     assert.ok(children.every((child) => !child.attributes.has(OBSIDIAN_IGNORE_SWIPE_ATTRIBUTE)));

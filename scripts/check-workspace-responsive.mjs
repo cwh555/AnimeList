@@ -156,6 +156,14 @@ try{
     return getComputedStyle(left).display==='none'&&getComputedStyle(right).display==='none';
   };
   details.libraryPluginWideSwipe=validateOwnership();
+  if(${mobile}) {
+    const before=app.scrollTop;
+    app.scrollTop=140;
+    await frames();
+    details.libraryNativeEdgesStayVisibleAfterScroll=app.scrollTop>0 && validateOwnership();
+    app.scrollTop=before;
+    await frames();
+  }
   details.libraryFits=noOverflow(app);
 
   shell=await render('scores');
