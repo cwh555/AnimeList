@@ -21,6 +21,7 @@ export function imageLightboxZoomFromWheel(current: number, deltaY: number): num
 export class ImageLightboxModal extends Modal {
   private index: number;
   private stage: HTMLElement | null = null;
+  private canvas: HTMLElement | null = null;
   private image: HTMLImageElement | null = null;
   private missing: HTMLElement | null = null;
   private counter: HTMLElement | null = null;
@@ -135,6 +136,23 @@ export class ImageLightboxModal extends Modal {
   private buildShell(): void {
     this.contentEl.replaceChildren();
     this.stage = makeEl("div", "al-image-lightbox-stage");
+    this.canvas = makeEl("div", "al-image-lightbox-canvas");
+    Object.assign(this.stage.style, {
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr)",
+      alignItems: "stretch",
+      justifyContent: "normal",
+      boxSizing: "border-box",
+    });
+    Object.assign(this.canvas.style, {
+      position: "relative",
+      display: "flex",
+      minWidth: "0",
+      minHeight: "0",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    });
     this.image = makeEl("img", "al-image-lightbox-image");
     this.image.alt = "";
     this.image.draggable = false;
@@ -155,20 +173,42 @@ export class ImageLightboxModal extends Modal {
     });
     this.missing = makeEl("div", "al-image-lightbox-missing", imageSectionText("missing"));
     this.missing.hidden = true;
-    this.stage.append(this.image, this.missing);
+    this.canvas.append(this.image, this.missing);
 
     if (this.entries.length > 1) {
+      this.stage.classList.add("has-navigation");
+      Object.assign(this.stage.style, {
+        gridTemplateColumns: "clamp(40px, 8vw, 48px) minmax(0, 1fr) clamp(40px, 8vw, 48px)",
+      });
       this.previous = makeEl("button", "al-image-lightbox-nav is-previous");
       this.previous.type = "button";
       this.previous.setAttribute("aria-label", imageSectionText("previousImage"));
       setAnimeListIcon(this.previous, "chevron-left");
+      Object.assign(this.previous.style, {
+        position: "static",
+        top: "auto",
+        left: "auto",
+        alignSelf: "center",
+        justifySelf: "center",
+        transform: "none",
+      });
       this.previous.addEventListener("click", (event) => { event.stopPropagation(); this.move(-1); });
       this.next = makeEl("button", "al-image-lightbox-nav is-next");
       this.next.type = "button";
       this.next.setAttribute("aria-label", imageSectionText("nextImage"));
       setAnimeListIcon(this.next, "chevron-right");
+      Object.assign(this.next.style, {
+        position: "static",
+        top: "auto",
+        right: "auto",
+        alignSelf: "center",
+        justifySelf: "center",
+        transform: "none",
+      });
       this.next.addEventListener("click", (event) => { event.stopPropagation(); this.move(1); });
-      this.stage.append(this.previous, this.next);
+      this.stage.append(this.previous, this.canvas, this.next);
+    } else {
+      this.stage.append(this.canvas);
     }
 
     this.stage.addEventListener("wheel", (event) => {
@@ -179,7 +219,7 @@ export class ImageLightboxModal extends Modal {
     }, { passive: false });
     this.stage.addEventListener("dblclick", () => this.resetZoom());
     this.stage.addEventListener("pointerdown", (event) => {
-      if (this.zoom <= 1 || event.button !== 0) return;
+      if (this.zoom <= 1 || event.button !== 0 || !(event.target instanceof Node) || !this.canvas?.contains(event.target)) return;
       this.pan = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: this.panX, startY: this.panY };
       this.stage?.setPointerCapture(event.pointerId);
       this.stage?.classList.add("is-panning");

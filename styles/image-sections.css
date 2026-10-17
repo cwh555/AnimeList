@@ -490,6 +490,10 @@
   place-items:center;
   color:var(--text-muted);
 }
+.al-image-lightbox-image[hidden],
+.al-image-lightbox-missing[hidden] {
+  display:none;
+}
 
 @media (max-width:620px) {
   .animelist-image-lightbox { width:calc(100vw - 16px); max-width:calc(100vw - 16px); }
