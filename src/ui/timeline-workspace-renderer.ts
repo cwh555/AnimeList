@@ -28,7 +28,7 @@ import { assignTimelineLanes, compareTimelineEntries, filterTimelineEntries, tim
 import { timelineWorkspaceText } from "../features/timeline/text";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
-import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { appendObsidianNativeSwipeEdges, isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 interface TimedTimelineEntry extends TimelineMediaEntry { completedTime: number; }
 
@@ -411,7 +411,8 @@ export function renderTimelineWorkspace(
 
   function renderOverview(): void {
     if (!currentItems.length || !viewport) return;
-    const overview = makeEl("div", "al-timeline-overview");
+    const overviewHost = makeEl("div", "al-timeline-overview-host");
+    const overview = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-overview"));
     overview.setAttribute("role", "slider");
     overview.setAttribute("tabindex", "0");
     overview.setAttribute("aria-orientation", "horizontal");
@@ -448,7 +449,9 @@ export function renderTimelineWorkspace(
     const windowEl = makeEl("span", "al-timeline-overview-window");
     chart.appendChild(windowEl);
     overview.append(label, chart);
-    body.appendChild(overview);
+    overviewHost.appendChild(overview);
+    appendObsidianNativeSwipeEdges(overviewHost);
+    body.appendChild(overviewHost);
 
     updateOverviewWindow = () => {
       if (!viewport) return;
@@ -510,10 +513,11 @@ export function renderTimelineWorkspace(
     }
     const wrap = makeEl("section", "al-timeline-scale-wrap al-timeline-temporal-dimension");
     wrap.dataset.temporalDimension = "dated";
-    viewport = makeEl("div", "al-timeline-viewport al-timeline-workspace-viewport");
+    viewport = isolateHorizontalSwipeSurface(makeEl("div", "al-timeline-viewport al-timeline-workspace-viewport"));
     scene = makeEl("div", "al-timeline-scene");
     viewport.appendChild(scene);
     wrap.appendChild(viewport);
+    appendObsidianNativeSwipeEdges(wrap);
     body.appendChild(wrap);
     renderOverview();
     const undated = renderUndatedDimension();
