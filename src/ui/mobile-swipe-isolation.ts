@@ -1,3 +1,5 @@
+import { makeEl } from "./ui-helpers";
+
 export const OBSIDIAN_IGNORE_SWIPE_ATTRIBUTE = "data-ignore-swipe";
 
 /**
@@ -23,9 +25,7 @@ export function isolateHorizontalSwipeSurface<T extends HTMLElement>(element: T)
  */
 export function appendObsidianNativeSwipeEdges(container: HTMLElement): void {
   for (const side of ["left", "right"] as const) {
-    // eslint-disable-next-line obsidianmd/prefer-create-el -- This helper must also run in browser fixtures without Obsidian DOM extensions.
-    const edge = container.ownerDocument.createElement("div");
-    edge.className = `al-native-swipe-edge is-${side}`;
+    const edge = makeEl("div", `al-native-swipe-edge is-${side}`);
     edge.setAttribute("aria-hidden", "true");
     container.appendChild(edge);
   }
