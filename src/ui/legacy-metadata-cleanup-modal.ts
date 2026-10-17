@@ -1,4 +1,5 @@
-import { Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import { cleanupLegacyMetadataNotes } from "../data/legacy-metadata-cleanup";
 import type {
@@ -73,7 +74,7 @@ function setProgress(fill: HTMLElement, completed: number, total: number): numbe
   return percent;
 }
 
-export class LegacyMetadataCleanupModal extends Modal {
+export class LegacyMetadataCleanupModal extends AnimeListModal {
   constructor(private readonly host: AnimeListFeatureHost) {
     super(host.app);
   }
