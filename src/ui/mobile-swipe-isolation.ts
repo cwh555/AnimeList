@@ -30,3 +30,9 @@ export function appendObsidianNativeSwipeEdges(container: HTMLElement): void {
     container.appendChild(edge);
   }
 }
+
+/** Protect one complete AnimeList surface while leaving unmarked edge siblings. */
+export function isolateAnimeListViewport(host: HTMLElement, surface: HTMLElement): void {
+  isolateHorizontalSwipeSurface(surface);
+  appendObsidianNativeSwipeEdges(host);
+}

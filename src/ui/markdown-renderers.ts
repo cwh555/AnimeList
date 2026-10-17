@@ -12,6 +12,7 @@ import { appendIconLabel, asArray, itemStatusLabel, makeEl, mediaUnitLabel, setA
 import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
 import { installCoverImageLoading, type CoverImageLoadingController } from "./cover-image-loading";
+import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
@@ -67,6 +68,7 @@ export class AnimeListRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
+    isolateHorizontalSwipeSurface(this.containerEl);
     if (!this.coverLoading) {
       this.coverLoading = installCoverImageLoading(this.containerEl, {
         selector: "img.al-cover",
@@ -181,6 +183,7 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
   }
 
   render(): void {
+    isolateHorizontalSwipeSurface(this.containerEl);
     const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
     if (!(file instanceof TFile)) return;
     const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter || {};

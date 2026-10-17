@@ -17,6 +17,7 @@ import { renderScoreDashboard, type ScoreDashboardUiAdapters, type ScoreDashboar
 import { applyScoreDashboardDomChanges, refreshScoreDashboardDomSummary } from "./dom-move";
 import type { MediaItem } from "../../types";
 import { installCoverImageLoading } from "../cover-image-loading";
+import { isolateAnimeListViewport } from "../mobile-swipe-isolation";
 
 const controllers = new WeakMap<HTMLElement, AbortController>();
 
@@ -65,6 +66,9 @@ export function renderScoreDashboardWithBatchDrag(
     });
     controller.signal.addEventListener("abort", () => coverLoading.disconnect(), { once: true });
     const shell = container.querySelector<HTMLElement>(".al-score-dashboard");
+    if (container.classList.contains("animelist-score-dashboard-view") && shell) {
+      isolateAnimeListViewport(container, shell);
+    }
     const batchButton = container.querySelector<HTMLButtonElement>(
       ".al-score-dashboard-action-group .al-score-tool-button:last-child",
     );
