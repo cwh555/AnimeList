@@ -1923,7 +1923,7 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   }
   .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap {
     flex: 0 0 auto;
-    height: clamp(180px, 38dvh, 260px);
+    height: clamp(180px, 25dvh, 220px);
     min-height: 180px;
   }
 }
