@@ -340,3 +340,24 @@
   grid-template-columns: 1fr;
   gap: 8px;
 }
+
+/* Mobile Timeline gives AnimeList the central drag surface, while leaving
+ * small unmarked start targets for Obsidian's native edge swipes. */
+.animelist-native-view .al-timeline-overview-host {
+  position: relative;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.is-mobile .animelist-native-view .al-timeline-scale-wrap { position: relative; }
+.is-mobile .animelist-native-view .al-native-swipe-edge {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: auto;
+  touch-action: pan-x;
+}
+.is-mobile .animelist-native-view .al-native-swipe-edge.is-left { left: 0; }
+.is-mobile .animelist-native-view .al-native-swipe-edge.is-right { right: 0; }
