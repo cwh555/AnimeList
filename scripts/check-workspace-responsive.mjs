@@ -57,7 +57,7 @@ const [bundle, styles] = await Promise.all([
 
 const pixel = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22960%22%3E%3Crect%20width%3D%22640%22%20height%3D%22960%22%20fill%3D%22%235b5b5b%22%2F%3E%3C%2Fsvg%3E";
 
-function fixture({ leafWidth, expectedSize, dynamic = false }) {
+function fixture({ leafWidth, expectedSize, dynamic = false, mobile = false }) {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 :root{--background-primary:#111;--background-primary-alt:#181818;--background-secondary:#222;--background-secondary-alt:#292929;--background-modifier-border:#444;--background-modifier-hover:#333;--interactive-accent:#7867e6;--text-normal:#eee;--text-muted:#aaa;--text-faint:#777;--text-on-accent:#fff;--input-shadow:none;}
 html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family:sans-serif;overflow:auto}button,input,select{font:inherit}
@@ -79,6 +79,7 @@ for(const [name,fn] of Object.entries({addClass:function(...n){this.classList.ad
 try{
   const api=AnimeListWorkspaceResponsive;
   const app=document.querySelector('#app');
+  if(${mobile}) document.body.classList.add('is-mobile');
   const leaf=document.querySelector('#leaf');
   const frames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   const wait=async()=>{await new Promise(resolve=>setTimeout(resolve,35));await frames();};
@@ -138,8 +139,23 @@ try{
   details.horizontalSwipeIsolationKeepsVerticalPan=getComputedStyle(workspaceNav).touchAction==='auto';
   details.libraryHorizontalSurfacesOwnSwipe=app.querySelector('.al-type-tabs')?.getAttribute('data-ignore-swipe')==='true'
     && statuses?.getAttribute('data-ignore-swipe')==='true';
-  details.workspaceRootKeepsNativeSwipe=!app.querySelector('.al-workspace-shell')?.hasAttribute('data-ignore-swipe')
-    && !app.querySelector('.al-workspace-page')?.hasAttribute('data-ignore-swipe');
+  details.workspaceRootKeepsNativeSwipe=!app.hasAttribute('data-ignore-swipe')
+    && !app.querySelector('.al-workspace-page')?.hasAttribute('data-ignore-swipe')
+    && !!app.querySelector('.al-workspace-shell[data-ignore-swipe="true"]');
+  const validateOwnership=()=>{
+    const left=app.querySelector(':scope > .al-native-swipe-edge.is-left'),right=app.querySelector(':scope > .al-native-swipe-edge.is-right');
+    const surface=app.querySelector('.al-workspace-shell');
+    if(surface?.getAttribute('data-ignore-swipe')!=='true'||!left||!right) return false;
+    if(left.hasAttribute('data-ignore-swipe')||right.hasAttribute('data-ignore-swipe')) return false;
+    if(${mobile}){
+      const rect=app.getBoundingClientRect(),y=Math.min(rect.bottom-12,rect.top+25);
+      return !!document.elementFromPoint(rect.left+rect.width/2,y)?.closest('[data-ignore-swipe]')
+        && document.elementFromPoint(rect.left+12,y)===left
+        && document.elementFromPoint(rect.right-12,y)===right;
+    }
+    return getComputedStyle(left).display==='none'&&getComputedStyle(right).display==='none';
+  };
+  details.libraryPluginWideSwipe=validateOwnership();
   details.libraryFits=noOverflow(app);
 
   shell=await render('scores');
@@ -157,6 +173,7 @@ try{
   details.scoreHorizontalSurfacesOwnSwipe=app.querySelector('.al-score-dashboard-tabs')?.getAttribute('data-ignore-swipe')==='true'
     && scorePosters?.getAttribute('data-ignore-swipe')==='true';
   details.scoresFit=noOverflow(app);
+  details.scoresPluginWideSwipe=validateOwnership();
 
   shell=await render('images');
   details.imagesSize=shell.dataset.windowSize==='${expectedSize}';
@@ -171,6 +188,7 @@ try{
   details.imageHorizontalSurfacesOwnSwipe=app.querySelector('.al-gallery-mode-tabs')?.getAttribute('data-ignore-swipe')==='true'
     && app.querySelector('.al-gallery-type-filters')?.getAttribute('data-ignore-swipe')==='true';
   details.imagesFit=noOverflow(app);
+  details.imagesPluginWideSwipe=validateOwnership();
 
   shell=await render('timeline');
   details.timelineSize=shell.dataset.windowSize==='${expectedSize}';
@@ -183,6 +201,7 @@ try{
   details.timelineHorizontalSurfacesOwnSwipe=app.querySelector('.al-timeline-view-modes')?.getAttribute('data-ignore-swipe')==='true'
     && app.querySelector('.al-timeline-type-filters')?.getAttribute('data-ignore-swipe')==='true';
   details.timelineFits=noOverflow(app);
+  details.timelinePluginWideSwipe=validateOwnership();
 
   if(${dynamic}){
     shell=await render('library');
@@ -219,7 +238,7 @@ const cases = [
 try {
   for (const testCase of cases) {
     await runChromiumDatasetTest({
-      html: fixture(testCase),
+      html: fixture({ ...testCase, mobile: testCase.viewport.mobile }),
       profile: path.join(output, testCase.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")),
       testName: testCase.name,
       requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",

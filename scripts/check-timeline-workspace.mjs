@@ -83,67 +83,25 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const overviewInitial=document.querySelector('.al-timeline-overview'); const overviewWindowInitial=document.querySelector('.al-timeline-overview-window'); const overviewInitialRect=overviewInitial.getBoundingClientRect(); const viewportInitialRect=viewport.getBoundingClientRect(); const appRect=app.getBoundingClientRect(); const overviewStyle=getComputedStyle(overviewInitial); const overviewWindowStyle=getComputedStyle(overviewWindowInitial);
  d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
- d.overviewBelowCanvas=overviewInitial.parentElement?.classList.contains('al-timeline-overview-host')
-   && overviewInitial.parentElement.parentElement===document.querySelector('.al-timeline-workspace-body')
-   && overviewInitialRect.top>=viewportInitialRect.bottom-1;
+ d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
  d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
- d.overviewTouchScrubPreserved=overviewStyle.touchAction==='pan-y';
- const closestSwipeOwner=(target)=>target?.closest?.('[data-ignore-swipe]');
- const elementAt=(x,y)=>document.elementFromPoint(x,y);
- const viewportEdgeHost=viewport.parentElement;
- const overviewEdgeHost=overviewInitial.parentElement;
- const leftViewportEdge=viewportEdgeHost?.querySelector('.al-native-swipe-edge.is-left');
- const rightViewportEdge=viewportEdgeHost?.querySelector('.al-native-swipe-edge.is-right');
- const leftOverviewEdge=overviewEdgeHost?.querySelector('.al-native-swipe-edge.is-left');
- const rightOverviewEdge=overviewEdgeHost?.querySelector('.al-native-swipe-edge.is-right');
- const vp=viewport.getBoundingClientRect();
- const ov=overviewEdgeHost.getBoundingClientRect();
- const isMobile=document.body.classList.contains('is-mobile');
- let touchGeometryTrace;
- d.timelineSwipeOwnershipScoped=viewport.getAttribute('data-ignore-swipe')==='true'
-   && overviewInitial.getAttribute('data-ignore-swipe')==='true'
-   && !closestSwipeOwner(app) && !closestSwipeOwner(overviewEdgeHost)
-   && !!leftViewportEdge && !!rightViewportEdge && !!leftOverviewEdge && !!rightOverviewEdge;
- if(isMobile) {
-   d.timelineMiddleClaimsSwipe=!!closestSwipeOwner(elementAt(vp.left+vp.width/2,vp.top+Math.min(12,vp.height/2)));
-   d.timelineLeftEdgeNative=elementAt(vp.left+12,vp.top+Math.min(12,vp.height/2))===leftViewportEdge
-     && !closestSwipeOwner(leftViewportEdge);
-   d.timelineRightEdgeNative=elementAt(vp.right-12,vp.top+Math.min(12,vp.height/2))===rightViewportEdge
-     && !closestSwipeOwner(rightViewportEdge);
-   d.overviewMiddleClaimsSwipe=!!closestSwipeOwner(elementAt(ov.left+ov.width/2,ov.top+ov.height/2));
-   d.overviewLeftEdgeNative=elementAt(ov.left+12,ov.top+ov.height/2)===leftOverviewEdge
-     && !closestSwipeOwner(leftOverviewEdge);
-   d.overviewRightEdgeNative=elementAt(ov.right-12,ov.top+ov.height/2)===rightOverviewEdge
-     && !closestSwipeOwner(rightOverviewEdge);
-   if(innerWidth===320) {
-     const bodyElement=document.querySelector('.al-timeline-workspace-body');
-     d.shortPhoneCanvasRemainsUsable=vp.height>=179;
-     d.shortPhoneTimelineScrollsInternally=getComputedStyle(bodyElement).overflowY==='auto'
-       && getComputedStyle(bodyElement).overscrollBehaviorY==='contain'
-       && bodyElement.scrollHeight>bodyElement.clientHeight;
-     const hit=(x,y)=>{const el=elementAt(x,y);return el?el.className||el.tagName:'null'};
-     const vpY=vp.top+Math.min(12,vp.height/2);
-     touchGeometryTrace={
-       viewport:{left:vp.left,right:vp.right,top:vp.top,bottom:vp.bottom,width:vp.width,height:vp.height},
-       wrap:{left:viewportEdgeHost.getBoundingClientRect().left,top:viewportEdgeHost.getBoundingClientRect().top,height:viewportEdgeHost.getBoundingClientRect().height},
-       controls:{top:document.querySelector('.al-timeline-workspace-controls').getBoundingClientRect().top,height:document.querySelector('.al-timeline-workspace-controls').getBoundingClientRect().height},
-       overview:{top:ov.top,height:ov.height},
-       middleHit:hit(vp.left+vp.width/2,vpY),leftHit:hit(vp.left+12,vpY),rightHit:hit(vp.right-12,vpY),
-       edgeStyle:getComputedStyle(leftViewportEdge).position,
-       overviewMiddleHit:hit(ov.left+ov.width/2,ov.top+ov.height/2),
-     };
+ const viewportBounds=viewport.getBoundingClientRect(),appBounds=app.getBoundingClientRect();
+ const leftEdge=app.querySelector(':scope > .al-native-swipe-edge.is-left'),rightEdge=app.querySelector(':scope > .al-native-swipe-edge.is-right');
+ d.sharedPluginSurfaceOwnsSwipe=app.querySelector('.al-workspace-shell')?.getAttribute('data-ignore-swipe')==='true'
+   && !app.hasAttribute('data-ignore-swipe')&&!!leftEdge&&!!rightEdge&&!leftEdge.hasAttribute('data-ignore-swipe')&&!rightEdge.hasAttribute('data-ignore-swipe');
+ if(document.body.classList.contains('is-mobile')) {
+   const y=viewportBounds.top+Math.min(12,viewportBounds.height/2);
+   d.pluginCenterHitOwnsSwipe=!!document.elementFromPoint(appBounds.left+appBounds.width/2,y)?.closest('[data-ignore-swipe]');
+   d.pluginLeftEdgeIsNative=document.elementFromPoint(appBounds.left+12,y)===leftEdge;
+   d.pluginRightEdgeIsNative=document.elementFromPoint(appBounds.right-12,y)===rightEdge;
+   if(innerWidth===320){
+     const timelineBody=document.querySelector('.al-timeline-workspace-body');
+     d.shortPhoneCanvasUsable=viewportBounds.height>=179;
+     d.shortPhoneScrollsInternally=getComputedStyle(timelineBody).overflowY==='auto'&&timelineBody.scrollHeight>timelineBody.clientHeight;
    }
-   d.nativeEdgeZonesAreNarrow=['left','right'].every((side)=>{
-     const a=viewportEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
-     const b=overviewEdgeHost.querySelector('.al-native-swipe-edge.is-'+side);
-     return Math.abs(a.getBoundingClientRect().width-24)<=1
-       && Math.abs(b.getBoundingClientRect().width-24)<=1
-       && getComputedStyle(a).touchAction==='pan-x';
-   });
  } else {
-   d.desktopSwipeEdgesInactive=getComputedStyle(leftViewportEdge).position!=='absolute'
-     && getComputedStyle(leftOverviewEdge).position!=='absolute';
+   d.desktopEdgesHidden=getComputedStyle(leftEdge).display==='none'&&getComputedStyle(rightEdge).display==='none';
  }
  d.materialOverviewIndicator=parseFloat(overviewWindowStyle.borderTopWidth)<=0.1&&parseFloat(overviewWindowStyle.borderRadius)>=8&&overviewWindowStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewWindowStyle.backgroundColor!=='transparent';
  let cards=datedCards(); let axis=document.querySelector('.al-timeline-axis');
@@ -186,7 +144,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.historyScrollContained=app.scrollHeight<=app.clientHeight+1&&document.querySelector('.al-timeline-workspace-body').scrollHeight>=document.querySelector('.al-timeline-workspace-body').clientHeight;
  d.noPageOverflow=document.documentElement.scrollWidth<=document.documentElement.clientWidth;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
- document.body.dataset.details=JSON.stringify({...d,...(touchGeometryTrace?{touchGeometryTrace}:{})}); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
+ document.body.dataset.details=JSON.stringify(d); document.body.dataset.result=Object.values(d).every(Boolean)?'pass':'fail';
 })().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result='fail'});
 </script></body></html>`;
 

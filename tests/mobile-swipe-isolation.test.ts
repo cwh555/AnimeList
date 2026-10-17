@@ -4,6 +4,7 @@ import {
   OBSIDIAN_IGNORE_SWIPE_ATTRIBUTE,
   appendObsidianNativeSwipeEdges,
   isolateHorizontalSwipeSurface,
+  isolateAnimeListViewport,
 } from "../src/ui/mobile-swipe-isolation";
 
 function fakeElement(): {
@@ -48,7 +49,7 @@ describe("mobile horizontal swipe ownership", () => {
       },
     });
     try {
-      appendObsidianNativeSwipeEdges(container);
+      isolateAnimeListViewport(container, fakeElement().element);
     } finally {
       if (previous) Object.defineProperty(globalThis, "createEl", previous);
       else Reflect.deleteProperty(globalThis, "createEl");
