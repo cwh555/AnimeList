@@ -158,7 +158,10 @@ render();
  details.workspaceAndGallerySwipeOwnership=document.querySelector('.al-workspace-nav')?.getAttribute('data-ignore-swipe')==='true'
    && modeTabs?.getAttribute('data-ignore-swipe')==='true'
    && document.querySelector('.al-gallery-type-filters')?.getAttribute('data-ignore-swipe')==='true'
-   && !document.querySelector('.al-workspace-shell')?.hasAttribute('data-ignore-swipe');
+   && document.querySelector('.al-workspace-shell')?.getAttribute('data-ignore-swipe')==='true'
+   && !document.querySelector('.animelist-native-view')?.hasAttribute('data-ignore-swipe')
+   && !!document.querySelector('.animelist-native-view > .al-native-swipe-edge.is-left')
+   && !!document.querySelector('.animelist-native-view > .al-native-swipe-edge.is-right');
 
  const slider=document.querySelector('.al-gallery-columns input');
  slider.value='2'; const tileBeforeColumns=document.querySelector('.al-gallery-image-tile'); const imageBeforeColumns=tileBeforeColumns?.querySelector('img'); slider.dispatchEvent(new Event('input',{bubbles:true})); await frames(); details.galleryColumnChangeUsesLayoutMotion=[...document.querySelectorAll('.al-gallery-image-tile')].some(tile=>tile.dataset.layoutMotion==='active'||tile.getAnimations().length>0); details.galleryColumnChangePreservesImageNode=document.querySelector('.al-gallery-image-tile')===tileBeforeColumns&&document.querySelector('.al-gallery-image-tile img')===imageBeforeColumns; await new Promise(r=>setTimeout(r,230)); await frames();
