@@ -88,6 +88,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
    && overviewInitialRect.top>=viewportInitialRect.bottom-1;
  d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
+ d.overviewTouchScrubPreserved=overviewStyle.touchAction==='pan-y';
  const closestSwipeOwner=(target)=>target?.closest?.('[data-ignore-swipe]');
  const elementAt=(x,y)=>document.elementFromPoint(x,y);
  const viewportEdgeHost=viewport.parentElement;
