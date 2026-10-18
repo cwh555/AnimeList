@@ -68,6 +68,8 @@ Duplicate warnings are intentionally conservative. A warning appears only when s
 
 When a supported result is selected, AnimeList can enrich the note with classification metadata without replacing the original provider identity. Anime records can show format, animation-production studio, and quarter; manga and novels show format and author information when available. AniList classification can also provide filtered media tags and source material.
 
+For anime, the Add/Edit form also allows you to correct the format, animation studio, and season/year classification manually. These edits preserve the note's other frontmatter fields, body content, and original metadata source identity.
+
 The Library Filter dialog contains three independent groups:
 
 - **Company** — animation studios for anime. Multiple selections require the work to match every selected studio identity. Formatting-only name variants are collapsed into one option.
@@ -271,9 +273,11 @@ In Actual time, horizontal distance remains proportional to completion time. Two
 
 Trackpad horizontal movement or dragging pans the scene. Ctrl/Cmd-modified wheel or pinch can change whole-scene scale, while the dedicated spacing controls change temporal spacing. Scaling keeps the timeline axis at the same screen-space vertical position instead of making the scene jump. The initial view and **Reset** center the newest work horizontally and center the timeline axis vertically.
 
-The scene is contained inside the Obsidian leaf like Graph View: pan/zoom stays inside the canvas and does not make the AnimeList page taller than the visible leaf. A smooth density overview is rendered as a footer directly below the canvas. Its tonal highlighted region represents the currently visible time range; selecting the overview navigates the timeline without moving the overview itself. History has its own bounded scroll area.
+The scene is contained inside the Obsidian leaf like Graph View: pan/zoom stays inside the canvas and does not make the AnimeList page taller than the visible leaf. A calendar-aware activity overview is rendered directly below the canvas. Compact-support smoothing retains visible short viewing bursts; the tonal highlighted region represents the current time range. Selecting the overview navigates the timeline without moving the overview itself. History has its own bounded scroll area. On short phone screens, the Timeline content scrolls internally to keep its canvas usable.
 
 Completed chapter, season, or volume entries appear as separate dated events. Each event prefers its own entry cover and falls back to the normal series cover when no entry cover is available. Select a card to open its Markdown note.
+
+On mobile Obsidian, AnimeList keeps horizontal interactions inside its workspace pages (Library, Timeline, Score Dashboard, and Images) and its note-media/dialog surfaces. Start a swipe from the outermost roughly 24 px at either edge when you want Obsidian's native left/right sidebar gesture instead. The central area remains available for AnimeList's horizontal controls, timeline panning, and image interaction.
 
 ## Library Export
 

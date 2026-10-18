@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.3 - 2026-10-18
+
+### Improved
+
+- Made anime format, studio, and release-quarter metadata editable while preserving unrelated note frontmatter and content.
+- Replaced Timeline's adaptive Gaussian density overview with calendar-aware, compact-support smoothing to keep short viewing activity peaks visible; retained newest-first order for same-day history entries.
+
+### Fixed
+
+- Kept Lightbox navigation controls outside the image canvas, with bounded pan/zoom and correct missing-image fallbacks.
+- Isolated horizontal gestures across the entire AnimeList mobile interface—including Library, Scores, Images, Timeline, embedded note UI, and plugin modals—while retaining native Obsidian sidebar swipes from the screen edges.
+- Kept mobile gesture edge targets usable after scrolling and prevented the Timeline canvas from collapsing on short phone screens.
+- Avoided enlarged blurred cover placeholders and strengthened Chromium regression coverage for responsive layouts and interactions.
+
+### Compatibility
+
+- The media schema remains version 6. Existing Markdown/frontmatter, stored settings, and note content remain compatible; no automatic schema migration is introduced.
+
 ## 1.5.2 - 2026-09-01
 
 ### Changed
