@@ -9,6 +9,7 @@ import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
+import { MediaCoverStorage } from "../data/media-cover-storage";
 import { MediaAssetGarbageCollector } from "../data/media-asset-garbage-collector";
 import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
@@ -106,7 +107,16 @@ export class AnimeListApplicationServices {
   }
 
   private mediaUpdates(): MediaUpdateService {
-    this.updateService ??= new MediaUpdateService(this.app, { refreshViews: () => this.callbacks.refreshViews() });
+    this.updateService ??= new MediaUpdateService(
+      this.app,
+      { refreshViews: () => this.callbacks.refreshViews() },
+      new MediaCoverStorage(
+        this.app,
+        this.settings,
+        this.libraryStorage(),
+        { optimizeFile: (file) => this.coverCache?.optimizeFile(file) ?? Promise.resolve() },
+      ),
+    );
     return this.updateService;
   }
 
@@ -282,7 +292,7 @@ export class AnimeListApplicationServices {
       : form;
     return this.mediaNotes().create(enriched, preparedForm, coverAsset);
   }
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
-    await this.mediaUpdates().update(file, mediaType, form);
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void> {
+    await this.mediaUpdates().update(file, mediaType, form, coverAsset);
   }
 }

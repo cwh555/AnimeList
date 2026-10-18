@@ -28,7 +28,7 @@ export interface AnimeListUiHost {
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;
   getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
-  updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
+  updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void>;
   deleteMediaFile(file: TFile): Promise<void>;
   setFavorite(path: string, next: boolean): Promise<void>;
   openLibrary(): Promise<void>;
