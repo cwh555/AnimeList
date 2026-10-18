@@ -90,7 +90,9 @@ export function createMediaCoverPicker(
     element: host,
     async readSelectedAsset() {
       const file = selected;
-      return file ? { name: file.name, contentType: file.type, data: await file.arrayBuffer() } : null;
+      if (!file) return null;
+      if (file.size === 0 || file.size > 20 * 1024 * 1024) throw new Error("Cover image must be a nonempty file no larger than 20 MB.");
+      return { name: file.name, contentType: file.type, data: await file.arrayBuffer() };
     },
     dispose() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
