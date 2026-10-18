@@ -1,4 +1,5 @@
-import { Modal, Notice, TFile } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { manualMediaResult, type MediaCoverAssetInput } from "../domain/manual-media";
 import { manualMediaText } from "../features/manual-media/text";
@@ -36,7 +37,7 @@ interface ManualMediaFormState {
   templatePath?: string;
 }
 
-export class AddMediaModal extends Modal {
+export class AddMediaModal extends AnimeListModal {
   readonly plugin: AnimeListUiHost;
   mediaType: MediaType;
   query = "";
@@ -494,7 +495,7 @@ export class AddMediaModal extends Modal {
   }
 }
 
-export class ConfirmDeleteModal extends Modal {
+export class ConfirmDeleteModal extends AnimeListModal {
   constructor(
     private readonly plugin: AnimeListUiHost,
     private readonly file: TFile,
@@ -535,7 +536,7 @@ export class ConfirmDeleteModal extends Modal {
   }
 }
 
-export class EditMediaModal extends Modal {
+export class EditMediaModal extends AnimeListModal {
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
 
   constructor(

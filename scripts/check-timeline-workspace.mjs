@@ -63,6 +63,7 @@ html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family
 <script>${bundle}</script><script>
 const items=[${items}];
 const app=document.querySelector('#app');
+if(innerWidth<=700) document.body.classList.add('is-mobile');
 const page={id:'timeline',label:'Timeline',icon:'clock-3',order:20,render(el){AnimeListTimelineTest.renderTimelineWorkspace(el,items,{maxStackDepth:3,openFile:()=>{}})}};
 const result=AnimeListTimelineTest.renderAnimeListWorkspaceShell(app,{pages:[page],activeSection:'timeline',onSelect:()=>{}}); page.render(result.page);
 const click=(el,x)=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x||0}));
@@ -85,6 +86,23 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
  d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
+ const viewportBounds=viewport.getBoundingClientRect(),appBounds=app.getBoundingClientRect();
+ const leftEdge=app.querySelector(':scope > .al-native-swipe-edge.is-left'),rightEdge=app.querySelector(':scope > .al-native-swipe-edge.is-right');
+ d.sharedPluginSurfaceOwnsSwipe=app.querySelector('.al-workspace-shell')?.getAttribute('data-ignore-swipe')==='true'
+   && !app.hasAttribute('data-ignore-swipe')&&!!leftEdge&&!!rightEdge&&!leftEdge.hasAttribute('data-ignore-swipe')&&!rightEdge.hasAttribute('data-ignore-swipe');
+ if(document.body.classList.contains('is-mobile')) {
+   const y=viewportBounds.top+Math.min(12,viewportBounds.height/2);
+   d.pluginCenterHitOwnsSwipe=!!document.elementFromPoint(appBounds.left+appBounds.width/2,y)?.closest('[data-ignore-swipe]');
+   d.pluginLeftEdgeIsNative=document.elementFromPoint(appBounds.left+12,y)===leftEdge;
+   d.pluginRightEdgeIsNative=document.elementFromPoint(appBounds.right-12,y)===rightEdge;
+   if(innerWidth===320){
+     const timelineBody=document.querySelector('.al-timeline-workspace-body');
+     d.shortPhoneCanvasUsable=viewportBounds.height>=179;
+     d.shortPhoneScrollsInternally=getComputedStyle(timelineBody).overflowY==='auto'&&timelineBody.scrollHeight>timelineBody.clientHeight;
+   }
+ } else {
+   d.desktopEdgesHidden=getComputedStyle(leftEdge).display==='none'&&getComputedStyle(rightEdge).display==='none';
+ }
  d.materialOverviewIndicator=parseFloat(overviewWindowStyle.borderTopWidth)<=0.1&&parseFloat(overviewWindowStyle.borderRadius)>=8&&overviewWindowStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewWindowStyle.backgroundColor!=='transparent';
  let cards=datedCards(); let axis=document.querySelector('.al-timeline-axis');
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
@@ -137,6 +155,7 @@ try {
     { width: 1000, height: 620 },
     { width: 820, height: 900 },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    { width: 320, height: 720, deviceScaleFactor: 2, mobile: true },
   ]) {
     await runChromiumDatasetTest({
       html,

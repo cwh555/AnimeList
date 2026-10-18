@@ -1,0 +1,22 @@
+/* All AnimeList native views share the same mobile gesture ownership boundary.
+ * Physical side strips are siblings of the ignored content subtree. */
+.al-native-swipe-edge { display: none; }
+
+.is-mobile .animelist-native-view,
+.is-mobile .animelist-score-dashboard-view { position: relative; }
+
+.is-mobile .animelist-native-view > .al-native-swipe-edge,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge {
+  display: block;
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  width: 24px;
+  height: 100%;
+  pointer-events: auto;
+  touch-action: pan-x;
+}
+.is-mobile .animelist-native-view > .al-native-swipe-edge.is-left,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-left { float: left; margin-right: -24px; }
+.is-mobile .animelist-native-view > .al-native-swipe-edge.is-right,
+.is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-right { float: right; margin-left: -24px; }

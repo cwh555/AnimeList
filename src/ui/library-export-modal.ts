@@ -1,4 +1,5 @@
-import { Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { MediaItem } from "../domain/media-types";
 import {
@@ -34,7 +35,7 @@ interface LibraryExportModalState {
   textTemplate: string;
 }
 
-export class LibraryExportModal extends Modal {
+export class LibraryExportModal extends AnimeListModal {
   private readonly service: LibraryExportService;
   private readonly specialLabelMode: SpecialLabelMode;
   private readonly exportedAt = new Date().toISOString();

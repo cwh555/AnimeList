@@ -213,6 +213,7 @@
   background: var(--al-m3-surface-container);
   box-shadow: none;
   cursor: pointer;
+  touch-action: pan-y;
 }
 .animelist-native-view .al-timeline-overview:focus-visible {
   outline: 2px solid var(--al-m3-primary);
@@ -339,4 +340,19 @@
 .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-undated-dimension {
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+/* Short phone viewports can run out of vertical space when both Timeline
+ * controls and unknown-date cards are present. Keep the actual pan surface
+ * usable and scroll the Timeline body rather than the entire Obsidian leaf. */
+@media (max-height: 760px) {
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-workspace-body {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-wrap {
+    flex: 0 0 auto;
+    height: clamp(180px, 25dvh, 220px);
+    min-height: 180px;
+  }
 }

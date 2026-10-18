@@ -1,4 +1,5 @@
-import { Menu, Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Menu, Notice } from "obsidian";
 import type { ImageSectionService } from "../data/image-section-service";
 import { imageSectionText } from "../features/image-sections/text";
 import { copyImageToClipboard } from "./image-clipboard";
@@ -18,7 +19,7 @@ export function imageLightboxZoomFromWheel(current: number, deltaY: number): num
   return Math.max(1, Math.min(5, next));
 }
 
-export class ImageLightboxModal extends Modal {
+export class ImageLightboxModal extends AnimeListModal {
   private index: number;
   private stage: HTMLElement | null = null;
   private canvas: HTMLElement | null = null;
@@ -36,7 +37,7 @@ export class ImageLightboxModal extends Modal {
   private readonly preloadResults = new Map<string, Promise<boolean>>();
 
   constructor(
-    app: ConstructorParameters<typeof Modal>[0],
+    app: ConstructorParameters<typeof AnimeListModal>[0],
     private readonly service: ImageSectionService,
     private readonly entries: readonly ImageLightboxEntry[],
     startIndex: number,

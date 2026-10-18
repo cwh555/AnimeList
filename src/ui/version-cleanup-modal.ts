@@ -1,4 +1,5 @@
-import { Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import {
   applyDuplicateDefaultCoverCleanup,
@@ -10,7 +11,7 @@ function appendRule(parent: HTMLElement, text: string): void {
   parent.createEl("li", { text });
 }
 
-export class DuplicateCoverCleanupModal extends Modal {
+export class DuplicateCoverCleanupModal extends AnimeListModal {
   constructor(private readonly host: AnimeListFeatureHost) {
     super(host.app);
   }

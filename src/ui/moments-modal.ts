@@ -1,4 +1,5 @@
-import { Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { Notice } from "obsidian";
 import type { ImageSectionAssetInput, ImageSectionService } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
 import { imageExtensionFor } from "../domain/image-section";
@@ -38,7 +39,7 @@ function assetPreview(asset: ImageSectionAssetInput): string {
   return URL.createObjectURL(new Blob([asset.data], { type: asset.contentType || "application/octet-stream" }));
 }
 
-export class MomentEditorModal extends Modal {
+export class MomentEditorModal extends AnimeListModal {
   private readonly isEdit: boolean;
   private textValue: string;
   private sourceValue: string;
@@ -58,7 +59,7 @@ export class MomentEditorModal extends Modal {
   private readonly pendingImageTiles = new Map<number, HTMLElement>();
 
   constructor(
-    app: ConstructorParameters<typeof Modal>[0],
+    app: ConstructorParameters<typeof AnimeListModal>[0],
     private readonly imageService: ImageSectionService,
     private readonly sourcePath: string,
     initial: MomentItem | null,
@@ -531,9 +532,9 @@ export class MomentEditorModal extends Modal {
   }
 }
 
-export class DeleteMomentModal extends Modal {
+export class DeleteMomentModal extends AnimeListModal {
   constructor(
-    app: ConstructorParameters<typeof Modal>[0],
+    app: ConstructorParameters<typeof AnimeListModal>[0],
     private readonly onDelete: () => Promise<void>,
   ) { super(app); }
 

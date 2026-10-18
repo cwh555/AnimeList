@@ -1,4 +1,5 @@
-import { Modal, setIcon } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { setIcon } from "obsidian";
 import type { App } from "obsidian";
 import type { ReleaseTrackingService, ReleaseRefreshItemResult, ReleaseRefreshProgress, ReleaseRefreshSummary } from "../data/release-tracking-service";
 import type { MediaItem } from "../domain/media-types";
@@ -94,7 +95,7 @@ function cover(item: MediaItem): HTMLElement {
   return frame;
 }
 
-export class ReleaseTrackingDashboardModal extends Modal {
+export class ReleaseTrackingDashboardModal extends AnimeListModal {
   private readonly items: MediaItem[];
   private readonly results = new Map<string, ReleaseRefreshItemResult>();
   private readonly refreshing = new Set<string>();

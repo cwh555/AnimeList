@@ -3,7 +3,7 @@ import type { LibrarySection } from "../domain/settings-types";
 import { uiText } from "../ui-text";
 import type { WorkspaceMenuAction, WorkspacePageDefinition } from "./workspace-contracts";
 import { appendIconLabel, makeEl, setAnimeListIcon } from "./ui-helpers";
-import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { isolateAnimeListViewport, isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
 import { disconnectWorkspaceWindowSize, observeWorkspaceWindowSize } from "./workspace-responsive";
 
 export interface WorkspaceShellOptions {
@@ -163,6 +163,7 @@ export function renderAnimeListWorkspaceShell(
 
   shell.append(header, navRow, page);
   container.appendChild(shell);
+  isolateAnimeListViewport(container, shell);
   observeWorkspaceWindowSize(container, shell);
   workspaceShellCache.set(container, { signature, shell, page: pageBody, pageActions, state });
   return { page: pageBody, pageActions, activePage };

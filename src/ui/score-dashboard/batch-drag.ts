@@ -17,6 +17,7 @@ import { renderScoreDashboard, type ScoreDashboardUiAdapters, type ScoreDashboar
 import { applyScoreDashboardDomChanges, refreshScoreDashboardDomSummary } from "./dom-move";
 import type { MediaItem } from "../../types";
 import { installCoverImageLoading } from "../cover-image-loading";
+import { isolateAnimeListViewport } from "../mobile-swipe-isolation";
 
 const controllers = new WeakMap<HTMLElement, AbortController>();
 
@@ -65,6 +66,12 @@ export function renderScoreDashboardWithBatchDrag(
     });
     controller.signal.addEventListener("abort", () => coverLoading.disconnect(), { once: true });
     const shell = container.querySelector<HTMLElement>(".al-score-dashboard");
+    // The shared Workspace shell already owns every nested page; only the
+    // legacy standalone Score Dashboard needs an independent viewport boundary.
+    if (shell && container.classList.contains("animelist-score-dashboard-view")
+      && !container.closest?.(".al-workspace-shell")) {
+      isolateAnimeListViewport(container, shell);
+    }
     const batchButton = container.querySelector<HTMLButtonElement>(
       ".al-score-dashboard-action-group .al-score-tool-button:last-child",
     );

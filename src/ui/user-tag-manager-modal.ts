@@ -1,4 +1,5 @@
-import { App, Modal, Notice } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { App, Notice } from "obsidian";
 import type { UserTagLibraryService, UserTagUsage } from "../data/user-tag-library-service";
 import {
   addUserTagToCatalog,
@@ -22,7 +23,7 @@ function sameTags(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-export class UserTagManagerModal extends Modal {
+export class UserTagManagerModal extends AnimeListModal {
   private catalog: string[];
   private selectedTag = "";
   private query = "";

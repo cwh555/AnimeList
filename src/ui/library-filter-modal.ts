@@ -1,4 +1,5 @@
-import { App, Modal } from "obsidian";
+import { AnimeListModal } from "./animelist-modal";
+import { App } from "obsidian";
 import type { LibraryFilterOptions, LibraryFilters, LibraryQuarterOption } from "../domain/library-filters";
 import { normalizeLibraryFilters, toggleLibraryFilterValue, toggleLibraryQuarter } from "../domain/library-filters";
 import { localizeProviderTag } from "../i18n/provider-tag-localization";
@@ -15,7 +16,7 @@ function filterText(value: string, query: string): boolean {
     || localizeProviderTag(value).toLocaleLowerCase().includes(normalizedQuery);
 }
 
-export class LibraryFilterModal extends Modal {
+export class LibraryFilterModal extends AnimeListModal {
   private draft: LibraryFilters;
   private query = "";
   private groupsEl?: HTMLElement;
