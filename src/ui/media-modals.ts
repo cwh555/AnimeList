@@ -16,6 +16,7 @@ import { createLabeledField, createMediaEditorFields, createMediaFormContext, cr
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 import { transitionSurface } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { createMediaCoverPicker, type MediaCoverPicker } from "./media-cover-picker";
 
 
 function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
@@ -538,6 +539,7 @@ export class ConfirmDeleteModal extends AnimeListModal {
 
 export class EditMediaModal extends AnimeListModal {
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
+  private coverPicker: MediaCoverPicker | null = null;
 
   constructor(
     private readonly plugin: AnimeListUiHost,
@@ -554,11 +556,15 @@ export class EditMediaModal extends AnimeListModal {
   onClose(): void {
     this.activeFormContext?.dispose();
     this.activeFormContext = null;
+    this.coverPicker?.dispose();
+    this.coverPicker = null;
   }
 
   private render(): void {
     this.activeFormContext?.dispose();
     this.activeFormContext = null;
+    this.coverPicker?.dispose();
+    this.coverPicker = null;
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
@@ -578,6 +584,9 @@ export class EditMediaModal extends AnimeListModal {
     metadataHost.className = "al-edit-metadata-host";
     renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
     this.contentEl.appendChild(metadataHost);
+
+    this.coverPicker = createMediaCoverPicker(this.plugin, this.file, frontmatter);
+    this.contentEl.appendChild(this.coverPicker.element);
 
     const formHeading = createEl("h3");
     formHeading.className = "al-form-section-heading al-edit-form-heading";
@@ -648,7 +657,8 @@ export class EditMediaModal extends AnimeListModal {
         try {
           const submitContext = { ...context, form: mediaFormValues(context) };
           await this.plugin.prepareMediaSubmit(submitContext);
-          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
+          const coverAsset = await this.coverPicker?.readSelectedAsset();
+          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form, coverAsset);
           this.close();
           new Notice(uiText("notice.saved"));
         } catch (error) {
