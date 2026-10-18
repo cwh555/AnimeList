@@ -29,6 +29,7 @@ export const TEST_FEATURES = [
 
 export const TEST_TARGETS = [
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
+  { path: "tests/media-cover-replacement.test.ts", kind: "test", suite: "contract", features: ["covers", "library", "markdown"] },
   { path: "tests/media-asset-cleanup.test.ts", kind: "test", suite: "unit", features: ["covers", "image-sections", "moments", "markdown"] },
   { path: "tests/vault-trash.test.ts", kind: "test", suite: "unit", features: ["covers", "image-sections"] },
   { path: "tests/media-form-lifecycle.test.ts", kind: "test", suite: "unit", features: ["serial-covers", "settings"] },
