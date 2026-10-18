@@ -322,8 +322,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.services().createMediaNote(result, form, coverAsset);
   }
 
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
-    await this.services().updateMediaNote(file, mediaType, form);
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void> {
+    await this.services().updateMediaNote(file, mediaType, form, coverAsset);
   }
 
   getFeatureSettingsSections(): ReturnType<AnimeListFeatureRegistry<AnimeListFeatureHost>["settingsSections"]> { return this.features.settingsSections(this); }

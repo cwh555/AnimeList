@@ -51,6 +51,10 @@ Click an entry's cover area or retry action to open manual cover search. Manual 
 
 Clear an entry cover to return that entry to the series-cover fallback. Existing notes can use **Settings → Maintenance → Serial cover recovery** to scan dated entries in a floating progress window. The migration reports loaded, not found, failed, and skipped records, supports cancellation, and never overwrites an existing entry cover.
 
+### Replace an existing work cover
+
+Open a work's **Edit** dialog to view its current cover. Under **Work cover**, choose a local JPEG, PNG, WebP, or AVIF file (maximum 20 MB). The replacement preview does not change the vault until **Save**. **Cancel replacement** or closing the editor retains the current cover. A successful save copies the new original image to the configured cover folder and updates only the note's existing `cover` frontmatter value alongside the normal editable fields; metadata source, `cover_remote`, unrelated YAML, and Markdown body are preserved. Previous cover files are not automatically deleted because other notes may still refer to them.
+
 ## Search and duplicate warnings
 
 AnimeList searches enabled providers:

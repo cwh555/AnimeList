@@ -183,6 +183,16 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] Edit, reorder, add, or remove an original Image Section reference, then return to/refresh Images and confirm the aggregate updates without a Vault-wide Markdown scan or duplicated asset. Rename/delete a media note and confirm stale work entries disappear.
 - [ ] A work with an empty Image Section does not create an empty board; an entirely empty aggregate shows the safe empty state. Large galleries progressively append image DOM instead of rendering every image eagerly.
 
+## Work cover replacement
+
+- [ ] Open an existing anime, manga, and novel in **Edit**: the current cover is displayed, and a local image can be chosen as a replacement.
+- [ ] Choose JPEG, PNG, WebP, and AVIF files on desktop and mobile; preview appears without changing the vault before **Save**.
+- [ ] **Cancel replacement** (and closing the editor without saving) preserves the original frontmatter and cover; file preview resources do not leak across repeated selections.
+- [ ] **Save** writes a uniquely named new file to the configured cover folder and updates `cover`; original image and `cover_remote` remain present; note prose and unrelated frontmatter are unchanged.
+- [ ] Reopen Library, Timeline, Images and the note detail: the new cover is rendered without stale thumbnails, while the old file remains untouched even if another note shares it.
+- [ ] Saving other edits with no replacement leaves the original cover unchanged.
+- [ ] Empty/unsupported/mismatched files and files over 20 MB are rejected without touching the note or vault images; a failed note write rolls back only the new uncommitted cover.
+
 ## Image Sections
 
 Use the editor context menu **AnimeList → Add image section**.

@@ -34,6 +34,8 @@ jobs:
         run: npm run test:browser:date
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run media cover replacement picker in Chromium
+        run: npm run test:browser:cover-upload
       - name: Run Lightbox layout and interaction regressions in Chromium
         run: npm run test:browser:image-session-regressions
       - name: Run Score Dashboard mobile interactions in Chromium

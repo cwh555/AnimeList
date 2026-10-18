@@ -10,6 +10,7 @@ import { uiText } from "../ui-text";
 import { buildMediaMarkdown, validateMediaNoteForm } from "./media-note-codec";
 import { MediaRepository } from "./media-repository";
 import { LibraryStorage } from "./library-storage";
+import { MediaCoverStorage } from "./media-cover-storage";
 
 
 export interface CoverOptimizer {
@@ -63,26 +64,6 @@ export class MediaNoteService {
     return path;
   }
 
-  private async storeCoverAsset(result: ExternalMediaResult, asset: MediaCoverAssetInput): Promise<string> {
-    const contentType = asset.contentType ?? "";
-    const sourceExtension = asset.name.split(".").pop()?.toLocaleLowerCase() ?? "";
-    const extension = ["jpg", "jpeg", "png", "webp", "avif"].includes(sourceExtension)
-      ? sourceExtension === "jpeg" ? "jpg" : sourceExtension
-      : /png/i.test(contentType) ? "png"
-        : /webp/i.test(contentType) ? "webp"
-          : /avif/i.test(contentType) ? "avif" : "jpg";
-    const folder = normalizePath(`${this.settings().coverFolder}/${result.mediaType}`);
-    await this.storage.ensureFolder(folder);
-    const path = await this.storage.uniqueFilePath(folder, `${slugify(result.title)}-manual`, extension);
-    const file = await this.app.vault.createBinary(path, asset.data);
-    try {
-      await this.coverOptimizer.optimizeFile(file);
-    } catch (error) {
-      console.warn("AnimeList manual cover thumbnail generation failed", error);
-    }
-    return path;
-  }
-
   async create(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile> {
     validateMediaNoteForm(result, form);
     const existing = result.sourceId
@@ -96,7 +77,8 @@ export class MediaNoteService {
 
     let coverPath = "";
     if (coverAsset) {
-      coverPath = await this.storeCoverAsset(result, coverAsset);
+      coverPath = await new MediaCoverStorage(this.app, this.settings, this.storage, this.coverOptimizer)
+        .store(result.mediaType, result.title, coverAsset, "manual");
     } else if (result.coverUrl) {
       try {
         coverPath = await this.downloadCover(result);
