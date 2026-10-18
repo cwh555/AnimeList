@@ -169,7 +169,7 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] The native AnimeList ItemView shows one primary navigation row in this exact order: **Library → Timeline → Score Dashboard → Images**. Switching pages reuses the same ItemView instead of opening a modal or another Obsidian tab.
 - [ ] Primary navigation is visually different from page-local filters: the workspace row is flat/underlined with icon + label, while Library/Images filters remain smaller page-local controls. On mobile the workspace row remains visible and horizontally scrollable.
 - [ ] The AnimeList header shows only the product name; the old Markdown-description subtitle is absent.
-- [ ] The top-level workspace navigation has no vertical scrollbar and contains page destinations only. Workspace actions live in the header: **Export** is direct when it is the only action; enabling Latest release tracking collapses Export + Release Updates into the native **More** menu. Timeline, Score Dashboard, and Images are not duplicated as header buttons.
+- [ ] The top-level workspace navigation has no vertical scrollbar and contains page destinations only. Workspace actions live in the header: **Export** is direct when it is the only action; with Latest release tracking enabled, **Release updates** and **Export** remain the first two directly visible actions. Only additional actions go into **More**. Timeline, Score Dashboard, and Images are not duplicated as header buttons.
 - [ ] In **Library**, **Collect** is on the same row as **All / Anime / Manga / Novel**, aligned to the far right; it is not shown as a global workspace action on Timeline, Score Dashboard, or Images.
 - [ ] Library retains its existing All/Anime/Manga/Novel, status, search, filter, sort, and Grid/List/Poster behavior inside the Library page. The standalone Markdown `animelist` block retains its existing self-contained header/actions.
 - [ ] Timeline opened from either the workspace tab or command uses the shared AnimeList page and preserves existing timeline filters/scale/navigation.
@@ -294,6 +294,12 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 
 ## Mobile / narrow layouts
 
+- [ ] On iOS/Android, swipe horizontally from the **center** of Library, Timeline, Score Dashboard, and Images. AnimeList controls respond normally without opening an Obsidian sidebar.
+- [ ] Starting a horizontal swipe within roughly 24px of the **physical left/right screen edge** still allows Obsidian's own sidebar navigation.
+- [ ] Scroll the Library vertically, then repeat center and edge swipes; the gesture boundary remains effective after scrolling without blocking normal tap/vertical scroll actions.
+- [ ] Test horizontal controls, Timeline pan/Overview scrub, Score Dashboard dragging, image gallery navigation, and note-embedded Image Sections/Moments: swipes do not trigger unrelated Obsidian sidebars.
+- [ ] Open and interact with an AnimeList modal (including Lightbox, add/edit, and Moments), and verify central gestures do not navigate Obsidian while close/cancel and controls remain responsive.
+- [ ] On short phones (for example 320 × 720), the Timeline canvas remains draggable, unknown-date content can be reached by vertical scrolling, and the overview stays usable.
 - [ ] Library controls remain usable on iOS or Android with touch-sized primary actions.
 - [ ] Card/poster view becomes a usable two-column cover-first layout on phones; list view does not overflow horizontally; tablet/desktop layouts remain unchanged.
 - [ ] Type/status controls and applicable score/timeline lanes can be swiped horizontally without clipping their content.
