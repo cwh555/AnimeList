@@ -29,6 +29,7 @@ import { timelineWorkspaceText } from "../features/timeline/text";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { installTimelinePointerPan } from "./timeline-pan-gesture";
 
 interface TimedTimelineEntry extends TimelineMediaEntry { completedTime: number; }
 
@@ -522,32 +523,14 @@ export function renderTimelineWorkspace(
     state.focusTime = maximumTime;
     centerFocus(true);
 
-    let drag: { id: number; x: number; y: number; startPanX: number; startPanY: number } | null = null;
-    viewport.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || (event.target instanceof Element && event.target.closest(".al-timeline-card"))) return;
-      drag = {
-        id: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        startPanX: state.panX,
-        startPanY: state.panY,
-      };
-      viewport?.classList.add("is-dragging");
-      viewport.setPointerCapture(event.pointerId);
+    installTimelinePointerPan(viewport, {
+      position: () => ({ x: state.panX, y: state.panY }),
+      panTo: (x, y) => {
+        state.panX = x;
+        state.panY = y;
+        applyPan();
+      },
     });
-    viewport.addEventListener("pointermove", (event) => {
-      if (!drag || drag.id !== event.pointerId) return;
-      state.panX = drag.startPanX + event.clientX - drag.x;
-      state.panY = drag.startPanY + event.clientY - drag.y;
-      applyPan();
-    });
-    const endDrag = (event: PointerEvent) => {
-      if (!drag || drag.id !== event.pointerId) return;
-      drag = null;
-      viewport?.classList.remove("is-dragging");
-    };
-    viewport.addEventListener("pointerup", endDrag);
-    viewport.addEventListener("pointercancel", endDrag);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
       if (event.ctrlKey || event.metaKey) {

@@ -30,6 +30,7 @@ export function createTimelinePosterCard(
   if (item.cover) {
     const image = makeEl("img", "", "");
     image.alt = uiText("timeline.coverAlt", { title: item.title });
+    image.draggable = false;
     bindImageFallback(image, () => {
       const missing = makeEl("span", "al-timeline-cover-missing");
       setAnimeListIcon(missing, "image-off");
