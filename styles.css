@@ -6089,8 +6089,8 @@ button.al-moment-stack-strip:focus-visible {
 
 .markdown-preview-view.al-reading-note-wide > .markdown-preview-sizer {
   box-sizing: border-box;
-  width: min(100%, 1480px) !important;
-  max-width: 1480px !important;
+  width: min(100%, 1480px);
+  max-width: 1480px;
   margin-inline: auto;
   padding-inline-start: calc(var(--al-reading-note-left) + var(--al-reading-note-gap) + 18px);
   padding-inline-end: calc(var(--al-reading-note-right) + var(--al-reading-note-gap) + 18px);
@@ -6252,7 +6252,7 @@ button.al-moment-stack-strip:focus-visible {
 .al-reading-note-action[aria-pressed="true"] .al-reading-note-action-icon {
   color: #dab055;
 }
-.markdown-preview-view.al-reading-note-wide .al-reading-note-original { display: none !important; }
+.markdown-preview-view.al-reading-note-wide .al-reading-note-original { display: none; }
 /* The plugin also checks the leaf width in JS. This fallback handles viewport changes
    before ResizeObserver's notification arrives. */
 @media (max-width: 1099px) {
