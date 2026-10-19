@@ -5,7 +5,7 @@ import { makeEl, setAnimeListIcon } from "./ui-helpers";
 import { uiText } from "../ui-text";
 
 export const READING_NOTE_MIN_WIDTH = 1100;
-const mountedReadingViews = new WeakSet<HTMLElement>();
+const mountedReadingViews = new WeakMap<HTMLElement, { owner: HTMLElement; layout: ReadingNoteLayout }>();
 
 export interface ReadingNotePresentation {
   readonly title: string;
@@ -74,7 +74,10 @@ export function installReadingNoteLayout(
 ): ReadingNoteLayout | null {
   if (isEmbedded(detailContainer)) return null;
   const preview = detailContainer.closest<HTMLElement>(".markdown-preview-view");
-  if (!preview || !preview.closest(".markdown-reading-view") || mountedReadingViews.has(preview)) return null;
+  if (!preview || !preview.closest(".markdown-reading-view")) return null;
+  const active = mountedReadingViews.get(preview);
+  if (active?.owner === detailContainer) return null;
+  active?.layout.dispose();
   const sizer = preview.querySelector<HTMLElement>(":scope > .markdown-preview-sizer");
   if (!sizer || !sizer.contains(detailContainer)) return null;
 
@@ -87,7 +90,6 @@ export function installReadingNoteLayout(
   const right = makeEl("aside", "al-reading-note-rail al-reading-note-rail-right");
   rails.append(left, right);
   preview.insertBefore(rails, sizer);
-  mountedReadingViews.add(preview);
   original.classList.add("al-reading-note-original");
 
   let disposed = false;
@@ -177,7 +179,7 @@ export function installReadingNoteLayout(
   document.defaultView?.addEventListener("resize", resize);
   resize();
 
-  return {
+  const layout: ReadingNoteLayout = {
     update(data) {
       if (disposed) return;
       presentation = data;
@@ -192,7 +194,11 @@ export function installReadingNoteLayout(
       preview.classList.remove("al-reading-note-wide");
       original.classList.remove("al-reading-note-original");
       rails.remove();
-      mountedReadingViews.delete(preview);
+      if (mountedReadingViews.get(preview)?.owner === detailContainer) {
+        mountedReadingViews.delete(preview);
+      }
     },
   };
+  mountedReadingViews.set(preview, { owner: detailContainer, layout });
+  return layout;
 }
