@@ -130,6 +130,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=datedCards();
  d.resetPreservesPosterNode=cards[0]===resetCardBefore&&cards[0]?.querySelector('img')===resetImageBefore;
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
+ d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
  const posterPan=datedCards()[0], pr=posterPan.getBoundingClientRect();
  const px=pr.left+pr.width/2, py=pr.top+pr.height/2;
  const touchPointer=(kind,x,y)=>new PointerEvent(kind,{bubbles:true,cancelable:true,pointerId:33,pointerType:"touch",isPrimary:true,button:0,clientX:x,clientY:y});
@@ -147,7 +148,6 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  posterPan.click();
  d.posterTapStillOpens=openedNotes.length===1;
  d.posterImagesCannotStartNativeDrag=posterPan.querySelector("img")?.draggable===false;
- d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
  d.resetRestoresScale=Math.abs(cards[0].getBoundingClientRect().height-180)<=2;
  const overview=document.querySelector('.al-timeline-overview'); const chart=document.querySelector('.al-timeline-overview-chart'); const beforeTransform=scene.style.transform; const axisBeforeOverview=axisScreenY(); const r=chart.getBoundingClientRect(); click(overview,r.left+r.width*.15); await frames(); d.overviewNavigation=scene.style.transform!==beforeTransform;
  d.overviewKeepsAxisY=Math.abs(axisScreenY()-axisBeforeOverview)<=1;
