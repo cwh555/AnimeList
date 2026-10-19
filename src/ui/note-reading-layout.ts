@@ -5,6 +5,7 @@ import { makeEl, setAnimeListIcon } from "./ui-helpers";
 import { uiText } from "../ui-text";
 
 export const READING_NOTE_MIN_WIDTH = 1100;
+const mountedReadingViews = new WeakSet<HTMLElement>();
 
 export interface ReadingNotePresentation {
   readonly title: string;
@@ -73,7 +74,7 @@ export function installReadingNoteLayout(
 ): ReadingNoteLayout | null {
   if (isEmbedded(detailContainer)) return null;
   const preview = detailContainer.closest<HTMLElement>(".markdown-preview-view");
-  if (!preview || !preview.closest(".markdown-reading-view")) return null;
+  if (!preview || !preview.closest(".markdown-reading-view") || mountedReadingViews.has(preview)) return null;
   const sizer = preview.querySelector<HTMLElement>(":scope > .markdown-preview-sizer");
   if (!sizer || !sizer.contains(detailContainer)) return null;
 
@@ -81,14 +82,12 @@ export function installReadingNoteLayout(
     ?? detailContainer.closest<HTMLElement>(".block-language-animelist-detail")
     ?? detailContainer;
   const document = detailContainer.ownerDocument;
-  const rails = document.createElement("div");
-  rails.className = "al-reading-note-rails";
-  const left = document.createElement("aside");
-  left.className = "al-reading-note-rail al-reading-note-rail-left";
-  const right = document.createElement("aside");
-  right.className = "al-reading-note-rail al-reading-note-rail-right";
+  const rails = makeEl("div", "al-reading-note-rails");
+  const left = makeEl("aside", "al-reading-note-rail al-reading-note-rail-left");
+  const right = makeEl("aside", "al-reading-note-rail al-reading-note-rail-right");
   rails.append(left, right);
   preview.insertBefore(rails, sizer);
+  mountedReadingViews.add(preview);
   original.classList.add("al-reading-note-original");
 
   let disposed = false;
@@ -193,6 +192,7 @@ export function installReadingNoteLayout(
       preview.classList.remove("al-reading-note-wide");
       original.classList.remove("al-reading-note-original");
       rails.remove();
+      mountedReadingViews.delete(preview);
     },
   };
 }
