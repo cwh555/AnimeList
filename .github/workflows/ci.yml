@@ -34,6 +34,15 @@ jobs:
         run: npm run test:browser:date
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run AnimeList Note Reading View layout in Chromium
+        run: npm run test:browser:note-reading
+      - name: Upload desktop Reading View prototype screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: anime-reading-view-preview
+          path: .tmp/note-reading-layout-preview.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Run media cover replacement picker in Chromium
         run: npm run test:browser:cover-upload
       - name: Run Lightbox layout and interaction regressions in Chromium

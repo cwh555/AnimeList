@@ -143,6 +143,12 @@ The **Images** page is a derived view over the `animelist-images` blocks already
 
 See [`IMAGES_WORKSPACE.md`](IMAGES_WORKSPACE.md) for the detailed workspace/data contract.
 
+### Desktop Reading View note layout (preview feature)
+
+For a normal AnimeList media note containing `animelist-detail`, a sufficiently wide (at least 1100px) desktop Reading View pane shows a three-column layout: the left rail summarizes the cover and original metadata, the center continues to render the **original Obsidian Markdown** including user prose, Images and Moments, and the right rail shows status/progress/score plus Edit, Favorite, and Library actions. The two rails track vertical note scrolling.
+
+This change is purely visual and does not move, rewrite, or copy Markdown/frontmatter. Resizing the pane below the threshold, opening the note in Live Preview, or viewing the note on mobile returns to the existing original detail card. Embedded notes and unrelated markdown documents are not restyled. The layout is installed and disposed with the existing Markdown render child lifecycle.
+
 ## Image Sections
 
 Image Sections let a media note keep reusable groups of related images as ordinary Markdown.

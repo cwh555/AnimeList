@@ -183,6 +183,17 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] Edit, reorder, add, or remove an original Image Section reference, then return to/refresh Images and confirm the aggregate updates without a Vault-wide Markdown scan or duplicated asset. Rename/delete a media note and confirm stale work entries disappear.
 - [ ] A work with an empty Image Section does not create an empty board; an entirely empty aggregate shows the safe empty state. Large galleries progressively append image DOM instead of rendering every image eagerly.
 
+## Desktop note Reading View — three-column prototype
+
+- [ ] With an AnimeList anime note open in **Reading View** in a wide Obsidian leaf (roughly 1100px or wider), verify **left cover and metadata / center native Markdown / right status, progress, score, actions**.
+- [ ] Scroll a long note with Moments and Image Sections: rails remain accessible, native images/quotes and Markdown preserve their order, no side rail overlaps the center.
+- [ ] Resize the Obsidian leaf below 1100px or split the editor into two narrow panes: the original note detail card returns; no horizontal overflow or duplicate sidebars.
+- [ ] Switch between Reading View and Live Preview/source editing and back: editing remains native; the note and embedded blocks are neither moved nor duplicated.
+- [ ] Change title, status, score and cover, save, then return to Reading View: both sidebars refresh to current metadata and do not display stale thumbnails.
+- [ ] Test actions in the right sidebar (Edit, Favorite, Library), plus long strings/empty cover, normal Obsidian themes and a non-AnimeList note.
+- [ ] In mobile Obsidian, the original one-column detail card and the existing native swipes remain usable.
+- [ ] Unload/disable/re-enable the plugin, reopen the same note: no residual rails, duplicated controls, or altered Markdown.
+
 ## Work cover replacement
 
 - [ ] Open an existing anime, manga, and novel in **Edit**: the current cover is displayed, and a local image can be chosen as a replacement.

@@ -49,7 +49,8 @@
     "test:browser:image-order-session": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-order-session.mjs",
     "test:browser:image-empty-target": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-empty-drop-target.mjs",
     "test:browser:image-final-slot": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-final-slot.mjs",
-    "test:browser:cover-upload": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-media-cover-picker.mjs"
+    "test:browser:cover-upload": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-media-cover-picker.mjs",
+    "test:browser:note-reading": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-note-reading-layout.mjs"
   },
   "keywords": [
     "obsidian",
