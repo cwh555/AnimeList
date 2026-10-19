@@ -11,7 +11,7 @@ try {
   await build({
     absWorkingDir: root,
     stdin: {
-      contents: 'import { registerBundledLocales } from "./src/i18n/locales"; registerBundledLocales(); export { installReadingNoteLayout } from "./src/ui/note-reading-layout";',
+      contents: 'import "./src/ui-text"; import { registerLocaleMessages, setActiveLocale } from "./src/i18n/catalog"; import { EN_CORE_MESSAGES } from "./src/i18n/locales/en/core"; registerLocaleMessages("core", "en", EN_CORE_MESSAGES); setActiveLocale("en"); export { installReadingNoteLayout } from "./src/ui/note-reading-layout";',
       resolveDir: root,
       loader: "ts",
     },
