@@ -11,7 +11,7 @@ try {
   await build({
     absWorkingDir: root,
     stdin: {
-      contents: 'import "./src/ui-text"; import { registerLocaleMessages, setActiveLocale } from "./src/i18n/catalog"; import { EN_CORE_MESSAGES } from "./src/i18n/locales/en/core"; registerLocaleMessages("core", "en", EN_CORE_MESSAGES); setActiveLocale("en"); export { installReadingNoteLayout } from "./src/ui/note-reading-layout";',
+      contents: 'import "./src/ui-text"; import { registerLocaleMessages, setActiveLocale } from "./src/i18n/catalog"; import { EN_CORE_MESSAGES } from "./src/i18n/locales/en/core"; registerLocaleMessages("core", "en", EN_CORE_MESSAGES); setActiveLocale("en"); export { installReadingNoteLayout, mountReadingNoteLayoutWhenReady } from "./src/ui/note-reading-layout";',
       resolveDir: root,
       loader: "ts",
     },
@@ -41,7 +41,7 @@ try {
   const cover = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="520"><rect width="100%" height="100%" fill="#324a73"/><circle cx="180" cy="195" r="85" fill="#768eba"/><path d="M30 500Q180 265 330 500Z" fill="#c9bad4"/></svg>');
   const longText = Array.from({length:32}, (_,i) => '<p class="prose">This paragraph is part of the original Markdown. Original notes, images and Moments remain in their native content flow — section ' + (i+1) + '.</p>').join("");
 
-  function fixture({ leafWidth, mobile = false }) {
+  function fixture({ leafWidth, mobile = false, wrappedSizer = false, delayedAttach = false, leafMode = false }) {
     const bodyClass = mobile ? "is-mobile" : "";
     return `<!doctype html><html><head>
       <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -74,6 +74,17 @@ try {
         const section=document.querySelector("#image-section");
         const moments=document.querySelector("#moment-section");
         const oldNodes=[...sizer.children];
+        const originalSizerParent=sizer.parentElement;
+        if (${wrappedSizer}) {
+          const wrapper=document.createElement("div");
+          wrapper.className="reading-sizer-wrapper";
+          sizer.before(wrapper);wrapper.append(sizer);
+        }
+        if (${leafMode}) {
+          const root=view.closest(".markdown-reading-view");
+          root.className="workspace-leaf-content";
+          root.dataset.type="markdown";
+        }
         const actions={edit:0,fav:0,library:0};
         const plugin={openEditModal(){actions.edit++},async setFavorite(){actions.fav++},async openLibrary(){actions.library++}};
         const data={
@@ -86,12 +97,29 @@ try {
         const detail=document.querySelector("#detail-host");
         const initialWidth=view.clientWidth;
         const expectWide=initialWidth>=1100 && !document.body.classList.contains("is-mobile");
-        const controller=AnimeListReadingNote.installReadingNoteLayout(detail,file,plugin);
-        if(!controller) throw new Error("Expected Reading View controller was not installed");
-        controller.update(data);
+        let controller;
+        if (${delayedAttach}) {
+          const root=view.parentElement;
+          const parent=root.parentElement;
+          root.remove();
+          controller=AnimeListReadingNote.mountReadingNoteLayoutWhenReady(detail,file,plugin);
+          controller.update(data);
+          await sleep(90);
+          checks.detachedDoesNotMount=!view.querySelector(":scope > .al-reading-note-rails");
+          parent.append(root);
+          await sleep(180);
+          checks.mountAfterAttachment=!!view.querySelector(":scope > .al-reading-note-rails");
+        } else {
+          controller=AnimeListReadingNote.installReadingNoteLayout(detail,file,plugin);
+          if(!controller) throw new Error("Expected Reading View controller was not installed");
+          controller.update(data);
+          checks.detachedDoesNotMount=true;
+          checks.mountAfterAttachment=true;
+        }
         await sleep(80);
         checks.onlyLocalViewChanged=!!view.querySelector(":scope > .al-reading-note-rails")
-          && sizer.parentElement===view && [...sizer.children].every((c,i)=>c===oldNodes[i])
+          && sizer.parentElement===( ${wrappedSizer} ? view.querySelector(".reading-sizer-wrapper") : originalSizerParent )
+          && [...sizer.children].every((c,i)=>c===oldNodes[i])
           && prose.parentElement===sizer && section.parentElement===sizer && moments.parentElement===sizer;
         checks.widthActivation=view.classList.contains("al-reading-note-wide")===expectWide;
         checks.nativeDetailFallback=expectWide
@@ -172,13 +200,17 @@ try {
       </body></html>`;
   }
 
-  for(const [width,mobile] of [[1480,false],[840,false],[390,true]]) {
-    const html=fixture({leafWidth:mobile?390:width,mobile});
+  for(const {width,mobile=false,wrappedSizer=false,delayedAttach=false,leafMode=false} of [
+    {width:1480}, {width:840}, {width:390,mobile:true},
+    {width:1480,wrappedSizer:true,leafMode:true},
+    {width:1480,delayedAttach:true},
+  ]) {
+    const html=fixture({leafWidth:mobile?390:width,mobile,wrappedSizer,delayedAttach,leafMode});
     await runChromiumDatasetTest({
       html,
       profile:path.join(output,"profile-"+width),
       viewport:{width:mobile?390:Math.max(width+40,1000),height:850,mobile,deviceScaleFactor:1},
-      testName:"AnimeList Note Reading View "+width+"px",
+      testName:"AnimeList Note Reading View "+width+"px"+(wrappedSizer?" wrapped-leaf":"")+(delayedAttach?" delayed-attach":""),
       resultTimeoutMs:7000,
       interact:width!==1480 ? undefined : async ({send,sleep})=>{
         for(let attempt=0;attempt<120;attempt++){
