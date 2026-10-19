@@ -5,7 +5,7 @@
   --al-reading-note-gap: 22px;
 }
 
-.markdown-preview-view.al-reading-note-wide > .markdown-preview-sizer {
+.markdown-preview-view.al-reading-note-wide  .al-reading-note-sizer {
   box-sizing: border-box;
   width: min(100%, 1480px);
   max-width: 1480px;

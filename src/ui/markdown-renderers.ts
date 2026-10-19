@@ -13,7 +13,7 @@ import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
 import { installCoverImageLoading, type CoverImageLoadingController } from "./cover-image-loading";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
-import { installReadingNoteLayout, type ReadingNoteLayout } from "./note-reading-layout";
+import { mountReadingNoteLayoutWhenReady, type ReadingNoteLayout } from "./note-reading-layout";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
@@ -333,7 +333,7 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     this.containerEl.appendChild(card);
     this.hideLegacyCoverEmbed(coverResource);
     this.plugin.afterDetailRender(this.containerEl, this.sourcePath, fm);
-    this.readingLayout ??= installReadingNoteLayout(this.containerEl, file, this.plugin);
+    this.readingLayout ??= mountReadingNoteLayoutWhenReady(this.containerEl, file, this.plugin);
     this.readingLayout?.update({
       title: detailString(fm.title) || file.basename,
       originalTitle: detailString(fm.title_original),

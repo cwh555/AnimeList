@@ -74,12 +74,17 @@ export function installReadingNoteLayout(
 ): ReadingNoteLayout | null {
   if (isEmbedded(detailContainer)) return null;
   const preview = detailContainer.closest<HTMLElement>(".markdown-preview-view");
-  if (!preview || !preview.closest(".markdown-reading-view")) return null;
+  // Depending on the Obsidian version, the reading surface can be inside a
+  // markdown leaf without a separate .markdown-reading-view ancestor.
+  if (!preview || (!preview.closest(".markdown-reading-view")
+    && !preview.closest('.workspace-leaf-content[data-type="markdown"]'))) return null;
   const active = mountedReadingViews.get(preview);
   if (active?.owner === detailContainer) return null;
   active?.layout.dispose();
-  const sizer = preview.querySelector<HTMLElement>(":scope > .markdown-preview-sizer");
-  if (!sizer || !sizer.contains(detailContainer)) return null;
+  // Some Obsidian builds wrap the sizer. Scope the search to the sizer that
+  // actually owns this block rather than assuming it is a direct child.
+  const sizer = detailContainer.closest<HTMLElement>(".markdown-preview-sizer");
+  if (!sizer || !preview.contains(sizer) || sizer.closest(".markdown-preview-view") !== preview) return null;
 
   const original = detailContainer.closest<HTMLElement>(".el-pre")
     ?? detailContainer.closest<HTMLElement>(".block-language-animelist-detail")
@@ -89,7 +94,8 @@ export function installReadingNoteLayout(
   const left = makeEl("aside", "al-reading-note-rail al-reading-note-rail-left");
   const right = makeEl("aside", "al-reading-note-rail al-reading-note-rail-right");
   rails.append(left, right);
-  preview.insertBefore(rails, sizer);
+  preview.insertBefore(rails, sizer.parentElement === preview ? sizer : preview.firstChild);
+  sizer.classList.add("al-reading-note-sizer");
   original.classList.add("al-reading-note-original");
 
   let disposed = false;
@@ -193,6 +199,7 @@ export function installReadingNoteLayout(
       document.defaultView?.removeEventListener("resize", resize);
       preview.classList.remove("al-reading-note-wide");
       original.classList.remove("al-reading-note-original");
+      sizer.classList.remove("al-reading-note-sizer");
       rails.remove();
       if (mountedReadingViews.get(preview)?.owner === detailContainer) {
         mountedReadingViews.delete(preview);
@@ -201,4 +208,53 @@ export function installReadingNoteLayout(
   };
   mountedReadingViews.set(preview, { owner: detailContainer, layout });
   return layout;
+}
+
+/**
+ * MarkdownRenderChild.onload may fire before Obsidian attaches its rendered
+ * section to the Reading View. Delay mounting until the host has a parent;
+ * keep this controller stable across metadata refreshes and cancel on unload.
+ * A bounded retry also covers async Reading View section insertion.
+ */
+export function mountReadingNoteLayoutWhenReady(
+  detailContainer: HTMLElement,
+  file: TFile,
+  plugin: Pick<AnimeListUiHost, "openEditModal" | "setFavorite" | "openLibrary">,
+): ReadingNoteLayout {
+  let mounted: ReadingNoteLayout | null = null;
+  let current: ReadingNotePresentation | null = null;
+  let disposed = false;
+  let timer: number | null = null;
+  let attempts = 0;
+
+  const tryMount = (): void => {
+    timer = null;
+    if (disposed || mounted) return;
+    if (detailContainer.closest(".markdown-source-view")) return;
+    if (detailContainer.isConnected) {
+      mounted = installReadingNoteLayout(detailContainer, file, plugin);
+      if (mounted && current) mounted.update(current);
+    }
+    if (!mounted && ++attempts < 8) {
+      timer = detailContainer.ownerDocument.defaultView?.setTimeout(tryMount, 75) ?? null;
+    }
+  };
+
+  // Avoid examining the DOM synchronously: Obsidian may still be assembling
+  // its Markdown section at the moment the code block processor is loaded.
+  timer = detailContainer.ownerDocument.defaultView?.setTimeout(tryMount, 0) ?? null;
+  return {
+    update(data) {
+      if (disposed) return;
+      current = data;
+      mounted?.update(data);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (timer !== null) detailContainer.ownerDocument.defaultView?.clearTimeout(timer);
+      mounted?.dispose();
+      mounted = null;
+    },
+  };
 }
