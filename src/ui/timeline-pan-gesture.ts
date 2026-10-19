@@ -13,7 +13,7 @@ export interface TimelinePanAdapters {
 export const TIMELINE_PAN_START_THRESHOLD_PX = 6;
 
 export function installTimelinePointerPan(viewport: HTMLElement, adapters: TimelinePanAdapters): void {
-  const view = viewport.ownerDocument.defaultView;
+  const view = viewport.ownerDocument?.defaultView;
   if (!view) return;
 
   interface Gesture {
