@@ -38,8 +38,6 @@ export function installScoreDashboardTouchInteractions(
     if (active) view.clearTimeout(active.timer);
     active = null;
   };
-  container.querySelectorAll<HTMLButtonElement>(".al-score-poster")
-    .forEach((poster) => { poster.style.touchAction = "auto"; });
   signal.addEventListener("abort", clear, { once: true });
 
   container.addEventListener("pointerdown", (event) => {
