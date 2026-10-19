@@ -15,7 +15,7 @@ import {
   toggleScoreDashboardPathSelection,
 } from "../src/domain/score-dashboard/selection";
 import {
-  SCORE_DASHBOARD_TOUCH_DRAG_THRESHOLD_PX,
+  SCORE_DASHBOARD_TOUCH_SCROLL_TOLERANCE_PX,
   scoreDashboardTouchIntent,
   shouldExitScoreDashboardTouchBatchMode,
 } from "../src/ui/score-dashboard/touch";
@@ -146,17 +146,18 @@ describe("score dashboard refresh scope", () => {
 });
 
 describe("score dashboard mobile touch gestures", () => {
-  it("keeps small movement pending until the drag threshold is crossed", () => {
+  it("keeps small movement pending until a swipe is detected", () => {
     assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 23, y: 24 }), "pending");
-    assert.equal(SCORE_DASHBOARD_TOUCH_DRAG_THRESHOLD_PX > 0, true);
+    assert.equal(SCORE_DASHBOARD_TOUCH_SCROLL_TOLERANCE_PX > 0, true);
   });
 
   it("reserves horizontal movement for the native mobile score rail", () => {
-    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 60, y: 24 }), "horizontal-scroll");
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 60, y: 24 }), "scroll");
   });
 
-  it("treats vertical movement as direct score dragging", () => {
-    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 24, y: 60 }), "drag");
+  it("treats vertical movement as browsing, not an edit", () => {
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 24, y: 60 }), "scroll");
+    assert.equal(scoreDashboardTouchIntent({ x: 20, y: 20 }, { x: 24, y: 60 }, 100), "pending");
   });
 
   it("exits touch batch mode whenever the selection becomes empty", () => {

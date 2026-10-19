@@ -143,13 +143,12 @@ const html = `<!doctype html>
       alpha.click();
       await delay(80);
 
-      details.directTouchDragApplied = applied.length === 1
-        && applied[0].length === 1
-        && applied[0][0].filePath === "Alpha.md"
-        && applied[0][0].nextScore === 9;
-      details.dragDoesNotOpenFile = opened.length === 0;
-      details.dragMovedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
-      details.dragPreservesPosterNode = poster("Alpha.md") === alpha;
+      details.verticalSwipeDoesNotEditScore = applied.length === 0;
+      details.verticalSwipeDoesNotOpenFile = opened.length === 0;
+      details.verticalSwipeDoesNotEnterBatch = !shell().classList.contains("is-batch-mode");
+      details.verticalSwipePreservesPosterNode = poster("Alpha.md") === alpha;
+      details.mobilePosterPansNatively = getComputedStyle(alpha).touchAction === "auto";
+      details.mobileNativeDragDisabled = alpha.draggable === false;
 
       const alphaAfterDrag = poster("Alpha.md");
       alphaAfterDrag.scrollIntoView({ block:"center" });
@@ -189,6 +188,17 @@ const html = `<!doctype html>
       batchButton.click();
       await delay(30);
       details.emptyTouchBatchCannotPersist = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
+      batchButton.click();
+      poster("Alpha.md").click();
+      const moveTo = dashboard.querySelector(".al-score-batch-target");
+      moveTo.value = "9.0";
+      moveTo.dispatchEvent(new Event("change", { bubbles:true }));
+      await delay(100);
+      details.explicitTargetSelectionChangesScore = applied.length === 1
+        && applied[0].length === 1
+        && applied[0][0].filePath === "Alpha.md"
+        && applied[0][0].nextScore === 9
+        && poster("Alpha.md")?.dataset.score === "9.0";
 
       const alphaBeforeFilters = poster("Alpha.md");
       const alphaCoverBeforeFilters = alphaBeforeFilters?.querySelector("img");
