@@ -34,6 +34,7 @@ export const EN_SCORE_DASHBOARD_MESSAGES = {
     moveNoChange: "The works are already at the target score. Nothing changed.",
     moveFailed: "Score update failed: {message}",
     dragHint: "Drag a cover to change its score",
+    mobileHint: "Long-press a cover to select it, then use Move to to change its score. Swipe to browse.",
     selectionHint: "Click covers to select works, then move them with the batch toolbar.",
     ratedSummary: "Rated {rated}/{total}",
     coverAlt: "Cover of {title}",

@@ -34,6 +34,7 @@ export const KO_SCORE_DASHBOARD_MESSAGES = {
     moveNoChange: "작품이 이미 목표 평점에 있습니다. 변경할 항목이 없습니다.",
     moveFailed: "평점 업데이트 실패: {message}",
     dragHint: "표지를 드래그해 평점 변경",
+    mobileHint: "표지를 길게 눌러 선택한 뒤 '이동'으로 점수를 변경하세요. 스와이프는 탐색에만 사용됩니다.",
     selectionHint: "표지를 클릭해 작품을 선택한 뒤 일괄 도구 모음으로 이동하세요.",
     ratedSummary: "평점 입력 {rated}/{total}",
     coverAlt: "{title} 표지",
