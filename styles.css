@@ -6079,4 +6079,18 @@ button.al-moment-stack-strip:focus-visible {
   .al-edit-cover-previews { gap: 8px; }
   .al-edit-cover-preview { padding: 8px; }
 }
+
+/* Mobile browsing gestures must not look or behave like edit gestures. */
+@media (hover: none) and (pointer: coarse) {
+  .al-score-dashboard .al-score-poster,
+  .al-score-dashboard .al-score-poster:active { cursor: pointer; touch-action: auto; }
+  .al-score-dashboard .al-score-poster:hover { transform: none; }
+  .al-score-lane-posters { scroll-snap-type: none; }
+  .al-timeline-viewport .al-timeline-card,
+  .al-timeline-viewport .al-timeline-card img {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+  }
+}
 /* END GENERATED FEATURE STYLES */
