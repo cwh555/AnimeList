@@ -6079,4 +6079,183 @@ button.al-moment-stack-strip:focus-visible {
   .al-edit-cover-previews { gap: 8px; }
   .al-edit-cover-preview { padding: 8px; }
 }
+
+/* Reading View only: surrounding rails never reparent Obsidian's rendered Markdown. */
+.markdown-preview-view.al-reading-note-wide {
+  --al-reading-note-left: 210px;
+  --al-reading-note-right: 220px;
+  --al-reading-note-gap: 22px;
+}
+
+.markdown-preview-view.al-reading-note-wide > .markdown-preview-sizer {
+  box-sizing: border-box;
+  width: min(100%, 1480px) !important;
+  max-width: 1480px !important;
+  margin-inline: auto;
+  padding-inline-start: calc(var(--al-reading-note-left) + var(--al-reading-note-gap) + 18px);
+  padding-inline-end: calc(var(--al-reading-note-right) + var(--al-reading-note-gap) + 18px);
+  min-width: 0;
+}
+
+.markdown-preview-view > .al-reading-note-rails {
+  position: sticky;
+  top: 16px;
+  z-index: 3;
+  box-sizing: border-box;
+  width: min(100%, 1480px);
+  height: 0;
+  margin-inline: auto;
+  pointer-events: none;
+}
+
+.markdown-preview-view:not(.al-reading-note-wide) > .al-reading-note-rails {
+  display: none;
+}
+
+.al-reading-note-rail {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  max-height: min(75vh, 720px);
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-secondary);
+  box-shadow: 0 8px 22px color-mix(in srgb, black 9%, transparent);
+  color: var(--text-normal);
+  pointer-events: auto;
+}
+
+.al-reading-note-rail-left {
+  inset-inline-start: 12px;
+  width: var(--al-reading-note-left, 210px);
+}
+.al-reading-note-rail-right {
+  inset-inline-end: 12px;
+  width: var(--al-reading-note-right, 220px);
+}
+.al-reading-note-cover {
+  display: grid;
+  min-height: 140px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--background-secondary-alt);
+}
+.al-reading-note-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 290px;
+  object-fit: contain;
+}
+.al-reading-note-no-cover {
+  display: grid;
+  min-height: 140px;
+  width: 100%;
+  place-items: center;
+  color: var(--text-muted);
+}
+.al-reading-note-no-cover svg { width: 42px; height: 42px; }
+.al-reading-note-title h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.al-reading-note-title p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  font-size: .75rem;
+}
+.al-reading-note-metadata {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.al-reading-note-meta-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.al-reading-note-meta-row dt {
+  color: var(--text-muted);
+  font-size: .67rem;
+}
+.al-reading-note-meta-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: .77rem;
+  line-height: 1.4;
+}
+.al-reading-note-source {
+  overflow-wrap: anywhere;
+  font-size: .73rem;
+}
+.al-reading-note-info {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+}
+.al-reading-note-info-label {
+  color: var(--text-muted);
+  font-size: .72rem;
+}
+.al-reading-note-info-value {
+  overflow-wrap: anywhere;
+  font-size: .95rem;
+  line-height: 1.4;
+}
+.al-reading-note-progress .al-reading-note-info-value { color: var(--text-accent); }
+.al-reading-note-score .al-reading-note-info-value { color: #dab055; }
+.al-reading-note-actions {
+  display: grid;
+  gap: 8px;
+}
+.al-reading-note-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: .76rem;
+}
+.al-reading-note-action:hover,
+.al-reading-note-action:focus-visible {
+  background: var(--background-modifier-hover);
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.al-reading-note-action-icon { display: grid; place-items: center; width: 18px; }
+.al-reading-note-action-icon svg { width: 16px; height: 16px; }
+.al-reading-note-action.is-primary {
+  border-color: color-mix(in srgb, var(--interactive-accent) 50%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 11%, var(--background-primary));
+}
+.al-reading-note-action[aria-pressed="true"] .al-reading-note-action-icon {
+  color: #dab055;
+}
+.markdown-preview-view.al-reading-note-wide .al-reading-note-original { display: none !important; }
+/* The plugin also checks the leaf width in JS. This fallback handles viewport changes
+   before ResizeObserver's notification arrives. */
+@media (max-width: 1099px) {
+  .markdown-preview-view > .al-reading-note-rails { display: none; }
+}
 /* END GENERATED FEATURE STYLES */

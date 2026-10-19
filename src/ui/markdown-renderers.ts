@@ -13,6 +13,7 @@ import { bindImageFallback } from "./image-fallback";
 import { transitionSurface } from "./layout-motion";
 import { installCoverImageLoading, type CoverImageLoadingController } from "./cover-image-loading";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { installReadingNoteLayout, type ReadingNoteLayout } from "./note-reading-layout";
 
 export class AnimeListRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
@@ -114,6 +115,7 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
   private renderTimer: number | null = null;
   private legacyCoverElement: HTMLElement | null = null;
   private detailCoverCache: { resource: string; image: HTMLImageElement } | null = null;
+  private readingLayout: ReadingNoteLayout | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -140,6 +142,8 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     this.legacyCoverElement?.removeClass("animelist-detail-legacy-cover");
     this.legacyCoverElement = null;
     this.detailCoverCache = null;
+    this.readingLayout?.dispose();
+    this.readingLayout = null;
   }
 
   private hideLegacyCoverEmbed(resourcePath: string): void {
@@ -185,7 +189,11 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
   render(): void {
     isolateHorizontalSwipeSurface(this.containerEl);
     const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
-    if (!(file instanceof TFile)) return;
+    if (!(file instanceof TFile)) {
+      this.readingLayout?.dispose();
+      this.readingLayout = null;
+      return;
+    }
     const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter || {};
     transitionSurface(this.containerEl, () => this.containerEl.replaceChildren());
 
@@ -325,5 +333,25 @@ export class DetailActionsRenderChild extends MarkdownRenderChild {
     this.containerEl.appendChild(card);
     this.hideLegacyCoverEmbed(coverResource);
     this.plugin.afterDetailRender(this.containerEl, this.sourcePath, fm);
+    this.readingLayout ??= installReadingNoteLayout(this.containerEl, file, this.plugin);
+    this.readingLayout?.update({
+      title: detailString(fm.title) || file.basename,
+      originalTitle: detailString(fm.title_original),
+      coverResource,
+      mediaType,
+      format: mediaFormatLabel(detailString(fm.format)),
+      year: detailString(fm.year),
+      people,
+      status: detailItem.status,
+      statusLabel: itemStatusLabel(detailItem),
+      progress: progressText,
+      score: fm.score != null && fm.score !== "" && Number.isFinite(Number(fm.score))
+        ? Number(fm.score).toFixed(1)
+        : "",
+      quarter,
+      sourceUrl: urls[0] ?? "",
+      sourceLabel: provider ? mediaProviderLabel(provider) : "",
+      favorite: fm.favorite === true,
+    });
   }
 }

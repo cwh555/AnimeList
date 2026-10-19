@@ -34,6 +34,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/workspace-responsive-pages.css",
   "styles/plugin-mobile-gestures.css",
   "styles/media-cover-replacement.css",
+  "styles/note-reading-layout.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {
