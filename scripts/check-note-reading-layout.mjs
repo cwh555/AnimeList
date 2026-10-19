@@ -61,7 +61,7 @@ try {
        <div id="detail-block" class="el-pre"><div class="block-language-animelist-detail" id="detail-host"><div class="al-detail-card">Native detail header</div></div></div>
        <p id="untouched" class="prose">A note written directly in Markdown, not a duplicate data model.</p>
        <div id="image-section" class="image-card"><h3>Images</h3><p>Native image sections remain in their original place.</p></div>
-       <div id="moment-section" class="moment-card"><h3>Moments</h3><p>「Although it was only a short time...」</p></div>
+       <div id="moment-section" class="moment-card"><h3>Moments</h3><p>Although it was only a short time...</p></div>
        ${longText}
       </div></div></main>
       <script>window.createEl=(tag)=>document.createElement(tag);</script>
@@ -77,7 +77,7 @@ try {
         const actions={edit:0,fav:0,library:0};
         const plugin={openEditModal(){actions.edit++},async setFavorite(){actions.fav++},async openLibrary(){actions.library++}};
         const data={
-          title:"Example Anime", originalTitle:"サンプルアニメ", coverResource:${JSON.stringify(cover)},
+          title:"Example Anime", originalTitle:"Example Anime — Original", coverResource:${JSON.stringify(cover)},
           mediaType:"anime",format:"TV",year:"2026",people:"Animation Studio",status:"ongoing",
           statusLabel:"Watching",progress:"7 / 12 episodes",score:"9.5",quarter:"Fall 2026",
           sourceUrl:"https://example.org/title",sourceLabel:"Bangumi",favorite:false,
@@ -143,7 +143,27 @@ try {
         embedded.remove();
         if(expectWide){
           const restored=AnimeListReadingNote.installReadingNoteLayout(detail,file,plugin);
+          if(!restored)throw new Error("Failed to reinstall Reading View layout");
           restored.update(data);
+          const replacementBlock=document.createElement("div");
+          replacementBlock.className="el-pre";
+          const replacementDetail=document.createElement("div");
+          replacementDetail.className="block-language-animelist-detail";
+          replacementBlock.append(replacementDetail);
+          sizer.insertBefore(replacementBlock,prose);
+          const newer=AnimeListReadingNote.installReadingNoteLayout(replacementDetail,file,plugin);
+          checks.newRenderChildReplacesPrevious=!!newer
+            && view.querySelectorAll(":scope > .al-reading-note-rails").length===1;
+          newer?.update({...data,progress:"9 / 12 episodes"});
+          restored.dispose();
+          checks.oldUnloadDoesNotRemoveNew=!!view.querySelector(":scope > .al-reading-note-rails")
+            && document.querySelector(".al-reading-note-rail-right").textContent.includes("9 / 12");
+          newer?.dispose();
+          replacementBlock.remove();
+          const final=AnimeListReadingNote.installReadingNoteLayout(detail,file,plugin);
+          checks.ownerClearedForReinstall=!!final
+            && view.querySelectorAll(":scope > .al-reading-note-rails").length===1;
+          final?.update(data);
           await sleep(70);
         }
         document.body.dataset.details=JSON.stringify(checks);
