@@ -135,11 +135,18 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  const px=pr.left+pr.width/2, py=pr.top+pr.height/2;
  const touchPointer=(kind,x,y)=>new PointerEvent(kind,{bubbles:true,cancelable:true,pointerId:33,pointerType:"touch",isPrimary:true,button:0,clientX:x,clientY:y});
  const beforePosterPan=scene.style.transform;
+ const posterXBeforePan=posterPan.getBoundingClientRect().left;
  posterPan.dispatchEvent(touchPointer("pointerdown",px,py));
- posterPan.dispatchEvent(touchPointer("pointermove",px+42,py+25));
- posterPan.dispatchEvent(touchPointer("pointerup",px+42,py+25));
+ posterPan.dispatchEvent(touchPointer("pointermove",px+10,py+8));
+ // Mobile browsers implicitly capture touch pointers on the pressed child.
+ // When explicit capture transfers to the viewport, its loss bubbles upward;
+ // this must not terminate the active canvas gesture.
+ posterPan.dispatchEvent(new PointerEvent("lostpointercapture",{bubbles:true,pointerId:33,pointerType:"touch",isPrimary:true}));
+ viewport.dispatchEvent(touchPointer("pointermove",px+42,py+25));
+ viewport.dispatchEvent(touchPointer("pointerup",px+42,py+25));
  await frames();
  d.posterOriginSwipePans=scene.style.transform!==beforePosterPan;
+ d.descendantCaptureLossKeepsPan=Math.abs(posterPan.getBoundingClientRect().left-posterXBeforePan-42)<=1;
  const afterDragClick=new MouseEvent("click",{bubbles:true,cancelable:true});
  posterPan.dispatchEvent(afterDragClick);
  d.posterDragDoesNotOpen=afterDragClick.defaultPrevented&&openedNotes.length===0;

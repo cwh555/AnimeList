@@ -112,7 +112,10 @@ export function installTimelinePointerPan(viewport: HTMLElement, adapters: Timel
     release();
   });
   viewport.addEventListener("lostpointercapture", (event) => {
-    if (active?.pointerId === event.pointerId) release();
+    // Touch starts with implicit capture on a descendant (often a poster).
+    // Its lostpointercapture bubbles through this viewport when capture moves
+    // to the viewport. Only release on capture loss from the viewport itself.
+    if (event.target === viewport && active?.pointerId === event.pointerId) release();
   });
 
   // Dragging a poster must not also open its note on release.
