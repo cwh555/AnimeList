@@ -297,7 +297,9 @@ export function renderTimelineWorkspace(
     if (!viewport) return 0;
     // Compact mobile Timeline puts every stack lane above the axis. Centering
     // that axis clips the posters even in an otherwise adequate canvas.
-    if (windowSize(root) !== "compact" || !root.ownerDocument.body.classList.contains("is-mobile")) {
+    const shortMobileViewport = (root.ownerDocument.defaultView?.innerHeight ?? Infinity) <= 600;
+    if (!root.ownerDocument.body.classList.contains("is-mobile")
+      || (windowSize(root) !== "compact" && !shortMobileViewport)) {
       return viewport.clientHeight / 2;
     }
     // The canvas itself may extend below a short phone screen. Keep the first
