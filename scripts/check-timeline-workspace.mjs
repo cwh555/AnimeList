@@ -63,7 +63,7 @@ html,body{margin:0;width:100%;height:100%;background:#111;color:#eee;font-family
 <script>${bundle}</script><script>
 const items=[${items}];
 const app=document.querySelector('#app');
-if(innerWidth<=700) document.body.classList.add('is-mobile');
+if(innerWidth<=700 || innerHeight<450) document.body.classList.add('is-mobile');
 const openedNotes=[]; const page={id:'timeline',label:'Timeline',icon:'clock-3',order:20,render(el){AnimeListTimelineTest.renderTimelineWorkspace(el,items,{maxStackDepth:3,openFile:(path)=>openedNotes.push(path)})}};
 const result=AnimeListTimelineTest.renderAnimeListWorkspaceShell(app,{pages:[page],activeSection:'timeline',onSelect:()=>{}}); page.render(result.page);
 const click=(el,x)=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x||0}));
@@ -72,9 +72,12 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  if(document.body.classList.contains('is-mobile')){
    const mobileViewport=document.querySelector('.al-timeline-workspace-viewport');
    const mobileScene=document.querySelector('.al-timeline-scene');
-   const mobilePoster=[...mobileScene.querySelectorAll('.al-timeline-card')].at(-1);
+   const visiblePosters=[...mobileScene.querySelectorAll('.al-timeline-card')].map(card=>({card,rect:card.getBoundingClientRect()}))
+     .filter(({rect})=>rect.bottom>Math.max(0,mobileViewport.getBoundingClientRect().top)+20&&rect.top<innerHeight-20&&rect.right>25&&rect.left<innerWidth-25);
+   const mobilePoster=(visiblePosters[0]?.card)||[...mobileScene.querySelectorAll('.al-timeline-card')].at(-1);
    const posterRect=mobilePoster.getBoundingClientRect();
-   const touchX=posterRect.left+posterRect.width/2,touchY=posterRect.top+posterRect.height/2;
+   const touchX=Math.max(posterRect.left+10,Math.min(posterRect.right-10,innerWidth-35));
+   const touchY=Math.max(posterRect.top+10,Math.min(posterRect.bottom-10,innerHeight-35));
    const startX=mobilePoster.getBoundingClientRect().left;
    window.__timelineNativeTouch={ready:true,x:touchX,y:touchY};
    await new Promise(resolve=>{window.__timelineNativeTouch.done=resolve;});
@@ -101,7 +104,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
  d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
- const phoneCanvas=document.body.classList.contains('is-mobile')&&shell.dataset.windowSize==='compact';
+ const phoneCanvas=document.body.classList.contains('is-mobile')&&(shell.dataset.windowSize==='compact'||innerHeight<=600);
  const bodyEl=document.querySelector('.al-timeline-workspace-body');
  d.overviewVisibleInsideLeaf=phoneCanvas
    ? bodyEl.scrollHeight>bodyEl.clientHeight&&getComputedStyle(bodyEl).overflowY==='auto'
@@ -109,7 +112,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  if(phoneCanvas){
    d.mobileCanvasHeightPreserved=viewport.clientHeight>=439;
    d.mobileUndatedPosterIsCompact=[...document.querySelectorAll('.al-timeline-undated-card')].every(c=>Math.abs(c.getBoundingClientRect().height-108)<=1);
-   bodyEl.scrollTop=bodyEl.scrollHeight;
+   overviewInitial.scrollIntoView({block:'center'});
    const overviewScrolled=overviewInitial.getBoundingClientRect();const bodyScrolled=bodyEl.getBoundingClientRect();
    d.mobileOverviewScrollReachable=overviewScrolled.bottom<=bodyScrolled.bottom+1&&overviewScrolled.top>=bodyScrolled.top-1;
    bodyEl.scrollTop=0;
@@ -138,7 +141,9 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
  d.initialLatestCentered=Math.abs(latestCenterX()-viewportCenter().x)<=2;
  const latestPoster=cards.at(-1).getBoundingClientRect();
- d.mobileLatestPosterInitiallyVisible=!phoneCanvas||(latestPoster.top>=viewport.getBoundingClientRect().top-1&&latestPoster.bottom<=Math.min(innerHeight-16,viewport.getBoundingClientRect().bottom)+1);
+ d.mobileLatestPosterInitiallyVisible=!phoneCanvas||(innerHeight<=600
+   ? datedCards().some(c=>{const r=c.getBoundingClientRect();return r.top<=innerHeight-25&&r.bottom>=viewport.getBoundingClientRect().top+25;})
+   : latestPoster.top>=viewport.getBoundingClientRect().top-1&&latestPoster.bottom<=Math.min(innerHeight-16,viewport.getBoundingClientRect().bottom)+1);
  d.initialAxisCentered=Math.abs(axisScreenY()-targetAxisY())<=2;
  const sameDay=cards.slice(0,2); const axisY=parseFloat(axis.style.top); const above=sameDay.filter(c=>parseFloat(c.style.top)+180<axisY+1).length; const below=sameDay.filter(c=>parseFloat(c.style.top)>axisY-1).length;
  d.responsiveLane=shell.dataset.windowSize==='compact'?above===2&&below===0:above>=1&&below>=1;
@@ -158,7 +163,11 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.horizontalSwipeKeepsAxisY=Math.abs(axisScreenY()-axisBeforeSwipe)<=1;
  const overviewBottomBeforeVerticalPan=overviewInitial.getBoundingClientRect().bottom; viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:0,deltaY:120})); await frames();
  d.overviewStableWhileScenePans=Math.abs(overviewInitial.getBoundingClientRect().bottom-overviewBottomBeforeVerticalPan)<=1;
- const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; const resetCardBefore=datedCards()[0]; const resetImageBefore=resetCardBefore?.querySelector('img'); click(resetButton); await frames(); d.resetUsesLayoutMotion=datedCards().some(c=>c.dataset.layoutMotion==='active'||c.getAnimations().length>0); await new Promise(r=>setTimeout(r,240)); await frames();
+ const resetButton=document.querySelectorAll('.al-timeline-tool-button')[1]; const resetCardBefore=datedCards()[0]; const resetImageBefore=resetCardBefore?.querySelector('img');
+ const originalAnimate=Element.prototype.animate;let resetMotionCalls=0;
+ Element.prototype.animate=function(...args){if(this.matches?.('.al-timeline-card'))resetMotionCalls++;return originalAnimate.apply(this,args);};
+ click(resetButton); await frames();Element.prototype.animate=originalAnimate;
+ d.resetUsesLayoutMotion=resetMotionCalls>0;await new Promise(r=>setTimeout(r,240)); await frames();
  viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=datedCards();
  d.resetPreservesPosterNode=cards[0]===resetCardBefore&&cards[0]?.querySelector('img')===resetImageBefore;
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
@@ -210,6 +219,8 @@ try {
     { width: 1504, height: 1024 },
     { width: 1000, height: 620 },
     { width: 820, height: 900 },
+    { width: 844, height: 390, deviceScaleFactor: 2, mobile: true },
+    { width: 667, height: 375, deviceScaleFactor: 2, mobile: true },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
     { width: 320, height: 720, deviceScaleFactor: 2, mobile: true },
   ]) {
