@@ -6093,4 +6093,24 @@ button.al-moment-stack-strip:focus-visible {
     -webkit-user-drag: none;
   }
 }
+
+/* Unknown-date cards are deliberately miniature. The timeline's full-size
+ * card selector otherwise overrides their 72x108 geometry. */
+.animelist-native-view .al-timeline-workspace .al-timeline-card.al-timeline-undated-card {
+  width: 72px;
+  height: 108px;
+}
+
+/* Phone controls and undated media must not squeeze the pan canvas below its
+ * posters. Scroll inside the Timeline body, never the parent Obsidian leaf.
+ * Narrow desktop panes keep their existing resizable layout. */
+.is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-workspace-body {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-scale-wrap {
+  flex: 0 0 auto;
+  height: 440px;
+  min-height: 440px;
+}
 /* END GENERATED FEATURE STYLES */

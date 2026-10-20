@@ -293,6 +293,20 @@ export function renderTimelineWorkspace(
     updateOverviewWindow?.();
   }
 
+  function initialAxisScreenY(): number {
+    if (!viewport) return 0;
+    // Compact mobile Timeline puts every stack lane above the axis. Centering
+    // that axis clips the posters even in an otherwise adequate canvas.
+    if (windowSize(root) !== "compact" || !root.ownerDocument.body.classList.contains("is-mobile")) {
+      return viewport.clientHeight / 2;
+    }
+    // The canvas itself may extend below a short phone screen. Keep the first
+    // full-sized poster above the visible fold, without changing its scale.
+    const visibleBelowTop = (root.ownerDocument.defaultView?.innerHeight ?? viewport.clientHeight)
+      - viewport.getBoundingClientRect().top;
+    return Math.max(212, Math.min(viewport.clientHeight - 40, visibleBelowTop - 40));
+  }
+
   function centerFocus(centerAxis = false): void {
     if (!viewport || !scene || !currentItems.length) return;
     const focusX = timelineXForTime(state.focusTime, minimumTime, state.daySpacing, SIDE_PADDING);
@@ -305,7 +319,7 @@ export function renderTimelineWorkspace(
         state.viewScale,
       );
       state.panX = pan.x;
-      state.panY = pan.y;
+      state.panY = initialAxisScreenY() - axisY * state.viewScale;
     } else {
       state.panX = viewport.clientWidth / 2 - focusX * state.viewScale;
     }
@@ -610,7 +624,7 @@ export function renderTimelineWorkspace(
         state.viewScale,
       );
       state.panX = pan.x;
-      state.panY = pan.y;
+      state.panY = initialAxisScreenY() - axisY * state.viewScale;
       applyPan();
     } else {
       centerFocus(true);

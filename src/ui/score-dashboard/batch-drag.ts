@@ -41,6 +41,7 @@ export function renderScoreDashboardWithBatchDrag(
   controllers.get(container)?.abort();
   let currentState = { ...initialState };
   let touchInputSeen = false;
+  let lastInputWasTouch = false;
 
   const render = (scrollTop: number, restoreBatchMode = false): void => {
     controllers.get(container)?.abort();
@@ -86,7 +87,7 @@ export function renderScoreDashboardWithBatchDrag(
     );
     let batchInvariantQueued = false;
     scheduleTouchBatchInvariant = (): void => {
-      if (!touchInputSeen || batchInvariantQueued) return;
+      if (!touchInputSeen || !lastInputWasTouch || batchInvariantQueued) return;
       batchInvariantQueued = true;
       queueMicrotask(() => {
         batchInvariantQueued = false;
@@ -98,7 +99,7 @@ export function renderScoreDashboardWithBatchDrag(
         batchButton.click();
       });
     };
-    const isTouchDevice = (): boolean => touchInputSeen
+    const isTouchDevice = (): boolean => lastInputWasTouch
       || container.ownerDocument.body.classList.contains("is-mobile")
       || container.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")?.matches === true;
     const syncDraggablePosters = (): void => {
@@ -245,9 +246,17 @@ export function renderScoreDashboardWithBatchDrag(
     installScoreDashboardTouchInteractions(container, shell, batchButton, controller.signal, {
       onTouchInput: () => {
         touchInputSeen = true;
+        lastInputWasTouch = true;
         syncDraggablePosters();
       },
     });
+    // A hybrid device must not lose desktop drag-and-drop for the rest of the
+    // session merely because its touchscreen was used once.
+    container.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || !lastInputWasTouch) return;
+      lastInputWasTouch = false;
+      syncDraggablePosters();
+    }, { ...options, capture: true });
 
     container.addEventListener("dragend", finishDrag, { ...options, capture: true });
     container.ownerDocument.defaultView?.addEventListener("blur", finishDrag, options);
