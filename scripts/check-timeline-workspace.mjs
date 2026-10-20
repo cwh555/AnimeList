@@ -68,10 +68,27 @@ const openedNotes=[]; const page={id:'timeline',label:'Timeline',icon:'clock-3',
 const result=AnimeListTimelineTest.renderAnimeListWorkspaceShell(app,{pages:[page],activeSection:'timeline',onSelect:()=>{}}); page.render(result.page);
 const click=(el,x)=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x||0}));
 const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-(async()=>{ await frames(); const d={};
+(async()=>{ await frames(); let nativeTouchResult=true;
+ if(document.body.classList.contains('is-mobile')){
+   const mobileViewport=document.querySelector('.al-timeline-workspace-viewport');
+   const mobileScene=document.querySelector('.al-timeline-scene');
+   const mobilePoster=[...mobileScene.querySelectorAll('.al-timeline-card')].at(-1);
+   const posterRect=mobilePoster.getBoundingClientRect();
+   const touchX=posterRect.left+posterRect.width/2,touchY=posterRect.top+posterRect.height/2;
+   const startX=mobilePoster.getBoundingClientRect().left;
+   window.__timelineNativeTouch={ready:true,x:touchX,y:touchY};
+   await new Promise(resolve=>{window.__timelineNativeTouch.done=resolve;});
+   await frames();
+   nativeTouchResult=mobilePoster.getBoundingClientRect().left-startX>35 && openedNotes.length===0;
+   click(document.querySelectorAll('.al-timeline-tool-button')[1]);
+   await frames();
+ }
+ const d={};
+ d.realMobileTouchPansFromPoster=nativeTouchResult;
  const shell=document.querySelector('.al-workspace-shell'); const root=document.querySelector('.al-timeline-workspace'); let viewport=document.querySelector('.al-timeline-workspace-viewport');
  const axisScreenY=()=>{const a=document.querySelector('.al-timeline-axis');const r=a.getBoundingClientRect();return r.top+r.height/2;};
  const viewportCenter=()=>{const r=viewport.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+ const targetAxisY=()=>{const r=viewport.getBoundingClientRect();return phoneCanvas? r.top+Math.max(212,Math.min(viewport.clientHeight-40,innerHeight-r.top-40)):r.top+r.height/2;};
  const datedCards=()=>[...document.querySelectorAll('.al-timeline-scene .al-timeline-card')];
  const latestCenterX=()=>{const c=datedCards().at(-1).getBoundingClientRect();return c.left+c.width/2;};
  d.fullPageNoModalFrame=!!root&&!document.querySelector('.al-timeline-toolbar')&&!document.querySelector('.al-timeline-copy')&&parseFloat(getComputedStyle(root).borderRadius||'0')===0;
@@ -84,7 +101,20 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  d.timelineOwnsLeafViewport=app.classList.contains('is-timeline-workspace')&&app.scrollHeight<=app.clientHeight+1&&appRect.bottom<=innerHeight+1;
  d.noVerticalPageOverflow=document.documentElement.scrollHeight<=document.documentElement.clientHeight+1&&document.body.scrollHeight<=document.body.clientHeight+1;
  d.overviewBelowCanvas=overviewInitial.parentElement===document.querySelector('.al-timeline-workspace-body')&&overviewInitialRect.top>=viewportInitialRect.bottom-1;
- d.overviewVisibleInsideLeaf=overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
+ const phoneCanvas=document.body.classList.contains('is-mobile')&&shell.dataset.windowSize==='compact';
+ const bodyEl=document.querySelector('.al-timeline-workspace-body');
+ d.overviewVisibleInsideLeaf=phoneCanvas
+   ? bodyEl.scrollHeight>bodyEl.clientHeight&&getComputedStyle(bodyEl).overflowY==='auto'
+   : overviewInitialRect.bottom<=appRect.bottom+1&&overviewInitialRect.bottom>viewportInitialRect.bottom&&overviewInitialRect.left>=appRect.left&&overviewInitialRect.right<=appRect.right;
+ if(phoneCanvas){
+   d.mobileCanvasHeightPreserved=viewport.clientHeight>=439;
+   d.mobileUndatedPosterIsCompact=[...document.querySelectorAll('.al-timeline-undated-card')].every(c=>Math.abs(c.getBoundingClientRect().height-108)<=1);
+   bodyEl.scrollTop=bodyEl.scrollHeight;
+   const overviewScrolled=overviewInitial.getBoundingClientRect();const bodyScrolled=bodyEl.getBoundingClientRect();
+   d.mobileOverviewScrollReachable=overviewScrolled.bottom<=bodyScrolled.bottom+1&&overviewScrolled.top>=bodyScrolled.top-1;
+   bodyEl.scrollTop=0;
+ }
+
  d.materialOverviewSurface=parseFloat(overviewStyle.borderRadius)>=14&&overviewStyle.backgroundColor!=='rgba(0, 0, 0, 0)'&&overviewStyle.backgroundColor!=='transparent';
  const viewportBounds=viewport.getBoundingClientRect(),appBounds=app.getBoundingClientRect();
  const leftEdge=app.querySelector(':scope > .al-native-swipe-edge.is-left'),rightEdge=app.querySelector(':scope > .al-native-swipe-edge.is-right');
@@ -107,7 +137,9 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  let cards=datedCards(); let axis=document.querySelector('.al-timeline-axis');
  d.fixedPosterBase=cards.length===4&&cards.every(c=>Math.abs(c.getBoundingClientRect().height-180)<=2&&Math.abs(c.querySelector('img').getBoundingClientRect().height-180)<=2);
  d.initialLatestCentered=Math.abs(latestCenterX()-viewportCenter().x)<=2;
- d.initialAxisCentered=Math.abs(axisScreenY()-viewportCenter().y)<=2;
+ const latestPoster=cards.at(-1).getBoundingClientRect();
+ d.mobileLatestPosterInitiallyVisible=!phoneCanvas||(latestPoster.top>=viewport.getBoundingClientRect().top-1&&latestPoster.bottom<=Math.min(innerHeight-16,viewport.getBoundingClientRect().bottom)+1);
+ d.initialAxisCentered=Math.abs(axisScreenY()-targetAxisY())<=2;
  const sameDay=cards.slice(0,2); const axisY=parseFloat(axis.style.top); const above=sameDay.filter(c=>parseFloat(c.style.top)+180<axisY+1).length; const below=sameDay.filter(c=>parseFloat(c.style.top)>axisY-1).length;
  d.responsiveLane=shell.dataset.windowSize==='compact'?above===2&&below===0:above>=1&&below>=1;
  const beforeGap=Math.abs(parseFloat(cards[2].style.left)-parseFloat(cards[0].style.left)); const beforeHeight=cards[0].getBoundingClientRect().height; const axisBeforeTemporal=axisScreenY();
@@ -130,7 +162,7 @@ const frames=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(
  viewport=document.querySelector('.al-timeline-workspace-viewport'); cards=datedCards();
  d.resetPreservesPosterNode=cards[0]===resetCardBefore&&cards[0]?.querySelector('img')===resetImageBefore;
  d.resetCentersLatest=Math.abs(latestCenterX()-viewportCenter().x)<=2;
- d.resetCentersAxis=Math.abs(axisScreenY()-viewportCenter().y)<=2;
+ d.resetCentersAxis=Math.abs(axisScreenY()-targetAxisY())<=2;
  const posterPan=datedCards()[0], pr=posterPan.getBoundingClientRect();
  const px=pr.left+pr.width/2, py=pr.top+pr.height/2;
  const touchPointer=(kind,x,y)=>new PointerEvent(kind,{bubbles:true,cancelable:true,pointerId:33,pointerType:"touch",isPrimary:true,button:0,clientX:x,clientY:y});
@@ -187,6 +219,26 @@ try {
       testName: `Timeline workspace ${viewport.width}px`,
       requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
       viewport,
+      interact: async ({send,sleep}) => {
+        if (!viewport.mobile) return;
+        await send("Emulation.setTouchEmulationEnabled",{enabled:true,maxTouchPoints:5});
+        let touch;
+        for(let i=0;i<100;i+=1){
+          const response=await send("Runtime.evaluate",{expression:"JSON.stringify(window.__timelineNativeTouch??null)",returnByValue:true});
+          touch=JSON.parse(response.result.value??"null");
+          if(touch?.ready)break;
+          await sleep(30);
+        }
+        if(!touch?.ready)throw new Error("Timeline native touch probe was not initialized");
+        const point=(x,y)=>({x,y,id:1,force:1});
+        await send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point(touch.x,touch.y)]});
+        for(const offset of [8,18,30,46,62]){
+          await send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[point(touch.x+offset,touch.y)]});
+          await sleep(24);
+        }
+        await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+        await send("Runtime.evaluate",{expression:"window.__timelineNativeTouch.done()"});
+      },
     });
   }
 } finally {

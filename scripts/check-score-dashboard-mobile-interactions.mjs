@@ -113,6 +113,32 @@ const html = `<!doctype html>
 
     (async () => {
       const details = {};
+      if (innerWidth > 700) {
+        await delay(40);
+        const alpha = poster("Alpha.md");
+        details.desktopPosterDraggable = alpha.draggable === true;
+        const point = center(alpha);
+        touch(alpha, "pointerdown", point.x, point.y, 43);
+        touch(alpha, "pointerup", point.x, point.y, 43);
+        details.hybridTouchTemporarilyDisablesDrag = alpha.draggable === false;
+        alpha.dispatchEvent(new PointerEvent("pointerdown", { bubbles:true, pointerType:"mouse", button:0, isPrimary:true }));
+        details.hybridMouseRestoresDrag = alpha.draggable === true;
+        const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
+        batchButton.click();
+        alpha.click();
+        await delay(50);
+        details.desktopSelectedPosterDraggable = shell().classList.contains("is-batch-mode") && alpha.classList.contains("is-selected") && alpha.draggable;
+        const transfer = new DataTransfer();
+        const lane90 = lane("9.0");
+        alpha.dispatchEvent(new DragEvent("dragstart", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        lane90.dispatchEvent(new DragEvent("dragover", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        lane90.dispatchEvent(new DragEvent("drop", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        await delay(150);
+        details.desktopDragChangesScore = applied.length===1 && applied[0].length===1 && applied[0][0].filePath==="Alpha.md" && applied[0][0].nextScore===9;
+        document.body.dataset.details = JSON.stringify(details);
+        document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
+        return;
+      }
 
       await delay(30);
       const eagerImages = [...dashboard.querySelectorAll('.al-score-poster-image')].filter((image) => image.loading === 'eager');
@@ -253,6 +279,13 @@ try {
     testName: "Score Dashboard mobile touch interaction test",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  });
+  await runChromiumDatasetTest({
+    html,
+    profile: path.join(output, "chrome-desktop"),
+    testName: "Score Dashboard desktop drag and hybrid pointer regression",
+    requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
+    viewport: { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false },
   });
 } finally {
   await rm(output, { recursive: true, force: true });
