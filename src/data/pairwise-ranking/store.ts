@@ -65,11 +65,13 @@ export class PairwiseRankingStore {
   }
 
   /** An immutable copy of the precise bytes recovered from, for user inspection. */
-  private async backupOriginal(contents: string): Promise<string> {
+  private async backupOriginal(contents: string, raw: ArrayBuffer): Promise<string> {
     const adapter = this.app.vault.adapter;
+    // Hash and copy the original byte sequence, including a possible UTF-8 BOM.
+    const originalBytes = new Uint8Array(raw);
     let hash = 2166136261;
-    for (let index = 0; index < contents.length; index++) {
-      hash ^= contents.charCodeAt(index);
+    for (const byte of originalBytes) {
+      hash ^= byte;
       hash = Math.imul(hash, 16777619);
     }
     const suffix = (hash >>> 0).toString(16).padStart(8, "0");
@@ -77,12 +79,12 @@ export class PairwiseRankingStore {
     for (let index = 0; index <= 99; index++) {
       const target = base + (index ? "-" + index : "") + ".json";
       if (await adapter.exists(target)) {
-        const old = new TextDecoder().decode(await adapter.readBinary(target));
-        if (old === contents) return target;
+        const oldBytes = new Uint8Array(await adapter.readBinary(target));
+        if (oldBytes.length === originalBytes.length
+          && oldBytes.every((byte, index) => byte === originalBytes[index])) return target;
         continue;
       }
-      const bytes = new TextEncoder().encode(contents);
-      await adapter.writeBinary(target, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      await adapter.writeBinary(target, raw.slice(0));
       return target;
     }
     throw new Error("Unable to preserve the original ranking backup; ranking file was not changed.");
@@ -97,12 +99,13 @@ export class PairwiseRankingStore {
     if (this.loaded) return this.loaded;
     const adapter = this.app.vault.adapter;
     if (await adapter.exists(this.path)) {
-      const contents = new TextDecoder().decode(await adapter.readBinary(this.path));
+      const raw = await adapter.readBinary(this.path);
+      const contents = new TextDecoder().decode(raw);
       const loaded = validateRankData(JSON.parse(contents) as unknown);
       if (loaded.recovered.length) {
         // Never silently overwrite a vault-synced file. Save the exact original
         // first, then keep the fixed round only in memory until the user edits.
-        const backupPath = await this.backupOriginal(contents);
+        const backupPath = await this.backupOriginal(contents, raw);
         this.recovery = {
           types: loaded.recovered,
           incompleteTypes: loaded.needsRecompare,
