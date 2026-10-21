@@ -350,3 +350,15 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Each operation changes only its owned fields/block and preserves unrelated frontmatter/body content.
 - [ ] No optional feature introduced by the current release performs a vault-wide automatic rewrite on startup.
 - [ ] Disabling optional features leaves stored Markdown readable and does not delete user data.
+
+## Language and title migration
+
+- [ ] Every Obsidian Settings section and Settings-launched dialog (buttons, status, failure and completion) remains English regardless of AnimeList UI locale.
+- [ ] Settings → Updates & cleanup → Preview title updates displays each scanned title, status, path and reason live; it never reports only a total skipped count.
+- [ ] An AniList-only work with a verified Bangumi candidate is offered as manual review, unchecked by default; ambiguous/mismatched-year candidates are not automatically selected.
+- [ ] A Bangumi result with Simplified Chinese but no verified Traditional title visibly explains the missing translation.
+- [ ] A Bangumi ID found in an AniList record's source_urls is usable for a direct lookup.
+- [ ] Custom titles, unavailable translations, HTTP 429 failures and cancelled scans never silently modify notes.
+- [ ] Applying a checked result leaves note path, body, unrelated frontmatter, tags, scores, progress and ranking unchanged. The previous name remains searchable in title_aliases, with title_original retained.
+- [ ] A 50+ work test vault scans progressively without blocking the settings dialog or flooding API requests; closing a scan cancels its remaining queued work.
+- [ ] Changing the interface language does not rewrite existing titles.

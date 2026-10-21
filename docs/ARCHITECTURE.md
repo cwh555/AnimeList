@@ -51,6 +51,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `media-classification-service.ts`: optional classification enrichment after a work is selected; failure never blocks note creation.
 - `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
 - `media-note-service.ts`: note creation and series-cover download workflow.
+- `title-localization-service.ts`: preview-first per-work title migration with bounded provider I/O and selective frontmatter writes; see docs/PROTOCOL.md for the language contract.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
 - `special-label-state-service.ts`: the single Favorite/Masterpiece metadata writer and compatibility cleanup path.
 - `image-section-service.ts`: Image Section asset import, exact/canonical-raster duplicate checks, thumbnail requests, Markdown updates, Set as cover, and reference-aware deletion.
