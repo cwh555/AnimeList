@@ -56,6 +56,45 @@ describe("ranking vault storage", () => {
     await assert.rejects(service.mutate((state) => { state.novel.ordered.push("N2"); }), /disk full/);
     assert.deepEqual((await service.load()).novel.ordered, ["N1"]);
   });
+  it("never writes ranking history, while reading old snapshots without changing the original file", async () => {
+    const { app, adapter } = setup();
+    const path = ".obsidian/animelist-ranking.json";
+    const old = emptyRankingState() as unknown as Record<string, unknown>;
+    for (const type of ["anime", "manga", "novel"]) {
+      (old[type] as Record<string, unknown>).history = [{
+        ordered: ["obsolete"], pending: {}, active: null,
+      }];
+    }
+    (old.anime as Record<string, unknown>).ordered = ["anime/A.md"];
+    const source = JSON.stringify(old);
+    adapter.put(path, source);
+    const service = new PairwiseRankingStore(app);
+    const state = await service.load();
+    for (const type of ["anime", "manga", "novel"] as const) {
+      assert.equal(Object.hasOwn(state[type], "history"), false);
+    }
+    assert.deepEqual(state.anime.ordered, ["anime/A.md"]);
+    assert.equal(new TextDecoder().decode(adapter.files.get(path)), source,
+      "reading an old snapshot must not rewrite source data");
+    await service.mutate((draft) => draft.anime.ordered.push("anime/B.md"));
+    const persisted = JSON.parse(new TextDecoder().decode(adapter.files.get(path))) as Record<string, Record<string, unknown>>;
+    for (const type of ["anime", "manga", "novel"]) {
+      assert.equal(Object.hasOwn(persisted[type], "history"), false,
+        "obsolete history must never be persisted again");
+    }
+    const reloaded = await new PairwiseRankingStore(app).load();
+    assert.deepEqual(reloaded.anime.ordered, ["anime/A.md", "anime/B.md"]);
+  });
+
+  it("tolerates old v1 data without any history field", async () => {
+    const { app, adapter } = setup();
+    const old = emptyRankingState();
+    adapter.put(".obsidian/animelist-ranking.json", JSON.stringify(old));
+    const loaded = await new PairwiseRankingStore(app).load();
+    assert.deepEqual(loaded.anime.ordered, []);
+    assert.equal(Object.hasOwn(loaded.anime, "history"), false);
+  });
+
   it("supports old v1 collections without a round field", async () => {
     const { app, adapter } = setup();
     const old = emptyRankingState();
