@@ -269,3 +269,8 @@ export function renderScoreDashboardWithBatchDrag(
 
   render(container.scrollTop);
 }
+
+export function disposeScoreDashboardInteractions(container: HTMLElement): void {
+  controllers.get(container)?.abort();
+  controllers.delete(container);
+}

@@ -4,7 +4,11 @@ import { ScoreDashboardRefreshGuard, shouldRefreshScoreDashboardMetadata, should
 import { applyScoreDashboardChanges } from "../../data/score-dashboard/score-service";
 import { ScoreDashboardDragAutoScroller } from "../../domain/score-dashboard/drag-scroll";
 import { SCORE_DASHBOARD_DEFAULT_SCALE } from "../../domain/score-dashboard/model";
-import { renderScoreDashboardWithBatchDrag } from "../../ui/score-dashboard/batch-drag";
+import { disposeScoreDashboardInteractions, renderScoreDashboardWithBatchDrag } from "../../ui/score-dashboard/batch-drag";
+import { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
+import { renderRankingPanel } from "../../ui/pairwise-ranking/panel";
+import { rankingText } from "../pairwise-ranking/text";
+import type { MediaType } from "../../domain/media-types";
 import { prepareScoreDashboardCoverSources } from "../../ui/score-dashboard/cover-sources";
 import { confirmScoreDashboardClamp } from "../../ui/score-dashboard/operation-ui";
 import type { ScoreDashboardUiState } from "../../ui/score-dashboard/renderer";
@@ -30,6 +34,10 @@ type ScoreDashboardPlugin = AnimeListFeatureHost & ScoreDashboardDomEventRegistr
 
 const HOSTS = new WeakMap<object, ScoreDashboardPluginHost>();
 const STATES = new WeakMap<object, ScoreDashboardUiState>();
+const RANK_STORES = new WeakMap<object, PairwiseRankingStore>();
+interface RankingWorkspaceState { mode: "rating" | "ranking"; type: MediaType; comparing: boolean }
+const RANK_STATES = new WeakMap<object, RankingWorkspaceState>();
+const RATING_MOUNTS = new WeakMap<object, HTMLElement>();
 
 function createHost(
   plugin: ScoreDashboardPlugin,
@@ -80,6 +88,16 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   const refreshGuard = new ScoreDashboardRefreshGuard();
   const dashboardHost = createHost(plugin, refreshGuard);
   HOSTS.set(plugin, dashboardHost);
+  const rankingStore = new PairwiseRankingStore(plugin.app);
+  RANK_STORES.set(plugin, rankingStore);
+  plugin.registerEvent(plugin.app.vault.on("rename", (file, oldPath) => {
+    if (!(file instanceof TFile)) return;
+    void rankingStore.rename(oldPath, file.path).catch((error: unknown) => {
+      dashboardHost.showNotice(rankingText("failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      }));
+    });
+  }));
 
   // Keep the old view type registered so restored workspaces from earlier versions remain valid.
   plugin.registerView(SCORE_DASHBOARD_VIEW_TYPE, (leaf) => new ScoreDashboardView(leaf, dashboardHost));
@@ -120,19 +138,77 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
 
 function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: HTMLElement): void {
   const dashboardHost = HOSTS.get(plugin);
-  if (!dashboardHost) return;
-  const state = STATES.get(plugin) ?? {
+  const rankingStore = RANK_STORES.get(plugin);
+  if (!dashboardHost || !rankingStore) return;
+  const scoreState = STATES.get(plugin) ?? {
     type: "all",
     scale: SCORE_DASHBOARD_DEFAULT_SCALE,
     showUnrated: false,
   };
-  container.addClass("animelist-score-dashboard-view");
-  renderScoreDashboardWithBatchDrag(container, dashboardHost.collectMediaItems(), state, {
-    openFile: (path) => dashboardHost.openMediaFile(path),
-    applyChanges: (changes) => dashboardHost.applyScoreChanges(changes),
-    confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
+  const rankState = RANK_STATES.get(plugin) ?? { mode: "rating", type: "anime", comparing: false };
+  const previous = RATING_MOUNTS.get(plugin);
+  if (previous) disposeScoreDashboardInteractions(previous);
+  RATING_MOUNTS.delete(plugin);
+  container.replaceChildren();
+  container.classList.toggle("animelist-score-dashboard-view", rankState.mode === "rating");
+
+  const tabs = document.createElement("nav");
+  tabs.className = "al-ranking-mode-tabs";
+  tabs.setAttribute("aria-label", rankingText("title"));
+  for (const mode of ["rating", "ranking"] as const) {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.textContent = rankingText(mode === "rating" ? "modeRating" : "modeRanking");
+    tab.classList.toggle("is-active", rankState.mode === mode);
+    tab.setAttribute("aria-pressed", String(rankState.mode === mode));
+    tab.addEventListener("click", () => {
+      if (rankState.mode === mode) return;
+      rankState.mode = mode;
+      RANK_STATES.set(plugin, rankState);
+      renderWorkspaceScoreDashboard(plugin, container);
+    });
+    tabs.appendChild(tab);
+  }
+  const body = document.createElement("div");
+  body.className = "al-score-mode-content";
+  container.append(tabs, body);
+
+  if (rankState.mode === "rating") {
+    RATING_MOUNTS.set(plugin, body);
+    renderScoreDashboardWithBatchDrag(body, dashboardHost.collectMediaItems(), scoreState, {
+      openFile: (path) => dashboardHost.openMediaFile(path),
+      applyChanges: (changes) => dashboardHost.applyScoreChanges(changes),
+      confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
+      showNotice: (message) => dashboardHost.showNotice(message),
+      onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
+    });
+    return;
+  }
+
+  const redraw = () => {
+    if (!container.isConnected || rankState.mode !== "ranking") return;
+    renderWorkspaceScoreDashboard(plugin, container);
+  };
+  void renderRankingPanel(body, {
+    app: plugin.app,
+    store: rankingStore,
+    items: dashboardHost.collectMediaItems(),
+    type: rankState.type,
+    comparing: rankState.comparing,
+    setComparing(value) {
+      rankState.comparing = value;
+      RANK_STATES.set(plugin, rankState);
+      redraw();
+    },
+    setType(value) {
+      rankState.type = value;
+      rankState.comparing = false;
+      RANK_STATES.set(plugin, rankState);
+      redraw();
+    },
+    redraw,
+    openNote: (path) => dashboardHost.openMediaFile(path),
     showNotice: (message) => dashboardHost.showNotice(message),
-    onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
   });
 }
 
