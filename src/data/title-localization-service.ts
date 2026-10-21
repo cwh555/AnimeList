@@ -8,12 +8,14 @@ import { AniListClient } from "./providers/anilist-client";
 
 type Provider = "bangumi" | "anilist";
 export type TitleSource = Readonly<{ provider: Provider; id: string }>;
-
+export type TitleScanStatus = "ready" | "review" | "unchanged" | "no-source" |
+  "no-translation" | "custom-title" | "ambiguous" | "lookup-failed";
 export interface TitleUpdateItem {
   readonly path: string;
   readonly oldTitle: string;
   readonly newTitle: string;
-  readonly source: TitleSource;
+  readonly source: TitleSource | null;
+  readonly requiresReview: boolean;
   readonly expectedProvider: string;
   readonly expectedSourceId: string;
   readonly expectedAniListId: string;
@@ -22,35 +24,41 @@ export interface TitleUpdateItem {
   readonly aliases: readonly string[];
   readonly localized: Partial<Record<SupportedLocale, string>>;
 }
-
+export interface TitleScanRow {
+  readonly path: string;
+  readonly title: string;
+  readonly status: TitleScanStatus;
+  readonly reason: string;
+  readonly proposal?: TitleUpdateItem;
+}
 export interface TitleUpdatePlan {
   readonly locale: SupportedLocale;
   readonly scanned: number;
   readonly skipped: number;
+  readonly rows: readonly TitleScanRow[];
   readonly failures: ReadonlyArray<{ path: string; message: string }>;
   readonly items: readonly TitleUpdateItem[];
 }
-
 export interface TitleUpdateResult {
   updated: number;
   skipped: number;
   failed: number;
   errors: Array<{ path: string; message: string }>;
 }
-
 export interface TitleUpdateOptions {
   fetch?: (mediaType: MediaType, source: TitleSource) => Promise<ExternalMediaResult | null>;
+  lookup?: (mediaType: MediaType, title: string) => Promise<ExternalMediaResult[]>;
   intervalMs?: number;
+  concurrency?: number;
   sleep?: (milliseconds: number) => Promise<void>;
   signal?: AbortSignal;
-  onProgress?: (completed: number, total: number, title: string) => void;
+  onProgress?: (completed: number, total: number, row: TitleScanRow) => void;
 }
-
 function field(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 function values(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : [];
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string").map(v => v.trim()).filter(Boolean) : [];
 }
 function mediaTypeOf(value: unknown): MediaType | null {
   return value === "anime" || value === "manga" || value === "novel" ? value : null;
@@ -59,168 +67,220 @@ function knownTitles(value: unknown): Partial<Record<SupportedLocale, string>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const raw = value as Record<string, unknown>;
   return mergeOfficialTitles(undefined, {
-    "zh-TW": field(raw["zh-TW"]),
-    "zh-CN": field(raw["zh-CN"]),
-    en: field(raw.en),
-    ja: field(raw.ja),
-    ko: field(raw.ko),
+    "zh-TW": field(raw["zh-TW"]), "zh-CN": field(raw["zh-CN"]),
+    en: field(raw.en), ja: field(raw.ja), ko: field(raw.ko),
   });
 }
-function sourceFor(frontmatter: Record<string, unknown>, locale: SupportedLocale): TitleSource | null {
-  const provider = field(frontmatter.source_provider);
-  const sourceId = field(frontmatter.source_id);
-  const anilistId = field(frontmatter.anilist_id);
-  if (locale === "zh-TW" || locale === "zh-CN") {
-    return provider === "bangumi" && /^\d+$/.test(sourceId) ? { provider: "bangumi", id: sourceId } : null;
-  }
-  const id = anilistId || (provider === "anilist" ? sourceId : "");
-  if (/^\d+$/.test(id)) return { provider: "anilist", id };
-  return provider === "bangumi" && /^\d+$/.test(sourceId) ? { provider: "bangumi", id: sourceId } : null;
+function normalizeTitle(value: string): string {
+  return value.normalize("NFKC").replace(/[\p{P}\p{S}\s]+/gu, "").toLocaleLowerCase();
 }
-function identity(frontmatter: Record<string, unknown>): readonly [string, string, string] {
-  return [field(frontmatter.source_provider), field(frontmatter.source_id), field(frontmatter.anilist_id)];
+function bangumiId(url: string): string {
+  return /https?:\/\/(?:bgm\.tv|bangumi\.tv)\/subject\/(\d+)(?:[/?#]|$)/i.exec(url)?.[1] ?? "";
 }
-function matchesSource(frontmatter: Record<string, unknown>, item: TitleUpdateItem): boolean {
-  const [provider, id, ani] = identity(frontmatter);
+function anilistId(url: string): string {
+  return /https?:\/\/(?:www\.)?anilist\.co\/(?:anime|manga)\/(\d+)(?:[/?#]|$)/i.exec(url)?.[1] ?? "";
+}
+function ids(fm: Record<string, unknown>): { bangumi: string; anilist: string } {
+  const provider = field(fm.source_provider);
+  const sourceId = field(fm.source_id);
+  const links = values(fm.source_urls);
+  return {
+    bangumi: (provider === "bangumi" && /^\d+$/.test(sourceId) ? sourceId : "")
+      || links.map(bangumiId).find(Boolean) || "",
+    anilist: field(fm.anilist_id) || (provider === "anilist" && /^\d+$/.test(sourceId) ? sourceId : "")
+      || links.map(anilistId).find(Boolean) || "",
+  };
+}
+function preferredSource(fm: Record<string, unknown>, locale: SupportedLocale): TitleSource | null {
+  const idMap = ids(fm);
+  const provider = locale === "zh-TW" || locale === "zh-CN" ? "bangumi" : "anilist";
+  const id = idMap[provider];
+  return /^\d+$/.test(id) ? { provider, id } : null;
+}
+function identity(fm: Record<string, unknown>): readonly [string, string, string] {
+  return [field(fm.source_provider), field(fm.source_id), field(fm.anilist_id)];
+}
+function matchesSource(fm: Record<string, unknown>, item: TitleUpdateItem): boolean {
+  const [provider, id, ani] = identity(fm);
   return provider === item.expectedProvider && id === item.expectedSourceId && ani === item.expectedAniListId;
 }
 function assertNotAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new Error("Title update preview was cancelled.");
 }
-function candidateTitle(result: ExternalMediaResult | null, locale: SupportedLocale): string | null {
-  return verifiedMediaTitle(result?.titleVariants, locale);
+function row(path: string, title: string, status: TitleScanStatus, reason: string, proposal?: TitleUpdateItem): TitleScanRow {
+  return { path, title, status, reason, ...(proposal ? { proposal } : {}) };
 }
-function normalizeTitle(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase();
+function providerTitles(candidate: ExternalMediaResult): string[] {
+  return [candidate.title, candidate.originalTitle, candidate.romajiTitle,
+    ...(candidate.searchTitles ?? []), ...Object.values(candidate.titleVariants?.localized ?? {})]
+    .map(v => v?.trim() ?? "").filter(Boolean);
+}
+function crossProviderCandidates(matches: readonly ExternalMediaResult[], fm: Record<string, unknown>): ExternalMediaResult[] {
+  const names = [field(fm.title_original), field(fm.title_romaji), field(fm.title), ...values(fm.title_aliases)]
+    .map(normalizeTitle).filter(Boolean);
+  const year = Number(fm.year);
+  return matches.filter(candidate => {
+    if (candidate.provider !== "bangumi" || !/^\d+$/.test(candidate.sourceId)) return false;
+    if (!providerTitles(candidate).some(name => names.includes(normalizeTitle(name)))) return false;
+    const otherYear = Number(candidate.year);
+    return !(Number.isFinite(year) && year > 0 && Number.isFinite(otherYear) && otherYear > 0 && year !== otherYear);
+  });
 }
 
-/** Preview-only read operations. Never use fuzzy title matching to establish identity. */
 export async function planStoredTitleUpdates(
-  app: App,
-  roots: string[],
-  locale: SupportedLocale,
-  options: TitleUpdateOptions = {},
+  app: App, roots: string[], locale: SupportedLocale, options: TitleUpdateOptions = {},
 ): Promise<TitleUpdatePlan> {
   const bangumi = new BangumiClient();
   const anilist = new AniListClient();
   const fetch = options.fetch ?? (async (mediaType: MediaType, source: TitleSource) =>
     source.provider === "bangumi"
-      ? bangumi.fetchById(mediaType, source.id)
+      ? bangumi.fetchTitleById(mediaType, source.id)
       : anilist.fetchMediaById(mediaType, source.id));
-  const sleep = options.sleep ?? (async (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)));
-  const intervalMs = Math.max(0, options.intervalMs ?? 1_200);
-  const files = getScopedMarkdownFiles(app, roots);
-  const items: TitleUpdateItem[] = [];
-  const failures: Array<{ path: string; message: string }> = [];
-  let skipped = 0;
-  let lastFetch = 0;
-  for (const [index, file] of files.entries()) {
+  const lookup = options.lookup ?? (async (mediaType: MediaType, title: string) =>
+    (await bangumi.searchPage(mediaType, title, 1)).results);
+  const sleep = options.sleep ?? (async (ms: number) =>
+    new Promise<void>(resolve => window.setTimeout(resolve, ms)));
+  const intervalMs = Math.max(0, options.intervalMs ?? 350);
+  const concurrency = Math.min(4, Math.max(1, Math.floor(options.concurrency ?? 3)));
+  let nextRequest = 0;
+  async function apiCall<T>(task: () => Promise<T>): Promise<T> {
+    const start = Math.max(Date.now(), nextRequest);
+    nextRequest = start + intervalMs;
+    if (start > Date.now()) await sleep(start - Date.now());
     assertNotAborted(options.signal);
-    const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-    const mediaType = mediaTypeOf(fm?.media_type);
-    const oldTitle = field(fm?.title);
-    if (!fm || !mediaType || !oldTitle) {
-      skipped += 1;
-      options.onProgress?.(index + 1, files.length, oldTitle || file.basename);
-      continue;
+    const result = await task();
+    assertNotAborted(options.signal);
+    return result;
+  }
+  const metadataCache = new Map<string, Promise<ExternalMediaResult | null>>();
+  function fetchCached(type: MediaType, source: TitleSource): Promise<ExternalMediaResult | null> {
+    const key = type + ":" + source.provider + ":" + source.id;
+    let pending = metadataCache.get(key);
+    if (!pending) {
+      pending = apiCall(() => fetch(type, source));
+      metadataCache.set(key, pending);
     }
-    const source = sourceFor(fm, locale);
-    if (!source) {
-      skipped += 1;
-      options.onProgress?.(index + 1, files.length, oldTitle);
-      continue;
-    }
+    return pending;
+  }
+  const files = getScopedMarkdownFiles(app, roots).filter(f =>
+    mediaTypeOf(app.metadataCache.getFileCache(f)?.frontmatter?.media_type) !== null);
+  const rows: TitleScanRow[] = new Array(files.length);
+  let next = 0;
+  let completed = 0;
+  async function evaluate(file: TFile): Promise<TitleScanRow> {
+    const fm = app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
+    const type = mediaTypeOf(fm?.media_type);
+    const old = field(fm?.title);
+    if (!fm || !type || !old) return row(file.path, old || file.basename, "no-source", "Media title or type is missing.");
     const stored = knownTitles(fm.title_localizations);
+    const source = preferredSource(fm, locale);
     let candidate: ExternalMediaResult | null = null;
-    let nextTitle = stored[locale] ?? null;
-    if (!nextTitle) {
-      try {
-        const delay = Math.max(0, intervalMs - (Date.now() - lastFetch));
-        if (lastFetch && delay) await sleep(delay);
-        assertNotAborted(options.signal);
-        lastFetch = Date.now();
-        candidate = await fetch(mediaType, source);
-        assertNotAborted(options.signal);
-        if (candidate && (candidate.provider !== source.provider || candidate.sourceId !== source.id || candidate.mediaType !== mediaType)) {
-          throw new Error("Provider returned an unexpected media identity.");
+    let target = stored[locale] ?? "";
+    let requiresReview = false;
+    let selectedSource: TitleSource | null = source;
+    if (!target && source) {
+      candidate = await fetchCached(type, source);
+      if (!candidate) return row(file.path, old, "no-translation", "The provider returned no work for the saved ID.");
+      if (candidate.sourceId !== source.id || candidate.provider !== source.provider || candidate.mediaType !== type) {
+        throw new Error("Provider returned a different work ID or type.");
+      }
+      target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
+    }
+    if (!target && !source && (locale === "zh-TW" || locale === "zh-CN") && ids(fm).anilist) {
+      const query = field(fm.title_original) || field(fm.title_romaji) || old;
+      const results = crossProviderCandidates(await apiCall(() => lookup(type, query)), fm);
+      if (results.length > 1) return row(file.path, old, "ambiguous", "Several Bangumi works match; no automatic selection.");
+      if (results.length === 1) {
+        selectedSource = { provider: "bangumi", id: results[0].sourceId };
+        candidate = await fetchCached(type, selectedSource);
+        if (!candidate || candidate.sourceId !== selectedSource.id || candidate.provider !== "bangumi" || candidate.mediaType !== type) {
+          throw new Error("Cross-provider match could not be verified by Bangumi ID.");
         }
-        nextTitle = candidateTitle(candidate, locale);
+        requiresReview = true;
+        target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
+      }
+      if (!results.length) return row(file.path, old, "no-source", "AniList has no Chinese title; no unique Bangumi title match was found.");
+    }
+    if (!target) {
+      const onlySimplified = locale === "zh-TW" && candidate?.titleVariants?.localized?.["zh-CN"];
+      return row(file.path, old, "no-translation", onlySimplified
+        ? "Bangumi supplies Simplified Chinese only; no verified Traditional Chinese title."
+        : "The provider has no verified title in the chosen language.");
+    }
+    if (normalizeTitle(target) === normalizeTitle(old)) return row(file.path, old, "unchanged", "Already matches the requested title.");
+    const owned = candidate
+      ? providerTitles(candidate).some(name => normalizeTitle(name) === normalizeTitle(old))
+      : [...Object.values(stored), field(fm.title_original), ...values(fm.title_aliases)]
+        .some(name => normalizeTitle(name) === normalizeTitle(old));
+    if (!owned) return row(file.path, old, "custom-title", "Current title is not recognized as a source title; preserving customization.");
+    const merged = mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
+    const aliases = [...new Set([...values(fm.title_aliases), old, field(fm.title_original),
+      field(fm.title_romaji), ...(candidate ? providerTitles(candidate) : []), target]
+      .map(name => name.trim()).filter(Boolean))];
+    const proposal: TitleUpdateItem = {
+      path: file.path, oldTitle: old, newTitle: target, source: selectedSource, requiresReview,
+      expectedProvider: field(fm.source_provider), expectedSourceId: field(fm.source_id),
+      expectedAniListId: field(fm.anilist_id), expectedMtime: file.stat.mtime,
+      originalTitle: field(fm.title_original) || candidate?.originalTitle || "",
+      aliases, localized: merged,
+    };
+    return row(file.path, old, requiresReview ? "review" : "ready",
+      requiresReview ? "Cross-provider title match: manually verify this identity." : "Verified provider ID and title.",
+      proposal);
+  }
+  async function worker(): Promise<void> {
+    while (next < files.length) {
+      assertNotAborted(options.signal);
+      const idx = next++;
+      const file = files[idx];
+      try {
+        rows[idx] = await evaluate(file);
       } catch (error) {
         assertNotAborted(options.signal);
-        failures.push({ path: file.path, message: error instanceof Error ? error.message : String(error) });
-        options.onProgress?.(index + 1, files.length, oldTitle);
-        continue;
+        rows[idx] = row(file.path,
+          field(app.metadataCache.getFileCache(file)?.frontmatter?.title) || file.basename,
+          "lookup-failed", error instanceof Error ? error.message : String(error));
       }
+      completed++;
+      options.onProgress?.(completed, files.length, rows[idx]);
     }
-    if (!nextTitle || normalizeTitle(nextTitle) === normalizeTitle(oldTitle)) {
-      skipped += 1;
-      options.onProgress?.(index + 1, files.length, oldTitle);
-      continue;
-    }
-    const known = mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
-    const aliases = [...new Set([oldTitle, field(fm.title_original), field(fm.title_romaji),
-      ...values(fm.title_aliases), ...(candidate?.searchTitles ?? []), candidate?.originalTitle ?? "", nextTitle]
-      .map((name) => name.trim()).filter(Boolean))];
-    // Safeguard against silently overwriting user-authored names.
-    const providerNames = candidate
-      ? [candidate.title, candidate.originalTitle, candidate.romajiTitle,
-        ...(candidate.searchTitles ?? []), ...Object.values(candidate.titleVariants?.localized ?? {})]
-      : [];
-    const recognized = new Set([...providerNames, ...Object.values(known)].map(normalizeTitle));
-    if (candidate && !recognized.has(normalizeTitle(oldTitle))) {
-      skipped += 1;
-      options.onProgress?.(index + 1, files.length, oldTitle);
-      continue;
-    }
-    if (!candidate && !Object.values(stored).some(v => normalizeTitle(v) === normalizeTitle(oldTitle))
-      && !values(fm.title_aliases).some(v => normalizeTitle(v) === normalizeTitle(oldTitle))) {
-      skipped += 1;
-      options.onProgress?.(index + 1, files.length, oldTitle);
-      continue;
-    }
-    items.push({
-      path: file.path, oldTitle, newTitle: nextTitle, source,
-      expectedProvider: field(fm.source_provider),
-      expectedSourceId: field(fm.source_id),
-      expectedAniListId: field(fm.anilist_id),
-      expectedMtime: file.stat.mtime,
-      originalTitle: field(fm.title_original) || candidate?.originalTitle || "",
-      aliases,
-      localized: known,
-    });
-    options.onProgress?.(index + 1, files.length, oldTitle);
   }
-  return { locale, scanned: files.length, skipped, failures, items };
+  await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
+  const items = rows.flatMap(r => r.proposal ? [r.proposal] : []);
+  const failures = rows.filter(r => r.status === "lookup-failed").map(r => ({ path: r.path, message: r.reason }));
+  return { locale, scanned: files.length, skipped: rows.length - items.length - failures.length, rows, failures, items };
 }
 
-/** Apply only confirmed rows, rechecking title, identity and modification time. */
+/** Confirmed, narrow frontmatter writes; no renamed paths, note body or asset writes. */
 export async function applyStoredTitleUpdates(
-  app: App,
-  plan: TitleUpdatePlan,
-  selectedPaths: ReadonlySet<string>,
+  app: App, plan: TitleUpdatePlan, selectedPaths: ReadonlySet<string>,
 ): Promise<TitleUpdateResult> {
   const result: TitleUpdateResult = { updated: 0, skipped: 0, failed: 0, errors: [] };
   for (const item of plan.items) {
     if (!selectedPaths.has(item.path)) continue;
     const file = app.vault.getAbstractFileByPath(item.path);
     if (!(file instanceof TFile) || file.stat.mtime !== item.expectedMtime) {
-      result.skipped += 1;
+      result.skipped++;
       continue;
     }
     let changed = false;
     try {
-      await app.fileManager.processFrontMatter(file, (fm) => {
+      await app.fileManager.processFrontMatter(file, fm => {
         if (field(fm.title) !== item.oldTitle || !matchesSource(fm, item)) return;
-        changed = true;
         fm.title = item.newTitle;
         if (!field(fm.title_original) && item.originalTitle) fm.title_original = item.originalTitle;
         fm.title_aliases = [...new Set([...values(fm.title_aliases), ...item.aliases])];
-        fm.title_localizations = { ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations)) ? fm.title_localizations as Record<string, unknown> : {}), ...item.localized };
+        fm.title_localizations = {
+          ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations))
+            ? fm.title_localizations as Record<string, unknown> : {}),
+          ...item.localized,
+        };
+        changed = true;
       });
-      if (changed) result.updated += 1;
-      else result.skipped += 1;
+      if (changed) result.updated++;
+      else result.skipped++;
     } catch (error) {
-      result.failed += 1;
+      result.failed++;
       result.errors.push({ path: item.path, message: error instanceof Error ? error.message : String(error) });
     }
   }
