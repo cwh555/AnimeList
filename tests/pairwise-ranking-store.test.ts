@@ -76,22 +76,98 @@ describe("ranking vault storage", () => {
     assert.equal(new TextDecoder().decode(adapter.files.get(".obsidian/animelist-ranking.json")), raw);
   });
 
-  it("detects null round arrays without crashing on .map or rewriting stored data", async () => {
-    for (const field of ["results", "baseline", "jobs", "left", "right", "winners"]) {
+  it("recovers manga.results = null while preserving other types and exact round order", async () => {
+    const { app, adapter } = setup();
+    const path = ".obsidian/animelist-ranking.json";
+    const stored = emptyRankingState();
+    stored.anime.ordered = ["anime/A.md", "anime/B.md"];
+    stored.novel.ordered = ["novel/N.md"];
+    stored.manga.round = startRankingRound(["M1", "M2", "M3", "M4"], "full");
+    // A finished job's winners must survive in a null-results reconstruction.
+    stored.manga.round.jobs[0].left = [];
+    stored.manga.round.jobs[0].right = [];
+    stored.manga.round.jobs[0].winners = ["M2", "M1"];
+    stored.manga.round.jobs[0].done = true;
+    (stored.manga.round as unknown as Record<string, unknown>).results = null;
+    const original = JSON.stringify(stored);
+    adapter.put(path, original);
+    const service = new PairwiseRankingStore(app);
+    const loaded = await service.load();
+    assert.deepEqual(loaded.anime.ordered, ["anime/A.md", "anime/B.md"]);
+    assert.deepEqual(loaded.novel.ordered, ["novel/N.md"]);
+    assert.deepEqual(loaded.manga.round?.results, [["M2", "M1"], []]);
+    assert.deepEqual(loaded.manga.round?.jobs[0].winners, ["M2", "M1"]);
+    assert.deepEqual(service.getRecoveryInfo()?.types, ["manga"]);
+    assert.deepEqual(service.getRecoveryInfo()?.incompleteTypes, []);
+    const backup = service.getRecoveryInfo()?.backupPath;
+    assert.ok(backup?.startsWith(".obsidian/animelist-ranking.recovery-"));
+    assert.equal(new TextDecoder().decode(adapter.files.get(backup)), original);
+    assert.equal(new TextDecoder().decode(adapter.files.get(path)), original,
+      "opening ranking cannot rewrite original source");
+    // Edit a different media type; this must persist the restored manga round too.
+    await service.mutate((data) => data.anime.ordered.push("anime/C.md"));
+    const reopened = await new PairwiseRankingStore(app).load();
+    assert.deepEqual(reopened.anime.ordered, ["anime/A.md", "anime/B.md", "anime/C.md"]);
+    assert.deepEqual(reopened.novel.ordered, ["novel/N.md"]);
+    assert.deepEqual(reopened.manga.round?.results, [["M2", "M1"], []]);
+    assert.equal(reopened.manga.round?.jobs[0].winners[0], "M2");
+  });
+
+  it("recovers the same malformed file repeatedly without accumulating backup files", async () => {
+    const { app, adapter } = setup();
+    const stored = emptyRankingState();
+    stored.manga.round = startRankingRound(["M1", "M2"], "full");
+    (stored.manga.round as unknown as Record<string, unknown>).results = null;
+    adapter.put(".obsidian/animelist-ranking.json", JSON.stringify(stored));
+    await new PairwiseRankingStore(app).load();
+    await new PairwiseRankingStore(app).load();
+    await new PairwiseRankingStore(app).load();
+    assert.equal(adapter.files.size, 2, "original and one stable backup only");
+  });
+
+  it("quarantines unrecoverable round fields per type instead of blocking the entire ranking", async () => {
+    for (const field of ["baseline", "jobs", "left", "right", "winners"]) {
       const { app, adapter } = setup();
-      const stored = emptyRankingState();
-      const round = startRankingRound(["A", "B"], "full");
-      if (field === "left" || field === "right" || field === "winners") {
-        (round.jobs[0] as unknown as Record<string, unknown>)[field] = null;
-      } else (round as unknown as Record<string, unknown>)[field] = null;
-      stored.anime.round = round;
-      const original = JSON.stringify(stored);
       const path = ".obsidian/animelist-ranking.json";
-      adapter.put(path, original);
-      await assert.rejects(new PairwiseRankingStore(app).load(), /Invalid saved ranking round/);
-      assert.equal(new TextDecoder().decode(adapter.files.get(path)), original,
-        "a malformed round must never be silently erased");
+      const stored = emptyRankingState();
+      stored.anime.ordered = ["anime/A"];
+      stored.novel.ordered = ["novel/N"];
+      stored.manga.ordered = ["manga/confirmed"];
+      stored.manga.round = startRankingRound(["manga/X", "manga/Y"], "append", ["manga/confirmed"]);
+      if (field === "left" || field === "right" || field === "winners") {
+        (stored.manga.round.jobs[0] as unknown as Record<string, unknown>)[field] = null;
+      } else (stored.manga.round as unknown as Record<string, unknown>)[field] = null;
+      adapter.put(path, JSON.stringify(stored));
+      const service = new PairwiseRankingStore(app);
+      const recovered = await service.load();
+      assert.equal(recovered.manga.round, null, field);
+      assert.deepEqual(recovered.manga.ordered, ["manga/confirmed"]);
+      assert.deepEqual(recovered.anime.ordered, ["anime/A"]);
+      assert.deepEqual(recovered.novel.ordered, ["novel/N"]);
+      assert.ok(service.getRecoveryInfo()?.incompleteTypes.includes("manga"));
+      const pending = new Set(Object.keys(recovered.manga.pending));
+      assert.ok(pending.size > 0, field);
+      assert.ok(!pending.has("manga/confirmed"));
+      assert.equal(adapter.files.size, 2);
+      await service.mutate((data) => data.anime.ordered.push("anime/B"));
+      const reread = await new PairwiseRankingStore(app).load();
+      assert.equal(reread.manga.round, null);
+      assert.deepEqual(reread.anime.ordered, ["anime/A", "anime/B"]);
     }
+  });
+
+  it("does not change source or fabricate an empty ranking if backup fails", async () => {
+    const { app, adapter } = setup();
+    const stored = emptyRankingState();
+    stored.manga.round = startRankingRound(["M1", "M2"], "full");
+    (stored.manga.round as unknown as Record<string, unknown>).results = null;
+    const path = ".obsidian/animelist-ranking.json";
+    const original = JSON.stringify(stored);
+    adapter.put(path, original);
+    adapter.failure = true;
+    await assert.rejects(new PairwiseRankingStore(app).load(), /disk full/);
+    assert.equal(adapter.files.size, 1);
+    assert.equal(new TextDecoder().decode(adapter.files.get(path)), original);
   });
 
   it("does not replace corrupt ranking state with a blank file", async () => {
