@@ -441,40 +441,39 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   let changed = false;
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
-    let changedHere = false;
     if (list.pendingQueue) {
       const mapped = [...new Set(list.pendingQueue.map((item) => item === from ? to : item))];
       if (JSON.stringify(mapped) !== JSON.stringify(list.pendingQueue)) {
         list.pendingQueue = mapped;
-        changedHere = true;
+
         changed = true;
       }
     }
     if (list.round) {
       const oldRound = JSON.stringify(list.round);
       mapRankingRound(list.round, (item) => item === from ? to : item);
-      if (oldRound !== JSON.stringify(list.round)) { changed = true; changedHere = true; }
+      if (oldRound !== JSON.stringify(list.round)) { changed = true;  }
     }
     const replace = (value: string): string => value === from ? to : value;
     if (list.ordered.includes(from)) {
       list.ordered = [...new Set(list.ordered.map(replace))];
       changed = true;
-      changedHere = true;
+
     }
     const relabel = (attempt: RankingAttempt): void => {
-      if (attempt.path === from) { attempt.path = to; changed = true; changedHere = true; }
+      if (attempt.path === from) { attempt.path = to; changed = true;  }
       if (Object.hasOwn(attempt.comparisons, from)) {
         attempt.comparisons[to] = attempt.comparisons[from];
         delete attempt.comparisons[from];
         changed = true;
-        changedHere = true;
+
       }
     };
     if (list.pending[from]) {
       if (!list.pending[to]) list.pending[to] = list.pending[from];
       delete list.pending[from];
       changed = true;
-      changedHere = true;
+
     }
     Object.values(list.pending).forEach(relabel);
     if (list.active) relabel(list.active);
