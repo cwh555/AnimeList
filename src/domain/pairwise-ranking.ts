@@ -357,6 +357,8 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   const newIndex = Math.max(0, Math.min(list.ordered.length - 1, Math.trunc(position) - 1));
   if (oldIndex < 0 || !Number.isFinite(position) || oldIndex === newIndex) return false;
   checkpoint(list);
+  // Explicit manual movement takes priority over an unfinished automatic round.
+  list.round = null;
   list.ordered.splice(oldIndex, 1);
   list.ordered.splice(newIndex, 0, path);
   // Every unaffected ranked pair keeps its relative order. Only comparisons to
@@ -371,6 +373,7 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
 export function placePendingItem(list: RankingCollection, path: string, position: number): boolean {
   if (!Object.hasOwn(list.pending, path) || !Number.isInteger(position)
     || position < 1 || position > list.ordered.length + 1) return false;
+  list.round = null;
   list.ordered.splice(position - 1, 0, path);
   delete list.pending[path];
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
@@ -474,12 +477,6 @@ export function rankingCounts(list: RankingCollection, eligible: readonly MediaI
   ranked: number; pending: number; unranked: number;
 } {
   const excluded = new Set([...list.ordered, ...Object.keys(list.pending)]);
-  if (list.round) {
-    for (const item of list.round.jobs) {
-      for (const path of [...item.left, ...item.right, ...item.winners]) excluded.add(path);
-    }
-    for (const result of list.round.results) for (const path of result) excluded.add(path);
-  }
   if (list.active) excluded.add(list.active.path);
   return {
     ranked: list.ordered.length,
