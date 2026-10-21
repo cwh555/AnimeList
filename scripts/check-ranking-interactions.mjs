@@ -84,7 +84,18 @@ try {
     'data.anime.ordered=["anime/A.md","anime/B.md","anime/C.md","anime/"+longTitle+".md"];data.anime.pending={};data.anime.active=null;data.anime.round=null;await redraw();',
     'checks.listCovers=root.querySelectorAll(".al-ranking-row img").length===4 && root.querySelectorAll(".al-ranking-handle").length===4;',
     'const listStyle=getComputedStyle(root.querySelector(".al-ranking-list"));',
-    'checks.responsiveGrid=innerWidth<600?listStyle.gridTemplateColumns.trim().split(" ").length===1:listStyle.gridTemplateColumns.trim().split(" ").length>=2;',
+    'const rankRows=[...root.querySelectorAll(".al-ranking-row")];',
+    'const rankRect=rankRows[0].getBoundingClientRect();const listRect=root.querySelector(".al-ranking-list").getBoundingClientRect();',
+    'const rankNum=rankRows[0].querySelector(".al-ranking-position").getBoundingClientRect();',
+    'const rankCover=rankRows[0].querySelector(".al-ranking-row-cover").getBoundingClientRect();',
+    'const rankTitle=rankRows[0].querySelector(".al-ranking-row-title").getBoundingClientRect();',
+    'const rankHandle=rankRows[0].querySelector(".al-ranking-handle").getBoundingClientRect();',
+    'checks.oneWorkPerRow=listStyle.gridTemplateColumns.trim().split(" ").length===1 && rankRows.every((row,i)=>i===0||row.getBoundingClientRect().top>=rankRows[i-1].getBoundingClientRect().bottom-1);',
+    'checks.fullWidthRows=rankRect.width>=listRect.width-2 && rankRect.width<=listRect.width+2;',
+    'checks.leftAlignedContents=rankNum.left<rankCover.left && rankCover.right<=rankTitle.left+1 && rankCover.left-listRect.left<105;',
+    'checks.dragHandleAtRight=listRect.right-rankHandle.right<25 && rankHandle.left>rankTitle.left;',
+    'checks.noOversizedGreyButton=getComputedStyle(rankRows[0].querySelector(".al-ranking-open")).backgroundColor==="rgba(0, 0, 0, 0)" && getComputedStyle(rankRows[0]).backgroundColor==="rgba(0, 0, 0, 0)";',
+    'checks.noRedundantRowActions=root.querySelectorAll(".al-ranking-move,.al-ranking-more").length===0 && !root.textContent.includes("區間重排");',
     'checks.longRowClamped=[...root.querySelectorAll(".al-ranking-row-title")].every(el=>el.getBoundingClientRect().width<=el.parentElement.getBoundingClientRect().width+1 && el.getBoundingClientRect().height<=parseFloat(getComputedStyle(el).lineHeight)*2+2);',
     'const grip=root.querySelector(".al-ranking-handle");',
     'grip.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true,cancelable:true}));await delay();',
@@ -102,6 +113,7 @@ try {
   for (const viewport of [
     { width: 320, height: 720, deviceScaleFactor: 2, mobile: true },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    { width: 768, height: 900, deviceScaleFactor: 1, mobile: false },
     { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false },
   ]) {
     await runChromiumDatasetTest({
