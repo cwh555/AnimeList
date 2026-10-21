@@ -206,8 +206,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
       confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
       showNotice: (message) => dashboardHost.showNotice(message),
       onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
-    });
-    container.prepend(tabs);
+    }, tabs);
     return;
   }
 

@@ -63,6 +63,8 @@ try {
     'checks.rankingInsideScores=root.querySelectorAll(".al-ranking-type-tabs button").length===3 && !root.querySelector(".al-score-dashboard");',
     'root.querySelector(".al-ranking-mode-tabs button").click();await delay();',
     'checks.ratingRestored=root.querySelectorAll(".al-score-poster").length===14 && !!root.querySelector(":scope > .al-score-dashboard");',
+    'root.querySelector(".al-score-dashboard-tab:last-child").click(); await delay();',
+    'checks.tabPersistsAfterScoreFilter=root.querySelectorAll(".al-ranking-mode-tabs button").length===2 && root.querySelectorAll(".al-score-poster").length===14;',
     'checks.noScoreMutation=items.every(x=>x.score===7.5);',
     'checks.noOverflow=document.documentElement.scrollWidth<=innerWidth+1;',
     'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
