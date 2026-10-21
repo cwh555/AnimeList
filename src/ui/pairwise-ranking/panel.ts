@@ -1,9 +1,9 @@
-import { Menu, Modal, setIcon, type App } from "obsidian";
+import { Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  completedRankingItems, moveRankedItem, rankingDropPosition, nextRankingPair,
-  prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
-  reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem, resumePendingRanking,
+  completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
+  prepareRanking, rankingBounds, rankingCounts,
+  reconcileRanking, undoRanking, placePendingItem, resumePendingRanking,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -91,6 +91,47 @@ class RankingMoveModal extends Modal {
     this.contentEl.append(label, error, controls);
     input.focus();
     input.select();
+  }
+}
+
+class RankingRangeModal extends Modal {
+  constructor(
+    app: App,
+    private readonly count: number,
+    private readonly apply: (first: number, last: number) => void,
+  ) { super(app); }
+  onOpen(): void {
+    this.contentEl.empty();
+    this.contentEl.createEl("h3", { text: t("range") });
+    const inputs = makeEl("div", "al-ranking-range-inputs");
+    const fields = [t("from"), t("to")].map((label, index) => {
+      const wrapper = makeEl("label", "al-ranking-move-label", label);
+      const input = makeEl("input");
+      input.type = "number";
+      input.min = "1";
+      input.max = String(this.count);
+      input.value = String(index === 0 ? 1 : this.count);
+      wrapper.append(input);
+      inputs.append(wrapper);
+      return input;
+    });
+    const error = makeEl("p", "al-ranking-error");
+    const controls = makeEl("div", "al-ranking-modal-actions");
+    controls.append(
+      button(t("cancel"), () => this.close()),
+      button(t("confirm"), () => {
+        const from = Number(fields[0].value);
+        const to = Number(fields[1].value);
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > this.count || to <= from) {
+          error.textContent = t("rangeInvalid");
+          return;
+        }
+        this.close();
+        this.apply(from, to);
+      }, undefined, "mod-cta"),
+    );
+    this.contentEl.append(inputs, error, controls);
+    fields[0].focus();
   }
 }
 
@@ -225,29 +266,37 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   }
 
   const actions = makeEl("div", "al-ranking-actions");
-  if (pair) {
-    actions.appendChild(button(t("continue"), compare, "play", "mod-cta"));
-  } else if (counts.unranked) {
-    actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => start("new"), "play", "mod-cta"));
+  if (pair) actions.appendChild(button(t("continue"), compare, "play", "mod-cta"));
+  else if (counts.unranked) {
+    actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => {
+      if (list.ordered.length === 0 || counts.unranked > 1) {
+        void mutate((draft) => {
+          prepareRankingRounds(draft, eligible, list.ordered.length ? "append" : "full");
+        }, true);
+      } else start("new");
+    }, "play", "mod-cta"));
   }
   if (counts.pending) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
+  if (list.ordered.length >= 2 && !list.round) {
+    actions.appendChild(button(t("range"), () => {
+      new RankingRangeModal(options.app, list.ordered.length, (first, last) => {
+        void mutate((draft) => { prepareRankingRounds(draft, eligible, "range", first, last); }, true);
+      }).open();
+    }, "list-ordered"));
+  }
   if (list.history.length) actions.appendChild(button(t("undo"), () => {
     void mutate((draft) => { undoRanking(draft); });
   }, "undo-2"));
-  const more = button(t("more"), () => {
-    const menu = new Menu();
-    menu.addItem((entry) => entry.setTitle(t("reset")).setIcon("rotate-ccw").onClick(() => {
+  if (list.ordered.length || list.round) {
+    actions.appendChild(button(t("reset"), () => {
       new RankingConfirmModal(options.app, () => {
         void mutate((draft) => {
-          Object.assign(draft, emptyRankingCollection());
-          prepareRanking(draft, eligible, "new");
+          draft.round = null;
+          prepareRankingRounds(draft, eligible, "full");
         }, true);
       }).open();
-    }));
-    const rect = more.getBoundingClientRect();
-    menu.showAtPosition({ x: rect.left, y: rect.bottom });
-  }, "ellipsis");
-  actions.appendChild(more);
+    }, "rotate-ccw", "al-ranking-reset"));
+  }
   panel.appendChild(actions);
 
   if (counts.pending) panel.appendChild(makeEl("p", "al-ranking-warning", t("warning")));
@@ -274,29 +323,14 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     handle.setAttribute("aria-label", t("drag", { title: item.title }));
     handle.title = t("drag", { title: item.title });
     row.appendChild(handle);
-    const menuButton = button("", () => {
-      const menu = new Menu();
-      menu.addItem((entry) => entry.setTitle(t("openNote")).setIcon("file-text")
-        .onClick(() => { void options.openNote(path); }));
-      menu.addItem((entry) => entry.setTitle(t("moveTo")).setIcon("list-ordered")
-        .onClick(() => new RankingMoveModal(options.app, list.ordered.length, index + 1, (rank) => {
-          void mutate((draft) => { moveRankedItem(draft, path, rank); });
-        }).open()));
-      menu.addItem((entry) => entry.setTitle(t("recompare")).setIcon("git-compare")
-        .onClick(() => {
-          void mutate((draft) => {
-            // A separate unfinished comparison must not disappear on single-item recompare.
-            if (draft.active) draft.pending[draft.active.path] = draft.active;
-            recompareRankedItem(draft, path);
-            draft.active = { path, comparisons: {} };
-            delete draft.pending[path];
-          }, true);
-        }));
-      const rect = menuButton.getBoundingClientRect();
-      menu.showAtPosition({ x: rect.left, y: rect.bottom });
-    }, "ellipsis", "al-ranking-more");
-    menuButton.setAttribute("aria-label", t("more"));
-    row.appendChild(menuButton);
+    const moveButton = button("", () => {
+      new RankingMoveModal(options.app, list.ordered.length, index + 1, (rank) => {
+        void mutate((draft) => { moveRankedItem(draft, path, rank); });
+      }).open();
+    }, "arrow-up-down", "al-ranking-move");
+    moveButton.setAttribute("aria-label", t("moveTo"));
+    moveButton.title = t("moveTo");
+    row.appendChild(moveButton);
     rows.push(row);
     result.appendChild(row);
     installReorderHandle(handle, row, rows, index + 1, (rank) => {

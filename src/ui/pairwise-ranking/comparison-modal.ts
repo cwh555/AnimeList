@@ -4,7 +4,7 @@ import { makeEl, errorMessage } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  decideRanking, nextRankingPair, reconcileRanking, undoRanking,
+  decideRanking, nextRankingPair, reconcileRanking, undoRanking, roundProgress,
   type RankingChoice, type RankingCollection,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -93,7 +93,11 @@ export class RankingComparisonModal extends AnimeListModal {
     if (!pair) { this.close(); return; }
     const { contentEl } = this;
     contentEl.replaceChildren();
-    const heading = makeEl("h2", "al-ranking-dialog-title", t("compare"));
+    const round = this.list.round;
+    const heading = makeEl("h2", "al-ranking-dialog-title",
+      round ? t("round", { count: round.stage }) : t("compare"));
+    const progress = round ? makeEl("p", "al-ranking-dialog-progress",
+      t("roundProgress", { done: round.comparisons, count: round.total })) : null;
     const choices = makeEl("div", "al-ranking-choices");
     for (const [path, answer] of [[pair.candidate, "better"], [pair.reference, "worse"]] as const) {
       const item = this.items.get(path);
@@ -122,7 +126,9 @@ export class RankingComparisonModal extends AnimeListModal {
     skip.addClass("al-ranking-skip");
     const pause = action(t("pause"), "pause", () => this.close());
     toolbar.append(undo, skip, pause);
-    contentEl.append(heading, choices, toolbar);
+    contentEl.append(heading);
+    if (progress) contentEl.append(progress);
+    contentEl.append(choices, toolbar);
     const first = choices.querySelector<HTMLButtonElement>("button");
     first?.focus();
   }
