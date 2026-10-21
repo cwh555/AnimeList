@@ -178,6 +178,7 @@ try {
     // Full integration: five completed manga, choose a cover, close the native
     // modal X, restart the plugin store, reopen and finish without null.map.
     'const closeItems=Array.from({length:5},(_,i)=>note("Close "+i,"manga"));',
+    'const backupsBeforeClose=[...persistedFiles.keys()].filter(key=>key.includes(".recovery-")).length;',
     'persistedFiles.set(rankingPath,new TextEncoder().encode(JSON.stringify({version:1,anime:empty(),manga:empty(),novel:empty()})).buffer);',
     'let closeStore=new AnimeListRanking.PairwiseRankingStore(persistedApp);',
     'const closeRoot=document.createElement("section");document.body.append(closeRoot);',
@@ -219,7 +220,7 @@ try {
     '}',
     'const closeComplete=(await new AnimeListRanking.PairwiseRankingStore(persistedApp).load()).manga;',
     'checks.nativeXRestartCompletes=!nativeXPremature&&closeAnswerCount>0&&closeComplete.ordered.length===5&&!closeComplete.round;',
-    'checks.nativeXNoSpuriousBackups=[...persistedFiles.keys()].filter(key=>key.includes(".recovery-")).length===0;',
+    'checks.nativeXNoSpuriousBackups=[...persistedFiles.keys()].filter(key=>key.includes(".recovery-")).length===backupsBeforeClose;',
     'closeRoot.remove();',
     'reviewRoot.remove();',
     'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
