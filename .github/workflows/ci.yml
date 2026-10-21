@@ -42,6 +42,8 @@ jobs:
         run: npm run test:browser:score-mobile
       - name: Run ranking interactions across mobile and desktop viewports
         run: npm run test:browser:ranking
+      - name: Run ranking pointer drag preview in Chromium
+        run: npm run test:browser:ranking-drag
       - name: Verify Scores and Ranking share one workspace without scroll regressions
         run: npm run test:browser:score-ranking
       - name: Run tag chip interactions in Chromium
