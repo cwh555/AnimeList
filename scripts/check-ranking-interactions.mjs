@@ -1,12 +1,15 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { build, stop } from "esbuild";
 import { runChromiumDatasetTest } from "./browser/chromium-page-runner.mjs";
 
 const root = process.cwd();
 const output = path.join(root, ".tmp", "ranking-interactions");
+const screenshots = path.join(root, ".tmp", "ranking-ui-screenshots");
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
+await rm(screenshots, { recursive: true, force: true });
+await mkdir(screenshots, { recursive: true });
 try {
   await build({
     absWorkingDir: root,
@@ -106,6 +109,7 @@ try {
     'checks.noScoreMutation=items.every(x=>x.score===undefined);',
     'checks.touchHandleOnly=getComputedStyle(root.querySelector(".al-ranking-handle")).touchAction==="none" && getComputedStyle(root.querySelector(".al-ranking-open")).touchAction!=="none";',
     'checks.noOverflow=document.documentElement.scrollWidth<=innerWidth+1 && root.scrollWidth<=innerWidth+1;',
+    'const finalSearch=root.querySelector(".al-ranking-search");finalSearch.value="";finalSearch.dispatchEvent(new Event("input",{bubbles:true}));',
     'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail";});',
     '</script></body></html>',
@@ -121,6 +125,24 @@ try {
       profile: path.join(output, "profile-" + viewport.width),
       viewport,
       testName: "Ranking interaction " + viewport.width + "px",
+      interact: async ({ send, sleep }) => {
+        // Capture the actual bundled ranking UI after browser interactions finish.
+        // This is a DOM screenshot, not a separately drawn design mockup.
+        for (let attempt = 0; attempt < 140; attempt++) {
+          const current = await send("Runtime.evaluate", {
+            expression: "document.body.dataset.result", returnByValue: true,
+          });
+          if (current.result.value !== "pending") break;
+          await sleep(40);
+        }
+        const result = await send("Page.captureScreenshot", {
+          format: "png", fromSurface: true, captureBeyondViewport: false,
+        });
+        await writeFile(
+          path.join(screenshots, "ranking-" + viewport.width + ".png"),
+          Buffer.from(result.data, "base64"),
+        );
+      },
     });
   }
 } finally {
