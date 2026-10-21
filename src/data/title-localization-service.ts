@@ -1,6 +1,6 @@
 import { TFile, type App } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
-import { mergeOfficialTitles, verifiedMediaTitle, type MediaTitleVariants } from "../domain/media-title-localization";
+import { mergeOfficialTitles, verifiedMediaTitle } from "../domain/media-title-localization";
 import type { SupportedLocale } from "../i18n/locale";
 import { getScopedMarkdownFiles } from "./vault-scope";
 import { BangumiClient } from "./providers/bangumi-client";
