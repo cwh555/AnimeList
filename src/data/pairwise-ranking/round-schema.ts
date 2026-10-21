@@ -20,18 +20,17 @@ export function assertStoredRankingRound(value: unknown, type: string): asserts 
     if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name]) || round[name] < 0) corrupted(name);
   }
   if (!paths(round.baseline)) corrupted("baseline");
-  if (!Array.isArray(round.jobs)) corrupted("jobs");
-  const jobs: unknown[] = round.jobs;
+  const jobs: unknown[] = Array.isArray(round.jobs) ? round.jobs : corrupted("jobs");
   for (const item of jobs) {
     if (!object(item) || !paths(item.left) || !paths(item.right)
       || !paths(item.winners) || typeof item.done !== "boolean") corrupted("jobs.item");
   }
   // A previously saved sparse results array becomes [null, ...] in JSON.
   // Array.prototype.every() skips holes, so use an indexed check as well.
-  if (!Array.isArray(round.results) || round.results.length !== jobs.length
+  const results: unknown[] = Array.isArray(round.results) ? round.results : corrupted("results");
+  if (results.length !== jobs.length
     || !jobs.every((job, index) => {
-      const result = round.results as unknown[];
-      const entry = result[index];
+      const entry = results[index];
       if (!paths(entry)) return false;
       const item = job as { done: boolean; winners: string[] };
       return item.done
