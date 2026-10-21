@@ -12,6 +12,9 @@ import { makeEl } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import { RankingComparisonModal } from "./comparison-modal";
 
+// The workspace scroll host survives list rebuilds; keep searches with it.
+const RANKING_QUERIES = new WeakMap<HTMLElement, string>();
+
 interface RankingPanelOptions {
   app: App;
   store: PairwiseRankingStore;
@@ -143,6 +146,7 @@ function installReorderHandle(
 }
 
 export async function renderRankingPanel(container: HTMLElement, options: RankingPanelOptions): Promise<void> {
+  const searchHost = container.closest<HTMLElement>(".al-workspace-page-body") ?? container;
   container.replaceChildren(makeEl("p", "al-ranking-loading", t("busy")));
   const eligible = completedRankingItems(options.items, options.type);
   let state: RankingState;
@@ -199,7 +203,10 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const typeTabs = makeEl("nav", "al-ranking-type-tabs");
   typeTabs.setAttribute("aria-label", t("title"));
   for (const type of ["anime", "manga", "novel"] as const) {
-    const tab = button(t(type), () => options.setType(type), undefined, type === options.type ? "is-active" : "");
+    const tab = button(t(type), () => {
+      RANKING_QUERIES.delete(searchHost);
+      options.setType(type);
+    }, undefined, type === options.type ? "is-active" : "");
     tab.setAttribute("aria-pressed", String(type === options.type));
     typeTabs.appendChild(tab);
   }
@@ -248,6 +255,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   search.type = "search";
   search.placeholder = t("search");
   search.setAttribute("aria-label", t("search"));
+  search.value = RANKING_QUERIES.get(searchHost) ?? "";
   panel.appendChild(search);
 
   const result = makeEl("ol", "al-ranking-list");
@@ -297,7 +305,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   }
   panel.appendChild(result);
   if (!list.ordered.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
-  search.addEventListener("input", () => {
+  const applySearch = (): void => {
     const q = search.value.trim().toLocaleLowerCase();
     for (const row of rows) {
       row.hidden = Boolean(q) && !row.dataset.title?.includes(q);
@@ -305,7 +313,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const handle = row.querySelector<HTMLButtonElement>(".al-ranking-handle");
       if (handle) handle.disabled = Boolean(q);
     }
+  };
+  search.addEventListener("input", () => {
+    RANKING_QUERIES.set(searchHost, search.value);
+    applySearch();
   });
+  applySearch();
 
   if (counts.pending) {
     const pendingSection = makeEl("section", "al-ranking-pending");
