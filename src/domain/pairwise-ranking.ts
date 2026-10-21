@@ -329,6 +329,29 @@ export function rankingDropPosition(
   return Math.max(1, Math.min(rowBounds.length, target));
 }
 
+/** Destination for a wrapped card grid, after logically removing the dragged item. */
+export function rankingGridDropPosition(
+  bounds: readonly { left: number; top: number; width: number; height: number }[],
+  sourceIndex: number, pointerX: number, pointerY: number,
+): number {
+  if (!bounds.length) return 1;
+  let nearest = 0;
+  let distance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < bounds.length; index++) {
+    const rect = bounds[index];
+    const dx = Math.max(rect.left - pointerX, 0, pointerX - rect.left - rect.width);
+    const dy = Math.max(rect.top - pointerY, 0, pointerY - rect.top - rect.height);
+    const score = dx * dx + dy * dy;
+    if (score < distance) { distance = score; nearest = index; }
+  }
+  const rect = bounds[nearest];
+  const isGrid = bounds.length >= 2 && Math.abs(bounds[0].top - bounds[1].top) < 8;
+  const after = isGrid ? pointerX >= rect.left + rect.width / 2
+    : pointerY >= rect.top + rect.height / 2;
+  const slot = nearest + (after ? 1 : 0);
+  return Math.max(1, Math.min(bounds.length, slot - (sourceIndex < slot ? 1 : 0) + 1));
+}
+
 export function moveRankedItem(list: RankingCollection, path: string, position: number): boolean {
   const oldIndex = list.ordered.indexOf(path);
   const newIndex = Math.max(0, Math.min(list.ordered.length - 1, Math.trunc(position) - 1));
