@@ -1,5 +1,6 @@
 import { normalizePath, type App } from "obsidian";
 import { emptyRankingState, type RankingState } from "../../domain/pairwise-ranking";
+import { assertStoredRankingRound } from "./round-schema";
 
 function validateRankData(input: unknown): RankingState {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Invalid ranking data");
@@ -12,6 +13,7 @@ function validateRankData(input: unknown): RankingState {
     if (!Array.isArray(collection.ordered) || !collection.ordered.every((x) => typeof x === "string")
         || !collection.pending || typeof collection.pending !== "object" || Array.isArray(collection.pending)
         || !Array.isArray(collection.history)) throw new Error("Corrupted ranking collection: " + type);
+    assertStoredRankingRound(collection.round, type);
     const attempts = [...Object.values(collection.pending as Record<string, unknown>), collection.active].filter((x) => x != null);
     for (const attempt of attempts) {
       if (typeof attempt !== "object" || Array.isArray(attempt)
