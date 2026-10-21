@@ -166,7 +166,10 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const eligible = completedRankingItems(options.items, options.type);
   let state: RankingState;
   try {
-    state = await options.store.mutate((draft) => { reconcileRanking(draft[options.type], eligible); });
+    // A view refresh must never irreversibly delete ranking state: a rename may
+    // temporarily precede the index/metadata refresh. Reconcile only the view.
+    state = JSON.parse(JSON.stringify(await options.store.load())) as RankingState;
+    reconcileRanking(state[options.type], eligible);
   } catch (error) {
     container.replaceChildren(makeEl("p", "al-ranking-error", t("failed", {
       reason: error instanceof Error ? error.message : String(error),
@@ -186,7 +189,10 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     if (busy) return;
     busy = true;
     try {
-      await options.store.mutate((draft) => edit(draft[options.type]));
+      await options.store.mutate((draft) => {
+        reconcileRanking(draft[options.type], eligible);
+        edit(draft[options.type]);
+      });
       options.redraw();
     } catch (error) {
       busy = false;
