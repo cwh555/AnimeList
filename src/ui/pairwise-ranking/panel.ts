@@ -3,7 +3,7 @@ import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, decideRanking, moveRankedItem, nextRankingPair,
   prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
-  reconcileRanking, undoRanking, emptyRankingCollection,
+  reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem,
   type RankingCollection, type RankingChoice,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -227,6 +227,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (pair) {
     actions.appendChild(button(t(options.comparing ? "exit" : "continue"), () => {
       options.setComparing(!options.comparing);
+      options.redraw();
     }, options.comparing ? "save" : "play"));
   } else if (counts.unranked) {
     actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => start("new"), "play"));
@@ -243,7 +244,8 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
         });
       }).open();
     }));
-    menu.showAtMouseEvent(new MouseEvent("click", { clientX: more.getBoundingClientRect().right, clientY: more.getBoundingClientRect().bottom }));
+    const rect = more.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
   }, "ellipsis");
   actions.appendChild(more);
   panel.appendChild(actions);
@@ -275,7 +277,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       void mutate((draft) => { undoRanking(draft); options.setComparing(true); });
     }, "undo-2");
     undo.disabled = list.history.length === 0;
-    secondary.append(undo, button(t("exit"), () => options.setComparing(false), "save"));
+    secondary.append(undo, button(t("exit"), () => { options.setComparing(false); options.redraw(); }, "save"));
     prompt.appendChild(secondary);
     panel.appendChild(prompt);
     return;
@@ -354,11 +356,19 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const info = makeEl("span", "al-ranking-pending-bounds", possible);
       const retry = button(t("retry"), () => {
         void mutate((draft) => {
-          prepareRanking(draft, eligible, "pending");
+          if (draft.active) draft.pending[draft.active.path] = draft.active;
+          draft.active = { path, comparisons: Object.fromEntries(Object.entries(draft.pending[path].comparisons)
+            .filter(([, choice]) => choice !== "skip")) };
+          delete draft.pending[path];
           options.setComparing(Boolean(nextRankingPair(draft)));
         });
       }, "refresh-cw");
-      row.append(label, info, retry);
+      const place = button(t("moveTo"), () => {
+        new RankingMoveModal(options.app, list.ordered.length + 1, list.ordered.length + 1, (rank) => {
+          void mutate((draft) => { placePendingItem(draft, path, rank); });
+        }).open();
+      }, "list-ordered");
+      row.append(label, info, retry, place);
       pendingSection.appendChild(row);
     }
     panel.appendChild(pendingSection);

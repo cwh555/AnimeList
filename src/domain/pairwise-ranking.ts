@@ -1,4 +1,4 @@
-import type { MediaItem, MediaType } from "../media-types";
+import type { MediaItem, MediaType } from "./media-types";
 
 export type RankingChoice = "better" | "worse" | "skip";
 export type RankingMode = "new" | "pending" | "reset";
@@ -116,6 +116,7 @@ function settleActive(list: RankingCollection): void {
 
 export function reconcileRanking(list: RankingCollection, eligible: readonly MediaItem[]): void {
   const allowed = new Set(eligible.map((item) => item.filePath));
+  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active });
   list.ordered = [...new Set(list.ordered.filter((path) => allowed.has(path)))];
   const ranked = new Set(list.ordered);
   const clean = (attempt: RankingAttempt): RankingAttempt => ({
@@ -132,8 +133,8 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
     list.active = clean(list.active);
     delete list.pending[list.active.path];
   }
-  // Undo snapshots refer to old library membership and must not resurrect removed entries.
-  list.history = [];
+  // Only invalidate undo if membership or reference evidence actually changed.
+  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active })) list.history = [];
 }
 
 function pickNext(list: RankingCollection, eligible: readonly MediaItem[], mode: "new" | "pending"): void {
@@ -141,7 +142,8 @@ function pickNext(list: RankingCollection, eligible: readonly MediaItem[], mode:
   if (mode === "pending") {
     const next = eligible.map((item) => item.filePath).find((path) => Object.hasOwn(list.pending, path));
     if (!next) return;
-    list.active = list.pending[next];
+    list.active = { path: next, comparisons: Object.fromEntries(Object.entries(list.pending[next].comparisons)
+      .filter(([, choice]) => choice !== "skip")) };
     delete list.pending[next];
     return;
   }
@@ -160,10 +162,12 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
   }
   pickNext(list, eligible, mode === "pending" ? "pending" : "new");
   settleActive(list);
-  // The first entry needs no comparisons, and may be followed by further entries.
-  if (!list.active && Object.keys(list.pending).length === 0) {
+  // Seed entries that need no question (e.g., the first item), then ask the next one.
+  for (let i = 0; i < eligible.length && !list.active; i += 1) {
+    const previous = list.ordered.length;
     pickNext(list, eligible, "new");
     settleActive(list);
+    if (list.ordered.length === previous) break;
   }
 }
 
@@ -207,6 +211,17 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   return true;
 }
 
+export function placePendingItem(list: RankingCollection, path: string, position: number): boolean {
+  if (!Object.hasOwn(list.pending, path) || !Number.isInteger(position)
+    || position < 1 || position > list.ordered.length + 1) return false;
+  list.ordered.splice(position - 1, 0, path);
+  delete list.pending[path];
+  for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
+  if (list.active) delete list.active.comparisons[path];
+  list.history = [];
+  return true;
+}
+
 export function recompareRankedItem(list: RankingCollection, path: string): boolean {
   const index = list.ordered.indexOf(path);
   if (index < 0) return false;
@@ -224,27 +239,31 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   let changed = false;
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
+    let changedHere = false;
     const replace = (value: string): string => value === from ? to : value;
     if (list.ordered.includes(from)) {
       list.ordered = [...new Set(list.ordered.map(replace))];
       changed = true;
+      changedHere = true;
     }
     const relabel = (attempt: RankingAttempt): void => {
-      if (attempt.path === from) { attempt.path = to; changed = true; }
+      if (attempt.path === from) { attempt.path = to; changed = true; changedHere = true; }
       if (Object.hasOwn(attempt.comparisons, from)) {
         attempt.comparisons[to] = attempt.comparisons[from];
         delete attempt.comparisons[from];
         changed = true;
+        changedHere = true;
       }
     };
     if (list.pending[from]) {
       if (!list.pending[to]) list.pending[to] = list.pending[from];
       delete list.pending[from];
       changed = true;
+      changedHere = true;
     }
     Object.values(list.pending).forEach(relabel);
     if (list.active) relabel(list.active);
-    if (changed) list.history = [];
+    if (changedHere) list.history = [];
   }
   return changed;
 }

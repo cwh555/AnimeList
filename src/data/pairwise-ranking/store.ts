@@ -44,7 +44,7 @@ export class PairwiseRankingStore {
     if (this.loaded) return this.loaded;
     const adapter = this.app.vault.adapter;
     if (await adapter.exists(this.path)) {
-      const contents = await adapter.read(this.path);
+      const contents = new TextDecoder().decode(await adapter.readBinary(this.path));
       this.loaded = validateRankData(JSON.parse(contents) as unknown);
       this.original = contents;
     } else {
@@ -65,11 +65,12 @@ export class PairwiseRankingStore {
       if (oldValue === newValue) { answer = current; return; }
       const adapter = this.app.vault.adapter;
       const found = await adapter.exists(this.path);
-      const onDisk = found ? await adapter.read(this.path) : null;
+      const onDisk = found ? new TextDecoder().decode(await adapter.readBinary(this.path)) : null;
       if (onDisk !== this.original) throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
       const folder = this.path.slice(0, this.path.lastIndexOf("/"));
       if (!(await adapter.exists(folder))) await adapter.mkdir(folder);
-      await adapter.write(this.path, newValue + "\n");
+      const bytes = new TextEncoder().encode(newValue + "\n");
+      await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
       this.original = newValue + "\n";
       this.loaded = next;
       answer = next;

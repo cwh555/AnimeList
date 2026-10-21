@@ -91,8 +91,8 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   const rankingStore = new PairwiseRankingStore(plugin.app);
   RANK_STORES.set(plugin, rankingStore);
   plugin.registerEvent(plugin.app.vault.on("rename", (file, oldPath) => {
-    if (!(file instanceof TFile)) return;
-    void rankingStore.rename(oldPath, file.path).catch((error: unknown) => {
+    if (!(file instanceof TFile) || typeof oldPath !== "string") return;
+    void rankingStore.rename(oldPath, file.path).then(() => plugin.refreshViews()).catch((error: unknown) => {
       dashboardHost.showNotice(rankingText("failed", {
         reason: error instanceof Error ? error.message : String(error),
       }));
@@ -198,7 +198,6 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     setComparing(value) {
       rankState.comparing = value;
       RANK_STATES.set(plugin, rankState);
-      redraw();
     },
     setType(value) {
       rankState.type = value;
