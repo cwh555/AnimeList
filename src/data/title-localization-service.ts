@@ -162,7 +162,11 @@ export async function planStoredTitleUpdates(
       ...values(fm.title_aliases), ...(candidate?.searchTitles ?? []), candidate?.originalTitle ?? "", nextTitle]
       .map((name) => name.trim()).filter(Boolean))];
     // Safeguard against silently overwriting user-authored names.
-    const recognized = new Set([...aliases.slice(1), ...Object.values(known)].map(normalizeTitle));
+    const providerNames = candidate
+      ? [candidate.title, candidate.originalTitle, candidate.romajiTitle,
+        ...(candidate.searchTitles ?? []), ...Object.values(candidate.titleVariants?.localized ?? {})]
+      : [];
+    const recognized = new Set([...providerNames, ...Object.values(known)].map(normalizeTitle));
     if (candidate && !recognized.has(normalizeTitle(oldTitle))) {
       skipped += 1;
       options.onProgress?.(index + 1, files.length, oldTitle);
