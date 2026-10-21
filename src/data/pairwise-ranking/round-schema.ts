@@ -11,7 +11,8 @@ export function assertStoredRankingRound(value: unknown, type: string): void {
     Array.isArray(input) && input.every((path) => typeof path === "string");
   if (round.kind !== "full" && round.kind !== "append" && round.kind !== "range") corrupted("kind");
   for (const name of ["stage", "total", "comparisons", "cursor", "rangeStart", "rangeLength"]) {
-    if (!Number.isSafeInteger(round[name]) || (round[name] as number) < 0) corrupted(name);
+    if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name])
+      || round[name] < 0) corrupted(name);
   }
   if (!isPaths(round.baseline)) corrupted("baseline");
   if (!Array.isArray(round.results) || !round.results.every(isPaths)) corrupted("results");
