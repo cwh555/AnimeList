@@ -123,6 +123,13 @@ export class TitleLocalizationModal extends AnimeListModal {
       }
       entry.createDiv({ cls: "al-result-meta", text: outcome.status + ": " + outcome.reason });
       entry.createDiv({ cls: "al-result-meta", text: outcome.path });
+      if (proposal?.source?.provider === "bangumi") {
+        const source = proposal.source;
+        const href = "https://bgm.tv/subject/" + source.id;
+        const link = entry.createEl("a", { text: source.provider + " #" + source.id, href });
+        link.setAttribute("rel", "noopener noreferrer");
+        link.setAttribute("target", "_blank");
+      }
     }
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
     const back = footer.createEl("button", { text: text("modal.back") });
