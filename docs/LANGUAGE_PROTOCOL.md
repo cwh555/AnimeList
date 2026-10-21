@@ -53,7 +53,9 @@ file modification time. It writes **only** `title`, optional missing
 `title_original`, merged `title_aliases`, and `title_localizations`,
 via Obsidian FileManager.processFrontMatter. Existing unrelated YAML, note bodies,
 media assets, paths, and user annotations are not rewritten. Individual errors are
-reported; data errors are never treated as successful updates.
+reported; data errors are never treated as successful updates. Once the user
+confirms a batch, closing the modal does not stop already selected updates;
+a completion Notice is still emitted.
 
 **Changing the UI language never runs this migration automatically.** This is
 intentional: note names and custom titles are user-owned persistent data. Filename

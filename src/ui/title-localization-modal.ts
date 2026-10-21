@@ -127,8 +127,11 @@ export class TitleLocalizationModal extends AnimeListModal {
       apply.disabled = true;
       back.disabled = true;
       void applyStoredTitleUpdates(this.host.app, plan, selected).then((result) => {
-        if (this.closed) return;
         if (result.updated) this.host.refreshViews();
+        if (this.closed) {
+          new Notice(text("modal.done", { updated: result.updated, skipped: result.skipped, failed: result.failed }));
+          return;
+        }
         this.contentEl.empty();
         this.contentEl.createEl("p", {
           cls: "al-version-cleanup-status",
