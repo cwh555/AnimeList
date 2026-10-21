@@ -5,7 +5,7 @@ AnimeList separates **interface language**, **source identity**, and **stored us
 | Data | Interface-language switch | Persisted representation |
 | --- | --- | --- |
 | UI labels, notices and feature captions | Localized | i18n catalogs |
-| Provider taxonomy tags with explicit API provenance | Localized in display only | Original API labels / compatible existing genres |
+| Dictionary-recognized provider taxonomy labels | Localized in display only | Canonical provider labels / compatible existing genres |
 | Personal tags and user-defined names | Unchanged | Original input |
 | Author, creator, studio, staff and publisher names | Unchanged | Provider values |
 | Existing note titles | Unchanged | `title` in YAML frontmatter |
@@ -25,6 +25,20 @@ titles are used as Japanese/Korean only with matching origin metadata.
 The importer always retains source-native `title_original` and searchable
 `title_aliases`. `title_localizations` keeps known, source-derived titles
 separately so future migration need not guess the language from aliases.
+
+## Legacy tag-provenance limitation
+
+The existing Library currently displays a localized label when an entry in
+`genres` matches the provider-tag dictionary. Since older `genres` can mix
+API and personal values, a user-authored tag that happens to match a provider
+term may also be rendered as translated text. This is a display-only behavior:
+the stored value is unchanged. Eliminating this ambiguity requires a separate
+provenance-preserving genre schema migration; the title-migration operation
+deliberately does not modify `genres`, `user_tags`, or `media_tags`.
+
+The legacy Settings page is still presented in English in the current plugin
+layout, independently of the interface locale used by other views. This is a
+separate pre-existing behavior and is not changed by the title updater.
 
 ## Existing notes / Updates & cleanup
 
