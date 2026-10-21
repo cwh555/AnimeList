@@ -4,7 +4,7 @@ import { makeEl, errorMessage } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  decideRanking, nextRankingPair, reconcileRanking, undoRanking, roundProgress,
+  decideRanking, nextRankingPair, reconcileRanking, undoRanking,
   type RankingChoice, type RankingCollection,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
