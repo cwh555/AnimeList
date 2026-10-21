@@ -118,11 +118,24 @@ const html = `<!doctype html>
         const alpha = poster("Alpha.md");
         details.desktopPosterDraggable = alpha.draggable === true;
         const point = center(alpha);
+        // A laptop may have a coarse primary touchscreen even when using a mouse.
+        const nativeMatchMedia = window.matchMedia.bind(window);
+        window.matchMedia = (query) => query === "(pointer: coarse)"
+          ? { matches: true } : nativeMatchMedia(query);
+        document.body.classList.add("is-mobile");
         touch(alpha, "pointerdown", point.x, point.y, 43);
         touch(alpha, "pointerup", point.x, point.y, 43);
         details.hybridTouchTemporarilyDisablesDrag = alpha.draggable === false;
+        const touchContextMenu = new MouseEvent("contextmenu", { bubbles:true, cancelable:true, button:2 });
+        alpha.dispatchEvent(touchContextMenu);
+        details.hybridTouchContextMenuSuppressed = touchContextMenu.defaultPrevented;
         alpha.dispatchEvent(new PointerEvent("pointerdown", { bubbles:true, pointerType:"mouse", button:0, isPrimary:true }));
         details.hybridMouseRestoresDrag = alpha.draggable === true;
+        const rightClick = new MouseEvent("contextmenu", { bubbles:true, cancelable:true, button:2 });
+        alpha.dispatchEvent(rightClick);
+        details.hybridMouseContextMenuPreserved = !rightClick.defaultPrevented;
+        document.body.classList.remove("is-mobile");
+        window.matchMedia = nativeMatchMedia;
         const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
         batchButton.click();
         alpha.click();

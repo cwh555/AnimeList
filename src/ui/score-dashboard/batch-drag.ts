@@ -41,7 +41,7 @@ export function renderScoreDashboardWithBatchDrag(
   controllers.get(container)?.abort();
   let currentState = { ...initialState };
   let touchInputSeen = false;
-  let lastInputWasTouch = false;
+  let lastPointerInput: "touch" | "mouse" | null = null;
 
   const render = (scrollTop: number, restoreBatchMode = false): void => {
     controllers.get(container)?.abort();
@@ -87,7 +87,7 @@ export function renderScoreDashboardWithBatchDrag(
     );
     let batchInvariantQueued = false;
     scheduleTouchBatchInvariant = (): void => {
-      if (!touchInputSeen || !lastInputWasTouch || batchInvariantQueued) return;
+      if (!touchInputSeen || lastPointerInput !== "touch" || batchInvariantQueued) return;
       batchInvariantQueued = true;
       queueMicrotask(() => {
         batchInvariantQueued = false;
@@ -99,9 +99,11 @@ export function renderScoreDashboardWithBatchDrag(
         batchButton.click();
       });
     };
-    const isTouchDevice = (): boolean => lastInputWasTouch
-      || container.ownerDocument.body.classList.contains("is-mobile")
-      || container.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")?.matches === true;
+    const isTouchDevice = (): boolean => lastPointerInput === "touch"
+      || (lastPointerInput !== "mouse" && (
+        container.ownerDocument.body.classList.contains("is-mobile")
+        || container.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")?.matches === true
+      ));
     const syncDraggablePosters = (): void => {
       const batchMode = shell.classList.contains("is-batch-mode");
       container.querySelectorAll<HTMLButtonElement>(".al-score-poster").forEach((poster) => {
@@ -246,15 +248,15 @@ export function renderScoreDashboardWithBatchDrag(
     installScoreDashboardTouchInteractions(container, shell, batchButton, controller.signal, {
       onTouchInput: () => {
         touchInputSeen = true;
-        lastInputWasTouch = true;
+        lastPointerInput = "touch";
         syncDraggablePosters();
       },
     });
     // A hybrid device must not lose desktop drag-and-drop for the rest of the
     // session merely because its touchscreen was used once.
     container.addEventListener("pointerdown", (event) => {
-      if (event.pointerType !== "mouse" || !lastInputWasTouch) return;
-      lastInputWasTouch = false;
+      if (event.pointerType !== "mouse" || lastPointerInput === "mouse") return;
+      lastPointerInput = "mouse";
       syncDraggablePosters();
     }, { ...options, capture: true });
 

@@ -28,7 +28,7 @@ export function installScoreDashboardTouchInteractions(
   const view = container.ownerDocument.defaultView;
   if (!view) return;
   let active: ActiveTouchPress | null = null;
-  let touchInputSeen = false;
+  let lastPointerWasTouch = false;
   let suppressClick: HTMLButtonElement | null = null;
   let programmaticClick = false;
   const options = { signal, capture: true } as const;
@@ -41,8 +41,12 @@ export function installScoreDashboardTouchInteractions(
   signal.addEventListener("abort", clear, { once: true });
 
   container.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") {
+      lastPointerWasTouch = false;
+      return;
+    }
     if (event.pointerType !== "touch" || event.isPrimary === false) return;
-    touchInputSeen = true;
+    lastPointerWasTouch = true;
     adapters.onTouchInput();
     suppressClick = null;
     clear();
@@ -84,7 +88,7 @@ export function installScoreDashboardTouchInteractions(
     if (event.pointerType === "touch" && active?.pointerId === event.pointerId) clear();
   }, options);
   container.addEventListener("contextmenu", (event) => {
-    if (!touchInputSeen || !posterAt(event.target)) return;
+    if (!lastPointerWasTouch || !posterAt(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
   }, options);
