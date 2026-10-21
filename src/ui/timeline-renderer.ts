@@ -12,6 +12,7 @@ import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { createTimelinePosterCard, TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 import { animateLayoutChange } from "./layout-motion";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { installTimelinePointerPan } from "./timeline-pan-gesture";
 
 export { TIMELINE_CARD_GEOMETRY } from "./timeline-card";
 
@@ -469,26 +470,14 @@ export const TimelineUI = (() => {
       }
     }, { passive: false });
 
-    let dragging: { id: number; x: number; y: number; startX: number; startY: number } | null = null;
-    viewport.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || (event.target instanceof Element && event.target.closest(".al-timeline-card"))) return;
-      dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: state.x, startY: state.y };
-      viewport.classList.add("is-dragging");
-      viewport.setPointerCapture(event.pointerId);
+    installTimelinePointerPan(viewport, {
+      position: () => ({ x: state.x, y: state.y }),
+      panTo: (x, y) => {
+        state.x = x;
+        state.y = y;
+        applyPan();
+      },
     });
-    viewport.addEventListener("pointermove", (event) => {
-      if (!dragging || dragging.id !== event.pointerId) return;
-      state.x = dragging.startX + event.clientX - dragging.x;
-      state.y = dragging.startY + event.clientY - dragging.y;
-      applyPan();
-    });
-    const stopDrag = (event: PointerEvent): void => {
-      if (!dragging || dragging.id !== event.pointerId) return;
-      dragging = null;
-      viewport.classList.remove("is-dragging");
-    };
-    viewport.addEventListener("pointerup", stopDrag);
-    viewport.addEventListener("pointercancel", stopDrag);
 
     renderGeometry();
     window.setTimeout(resetView, 0);

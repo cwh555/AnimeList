@@ -34,6 +34,7 @@ export const JA_SCORE_DASHBOARD_MESSAGES = {
     moveNoChange: "作品はすでに指定評価です。変更はありません。",
     moveFailed: "評価の更新に失敗しました: {message}",
     dragHint: "表紙をドラッグして評価を変更",
+    mobileHint: "表紙を長押しして選択し、「移動先」で評価を変更します。スワイプは閲覧のみです。",
     selectionHint: "表紙をクリックして作品を選択し、一括ツールバーから移動します。",
     ratedSummary: "評価済み {rated}/{total}",
     coverAlt: "{title} の表紙",

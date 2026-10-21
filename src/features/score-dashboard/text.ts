@@ -43,6 +43,7 @@ export const scoreDashboardText = {
   get moveNoChange() { return text("moveNoChange"); },
   moveFailed: (message: string) => text("moveFailed", { message }),
   get dragHint() { return text("dragHint"); },
+  get mobileHint() { return text("mobileHint"); },
   get selectionHint() { return text("selectionHint"); },
   ratedSummary: (rated: number, total: number) => text("ratedSummary", { rated, total }),
   coverAlt: (title: string) => text("coverAlt", { title }),

@@ -113,6 +113,45 @@ const html = `<!doctype html>
 
     (async () => {
       const details = {};
+      if (innerWidth > 700) {
+        await delay(40);
+        const alpha = poster("Alpha.md");
+        details.desktopPosterDraggable = alpha.draggable === true;
+        const point = center(alpha);
+        // A laptop may have a coarse primary touchscreen even when using a mouse.
+        const nativeMatchMedia = window.matchMedia.bind(window);
+        window.matchMedia = (query) => query === "(pointer: coarse)"
+          ? { matches: true } : nativeMatchMedia(query);
+        document.body.classList.add("is-mobile");
+        touch(alpha, "pointerdown", point.x, point.y, 43);
+        touch(alpha, "pointerup", point.x, point.y, 43);
+        details.hybridTouchTemporarilyDisablesDrag = alpha.draggable === false;
+        const touchContextMenu = new MouseEvent("contextmenu", { bubbles:true, cancelable:true, button:2 });
+        alpha.dispatchEvent(touchContextMenu);
+        details.hybridTouchContextMenuSuppressed = touchContextMenu.defaultPrevented;
+        alpha.dispatchEvent(new PointerEvent("pointerdown", { bubbles:true, pointerType:"mouse", button:0, isPrimary:true }));
+        details.hybridMouseRestoresDrag = alpha.draggable === true;
+        const rightClick = new MouseEvent("contextmenu", { bubbles:true, cancelable:true, button:2 });
+        alpha.dispatchEvent(rightClick);
+        details.hybridMouseContextMenuPreserved = !rightClick.defaultPrevented;
+        document.body.classList.remove("is-mobile");
+        window.matchMedia = nativeMatchMedia;
+        const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
+        batchButton.click();
+        alpha.click();
+        await delay(50);
+        details.desktopSelectedPosterDraggable = shell().classList.contains("is-batch-mode") && alpha.classList.contains("is-selected") && alpha.draggable;
+        const transfer = new DataTransfer();
+        const lane90 = lane("9.0");
+        alpha.dispatchEvent(new DragEvent("dragstart", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        lane90.dispatchEvent(new DragEvent("dragover", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        lane90.dispatchEvent(new DragEvent("drop", { bubbles:true, cancelable:true, dataTransfer:transfer }));
+        await delay(150);
+        details.desktopDragChangesScore = applied.length===1 && applied[0].length===1 && applied[0][0].filePath==="Alpha.md" && applied[0][0].nextScore===9;
+        document.body.dataset.details = JSON.stringify(details);
+        document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
+        return;
+      }
 
       await delay(30);
       const eagerImages = [...dashboard.querySelectorAll('.al-score-poster-image')].filter((image) => image.loading === 'eager');
@@ -143,13 +182,12 @@ const html = `<!doctype html>
       alpha.click();
       await delay(80);
 
-      details.directTouchDragApplied = applied.length === 1
-        && applied[0].length === 1
-        && applied[0][0].filePath === "Alpha.md"
-        && applied[0][0].nextScore === 9;
-      details.dragDoesNotOpenFile = opened.length === 0;
-      details.dragMovedAtTarget = poster("Alpha.md")?.dataset.score === "9.0";
-      details.dragPreservesPosterNode = poster("Alpha.md") === alpha;
+      details.verticalSwipeDoesNotEditScore = applied.length === 0;
+      details.verticalSwipeDoesNotOpenFile = opened.length === 0;
+      details.verticalSwipeDoesNotEnterBatch = !shell().classList.contains("is-batch-mode");
+      details.verticalSwipePreservesPosterNode = poster("Alpha.md") === alpha;
+      details.mobilePosterPansNatively = getComputedStyle(alpha).touchAction === "auto";
+      details.mobileNativeDragDisabled = alpha.draggable === false;
 
       const alphaAfterDrag = poster("Alpha.md");
       alphaAfterDrag.scrollIntoView({ block:"center" });
@@ -189,6 +227,17 @@ const html = `<!doctype html>
       batchButton.click();
       await delay(30);
       details.emptyTouchBatchCannotPersist = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
+      batchButton.click();
+      poster("Alpha.md").click();
+      const moveTo = dashboard.querySelector(".al-score-batch-target");
+      moveTo.value = "9.0";
+      moveTo.dispatchEvent(new Event("change", { bubbles:true }));
+      await delay(100);
+      details.explicitTargetSelectionChangesScore = applied.length === 1
+        && applied[0].length === 1
+        && applied[0][0].filePath === "Alpha.md"
+        && applied[0][0].nextScore === 9
+        && poster("Alpha.md")?.dataset.score === "9.0";
 
       const alphaBeforeFilters = poster("Alpha.md");
       const alphaCoverBeforeFilters = alphaBeforeFilters?.querySelector("img");
@@ -243,6 +292,13 @@ try {
     testName: "Score Dashboard mobile touch interaction test",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  });
+  await runChromiumDatasetTest({
+    html,
+    profile: path.join(output, "chrome-desktop"),
+    testName: "Score Dashboard desktop drag and hybrid pointer regression",
+    requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
+    viewport: { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false },
   });
 } finally {
   await rm(output, { recursive: true, force: true });
