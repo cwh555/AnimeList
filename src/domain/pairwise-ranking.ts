@@ -222,7 +222,7 @@ export function rankingDropPosition(
 ): number {
   let target = 1;
   rowBounds.forEach((rect, index) => {
-    if (index !== draggedIndex && pointerY > rect.top + rect.height / 2) target += 1;
+    if (index !== draggedIndex && pointerY >= rect.top + rect.height / 2) target += 1;
   });
   return Math.max(1, Math.min(rowBounds.length, target));
 }
