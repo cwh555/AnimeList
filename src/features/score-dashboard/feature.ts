@@ -38,7 +38,7 @@ type ScoreDashboardPlugin = AnimeListFeatureHost & ScoreDashboardDomEventRegistr
 const HOSTS = new WeakMap<object, ScoreDashboardPluginHost>();
 const STATES = new WeakMap<object, ScoreDashboardUiState>();
 const RANK_STORES = new WeakMap<object, PairwiseRankingStore>();
-interface RankingWorkspaceState { mode: "rating" | "ranking"; type: MediaType; comparing: boolean }
+interface RankingWorkspaceState { mode: "rating" | "ranking"; type: MediaType }
 const RANK_STATES = new WeakMap<HTMLElement, RankingWorkspaceState>();
 const RATING_MOUNTS = new WeakMap<HTMLElement, HTMLElement>();
 
@@ -172,7 +172,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     scale: SCORE_DASHBOARD_DEFAULT_SCALE,
     showUnrated: false,
   };
-  const rankState = RANK_STATES.get(container) ?? { mode: "rating", type: "anime", comparing: false };
+  const rankState = RANK_STATES.get(container) ?? { mode: "rating", type: "anime" };
   const preserveRankingScroll = container.querySelector(".al-ranking-panel") !== null;
   const previousRankingScrollTop = preserveRankingScroll ? container.scrollTop : 0;
   const previous = RATING_MOUNTS.get(container);
@@ -224,14 +224,8 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     store: rankingStore,
     items: dashboardHost.collectMediaItems(),
     type: rankState.type,
-    comparing: rankState.comparing,
-    setComparing(value) {
-      rankState.comparing = value;
-      RANK_STATES.set(container, rankState);
-    },
     setType(value) {
       rankState.type = value;
-      rankState.comparing = false;
       RANK_STATES.set(container, rankState);
       redraw();
     },
