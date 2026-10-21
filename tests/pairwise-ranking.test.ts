@@ -184,10 +184,12 @@ describe("pairwise ranking: strict ordered list", () => {
     state.anime.ordered = ["A", "B"];
     state.anime.active = { path: "C", comparisons: { B: "worse" } };
     state.manga.pending.M = { path: "M", comparisons: { B: "skip" } };
+    state.novel.history = [{ ordered: ["novel-unrelated"], pending: {}, active: null }];
     assert.equal(removeRankingPath(state, "B"), true);
     assert.deepEqual(state.anime.ordered, ["A"]);
     assert.deepEqual(state.anime.active?.comparisons, {});
     assert.deepEqual(state.manga.pending.M.comparisons, {});
+    assert.equal(state.novel.history.length, 1, "unrelated novel undo history stays intact");
     assert.equal(removeRankingPath(state, "B"), false);
   });
 

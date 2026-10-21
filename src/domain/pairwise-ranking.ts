@@ -290,25 +290,29 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
   let changed = false;
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
+    let changedHere = false;
     const previous = list.ordered.length;
     list.ordered = list.ordered.filter((item) => item !== path);
-    if (previous !== list.ordered.length) changed = true;
+    if (previous !== list.ordered.length) changedHere = true;
     if (Object.hasOwn(list.pending, path)) {
       delete list.pending[path];
-      changed = true;
+      changedHere = true;
     }
-    if (list.active?.path === path) { list.active = null; changed = true; }
+    if (list.active?.path === path) { list.active = null; changedHere = true; }
     for (const attempt of Object.values(list.pending)) {
       if (Object.hasOwn(attempt.comparisons, path)) {
         delete attempt.comparisons[path];
-        changed = true;
+        changedHere = true;
       }
     }
     if (list.active && Object.hasOwn(list.active.comparisons, path)) {
       delete list.active.comparisons[path];
+      changedHere = true;
+    }
+    if (changedHere) {
+      list.history = [];
       changed = true;
     }
-    if (changed) list.history = [];
   }
   return changed;
 }
