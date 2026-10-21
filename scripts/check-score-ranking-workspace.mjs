@@ -47,7 +47,7 @@ try {
     'const delay=()=>new Promise(resolve=>setTimeout(resolve,160));',
     'const svg="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2260%22/%3E";',
     'const items=Array.from({length:40},(_,i)=>({title:"Work "+i,mediaType:"anime",status:"completed",score:7.5,cover:svg,filePath:"AnimeList/Anime/Work"+i+".md",updated:0,updatedLabel:"",genres:[],people:[],volumeLog:[]}));',
-    'const empty=()=>({ordered:[],pending:{},active:null,history:[]});',
+    'const empty=()=>({ordered:[],pending:{},active:null});',
     'const initial={version:1,anime:{...empty(),ordered:items.map(item=>item.filePath)},manga:empty(),novel:empty()};',
     'let rankingFile=JSON.stringify(initial)+"\\n";',
     'const adapter={exists:async(path)=>path===".obsidian/animelist-ranking.json",readBinary:async()=>new TextEncoder().encode(rankingFile).buffer,writeBinary:async(path,bytes)=>{rankingFile=new TextDecoder().decode(bytes);}};',

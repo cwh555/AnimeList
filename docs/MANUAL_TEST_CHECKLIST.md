@@ -313,7 +313,7 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
 - [ ] New entries are inserted without reshuffling the existing ranked order.
 - [ ] Tournament-like merge rounds interleave comparisons; full rankings remain strict and skip never fabricates placement.
-- [ ] Drag-only manual rank changes, last-comparison undo, and confirmed complete reset work; no range-rerank action is shown and numeric scores remain unchanged.
+- [ ] Manual rank changes only use the drag handle; comparison modal has Skip and Pause but no Undo. Confirmed complete reset works, numeric scores stay unchanged.
 - [ ] Each ranked work has one full-width compact row at every viewport (320, 390, 768, 1200px), with rank, cover, left-aligned two-line title and one trailing drag handle. No oversized gray inner card.
 - [ ] While dragging, a pointer-following visual clone and source placeholder stay visible, with a clear drop highlight.
 - [ ] No redundant move-to-rank, range-rerank, or per-item more buttons remain; drag handle ArrowUp/ArrowDown provides keyboard sorting.
