@@ -20,6 +20,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/version-cleanup.css",
   "styles/masterpiece.css",
   "styles/score-dashboard.css",
+  "styles/pairwise-ranking.css",
   "styles/serial-cover.css",
   "styles/library-list.css",
   "styles/media-metadata.css",

@@ -3870,6 +3870,100 @@ button.al-moment-stack-strip:focus-visible {
   .al-score-lane { grid-template-columns:44px minmax(0,1fr); }
 }
 
+.al-ranking-mode-tabs {
+  display: flex; gap: 4px; margin: 0 0 12px; padding: 4px;
+  border-radius: var(--radius-m); background: var(--background-secondary);
+}
+.al-ranking-mode-tabs button {
+  flex: 1; padding: 9px 12px; border: 0; border-radius: var(--radius-s);
+  background: transparent; color: var(--text-muted); font-weight: 600;
+}
+.al-ranking-mode-tabs button.is-active {
+  background: var(--background-primary); color: var(--text-normal);
+  box-shadow: 0 1px 4px var(--background-modifier-box-shadow);
+}
+.al-ranking-panel { max-width: 900px; margin: auto; padding: 6px 8px 36px; }
+.al-ranking-header { display: grid; gap: 10px; margin-bottom: 12px; }
+.al-ranking-type-tabs { display: flex; gap: 6px; }
+.al-ranking-type-tabs button {
+  flex: 1; min-width: 0; padding: 8px 6px; border-radius: var(--radius-s);
+}
+.al-ranking-type-tabs .is-active {
+  border-color: var(--interactive-accent); color: var(--text-accent);
+}
+.al-ranking-stats { display: flex; flex-wrap: wrap; gap: 10px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-stats .has-pending { color: var(--text-warning); }
+.al-ranking-actions, .al-ranking-secondary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.al-ranking-actions button, .al-ranking-secondary button, .al-ranking-skip, .al-ranking-pending-row button {
+  display: inline-flex; gap: 6px; justify-content: center; align-items: center;
+  min-height: 36px; padding: 7px 12px;
+}
+.al-ranking-comparison { border: 1px solid var(--background-modifier-border); padding: 16px; border-radius: var(--radius-l); }
+.al-ranking-subtitle { color: var(--text-muted); font-size: var(--font-ui-small); text-transform: uppercase; }
+.al-ranking-instructions { margin: 8px 0 16px; text-align: center; font-weight: 600; }
+.al-ranking-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: auto; max-width: 540px; }
+.al-ranking-choice {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  min-width: 0; padding: 8px; height: auto; background: var(--background-primary);
+  border: 2px solid var(--background-modifier-border); border-radius: var(--radius-m);
+  color: var(--text-normal); cursor: pointer;
+}
+.al-ranking-choice:hover, .al-ranking-choice:focus-visible { border-color: var(--interactive-accent); }
+.al-ranking-choice-cover { display: block; width: 100%; aspect-ratio: 2 / 3; overflow: hidden; border-radius: var(--radius-s); background: var(--background-secondary); }
+.al-ranking-choice-cover img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.al-ranking-choice-title { text-align: center; overflow-wrap: anywhere; line-height: 1.4; }
+.al-ranking-skip { display: flex; margin: 14px auto 6px; min-width: 150px; }
+.al-ranking-secondary { justify-content: space-between; }
+.al-ranking-search { display: block; width: 100%; margin: 12px 0; }
+.al-ranking-warning { color: var(--text-warning); margin: 8px 0; }
+.al-ranking-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.al-ranking-row {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 76px;
+  padding: 6px 8px; border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m); background: var(--background-primary);
+}
+.al-ranking-row[hidden] { display: none; }
+.al-ranking-position { flex: 0 0 32px; text-align: center; font-weight: 700; color: var(--text-muted); }
+.al-ranking-open {
+  display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;
+  padding: 0; background: transparent; border: 0; box-shadow: none; text-align: left;
+  color: var(--text-normal); height: auto;
+}
+.al-ranking-open:hover { background: transparent; color: var(--text-accent); }
+.al-ranking-row-cover { flex: 0 0 43px; width: 43px; height: 63px; display: inline-flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: var(--radius-s); background: var(--background-secondary); }
+.al-ranking-row-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.al-ranking-row-title { font-weight: 600; overflow-wrap: anywhere; }
+.al-ranking-handle, .al-ranking-more {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 36px; width: 36px; min-height: 40px; padding: 0;
+}
+.al-ranking-handle { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.al-ranking-handle:active { cursor: grabbing; }
+.al-ranking-row.is-rank-moving { opacity: 0.6; }
+.al-ranking-row.is-rank-target { border: 2px solid var(--interactive-accent); }
+.al-ranking-pending { margin-top: 24px; border-top: 1px solid var(--background-modifier-border); padding-top: 12px; }
+.al-ranking-pending h3 { margin: 0 0 6px; }
+.al-ranking-pending > p { margin: 0 0 12px; color: var(--text-muted); }
+.al-ranking-pending-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 8px 0; padding: 8px;
+  border-radius: var(--radius-s); background: var(--background-secondary); }
+.al-ranking-pending-label { display: flex; gap: 10px; align-items: center; flex: 1; min-width: 140px; }
+.al-ranking-pending-bounds { color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-empty, .al-ranking-loading { padding: 28px 12px; color: var(--text-muted); text-align: center; }
+.al-ranking-error { color: var(--text-error); }
+.al-ranking-move-label { display: grid; gap: 8px; }
+.al-ranking-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+@media (max-width: 500px) {
+  .al-ranking-panel { padding: 4px 2px 28px; }
+  .al-ranking-comparison { padding: 8px; }
+  .al-ranking-choices { gap: 8px; }
+  .al-ranking-choice { padding: 5px; }
+  .al-ranking-row { gap: 5px; padding: 5px; }
+  .al-ranking-position { flex-basis: 26px; }
+  .al-ranking-row-cover { flex-basis: 40px; width: 40px; height: 60px; }
+  .al-ranking-handle, .al-ranking-more { flex-basis: 36px; }
+}
+
 /* Per-entry cover UI. Kept isolated from shared styles. */
 .animelist-modal .al-volume-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
