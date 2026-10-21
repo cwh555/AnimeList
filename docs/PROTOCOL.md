@@ -26,7 +26,7 @@ Legacy tag limitation: historical genres mixes provider terms and manually enter
 - title_aliases: historical names and search aliases.
 - title_localizations: optional locale-to-verified-title dictionary from the provider.
 
-Bangumi name_cn is Simplified Chinese, not necessarily an official Taiwanese Traditional title. A verified Traditional title must have explicit provenance from Bangumi infobox. AniList provides English/native/romaji, with JP/KR native attribution only if origin information supports it. Never invent an official translation from unlabelled synonyms. This plugin does **not** currently implement general machine translation or OpenCC.
+Bangumi name_cn is Simplified Chinese, not necessarily an official Taiwanese Traditional title. A verified Traditional title must have explicit provenance from Bangumi infobox. AniList provides English/native/romaji, with JP/KR native attribution only if origin information supports it. Never invent an official translation from unlabelled synonyms. OpenCC (opencc-js 1.4.2) is available **only** as an offline Chinese-script-conversion fallback. It is **not** a provider-verified localized title or general machine translation.
 
 ## Existing-title update workflow
 
@@ -36,7 +36,7 @@ Settings → Updates & cleanup → Existing media titles → Preview title updat
 2. The scanner shows each work's name, path and result as it completes. All scanned work results remain visible in the review list, not just proposals.
 3. Title candidates come from previously verified stored localizations, exact provider IDs, or exact provider IDs preserved in source URLs. Bangumi title-only requests omit the separate person/studio endpoint.
 4. For an AniList-only work needing a Chinese name, a unique original-title matching Bangumi search result can be proposed **for explicit review only**. Ambiguous or mismatched-year results are rejected; such proposals are unchecked by default.
-5. Every work shows its status: ready, review, unchanged, no-source, no-translation, custom-title, ambiguous, or lookup-failed. A Bangumi result with Simplified Chinese but no verified Traditional Chinese title must say so; the tool must not pretend a conversion succeeded.
+5. Every work shows its status: ready, review, unchanged, no-source, no-translation, custom-title, ambiguous, or lookup-failed. A Bangumi result with Simplified Chinese but no verified Traditional Chinese title may provide an OpenCC conversion as an **unchecked review-only proposal**; the UI must never mislabel it as an official translation. No Chinese source means a visible missing-translation status.
 6. The user reviews old → proposed name and selects works. Preview never writes.
 7. On apply, recheck source identity, original title and file modification time. Write only title, optional missing title_original, title_aliases, and title_localizations, through Obsidian processFrontMatter.
 8. Do not alter filenames, Markdown bodies, headings, personal scores, progress, authors, tags, covers, rankings, or unrelated YAML. This protects Obsidian links and note ownership.

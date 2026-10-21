@@ -1,6 +1,7 @@
 import { TFile, type App } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { mergeOfficialTitles, verifiedMediaTitle } from "../domain/media-title-localization";
+import { convertChineseScriptForReview } from "../domain/chinese-title-conversion";
 import type { SupportedLocale } from "../i18n/locale";
 import { getScopedMarkdownFiles } from "./vault-scope";
 import { BangumiClient } from "./providers/bangumi-client";
@@ -177,6 +178,7 @@ export async function planStoredTitleUpdates(
     let candidate: ExternalMediaResult | null = null;
     let target = stored[locale] ?? "";
     let requiresReview = false;
+    let scriptConverted = false;
     let selectedSource: TitleSource | null = source;
     if (!target && source) {
       candidate = await fetchCached(type, source);
@@ -200,6 +202,17 @@ export async function planStoredTitleUpdates(
         target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
       }
       if (!results.length) return row(file.path, old, "no-source", "AniList has no Chinese title; no unique Bangumi title match was found.");
+    }
+    if (!target && (locale === "zh-TW" || locale === "zh-CN")) {
+      const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
+      const input = candidate?.titleVariants?.localized?.[otherLocale] || stored[otherLocale];
+      if (input) {
+        target = convertChineseScriptForReview(input, locale) ?? "";
+        if (target) {
+          scriptConverted = true;
+          requiresReview = true;
+        }
+      }
     }
     if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");
     if (!target) {
@@ -226,7 +239,8 @@ export async function planStoredTitleUpdates(
       aliases, localized: merged,
     };
     return row(file.path, old, requiresReview ? "review" : "ready",
-      requiresReview ? "Cross-provider title match: manually verify this identity." : "Verified provider ID and title.",
+      scriptConverted ? "OpenCC script conversion only (NOT an official localized release title); verify before applying."
+        : requiresReview ? "Cross-provider title match: manually verify this identity." : "Verified provider ID and title.",
       proposal);
   }
   async function worker(): Promise<void> {

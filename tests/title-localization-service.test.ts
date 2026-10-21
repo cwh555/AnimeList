@@ -153,7 +153,7 @@ describe("safe existing-title localization", () => {
   });
 
 
-  it("explains missing Traditional Chinese translations instead of silently skipping", async () => {
+  it("exposes a labeled unchecked OpenCC candidate when Traditional is missing", async () => {
     const note = testNote("tw.md", {
       media_type: "anime", title: "原題", source_provider: "bangumi", source_id: "88",
     });
@@ -167,12 +167,41 @@ describe("safe existing-title localization", () => {
       onProgress: (_done, _total, row) => progress.push(row),
     });
     assert.equal(plan.scanned, 1);
-    assert.equal(plan.items.length, 0);
-    assert.equal(plan.rows[0].status, "no-translation");
-    assert.match(plan.rows[0].reason, /Simplified Chinese only/);
+    assert.equal(plan.items.length, 1);
+    assert.equal(plan.items[0].newTitle, "簡體標題");
+    assert.equal(plan.items[0].requiresReview, true);
+    assert.equal(plan.rows[0].status, "review");
+    assert.match(plan.rows[0].reason, /NOT an official/);
+    assert.deepEqual(plan.items[0].localized, { "zh-CN": "简体标题" });
     assert.equal(progress.length, 1);
     assert.equal(progress[0].title, "原題");
     assert.equal(note.written.length, 0);
+  });
+
+  it("keeps genuinely missing translations visible as a skip", async () => {
+    const note = testNote("no-titles.md", {
+      media_type: "anime", title: "原題", source_provider: "bangumi", source_id: "88",
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      intervalMs: 0,
+      fetch: async () => ({
+        ...bangumiResult("原題", ""),
+        titleVariants: { fallback: "原題", original: "原題", localized: {} },
+      }),
+    });
+    assert.equal(plan.rows[0].status, "no-translation");
+    assert.equal(plan.items.length, 0);
+  });
+
+  it("converts saved Traditional Chinese to a reviewable Simplified candidate without claiming a verified translation", async () => {
+    const note = testNote("converted.md", {
+      media_type: "anime", title: "傳統文字", title_localizations: { "zh-TW": "傳統文字" },
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", { intervalMs: 0 });
+    assert.equal(plan.rows[0].status, "review");
+    assert.equal(plan.items[0].newTitle, "传统文字");
+    assert.equal(plan.items[0].requiresReview, true);
+    assert.deepEqual(plan.items[0].localized, { "zh-TW": "傳統文字" });
   });
 
   it("resolves Bangumi ID from source URLs even when primary provider is AniList", async () => {
