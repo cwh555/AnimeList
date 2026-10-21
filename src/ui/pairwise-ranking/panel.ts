@@ -13,9 +13,6 @@ import { rankingCover } from "./cover";
 import { RankingComparisonModal } from "./comparison-modal";
 import { installRankingDrag } from "./drag";
 
-// The workspace scroll host survives list rebuilds; keep searches with it.
-const RANKING_QUERIES = new WeakMap<HTMLElement, string>();
-
 interface RankingPanelOptions {
   app: App;
   store: PairwiseRankingStore;
@@ -57,7 +54,6 @@ class RankingConfirmModal extends Modal {
 }
 
 export async function renderRankingPanel(container: HTMLElement, options: RankingPanelOptions): Promise<void> {
-  const searchHost = container.closest<HTMLElement>(".al-workspace-page-body") ?? container;
   container.replaceChildren(makeEl("p", "al-ranking-loading", t("busy")));
   const eligible = completedRankingItems(options.items, options.type);
   let state: RankingState;
@@ -114,10 +110,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const typeTabs = makeEl("nav", "al-ranking-type-tabs");
   typeTabs.setAttribute("aria-label", t("title"));
   for (const type of ["anime", "manga", "novel"] as const) {
-    const tab = button(t(type), () => {
-      RANKING_QUERIES.delete(searchHost);
-      options.setType(type);
-    }, undefined, type === options.type ? "is-active" : "");
+    const tab = button(t(type), () => options.setType(type), undefined, type === options.type ? "is-active" : "");
     tab.setAttribute("aria-pressed", String(type === options.type));
     typeTabs.appendChild(tab);
   }
@@ -163,20 +156,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   panel.appendChild(actions);
 
   if (counts.pending) panel.appendChild(makeEl("p", "al-ranking-warning", t("warning")));
-  const search = makeEl("input", "al-ranking-search");
-  search.type = "search";
-  search.placeholder = t("search");
-  search.setAttribute("aria-label", t("search"));
-  search.value = RANKING_QUERIES.get(searchHost) ?? "";
-  panel.appendChild(search);
-
   const result = makeEl("ol", "al-ranking-list");
   const rows: HTMLElement[] = [];
   for (const [index, path] of list.ordered.entries()) {
     const item = byPath.get(path);
     if (!item) continue;
     const row = makeEl("li", "al-ranking-row");
-    row.dataset.title = item.title.toLocaleLowerCase();
     row.append(makeEl("span", "al-ranking-position", String(index + 1)));
     const content = button("", () => { void options.openNote(path); }, undefined, "al-ranking-open");
     content.title = item.title;
@@ -194,21 +179,6 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   }
   panel.appendChild(result);
   if (!list.ordered.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
-  const applySearch = (): void => {
-    const q = search.value.trim().toLocaleLowerCase();
-    for (const row of rows) {
-      row.hidden = Boolean(q) && !row.dataset.title?.includes(q);
-      // Filtered positions do not correspond to global ranks: disable drag until the filter is cleared.
-      const handle = row.querySelector<HTMLButtonElement>(".al-ranking-handle");
-      if (handle) handle.disabled = Boolean(q);
-    }
-  };
-  search.addEventListener("input", () => {
-    RANKING_QUERIES.set(searchHost, search.value);
-    applySearch();
-  });
-  applySearch();
-
   if (counts.pending) {
     const pendingSection = makeEl("section", "al-ranking-pending");
     pendingSection.append(makeEl("h3", "", t("pendingTitle")));
