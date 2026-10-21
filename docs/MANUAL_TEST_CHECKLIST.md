@@ -305,7 +305,11 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 ## Ranking (Scores → Ranking)
 
 - [ ] Only completed Anime / Manga / Novel notes participate; each original media note is ranked independently.
-- [ ] Clicking a cover selects the preferred work; Skip does not silently create a tie or a definite position.
+- [ ] Opening a comparison launches an Obsidian modal; clicking a cover selects the preferred work, Skip never creates a tie.
+- [ ] The modal closes on Pause / Escape, then Continue restores the pending comparison without losing answers.
+- [ ] Long Chinese/Japanese/English titles fit within two lines inside modal cards at 320px/390px/desktop widths.
+- [ ] The main ranking page remains visible behind the modal; modal controls and native Obsidian close behavior work.
+- [ ] Rank search survives reorder/rerender, disables misleading drag-in-filtered-order, and resets when switching media type.
 - [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
 - [ ] New entries are inserted without reshuffling the existing ranked order.
 - [ ] Recompare, last-comparison undo, and complete reset behave correctly and do not modify numeric scores.
