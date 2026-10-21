@@ -19,6 +19,7 @@ import { serialEntryCoversFeature } from "./features/serial-covers/feature";
 import { serialCoverSettingsFeature } from "./features/serial-covers/settings";
 import { userTagSettingsFeature } from "./features/user-tags/settings";
 import { versionCleanupSettingsFeature } from "./features/version-cleanup/settings";
+import { titleLocalizationSettingsFeature } from "./features/title-localization/settings";
 
 registerBundledLocales();
 
@@ -38,6 +39,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   serialEntryCoversFeature,
   serialCoverSettingsFeature,
   versionCleanupSettingsFeature,
+  titleLocalizationSettingsFeature,
   userTagSettingsFeature,
   masterpieceFeature,
   scoreDashboardFeature,

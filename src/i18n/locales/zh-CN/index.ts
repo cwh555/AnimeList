@@ -1,3 +1,4 @@
+import { TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
 import { ZH_TW_CATALOGS, type LocaleCatalogs } from "../zh-TW";
 import { RANKING_MESSAGES } from "./ranking";
 import { CORE_MESSAGES } from "./core";
@@ -52,4 +53,5 @@ export const ZH_CN_CATALOGS: LocaleCatalogs = {
   "library-export": completeCatalog(ZH_TW_CATALOGS["library-export"], LIBRARY_EXPORT_MESSAGES),
   "timeline-workspace": completeCatalog(ZH_TW_CATALOGS["timeline-workspace"], TIMELINE_WORKSPACE_MESSAGES),
   "manual-media": completeCatalog(ZH_TW_CATALOGS["manual-media"], MANUAL_MEDIA_MESSAGES),
+  "title-localization": completeCatalog(ZH_TW_CATALOGS["title-localization"], TITLE_LOCALIZATION_MESSAGES),
 };

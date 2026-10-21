@@ -1,3 +1,4 @@
+import "../../features/title-localization/text";
 import "../../features/pairwise-ranking/text";
 import "../../features/release-tracking/text";
 import "../../features/image-sections/text";
