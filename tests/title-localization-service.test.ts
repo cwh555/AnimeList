@@ -85,6 +85,23 @@ describe("safe existing-title localization", () => {
     assert.deepEqual(note.data.title_localizations, { "zh-TW": "繁體標題", "zh-CN": "简体标题" });
   });
 
+  it("accepts a romanized provider alias while still requiring an exact provider ID", async () => {
+    const note = testNote("romaji.md", {
+      media_type: "anime", source_provider: "bangumi", source_id: "88",
+      title: "Romanized Title",
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      fetch: async () => ({
+        ...bangumiResult("原題", "简体标题"),
+        romajiTitle: "Romanized Title",
+        searchTitles: ["原題", "Romanized Title", "简体标题"],
+      }),
+    });
+    assert.equal(plan.items.length, 1);
+    assert.equal(plan.items[0].newTitle, "简体标题");
+  });
+
   it("does not overwrite manually authored names or guess missing titles", async () => {
     const note = testNote("custom.md", {
       media_type: "anime", source_provider: "bangumi", source_id: "88",
