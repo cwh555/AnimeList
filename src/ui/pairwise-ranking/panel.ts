@@ -3,7 +3,7 @@ import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
   prepareRanking, rankingBounds, rankingCounts,
-  reconcileRanking, undoRanking, resumePendingRanking,
+  reconcileRanking, undoRanking, resumePendingRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -60,8 +60,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   try {
     // A view refresh must never irreversibly delete ranking state: a rename may
     // temporarily precede the index/metadata refresh. Reconcile only the view.
-    state = JSON.parse(JSON.stringify(await options.store.load())) as RankingState;
-    reconcileRanking(state[options.type], eligible);
+    // No completed works means there is nothing to reconcile or rank.
+    // Do not touch a persisted in-progress round while the library is empty
+    // (e.g. before indexing completes or after all works become unfinished).
+    state = eligible.length === 0 ? emptyRankingState()
+      : JSON.parse(JSON.stringify(await options.store.load())) as RankingState;
+    if (eligible.length) reconcileRanking(state[options.type], eligible);
   } catch (error) {
     container.replaceChildren(makeEl("p", "al-ranking-error", t("failed", {
       reason: error instanceof Error ? error.message : String(error),
