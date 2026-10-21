@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { TFile } from "obsidian";
 import type { ExternalMediaResult } from "../src/domain/media-types";
-import { applyStoredTitleUpdates, planStoredTitleUpdates } from "../src/data/title-localization-service";
+import { applyStoredTitleUpdates, planStoredTitleUpdates, type TitleScanRow } from "../src/data/title-localization-service";
 
 function testNote(path: string, frontmatter: Record<string, unknown>) {
   const file = new TFile();
@@ -150,6 +150,136 @@ describe("safe existing-title localization", () => {
     const changed = await applyStoredTitleUpdates(note.app, plan, new Set(["a.md"]));
     assert.equal(changed.updated, 0);
     assert.equal(changed.skipped, 1);
+  });
+
+
+  it("explains missing Traditional Chinese translations instead of silently skipping", async () => {
+    const note = testNote("tw.md", {
+      media_type: "anime", title: "原題", source_provider: "bangumi", source_id: "88",
+    });
+    const progress: TitleScanRow[] = [];
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      intervalMs: 0,
+      fetch: async () => ({
+        ...bangumiResult("原題", "简体标题"),
+        titleVariants: { fallback: "简体标题", original: "原題", localized: { "zh-CN": "简体标题" } },
+      }),
+      onProgress: (_done, _total, row) => progress.push(row),
+    });
+    assert.equal(plan.scanned, 1);
+    assert.equal(plan.items.length, 0);
+    assert.equal(plan.rows[0].status, "no-translation");
+    assert.match(plan.rows[0].reason, /Simplified Chinese only/);
+    assert.equal(progress.length, 1);
+    assert.equal(progress[0].title, "原題");
+    assert.equal(note.written.length, 0);
+  });
+
+  it("resolves Bangumi ID from source URLs even when primary provider is AniList", async () => {
+    const note = testNote("links.md", {
+      title: "原題", media_type: "anime", source_provider: "anilist", source_id: "42",
+      source_urls: ["https://anilist.co/anime/42", "https://bgm.tv/subject/88"],
+    });
+    const seen: string[] = [];
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      fetch: async (_type, source) => {
+        seen.push(source.provider + ":" + source.id);
+        return bangumiResult("原題", "简体标题");
+      },
+    });
+    assert.deepEqual(seen, ["bangumi:88"]);
+    assert.equal(plan.rows[0].status, "ready");
+    assert.equal(plan.items[0].newTitle, "简体标题");
+  });
+
+  it("reviews cross-provider matches and never accepts an ambiguous title as identity", async () => {
+    const note = testNote("anilist.md", {
+      title: "原題", title_original: "原題", year: 2021,
+      media_type: "anime", source_provider: "anilist", source_id: "42",
+    });
+    const progress: string[] = [];
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      lookup: async (_type, title) => {
+        progress.push(title);
+        return [bangumiResult("原題", "简体标题")];
+      },
+      fetch: async (_type, source) => {
+        assert.equal(source.id, "88");
+        return bangumiResult("原題", "简体标题");
+      },
+    });
+    assert.deepEqual(progress, ["原題"]);
+    assert.equal(plan.items.length, 1);
+    assert.equal(plan.rows[0].status, "review");
+    assert.equal(plan.items[0].requiresReview, true);
+    const ambiguous = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      lookup: async () => [bangumiResult("原題", "简体标题"), { ...bangumiResult("原題", "繁體標題"), sourceId: "99" }],
+      fetch: async () => { throw Error("Must not fetch ambiguous candidates"); },
+    });
+    assert.equal(ambiguous.items.length, 0);
+    assert.equal(ambiguous.rows[0].status, "ambiguous");
+    assert.equal(note.written.length, 0);
+  });
+
+  it("filters cross-provider false positives by year and reports unmatched works", async () => {
+    const note = testNote("wrongyear.md", {
+      title: "原題", year: 2022, media_type: "anime", source_provider: "anilist", source_id: "42",
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      lookup: async () => [bangumiResult("原題", "简体标题")],
+      fetch: async () => { throw Error("A different release year must not be fetched"); },
+    });
+    assert.equal(plan.rows[0].status, "no-source");
+    assert.equal(plan.items.length, 0);
+  });
+
+  it("uses bounded concurrency instead of waiting serially for every work", async () => {
+    const inputs = Array.from({ length: 8 }, (_, i) => testNote("work-" + i + ".md", {
+      title: "原題", media_type: "anime", source_provider: "bangumi", source_id: String(100 + i),
+    }));
+    const byPath = new Map(inputs.map(v => [v.file.path, v]));
+    const app = {
+      vault: { getRoot: () => ({ children: inputs.map(v => v.file) }) },
+      metadataCache: { getFileCache: (f: TFile) => ({ frontmatter: byPath.get(f.path)?.data }) },
+    } as any;
+    let active = 0;
+    let peak = 0;
+    const updates: TitleScanRow[] = [];
+    const plan = await planStoredTitleUpdates(app, [""], "zh-CN", {
+      intervalMs: 0, concurrency: 3,
+      fetch: async (_type, source) => {
+        active++;
+        peak = Math.max(peak, active);
+        await new Promise(resolve => setTimeout(resolve, 2));
+        active--;
+        return { ...bangumiResult("原題", "简体标题"), sourceId: source.id };
+      },
+      onProgress: (_completed, _total, row) => updates.push(row),
+    });
+    assert.equal(plan.scanned, 8);
+    assert.equal(plan.items.length, 8);
+    assert.equal(peak, 3);
+    assert.equal(updates.length, 8);
+    assert.ok(updates.every(r => r.status === "ready"));
+  });
+
+  it("keeps statuses distinct for no-source, custom title and provider failures", async () => {
+    const noSource = testNote("manual.md", { title: "Manual title", media_type: "novel" });
+    const manual = await planStoredTitleUpdates(noSource.app, [""], "zh-CN", { intervalMs: 0 });
+    assert.equal(manual.rows[0].status, "no-source");
+    const bad = testNote("error.md", {
+      title: "原題", media_type: "anime", source_provider: "bangumi", source_id: "88",
+    });
+    const broken = await planStoredTitleUpdates(bad.app, [""], "zh-CN", {
+      intervalMs: 0, fetch: async () => { throw new Error("HTTP 429"); },
+    });
+    assert.equal(broken.rows[0].status, "lookup-failed");
+    assert.equal(broken.failures.length, 1);
+    assert.match(broken.failures[0].message, /429/);
   });
 
   it("aborts preview before scanning additional notes", async () => {

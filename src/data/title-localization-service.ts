@@ -201,6 +201,7 @@ export async function planStoredTitleUpdates(
       }
       if (!results.length) return row(file.path, old, "no-source", "AniList has no Chinese title; no unique Bangumi title match was found.");
     }
+    if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");
     if (!target) {
       const onlySimplified = locale === "zh-TW" && candidate?.titleVariants?.localized?.["zh-CN"];
       return row(file.path, old, "no-translation", onlySimplified
