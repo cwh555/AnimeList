@@ -132,7 +132,7 @@ try {
           const current = await send("Runtime.evaluate", {
             expression: "document.body.dataset.result", returnByValue: true,
           });
-          if (current.result.value !== "pending") break;
+          if (current.result.value === "pass" || current.result.value === "fail") break;
           await sleep(40);
         }
         const result = await send("Page.captureScreenshot", {
