@@ -8,6 +8,7 @@ import { disposeScoreDashboardInteractions, renderScoreDashboardWithBatchDrag } 
 import { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { renderRankingPanel } from "../../ui/pairwise-ranking/panel";
 import { rankingText } from "../pairwise-ranking/text";
+import { errorMessage } from "../../ui/ui-helpers";
 import type { MediaType } from "../../domain/media-types";
 import { prepareScoreDashboardCoverSources } from "../../ui/score-dashboard/cover-sources";
 import { confirmScoreDashboardClamp } from "../../ui/score-dashboard/operation-ui";
@@ -94,7 +95,7 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
     if (!(file instanceof TFile) || typeof oldPath !== "string") return;
     void rankingStore.rename(oldPath, file.path).then(() => plugin.refreshViews()).catch((error: unknown) => {
       dashboardHost.showNotice(rankingText("failed", {
-        reason: error instanceof Error ? error.message : String(error),
+        reason: errorMessage(error),
       }));
     });
   }));
@@ -152,11 +153,11 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
   container.replaceChildren();
   container.classList.toggle("animelist-score-dashboard-view", rankState.mode === "rating");
 
-  const tabs = document.createElement("nav");
+  const tabs = createEl("nav");
   tabs.className = "al-ranking-mode-tabs";
   tabs.setAttribute("aria-label", rankingText("title"));
   for (const mode of ["rating", "ranking"] as const) {
-    const tab = document.createElement("button");
+    const tab = createEl("button");
     tab.type = "button";
     tab.textContent = rankingText(mode === "rating" ? "modeRating" : "modeRanking");
     tab.classList.toggle("is-active", rankState.mode === mode);
@@ -169,7 +170,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     });
     tabs.appendChild(tab);
   }
-  const body = document.createElement("div");
+  const body = createDiv();
   body.className = "al-score-mode-content";
   container.append(tabs, body);
 

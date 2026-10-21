@@ -12,7 +12,7 @@ function validateRankData(input: unknown): RankingState {
     if (!Array.isArray(collection.ordered) || !collection.ordered.every((x) => typeof x === "string")
         || !collection.pending || typeof collection.pending !== "object" || Array.isArray(collection.pending)
         || !Array.isArray(collection.history)) throw new Error("Corrupted ranking collection: " + type);
-    const attempts = [...Object.values(collection.pending), collection.active].filter((x) => x != null);
+    const attempts = [...Object.values(collection.pending as Record<string, unknown>), collection.active].filter((x) => x != null);
     for (const attempt of attempts) {
       if (typeof attempt !== "object" || Array.isArray(attempt)
         || typeof (attempt as Record<string, unknown>).path !== "string"
@@ -56,7 +56,7 @@ export class PairwiseRankingStore {
 
   async mutate(change: (state: RankingState) => void): Promise<RankingState> {
     let answer: RankingState | null = null;
-    const task = this.serial.then(async () => {
+    const task: Promise<void> = this.serial.then(async (): Promise<void> => {
       const current = await this.load();
       const next = JSON.parse(JSON.stringify(current)) as RankingState;
       change(next);
@@ -70,12 +70,12 @@ export class PairwiseRankingStore {
       const folder = this.path.slice(0, this.path.lastIndexOf("/"));
       if (!(await adapter.exists(folder))) await adapter.mkdir(folder);
       const bytes = new TextEncoder().encode(newValue + "\n");
-      await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+      await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
       this.original = newValue + "\n";
       this.loaded = next;
       answer = next;
     });
-    this.serial = task.then(() => undefined, () => undefined);
+    this.serial = task.then(() => { /* ready for next update */ }, () => { /* retain queue after a rejected update */ });
     await task;
     if (!answer) throw new Error("Ranking save did not complete");
     return answer;
