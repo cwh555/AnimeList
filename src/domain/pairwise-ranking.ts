@@ -19,6 +19,10 @@ export interface RankingSnapshot {
   pending: Record<string, RankingAttempt>;
   active: RankingAttempt | null;
   round?: RankingRound | null;
+  /** Remaining paths in this user-initiated pending-review session.
+   * An empty array with active set means the last work is still in progress.
+   */
+  pendingQueue?: string[] | null;
 }
 
 export interface RankingCollection extends RankingSnapshot {
@@ -43,7 +47,7 @@ export interface RankingBounds {
 }
 
 export function emptyRankingCollection(): RankingCollection {
-  return { ordered: [], pending: {}, active: null, round: null, history: [] };
+  return { ordered: [], pending: {}, active: null, round: null, pendingQueue: null, history: [] };
 }
 
 export function emptyRankingState(): RankingState {
@@ -68,6 +72,7 @@ export function rankingSnapshot(list: RankingCollection): RankingSnapshot {
       [key, { path: value.path, comparisons: { ...value.comparisons } }])),
     active: list.active ? { path: list.active.path, comparisons: { ...list.active.comparisons } } : null,
     round: list.round ? JSON.parse(JSON.stringify(list.round)) as RankingRound : null,
+    pendingQueue: list.pendingQueue ? [...list.pendingQueue] : list.pendingQueue ?? null,
   };
 }
 
@@ -122,9 +127,28 @@ function settleActive(list: RankingCollection): void {
   }
 }
 
+/** Continue a saved, single-pass review of the pending entries.
+ * Skipped entries are deliberately not enqueued again in this session.
+ */
+function advancePendingQueue(list: RankingCollection): void {
+  if (!list.pendingQueue || list.active) return;
+  while (!list.active && list.pendingQueue.length) {
+    const path = list.pendingQueue.shift();
+    if (!path) continue;
+    const attempt = list.pending[path];
+    if (!attempt) continue; // May have been transitively settled since enqueue.
+    list.active = { path, comparisons: Object.fromEntries(
+      Object.entries(attempt.comparisons).filter(([, choice]) => choice !== "skip"),
+    ) };
+    delete list.pending[path];
+    settleActive(list);
+  }
+  if (!list.active && !list.pendingQueue.length) list.pendingQueue = null;
+}
+
 export function reconcileRanking(list: RankingCollection, eligible: readonly MediaItem[]): void {
   const allowed = new Set(eligible.map((item) => item.filePath));
-  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round });
+  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round, pendingQueue: list.pendingQueue });
   if (list.round) {
     mapRankingRound(list.round, (path) => allowed.has(path) ? path : null);
     const finished = advanceRound(list.round);
@@ -132,6 +156,10 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
   }
   list.ordered = [...new Set(list.ordered.filter((path) => allowed.has(path)))];
   const ranked = new Set(list.ordered);
+  if (list.pendingQueue) {
+    list.pendingQueue = [...new Set(list.pendingQueue.filter((path) => allowed.has(path) && !ranked.has(path)))];
+    if (!list.pendingQueue.length && !list.active) list.pendingQueue = null;
+  }
   const clean = (attempt: RankingAttempt): RankingAttempt => ({
     path: attempt.path,
     comparisons: Object.fromEntries(Object.entries(attempt.comparisons).filter(
@@ -147,7 +175,7 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
     delete list.pending[list.active.path];
   }
   // Only invalidate undo if membership or reference evidence actually changed.
-  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round })) list.history = [];
+  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round, pendingQueue: list.pendingQueue })) list.history = [];
 }
 
 /** Resolve only entries with exactly one consistent insertion slot, never infer a tie. */
@@ -246,9 +274,20 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
     list.ordered = [];
     list.pending = {};
     list.active = null;
+    list.pendingQueue = null;
     list.history = [];
   }
-  pickNext(list, eligible, mode === "pending" ? "pending" : "new");
+  if (mode === "pending") {
+    // Snapshot the entire batch once. A skipped item may remain pending, but
+    // cannot be requeued until the user explicitly begins a new review.
+    if (list.pendingQueue == null) {
+      list.pendingQueue = eligible.map((item) => item.filePath)
+        .filter((path) => Object.hasOwn(list.pending, path));
+    }
+    advancePendingQueue(list);
+    return;
+  }
+  pickNext(list, eligible, "new");
   settleActive(list);
   // Seed entries that need no question (e.g., the first item), then ask the next one.
   for (let i = 0; i < eligible.length && !list.active; i += 1) {
@@ -270,8 +309,11 @@ export function resumePendingRanking(
   delete list.pending[path];
   settleActive(list);
   if (!list.active) {
-    pickNext(list, eligible, "new");
-    settleActive(list);
+    if (list.pendingQueue != null) advancePendingQueue(list);
+    else {
+      pickNext(list, eligible, "new");
+      settleActive(list);
+    }
   }
   return true;
 }
@@ -300,8 +342,11 @@ export function decideRanking(
   settleActive(list);
   settleUnambiguousPending(list);
   if (!list.active) {
-    pickNext(list, eligible, "new");
-    settleActive(list);
+    if (list.pendingQueue != null) advancePendingQueue(list);
+    else {
+      pickNext(list, eligible, "new");
+      settleActive(list);
+    }
   }
   return true;
 }
@@ -313,6 +358,7 @@ export function undoRanking(list: RankingCollection): boolean {
   list.pending = previous.pending;
   list.active = previous.active;
   list.round = previous.round ?? null;
+  list.pendingQueue = previous.pendingQueue ?? null;
   return true;
 }
 
@@ -399,7 +445,12 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
     let changedHere = false;
-    if (list.round) {
+    if (list.pendingQueue) {
+      const oldLength = list.pendingQueue.length;
+      list.pendingQueue = list.pendingQueue.filter((item) => item !== path);
+      if (oldLength !== list.pendingQueue.length) changedHere = true;
+    }
+if (list.round) {
       const oldRound = JSON.stringify(list.round);
       mapRankingRound(list.round, (item) => item === path ? null : item);
       if (oldRound !== JSON.stringify(list.round)) {
@@ -440,7 +491,15 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
     let changedHere = false;
-    if (list.round) {
+    if (list.pendingQueue) {
+      const mapped = [...new Set(list.pendingQueue.map((item) => item === from ? to : item))];
+      if (JSON.stringify(mapped) !== JSON.stringify(list.pendingQueue)) {
+        list.pendingQueue = mapped;
+        changedHere = true;
+        changed = true;
+      }
+    }
+if (list.round) {
       const oldRound = JSON.stringify(list.round);
       mapRankingRound(list.round, (item) => item === from ? to : item);
       if (oldRound !== JSON.stringify(list.round)) { changed = true; changedHere = true; }
