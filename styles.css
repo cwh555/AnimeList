@@ -3909,28 +3909,38 @@ button.al-moment-stack-strip:focus-visible {
 .al-ranking-search { display: block; width: 100%; margin: 12px 0; }
 .al-ranking-warning { margin: 8px 0; color: var(--text-warning); font-size: var(--font-ui-small); }
 .al-ranking-list {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  align-items: stretch; gap: 10px; min-width: 0; margin: 0; padding: 0; list-style: none;
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: 0; min-width: 0; margin: 0; padding: 0; list-style: none;
+  border-top: 1px solid var(--background-modifier-border);
 }
 .al-ranking-row {
-  display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 100px;
-  padding: 8px; border: 1px solid var(--background-modifier-border);
-  border-radius: 10px; background: var(--background-primary-alt);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0;
+  min-height: 86px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0; background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
+.al-ranking-row:hover { background: var(--background-modifier-hover); }
 .al-ranking-row[hidden] { display: none; }
-.al-ranking-position { flex: 0 0 28px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.al-ranking-open {
+.al-ranking-position {
+  flex: 0 0 42px; text-align: center; font-size: var(--font-ui-medium);
+  font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.al-ranking-row:nth-child(-n + 3) .al-ranking-position { color: var(--text-accent); }
+.al-ranking-row > .al-ranking-open {
   display: flex; align-items: center; justify-content: flex-start;
-  gap: 12px; flex: 1 1 0; min-width: 0; width: 0;
-  height: auto; padding: 0; background: transparent; border: 0; box-shadow: none;
+  gap: 14px; flex: 1 1 auto; min-width: 0; width: 0; height: auto;
+  padding: 0; margin: 0; background: transparent; border: 0; box-shadow: none;
   text-align: left; color: var(--text-normal); overflow: hidden;
 }
-.al-ranking-open:hover { background: transparent; color: var(--text-accent); }
+.al-ranking-row > .al-ranking-open:hover,
+.al-ranking-row > .al-ranking-open:active {
+  background: transparent; border: 0; box-shadow: none; color: var(--text-accent);
+}
 .al-ranking-open:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .al-ranking-row-cover {
   display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 56px; width: 56px; height: 82px; overflow: hidden;
+  flex: 0 0 46px; width: 46px; height: 68px; overflow: hidden;
   border-radius: 5px; background: var(--background-secondary);
 }
 .al-ranking-row-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -3938,34 +3948,37 @@ button.al-moment-stack-strip:focus-visible {
   display: -webkit-box; min-width: 0; overflow: hidden;
   -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow-wrap: anywhere; word-break: break-word;
-  line-height: 1.4; max-height: 2.8em; font-size: var(--font-ui-small);
-  font-weight: 600;
+  line-height: 1.45; max-height: 2.9em; font-size: var(--font-ui-medium);
+  font-weight: 550;
 }
-.al-ranking-handle, .al-ranking-move {
+.al-ranking-handle {
   display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 36px; width: 36px; min-height: 40px; padding: 0;
+  flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0;
+  border: 0; border-radius: var(--radius-s);
   background: transparent; box-shadow: none; color: var(--text-muted);
+}
+.al-ranking-handle:hover, .al-ranking-handle:focus-visible {
+  background: var(--background-modifier-hover); color: var(--text-normal);
 }
 .al-ranking-handle { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .al-ranking-handle:active { cursor: grabbing; }
 .al-ranking-handle:disabled { opacity: .35; cursor: default; }
 .al-ranking-row.is-rank-moving {
-  opacity: .35; border-style: dashed; border-color: var(--interactive-accent);
+  opacity: .35; background: var(--background-secondary);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
 }
 .al-ranking-row.is-rank-target {
-  border-color: var(--interactive-accent);
-  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+  box-shadow: inset 0 -3px 0 var(--interactive-accent);
 }
 .al-ranking-drag-preview {
   position: fixed; top: 0; left: 0; z-index: 10000; pointer-events: none;
-  margin: 0; opacity: .96; border-color: var(--interactive-accent);
-  background: var(--background-primary-alt);
+  margin: 0; opacity: .97;
+  border: 1px solid var(--interactive-accent); border-radius: 8px;
+  background: var(--background-primary);
   box-shadow: 0 12px 36px rgba(0, 0, 0, .35);
   will-change: transform;
 }
 .al-ranking-reset { margin-left: auto; }
-.al-ranking-range-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-.al-ranking-range-inputs input { width: 100%; }
 .al-ranking-dialog-progress {
   color: var(--text-muted); text-align: center; font-size: var(--font-ui-smaller);
   margin: -10px 0 16px;
@@ -3980,7 +3993,6 @@ button.al-moment-stack-strip:focus-visible {
 .al-ranking-pending-bounds { color: var(--text-muted); font-size: var(--font-ui-small); }
 .al-ranking-empty, .al-ranking-loading { padding: 28px 12px; color: var(--text-muted); text-align: center; }
 .al-ranking-error { color: var(--text-error); }
-.al-ranking-move-label { display: grid; gap: 8px; }
 .al-ranking-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* Focused comparison uses the same Obsidian modal and button primitives. */
@@ -4033,12 +4045,12 @@ button.al-moment-stack-strip:focus-visible {
 @media (max-width: 600px) {
   .animelist-ranking-view { padding: 0 12px 32px; }
   .al-ranking-panel { padding: 4px 0 24px; }
-  .al-ranking-list { grid-template-columns: minmax(0, 1fr); }
-  .al-ranking-row { min-height: 84px; }
-  .al-ranking-row { gap: 6px; padding: 5px 6px; }
-  .al-ranking-position { flex-basis: 24px; }
-   .al-ranking-row-cover { flex-basis: 44px; width: 44px; height: 64px; }
-  .al-ranking-handle, .al-ranking-move { flex-basis: 36px; }
+  .al-ranking-row { min-height: 74px; gap: 8px; padding: 5px 4px; }
+  .al-ranking-position { flex-basis: 30px; font-size: var(--font-ui-small); }
+  .al-ranking-row-cover { flex-basis: 40px; width: 40px; height: 60px; }
+  .al-ranking-row > .al-ranking-open { gap: 10px; }
+  .al-ranking-handle { flex-basis: 44px; }
+  .al-ranking-row-title { font-size: var(--font-ui-small); }
   .al-ranking-type-tabs { width: 100%; }
   .al-ranking-type-tabs button { flex: 1; padding: 0 5px; }
   .modal.al-ranking-comparison-modal { width: calc(100vw - 16px); max-width: calc(100vw - 16px); }
