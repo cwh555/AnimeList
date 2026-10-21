@@ -137,6 +137,25 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
   if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active })) list.history = [];
 }
 
+/** Resolve only entries with exactly one consistent insertion slot, never infer a tie. */
+export function settleUnambiguousPending(list: RankingCollection): number {
+  let resolved = 0;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [path, attempt] of Object.entries(list.pending)) {
+      const { first, last } = rankingBounds(list, attempt);
+      if (first !== last) continue;
+      list.ordered.splice(first, 0, path);
+      delete list.pending[path];
+      resolved += 1;
+      changed = true;
+      break;
+    }
+  }
+  return resolved;
+}
+
 function pickNext(list: RankingCollection, eligible: readonly MediaItem[], mode: "new" | "pending"): void {
   if (list.active) return;
   if (mode === "pending") {
@@ -198,6 +217,7 @@ export function decideRanking(
   checkpoint(list);
   list.active.comparisons[pair.reference] = choice;
   settleActive(list);
+  settleUnambiguousPending(list);
   if (!list.active) {
     pickNext(list, eligible, "new");
     settleActive(list);
@@ -238,6 +258,7 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   // the moved work can contradict the latest explicit manual order.
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
   if (list.active) delete list.active.comparisons[path];
+  settleUnambiguousPending(list);
   list.history = [];
   return true;
 }

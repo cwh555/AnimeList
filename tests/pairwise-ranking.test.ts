@@ -5,7 +5,7 @@ import {
   completedRankingItems, decideRanking, emptyRankingCollection, emptyRankingState,
   moveRankedItem, nextRankingPair, placePendingItem, prepareRanking,
   rankingBounds, rankingCounts, rankingDropPosition, recompareRankedItem, renameRankingPath, resumePendingRanking,
-  undoRanking, reconcileRanking, removeRankingPath,
+  undoRanking, reconcileRanking, removeRankingPath, settleUnambiguousPending,
 } from "../src/domain/pairwise-ranking";
 
 function media(title: string, type: MediaType = "anime", status: MediaItem["status"] = "completed"): MediaItem {
@@ -75,6 +75,19 @@ describe("pairwise ranking: strict ordered list", () => {
     const remaining = Object.values(list.pending)[0];
     assert.deepEqual(rankingBounds(list, remaining), { first: 0, last: 1 });
     assert.deepEqual(rankingCounts(list, [a, b]), { ranked: 1, pending: 1, unranked: 0 });
+  });
+
+  it("automatically resolves a pending entry when strict evidence leaves a unique slot", () => {
+    const a = media("A"), b = media("B"), c = media("C");
+    const list = emptyRankingCollection();
+    list.ordered = [a.filePath, b.filePath];
+    list.pending[c.filePath] = { path: c.filePath, comparisons: {
+      [a.filePath]: "worse", [b.filePath]: "better",
+    } };
+    assert.equal(settleUnambiguousPending(list), 1);
+    assert.deepEqual(list.ordered, [a.filePath, c.filePath, b.filePath]);
+    assert.equal(Object.keys(list.pending).length, 0);
+    assert.equal(settleUnambiguousPending(list), 0);
   });
 
   it("retries skipped references while preserving explicit comparisons", () => {
