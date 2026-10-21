@@ -3,7 +3,7 @@ import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
   prepareRanking, rankingBounds, rankingCounts,
-  reconcileRanking, undoRanking, resumePendingRanking, emptyRankingState,
+  reconcileRanking, undoRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -197,12 +197,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
         ? t("onePosition", { first: bounds.first + 1 })
         : t("possible", { first: bounds.first + 1, last: bounds.last + 1 });
       const info = makeEl("span", "al-ranking-pending-bounds", possible);
-      const retry = button(t("retry"), () => {
-        void mutate((draft) => {
-          resumePendingRanking(draft, eligible, path);
-        }, true);
-      }, "refresh-cw");
-      row.append(label, info, retry);
+      row.append(label, info);
       pendingSection.appendChild(row);
     }
     panel.appendChild(pendingSection);
