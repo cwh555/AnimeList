@@ -51,12 +51,12 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
   } catch {
     // Continue to a reconstructive recovery, not a generic "invalid data" error.
   }
-  if (object(value) && (round.results === null || round.results === undefined)
-    && Array.isArray(round.jobs) && round.jobs.every((job) =>
+  if (object(value) && (value.results === null || value.results === undefined)
+    && Array.isArray(value.jobs) && value.jobs.every((job) =>
       object(job) && paths(job.left) && paths(job.right)
       && paths(job.winners) && typeof job.done === "boolean")) {
     const restored: RawRecord = { ...value,
-      results: round.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
+      results: value.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
     };
     try {
       assertStoredRankingRound(restored, type);
@@ -74,10 +74,10 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
     if (paths(input)) for (const path of input) participants.add(path);
   };
   if (object(value)) {
-    add(round.baseline);
-    if (Array.isArray(round.results)) for (const result of round.results) add(result);
-    if (Array.isArray(round.jobs)) {
-      for (const job of round.jobs) {
+    add(value.baseline);
+    if (Array.isArray(value.results)) for (const result of value.results) add(result);
+    if (Array.isArray(value.jobs)) {
+      for (const job of value.jobs) {
         if (!object(job)) continue;
         add(job.left);
         add(job.right);
