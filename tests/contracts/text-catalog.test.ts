@@ -94,7 +94,7 @@ describe("user-visible text catalog compatibility", () => {
     registerBundledLocales();
     const cases = [
       ["zh-TW", "收藏庫", "儲存", "Tags"],
-      ["zh-CN", "收藏库", "保存", "标签"],
+      ["zh-CN", "媒体库", "保存", "作品标签"],
       ["en", "Library", "Save", "Tags"],
       ["ja", "ライブラリ", "保存", "タグ"],
       ["ko", "라이브러리", "저장", "태그"],

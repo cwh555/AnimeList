@@ -97,6 +97,7 @@ export const TEST_TARGETS = [
   { path: "tests/markdown-refresh-scope.test.ts", kind: "test", suite: "unit", features: ["library", "markdown"] },
   { path: "tests/library-navigation.test.ts", kind: "test", suite: "integration", features: ["search", "library"] },
   { path: "tests/library-view.test.ts", kind: "test", suite: "unit", features: ["library", "masterpiece"] },
+  { path: "tests/media-title-localization.test.ts", kind: "test", suite: "unit", features: ["search", "text"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-pagination.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-settings.test.ts", kind: "test", suite: "integration", features: ["search", "settings"] },
