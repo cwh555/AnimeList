@@ -37,8 +37,8 @@ const HOSTS = new WeakMap<object, ScoreDashboardPluginHost>();
 const STATES = new WeakMap<object, ScoreDashboardUiState>();
 const RANK_STORES = new WeakMap<object, PairwiseRankingStore>();
 interface RankingWorkspaceState { mode: "rating" | "ranking"; type: MediaType; comparing: boolean }
-const RANK_STATES = new WeakMap<object, RankingWorkspaceState>();
-const RATING_MOUNTS = new WeakMap<object, HTMLElement>();
+const RANK_STATES = new WeakMap<HTMLElement, RankingWorkspaceState>();
+const RATING_MOUNTS = new WeakMap<HTMLElement, HTMLElement>();
 
 function createHost(
   plugin: ScoreDashboardPlugin,
@@ -146,10 +146,10 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     scale: SCORE_DASHBOARD_DEFAULT_SCALE,
     showUnrated: false,
   };
-  const rankState = RANK_STATES.get(plugin) ?? { mode: "rating", type: "anime", comparing: false };
-  const previous = RATING_MOUNTS.get(plugin);
+  const rankState = RANK_STATES.get(container) ?? { mode: "rating", type: "anime", comparing: false };
+  const previous = RATING_MOUNTS.get(container);
   if (previous) disposeScoreDashboardInteractions(previous);
-  RATING_MOUNTS.delete(plugin);
+  RATING_MOUNTS.delete(container);
   container.replaceChildren();
   container.classList.toggle("animelist-score-dashboard-view", rankState.mode === "rating");
 
@@ -165,7 +165,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     tab.addEventListener("click", () => {
       if (rankState.mode === mode) return;
       rankState.mode = mode;
-      RANK_STATES.set(plugin, rankState);
+      RANK_STATES.set(container, rankState);
       renderWorkspaceScoreDashboard(plugin, container);
     });
     tabs.appendChild(tab);
@@ -175,7 +175,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
   container.append(tabs, body);
 
   if (rankState.mode === "rating") {
-    RATING_MOUNTS.set(plugin, body);
+    RATING_MOUNTS.set(container, body);
     renderScoreDashboardWithBatchDrag(body, dashboardHost.collectMediaItems(), scoreState, {
       openFile: (path) => dashboardHost.openMediaFile(path),
       applyChanges: (changes) => dashboardHost.applyScoreChanges(changes),
@@ -198,12 +198,12 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     comparing: rankState.comparing,
     setComparing(value) {
       rankState.comparing = value;
-      RANK_STATES.set(plugin, rankState);
+      RANK_STATES.set(container, rankState);
     },
     setType(value) {
       rankState.type = value;
       rankState.comparing = false;
-      RANK_STATES.set(plugin, rankState);
+      RANK_STATES.set(container, rankState);
       redraw();
     },
     redraw,

@@ -36,8 +36,10 @@ export class PairwiseRankingStore {
   private original: string | null = null;
   private serial: Promise<void> = Promise.resolve();
 
-  constructor(private readonly app: App, pluginId = "animelist") {
-    this.path = normalizePath(app.vault.configDir + "/plugins/" + pluginId + "/ranking.json");
+  constructor(private readonly app: App) {
+    // Keep data outside the plugin installation directory: test-vault rebuilds and
+    // plugin reinstalls must not delete the user ranking.
+    this.path = normalizePath(app.vault.configDir + "/animelist-ranking.json");
   }
 
   async load(): Promise<RankingState> {

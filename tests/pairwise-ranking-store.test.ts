@@ -6,7 +6,7 @@ import { PairwiseRankingStore } from "../src/data/pairwise-ranking/store";
 class FakeAdapter {
   files = new Map<string, ArrayBuffer>();
   failure = false;
-  async exists(path: string): Promise<boolean> { return this.files.has(path) || path.endsWith("/plugins/animelist"); }
+  async exists(path: string): Promise<boolean> { return this.files.has(path) || path === ".obsidian"; }
   async mkdir(): Promise<void> { /* already configured */ }
   async readBinary(path: string): Promise<ArrayBuffer> {
     const value = this.files.get(path);
@@ -55,7 +55,7 @@ describe("ranking vault storage", () => {
   });
   it("does not replace corrupt ranking state with a blank file", async () => {
     const { app, adapter } = setup();
-    adapter.put(".obsidian/plugins/animelist/ranking.json", "{not-valid-json");
+    adapter.put(".obsidian/animelist-ranking.json", "{not-valid-json");
     await assert.rejects(new PairwiseRankingStore(app).load(), /JSON|Unexpected|Expected/);
     assert.equal(adapter.files.size, 1);
   });
