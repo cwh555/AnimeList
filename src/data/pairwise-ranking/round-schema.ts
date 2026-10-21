@@ -1,27 +1,92 @@
-/** Validate untrusted persisted round state before any ranking traversal. */
-export function assertStoredRankingRound(value: unknown, type: string): void {
-  if (value == null) return; // v1 before rounds, or no round active
+import type { RankingRound } from "../../domain/ranking-rounds";
+
+type RawRecord = Record<string, unknown>;
+function object(value: unknown): value is RawRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function paths(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/** Validate all fields traversed by the round algorithm before they are accessed. */
+export function assertStoredRankingRound(value: unknown, type: string): asserts value is RankingRound | null | undefined {
+  if (value == null) return; // old v1 files did not contain a round
   const corrupted = (field: string): never => {
-    throw new Error("Invalid saved ranking round (" + type + "." + field
-      + "). Original ranking file has not been changed.");
+    throw new Error("Invalid saved ranking round (" + type + "." + field + ").");
   };
-  if (!value || typeof value !== "object" || Array.isArray(value)) corrupted("round");
-  const round = value as Record<string, unknown>;
-  const isPaths = (input: unknown): input is string[] =>
-    Array.isArray(input) && input.every((path) => typeof path === "string");
-  if (round.kind !== "full" && round.kind !== "append" && round.kind !== "range") corrupted("kind");
+  if (!object(value)) corrupted("round");
+  if (value.kind !== "full" && value.kind !== "append" && value.kind !== "range") corrupted("kind");
   for (const name of ["stage", "total", "comparisons", "cursor", "rangeStart", "rangeLength"]) {
-    if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name])
-      || round[name] < 0) corrupted(name);
+    if (typeof value[name] !== "number" || !Number.isSafeInteger(value[name]) || value[name] < 0) corrupted(name);
   }
-  if (!isPaths(round.baseline)) corrupted("baseline");
-  if (!Array.isArray(round.results) || !round.results.every(isPaths)) corrupted("results");
-  const jobs = round.jobs;
-  if (!Array.isArray(jobs)) corrupted("jobs");
-  for (const item of jobs as unknown[]) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) corrupted("jobs.item");
-    const job = item as Record<string, unknown>;
-    if (!isPaths(job.left) || !isPaths(job.right) || !isPaths(job.winners)
-      || typeof job.done !== "boolean") corrupted("jobs.item");
+  if (!paths(value.baseline)) corrupted("baseline");
+  if (!Array.isArray(value.results) || !value.results.every(paths)) corrupted("results");
+  if (!Array.isArray(value.jobs)) corrupted("jobs");
+  for (const item of value.jobs as unknown[]) {
+    if (!object(item) || !paths(item.left) || !paths(item.right)
+      || !paths(item.winners) || typeof item.done !== "boolean") corrupted("jobs.item");
   }
+}
+
+export interface RecoveredRound {
+  round: RankingRound | null;
+  recovered: boolean;
+  /** True if an incomplete round could not be reconstructed exactly. */
+  needsRecompare: boolean;
+  /** Previously seen paths that must not disappear from the collection. */
+  pendingPaths: string[];
+}
+
+/**
+ * The results array is redundant: finished merge jobs also retain their winners.
+ * Recover from a null results field without losing the comparison queue.
+ * For unrecoverable structural damage, quarantine only that category's round and
+ * retain identifiable participants as undecided, never assigning invented ranks.
+ */
+export function recoverStoredRankingRound(value: unknown, type: string): RecoveredRound {
+  if (value == null) return { round: null, recovered: false, needsRecompare: false, pendingPaths: [] };
+  try {
+    assertStoredRankingRound(value, type);
+    return { round: value as RankingRound, recovered: false, needsRecompare: false, pendingPaths: [] };
+  } catch {
+    // Continue to a reconstructive recovery, not a generic "invalid data" error.
+  }
+  if (object(value) && (value.results === null || value.results === undefined)
+    && Array.isArray(value.jobs) && value.jobs.every((job) =>
+      object(job) && paths(job.left) && paths(job.right)
+      && paths(job.winners) && typeof job.done === "boolean")) {
+    const restored: RawRecord = { ...value,
+      results: value.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
+    };
+    try {
+      assertStoredRankingRound(restored, type);
+      return {
+        round: restored as unknown as RankingRound,
+        recovered: true, needsRecompare: false, pendingPaths: [],
+      };
+    } catch {
+      // A different field is damaged too; isolate this round below.
+    }
+  }
+
+  const participants = new Set<string>();
+  const add = (input: unknown): void => {
+    if (paths(input)) for (const path of input) participants.add(path);
+  };
+  if (object(value)) {
+    add(value.baseline);
+    if (Array.isArray(value.results)) for (const result of value.results) add(result);
+    if (Array.isArray(value.jobs)) {
+      for (const job of value.jobs) {
+        if (!object(job)) continue;
+        add(job.left);
+        add(job.right);
+        add(job.winners);
+      }
+    }
+  }
+  return {
+    round: null, recovered: true, needsRecompare: true,
+    pendingPaths: [...participants],
+  };
 }
