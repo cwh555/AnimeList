@@ -3,7 +3,7 @@ import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, decideRanking, moveRankedItem, nextRankingPair,
   prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
-  reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem,
+  reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem, resumePendingRanking,
   type RankingCollection, type RankingChoice, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -362,10 +362,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const info = makeEl("span", "al-ranking-pending-bounds", possible);
       const retry = button(t("retry"), () => {
         void mutate((draft) => {
-          if (draft.active) draft.pending[draft.active.path] = draft.active;
-          draft.active = { path, comparisons: Object.fromEntries(Object.entries(draft.pending[path].comparisons)
-            .filter(([, choice]) => choice !== "skip")) };
-          delete draft.pending[path];
+          resumePendingRanking(draft, eligible, path);
           options.setComparing(Boolean(nextRankingPair(draft)));
         });
       }, "refresh-cw");

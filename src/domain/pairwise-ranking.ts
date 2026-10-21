@@ -171,6 +171,23 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
   }
 }
 
+export function resumePendingRanking(
+  list: RankingCollection, eligible: readonly MediaItem[], path: string,
+): boolean {
+  const pending = list.pending[path];
+  if (!pending) return false;
+  if (list.active) list.pending[list.active.path] = list.active;
+  list.active = { path, comparisons: Object.fromEntries(Object.entries(pending.comparisons)
+    .filter(([, choice]) => choice !== "skip")) };
+  delete list.pending[path];
+  settleActive(list);
+  if (!list.active) {
+    pickNext(list, eligible, "new");
+    settleActive(list);
+  }
+  return true;
+}
+
 export function decideRanking(
   list: RankingCollection,
   eligible: readonly MediaItem[],
@@ -204,9 +221,10 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   checkpoint(list);
   list.ordered.splice(oldIndex, 1);
   list.ordered.splice(newIndex, 0, path);
-  // Explicit manual order is authoritative; invalidate comparisons inferred from the old chain.
-  for (const candidate of Object.values(list.pending)) candidate.comparisons = {};
-  if (list.active) list.active.comparisons = {};
+  // Every unaffected ranked pair keeps its relative order. Only comparisons to
+  // the moved work can contradict the latest explicit manual order.
+  for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
+  if (list.active) delete list.active.comparisons[path];
   list.history = [];
   return true;
 }

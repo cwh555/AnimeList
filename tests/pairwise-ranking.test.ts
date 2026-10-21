@@ -4,7 +4,7 @@ import type { MediaItem, MediaType } from "../src/domain/media-types";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, emptyRankingState,
   moveRankedItem, nextRankingPair, placePendingItem, prepareRanking,
-  rankingBounds, rankingCounts, recompareRankedItem, renameRankingPath,
+  rankingBounds, rankingCounts, recompareRankedItem, renameRankingPath, resumePendingRanking,
   undoRanking, reconcileRanking,
 } from "../src/domain/pairwise-ranking";
 
@@ -82,6 +82,18 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.deepEqual(list.ordered, [a.filePath, b.filePath, c.filePath]);
   });
 
+  it("resolves a pending entry as soon as its saved strict bounds become unique", () => {
+    const a = media("A"), b = media("B"), x = media("X");
+    const list = emptyRankingCollection();
+    list.ordered = [a.filePath, b.filePath];
+    list.pending[x.filePath] = { path: x.filePath, comparisons: {
+      [a.filePath]: "worse", [b.filePath]: "better",
+    } };
+    assert.equal(resumePendingRanking(list, [a, b, x], x.filePath), true);
+    assert.deepEqual(list.ordered, [a.filePath, x.filePath, b.filePath]);
+    assert.equal(list.active, null);
+  });
+
   it("uses transitively inferred insertion bounds without asking every reference", () => {
     const a = media("A"), b = media("B"), c = media("C"), x = media("X");
     const list = emptyRankingCollection();
@@ -112,7 +124,7 @@ describe("pairwise ranking: strict ordered list", () => {
     list.pending.E = { path: "E", comparisons: { B: "worse", D: "skip" } };
     assert.equal(moveRankedItem(list, "D", 2), true);
     assert.deepEqual(list.ordered, ["A", "D", "B", "C"]);
-    assert.deepEqual(list.pending.E.comparisons, {});
+    assert.deepEqual(list.pending.E.comparisons, { B: "worse" });
     assert.equal(moveRankedItem(list, "unknown", 1), false);
   });
 
