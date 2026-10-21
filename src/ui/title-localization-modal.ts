@@ -126,7 +126,8 @@ export class TitleLocalizationModal extends AnimeListModal {
       if (proposal?.source?.provider === "bangumi") {
         const source = proposal.source;
         const href = "https://bgm.tv/subject/" + source.id;
-        const link = entry.createEl("a", { text: source.provider + " #" + source.id, href });
+        const link = entry.createEl("a", { text: source.provider + " #" + source.id });
+        link.href = href;
         link.setAttribute("rel", "noopener noreferrer");
         link.setAttribute("target", "_blank");
       }
