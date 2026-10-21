@@ -117,6 +117,105 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.deepEqual(list.ordered, [a.filePath, b.filePath, c.filePath]);
   });
 
+  it("handles three already-pending manga in a single uninterrupted review", () => {
+    const items = Array.from({ length: 6 }, (_, index) => media("M" + index, "manga"));
+    const list = emptyRankingCollection();
+    list.ordered = items.slice(0, 3).map((item) => item.filePath);
+    for (const item of items.slice(3)) {
+      list.pending[item.filePath] = { path: item.filePath, comparisons: {} };
+    }
+    // This corresponds to the real UI's "ranked 3, pending 3" state.
+    prepareRanking(list, items, "pending");
+    assert.deepEqual(list.pendingQueue, [items[4].filePath, items[5].filePath]);
+    let comparisons = 0;
+    const visited = new Set<string>();
+    while (nextRankingPair(list)) {
+      const pair = nextRankingPair(list)!;
+      visited.add(pair.candidate);
+      assert.ok(decideRanking(list, items, "better"));
+      if (++comparisons > 50) throw new Error("Pending queue failed to finish");
+      if (visited.size < 3) assert.ok(nextRankingPair(list), "the next work must appear without another Start click");
+    }
+    assert.deepEqual([...visited], items.slice(3).map((item) => item.filePath));
+    assert.equal(list.ordered.length, 6);
+    assert.deepEqual(list.pending, {});
+    assert.equal(list.pendingQueue, null);
+    assert.equal(list.active, null);
+    assert.ok(comparisons >= 3);
+  });
+
+  it("skipped pending works are reviewed once per session, with no infinite repeat", () => {
+    const items = Array.from({ length: 5 }, (_, index) => media("M" + index, "manga"));
+    const list = emptyRankingCollection();
+    list.ordered = items.slice(0, 2).map((item) => item.filePath);
+    for (const item of items.slice(2)) {
+      list.pending[item.filePath] = { path: item.filePath, comparisons: {} };
+    }
+    prepareRanking(list, items, "pending");
+    const visited = new Set<string>();
+    let count = 0;
+    while (nextRankingPair(list)) {
+      const pair = nextRankingPair(list)!;
+      visited.add(pair.candidate);
+      assert.ok(decideRanking(list, items, "skip"));
+      if (++count > 20) throw new Error("A skipped work was requeued indefinitely");
+    }
+    assert.deepEqual([...visited], items.slice(2).map((item) => item.filePath));
+    assert.equal(list.ordered.length, 2);
+    assert.equal(Object.keys(list.pending).length, 3);
+    assert.equal(list.pendingQueue, null);
+    // Only a new explicit user action should retry unresolved comparisons.
+    prepareRanking(list, items, "pending");
+    assert.ok(nextRankingPair(list));
+  });
+
+  it("persists review progress, resumes after pause and restores queue on Undo", () => {
+    const items = Array.from({ length: 5 }, (_, index) => media("M" + index, "manga"));
+    const original = emptyRankingCollection();
+    original.ordered = items.slice(0, 2).map((item) => item.filePath);
+    for (const item of items.slice(2)) original.pending[item.filePath] = {
+      path: item.filePath, comparisons: {},
+    };
+    prepareRanking(original, items, "pending");
+    assert.equal(original.active?.path, items[2].filePath);
+    decideRanking(original, items, "better");
+    // Serialized persisted state is the state the modal will load after closing.
+    const restored = JSON.parse(JSON.stringify(original)) as typeof original;
+    const savedPair = nextRankingPair(restored);
+    prepareRanking(restored, items, "pending");
+    assert.deepEqual(nextRankingPair(restored), savedPair);
+    const before = JSON.parse(JSON.stringify(restored)) as typeof restored;
+    decideRanking(restored, items, "worse");
+    assert.equal(undoRanking(restored), true);
+    assert.deepEqual(restored.pendingQueue, before.pendingQueue);
+    assert.deepEqual(nextRankingPair(restored), nextRankingPair(before));
+    let count = 0;
+    while (nextRankingPair(restored)) {
+      decideRanking(restored, items, "better");
+      if (++count > 30) throw new Error("Resumed queue did not complete");
+    }
+    assert.equal(restored.ordered.length, 5);
+    assert.equal(restored.pendingQueue, null);
+  });
+
+  it("keeps review queue consistent when queued notes are renamed or removed", () => {
+    const items = Array.from({ length: 5 }, (_, index) => media("M" + index, "manga"));
+    const state = emptyRankingState();
+    const list = state.manga;
+    list.ordered = items.slice(0, 2).map((item) => item.filePath);
+    for (const item of items.slice(2)) list.pending[item.filePath] = {
+      path: item.filePath, comparisons: {},
+    };
+    prepareRanking(list, items, "pending");
+    const renameFrom = items[3].filePath;
+    const renamed = "manga/Renamed.md";
+    assert.equal(renameRankingPath(state, renameFrom, renamed), true);
+    assert.ok(list.pendingQueue?.includes(renamed));
+    assert.equal(removeRankingPath(state, items[4].filePath), true);
+    assert.equal(list.pendingQueue?.includes(items[4].filePath), false);
+    assert.equal(list.pending[renamed]?.path, renamed);
+  });
+
   it("resolves a pending entry as soon as its saved strict bounds become unique", () => {
     const a = media("A"), b = media("B"), x = media("X");
     const list = emptyRankingCollection();
