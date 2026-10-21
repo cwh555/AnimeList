@@ -6,6 +6,7 @@ import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { prepareTestFixtures, TEST_CHECKLIST_PATH } from "./test-vault-fixtures.mjs";
 import { applyReleaseTrackingTestFixtureMetadata } from "./release-tracking-test-fixtures.mjs";
+import { prepareRankingTestFixtures } from "./ranking-test-vault-fixtures.mjs";
 
 const RELEASE_FILES = ["main.js", "manifest.json", "styles.css"];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -160,6 +161,8 @@ enablePlugin();
 createDefaultAppConfig();
 const fixtures = await prepareTestFixtures(vaultRoot, { reset: false });
 applyReleaseTrackingTestFixtureMetadata(fixtures);
+const rankingFixtures = prepareRankingTestFixtures(vaultRoot);
+console.log("Ranking test fixtures: created=" + rankingFixtures.created + ", checklist=" + rankingFixtures.checklist);
 
 if (mode === "production") {
   copyReleaseFiles();

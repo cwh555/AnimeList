@@ -302,6 +302,22 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Out-of-range batch moves require confirmation and clamp to 0–10.
 - [ ] Opening the dashboard does not eagerly generate thumbnails for every library poster.
 
+## Ranking (Scores → Ranking)
+
+- [ ] Only completed Anime / Manga / Novel notes participate; each original media note is ranked independently.
+- [ ] Clicking a cover selects the preferred work; Skip does not silently create a tie or a definite position.
+- [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
+- [ ] New entries are inserted without reshuffling the existing ranked order.
+- [ ] Recompare, last-comparison undo, and complete reset behave correctly and do not modify numeric scores.
+- [ ] The ranked List shows covers, titles and ranks, with explicit drag handles and move-to-rank fallback.
+- [ ] Manual movement takes precedence over earlier comparison evidence.
+- [ ] Closing/restarting Obsidian preserves an active comparison and saved ranking.
+- [ ] Rebuilding test vault / updating plugin files preserves .obsidian/animelist-ranking.json.
+- [ ] Rename and completion-status changes do not leave ghost ranks.
+- [ ] Verify language labels in Traditional Chinese, English, Japanese and Korean.
+- [ ] Confirm the old Scores dashboard still behaves identically after switching modes.
+- [ ] Test touch scrolling, handle dragging and 320px mobile layout, plus desktop/keyboard interactions.
+
 ## Mobile / narrow layouts
 
 - [ ] On iOS/Android, swipe horizontally from the **center** of Library, Timeline, Score Dashboard, and Images. AnimeList controls respond normally without opening an Obsidian sidebar.
