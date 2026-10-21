@@ -3,6 +3,9 @@ import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres, normalize
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
+import { getActiveLocale } from "../i18n/catalog";
+import { normalizeSupportedLocale } from "../i18n/locale";
+import { resolveMediaTitle } from "../domain/media-title-localization";
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -143,7 +146,13 @@ function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string
 export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): ExternalMediaResult {
   const subject = record(value);
   const originalTitle = stringValue(subject.name).trim();
-  const localTitle = stringValue(subject.name_cn, originalTitle || uiText("media.untitled")).trim();
+  const simplifiedTitle = stringValue(subject.name_cn).trim();
+  const traditionalTitle = bangumiInfoboxValues(subject.infobox, ["繁體中文名", "繁体中文名"])[0] ?? "";
+  const localTitle = resolveMediaTitle({
+    fallback: simplifiedTitle || originalTitle || uiText("media.untitled"),
+    original: originalTitle,
+    localized: { "zh-CN": simplifiedTitle, "zh-TW": traditionalTitle, ja: originalTitle },
+  }, normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW");
   const images = record(subject.images);
   const people = mediaType === "anime"
     ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, BANGUMI_ANIMATION_STUDIO_FIELDS))
@@ -185,6 +194,8 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     searchTitles: [...new Set([
       localTitle,
       originalTitle,
+      simplifiedTitle,
+      traditionalTitle,
       ...bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
     ].map((title) => title.trim()).filter(Boolean))],
     sources: subjectId ? [{ provider: "bangumi", sourceId: subjectId, sourceUrl: `https://bgm.tv/subject/${subjectId}` }] : [],
@@ -194,8 +205,15 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
 export function normalizeAniListMedia(value: unknown, mediaType: MediaType): ExternalMediaResult {
   const media = record(value);
   const title = record(media.title);
-  const localTitle = stringValue(title.english, stringValue(title.romaji, stringValue(title.native, uiText("media.untitled")))).trim();
-  const originalTitle = stringValue(title.native, stringValue(title.romaji)).trim();
+  const englishTitle = stringValue(title.english).trim();
+  const romajiTitle = stringValue(title.romaji).trim();
+  const originalTitle = stringValue(title.native, romajiTitle).trim();
+  const localTitle = resolveMediaTitle({
+    fallback: englishTitle || romajiTitle || originalTitle || uiText("media.untitled"),
+    original: originalTitle,
+    romaji: romajiTitle,
+    localized: { en: englishTitle, ja: originalTitle },
+  }, normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW");
   const staff = asArray(record(media.staff).edges)
     .map((rawEdge) => record(rawEdge))
     .filter((edge) => /creator|story|art|author|original/i.test(stringValue(edge.role)))
