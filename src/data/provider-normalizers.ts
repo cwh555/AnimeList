@@ -178,6 +178,16 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     title: localTitle,
     originalTitle,
     romajiTitle: "",
+    titleVariants: {
+      fallback: localTitle,
+      original: originalTitle,
+      localized: {
+        ...(simplifiedTitle ? { "zh-CN": simplifiedTitle } : {}),
+        ...(traditionalTitle ? { "zh-TW": traditionalTitle } : {}),
+        ...(bangumiInfoboxValues(subject.infobox, ["日文名", "日本語名"])[0]
+          ? { ja: bangumiInfoboxValues(subject.infobox, ["日文名", "日本語名"])[0] } : {}),
+      },
+    },
     format,
     year: yearValue(date.slice(0, 4)),
     startDate: dateParts(date),
@@ -245,6 +255,16 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     title: localTitle,
     originalTitle,
     romajiTitle: stringValue(title.romaji),
+    titleVariants: {
+      fallback: localTitle,
+      original: originalTitle,
+      romaji: romajiTitle,
+      localized: {
+        ...(englishTitle ? { en: englishTitle } : {}),
+        ...(stringValue(media.countryOfOrigin).toUpperCase() === "JP" && originalTitle ? { ja: originalTitle } : {}),
+        ...(stringValue(media.countryOfOrigin).toUpperCase() === "KR" && originalTitle ? { ko: originalTitle } : {}),
+      },
+    },
     format: mapFormat(media.format, mediaType),
     year: yearValue(record(media.startDate).year),
     startDate: dateParts(media.startDate),

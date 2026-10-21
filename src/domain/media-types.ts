@@ -1,5 +1,6 @@
 import type { MediaStatus } from "./media-status";
 import type { MediaType } from "./media-primitives";
+import type { MediaTitleVariants } from "./media-title-localization";
 import type { MediaClassification } from "./media-classification";
 
 export type { MediaType } from "./media-primitives";
@@ -105,6 +106,7 @@ export interface ExternalMediaResult {
   externalScore: number | null;
   releaseStatus: ReleaseStatus;
   searchTitles?: string[];
+  titleVariants?: MediaTitleVariants;
   sources?: ExternalMediaSourceRef[];
   classification?: MediaClassification;
 }

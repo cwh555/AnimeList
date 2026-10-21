@@ -24,3 +24,21 @@ export function resolveMediaTitle(variants: MediaTitleVariants, locale: Supporte
   };
   return candidates[locale].map((value) => value?.trim()).find((value) => Boolean(value)) ?? "";
 }
+
+/** Strict migration lookup: never fall back to a different language. */
+export function verifiedMediaTitle(variants: MediaTitleVariants | undefined, locale: SupportedLocale): string | null {
+  const value = variants?.localized?.[locale]?.trim();
+  return value || null;
+}
+
+export function mergeOfficialTitles(
+  existing: Partial<Record<SupportedLocale, string>> | undefined,
+  incoming: Partial<Record<SupportedLocale, string>> | undefined,
+): Partial<Record<SupportedLocale, string>> {
+  const result: Partial<Record<SupportedLocale, string>> = {};
+  for (const locale of ["zh-TW", "zh-CN", "en", "ja", "ko"] as const) {
+    const value = incoming?.[locale]?.trim() || existing?.[locale]?.trim();
+    if (value) result[locale] = value;
+  }
+  return result;
+}

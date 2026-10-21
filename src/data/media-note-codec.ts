@@ -268,6 +268,13 @@ export function buildMediaMarkdown(
   if (result.romajiTitle && result.romajiTitle !== result.originalTitle) {
     lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   }
+  const localizedTitles = result.titleVariants?.localized ?? {};
+  const localeEntries = (["zh-TW", "zh-CN", "en", "ja", "ko"] as const)
+    .flatMap((locale) => localizedTitles[locale]?.trim() ? [[locale, localizedTitles[locale].trim()] as const] : []);
+  if (localeEntries.length) {
+    lines.push("title_localizations:");
+    for (const [locale, value] of localeEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
+  }
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(format)}`);
   lines.push(`status: ${yamlScalar(status)}`);
