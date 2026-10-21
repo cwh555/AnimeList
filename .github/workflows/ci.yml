@@ -32,6 +32,8 @@ jobs:
         run: TZ=Asia/Taipei npm test
       - name: Run segmented-date keyboard flow in Chromium
         run: npm run test:browser:date
+      - name: Validate English-only title migration dialog in desktop and mobile Chromium
+        run: npm run test:browser:title-localization
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
       - name: Run media cover replacement picker in Chromium
