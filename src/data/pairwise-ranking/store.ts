@@ -84,8 +84,10 @@ export class PairwiseRankingStore {
   }
 
   /** External edits are never silently overwritten; a reload is required. */
-  async rename(from: string, to: string): Promise<void> {
+  async rename(from: string, to: string): Promise<boolean> {
     const { renameRankingPath } = await import("../../domain/pairwise-ranking");
-    await this.mutate((state) => { renameRankingPath(state, from, to); });
+    let changed = false;
+    await this.mutate((state) => { changed = renameRankingPath(state, from, to); });
+    return changed;
   }
 }

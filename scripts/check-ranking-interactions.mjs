@@ -69,6 +69,7 @@ try {
     'grip.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true,cancelable:true}));await delay();',
     'checks.keyboardMove=data.anime.ordered[1]==="anime/A.md" && data.anime.ordered[0]==="anime/B.md";',
     'checks.noScoreMutation=items.every(x=>x.score===undefined);',
+    'checks.touchHandleOnly=getComputedStyle(root.querySelector(".al-ranking-handle")).touchAction==="none" && getComputedStyle(root.querySelector(".al-ranking-open")).touchAction!=="none";',
     'checks.noOverflow=document.documentElement.scrollWidth<=innerWidth+1 && root.scrollWidth<=innerWidth+1;',
     'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail";});',

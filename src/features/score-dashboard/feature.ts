@@ -93,7 +93,9 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   RANK_STORES.set(plugin, rankingStore);
   plugin.registerEvent(plugin.app.vault.on("rename", (file, oldPath) => {
     if (!(file instanceof TFile) || typeof oldPath !== "string") return;
-    void rankingStore.rename(oldPath, file.path).then(() => plugin.refreshViews()).catch((error: unknown) => {
+    void rankingStore.rename(oldPath, file.path).then((changed) => {
+      if (changed) plugin.refreshViews();
+    }).catch((error: unknown) => {
       dashboardHost.showNotice(rankingText("failed", {
         reason: errorMessage(error),
       }));
