@@ -171,8 +171,8 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       store: options.store,
       type: options.type,
       eligible,
-      onClose: options.redraw,
-      onError: options.showNotice,
+      onClose: () => options.redraw(),
+      onError: (message) => options.showNotice(message),
     }).open();
   };
   const mutate = async (edit: (list: RankingCollection) => void, compareAfter = false): Promise<void> => {
@@ -259,6 +259,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     row.dataset.title = item.title.toLocaleLowerCase();
     row.append(makeEl("span", "al-ranking-position", String(index + 1)));
     const content = button("", () => { void options.openNote(path); }, undefined, "al-ranking-open");
+    content.title = item.title;
     content.append(rankingCover(item, "al-ranking-row-cover"), makeEl("span", "al-ranking-row-title", item.title));
     row.appendChild(content);
     const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
@@ -308,7 +309,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
 
   if (counts.pending) {
     const pendingSection = makeEl("section", "al-ranking-pending");
-    pendingSection.append(makeEl("h3", "", t("pendingTitle")), makeEl("p", "", t("pendingHint")));
+    pendingSection.append(makeEl("h3", "", t("pendingTitle")));
     for (const [path, attempt] of Object.entries(list.pending)) {
       const item = byPath.get(path);
       if (!item) continue;

@@ -1,6 +1,6 @@
 import { setIcon, type App } from "obsidian";
 import { AnimeListModal } from "../animelist-modal";
-import { makeEl } from "../ui-helpers";
+import { makeEl, errorMessage } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
@@ -63,7 +63,7 @@ export class RankingComparisonModal extends AnimeListModal {
   }
 
   private fail(error: unknown): void {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = errorMessage(error);
     this.options.onError(t("failed", { reason }));
     if (!this.closed) this.close();
   }
