@@ -13,6 +13,7 @@ export const TEST_FEATURES = [
   "moments",
   "progress",
   "rating",
+  "ranking",
   "release",
   "release-tracking",
   "score-dashboard",
@@ -73,6 +74,8 @@ export const TEST_TARGETS = [
   { path: "tests/score-dashboard-selection.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
   { path: "tests/score-dashboard-drag-scroll.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
   { path: "tests/score-dashboard-cover-sources.test.ts", kind: "test", suite: "unit", features: ["score-dashboard", "covers"] },
+  { path: "tests/pairwise-ranking.test.ts", kind: "test", suite: "unit", features: ["ranking"] },
+  { path: "tests/pairwise-ranking-store.test.ts", kind: "test", suite: "integration", features: ["ranking", "markdown"] },
 
   { path: "tests/duplicate-detection.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/library-change-scope.test.ts", kind: "test", suite: "unit", features: ["library"] },
