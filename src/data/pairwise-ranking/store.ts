@@ -25,7 +25,7 @@ function validateRankData(input: unknown): LoadedRanking {
       recovered.push(type);
       collection.round = recovery.round;
       if (recovery.needsRecompare) needsRecompare.push(type);
-      const ordered = new Set(collection.ordered as string[]);
+      const ordered = new Set(collection.ordered);
       const pending = collection.pending as Record<string, unknown>;
       for (const path of recovery.pendingPaths) {
         if (!ordered.has(path) && !Object.hasOwn(pending, path) && path !== (collection.active as { path?: string } | null)?.path) {

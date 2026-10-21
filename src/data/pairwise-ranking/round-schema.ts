@@ -47,7 +47,7 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
   if (value == null) return { round: null, recovered: false, needsRecompare: false, pendingPaths: [] };
   try {
     assertStoredRankingRound(value, type);
-    return { round: value as RankingRound, recovered: false, needsRecompare: false, pendingPaths: [] };
+    return { round: value, recovered: false, needsRecompare: false, pendingPaths: [] };
   } catch {
     // Continue to a reconstructive recovery, not a generic "invalid data" error.
   }
