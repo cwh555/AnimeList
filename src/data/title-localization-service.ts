@@ -182,7 +182,7 @@ export async function planStoredTitleUpdates(
       candidate = await fetchCached(type, source);
       if (!candidate) return row(file.path, old, "no-translation", "The provider returned no work for the saved ID.");
       if (candidate.sourceId !== source.id || candidate.provider !== source.provider || candidate.mediaType !== type) {
-        throw new Error("Provider returned a different work ID or type.");
+        throw new Error("Provider returned unexpected media identity (work ID or type).");
       }
       target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
     }
