@@ -156,7 +156,7 @@ export async function planStoredTitleUpdates(
   function fetchCached(type: MediaType, source: TitleSource): Promise<ExternalMediaResult | null> {
     const key = type + ":" + source.provider + ":" + source.id;
     let pending = metadataCache.get(key);
-    if (!pending) {
+    if (pending === undefined) {
       pending = apiCall(() => fetch(type, source));
       metadataCache.set(key, pending);
     }
@@ -164,11 +164,11 @@ export async function planStoredTitleUpdates(
   }
   const files = getScopedMarkdownFiles(app, roots).filter(f =>
     mediaTypeOf(app.metadataCache.getFileCache(f)?.frontmatter?.media_type) !== null);
-  const rows: TitleScanRow[] = new Array(files.length);
+  const rows: TitleScanRow[] = [];
   let next = 0;
   let completed = 0;
   async function evaluate(file: TFile): Promise<TitleScanRow> {
-    const fm = app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined;
+    const fm = app.metadataCache.getFileCache(file)?.frontmatter;
     const type = mediaTypeOf(fm?.media_type);
     const old = field(fm?.title);
     if (!fm || !type || !old) return row(file.path, old || file.basename, "no-source", "Media title or type is missing.");
