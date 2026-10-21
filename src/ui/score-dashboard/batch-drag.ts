@@ -37,6 +37,7 @@ export function renderScoreDashboardWithBatchDrag(
   items: readonly MediaItem[],
   initialState: ScoreDashboardUiState,
   adapters: ScoreDashboardUiAdapters,
+  persistentChrome?: HTMLElement,
 ): void {
   controllers.get(container)?.abort();
   let currentState = { ...initialState };
@@ -58,6 +59,8 @@ export function renderScoreDashboardWithBatchDrag(
       },
     });
 
+    // Internal score-board rerenders must not erase the shared rating/ranking switch.
+    if (persistentChrome) container.prepend(persistentChrome);
     const controller = new AbortController();
     controllers.set(container, controller);
     const options = { signal: controller.signal };
@@ -268,4 +271,9 @@ export function renderScoreDashboardWithBatchDrag(
   };
 
   render(container.scrollTop);
+}
+
+export function disposeScoreDashboardInteractions(container: HTMLElement): void {
+  controllers.get(container)?.abort();
+  controllers.delete(container);
 }

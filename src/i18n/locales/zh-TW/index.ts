@@ -1,3 +1,4 @@
+import { RANKING_MESSAGES } from "./ranking";
 import { CORE_MESSAGES } from "./core";
 import { LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { MASTERPIECE_MESSAGES } from "./masterpiece";
@@ -45,6 +46,7 @@ export const ZH_TW_CATALOGS = {
   "progress-unit": PROGRESS_UNIT_MESSAGES,
   masterpiece: MASTERPIECE_MESSAGES,
   "score-dashboard": SCORE_DASHBOARD_MESSAGES,
+  ranking: RANKING_MESSAGES,
   "legacy-metadata": LEGACY_METADATA_MESSAGES,
   "user-tag": USER_TAG_MESSAGES,
   "image-section": IMAGE_SECTION_MESSAGES,

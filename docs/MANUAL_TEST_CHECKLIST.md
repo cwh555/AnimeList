@@ -302,6 +302,29 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Out-of-range batch moves require confirmation and clamp to 0–10.
 - [ ] Opening the dashboard does not eagerly generate thumbnails for every library poster.
 
+## Ranking (Scores → Ranking)
+
+- [ ] Only completed Anime / Manga / Novel notes participate; each original media note is ranked independently.
+- [ ] Opening a comparison launches an Obsidian modal; clicking a cover selects the preferred work, Skip never creates a tie.
+- [ ] The modal closes on Pause / Escape, then Continue restores the pending comparison without losing answers.
+- [ ] Long Chinese/Japanese/English titles fit within two lines inside modal cards at 320px/390px/desktop widths.
+- [ ] The main ranking page remains visible behind the modal; modal controls and native Obsidian close behavior work.
+- [ ] Ranking page has no work-search field; all completed ranked works remain visible after edits and category switching.
+- [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
+- [ ] New entries are inserted without reshuffling the existing ranked order.
+- [ ] Tournament-like merge rounds interleave comparisons; full rankings remain strict and skip never fabricates placement.
+- [ ] Manual rank changes only use the drag handle; comparison modal has Skip and Pause but no Undo. Confirmed complete reset works, numeric scores stay unchanged.
+- [ ] Each ranked work has one full-width compact row at every viewport (320, 390, 768, 1200px), with rank, cover, left-aligned two-line title and one trailing drag handle. No oversized gray inner card.
+- [ ] While dragging, a pointer-following visual clone and source placeholder stay visible, with a clear drop highlight.
+- [ ] No redundant move-to-rank, range-rerank, or per-item more buttons remain; drag handle ArrowUp/ArrowDown provides keyboard sorting.
+- [ ] Manual movement takes precedence over earlier comparison evidence.
+- [ ] Closing/restarting Obsidian preserves an active comparison and saved ranking.
+- [ ] Rebuilding test vault / updating plugin files preserves .obsidian/animelist-ranking.json.
+- [ ] Rename and completion-status changes do not leave ghost ranks.
+- [ ] Verify language labels in Traditional Chinese, English, Japanese and Korean.
+- [ ] Confirm the old Scores dashboard still behaves identically after switching modes.
+- [ ] Test touch scrolling, handle dragging and 320px mobile layout, plus desktop/keyboard interactions.
+
 ## Mobile / narrow layouts
 
 - [ ] On iOS/Android, swipe horizontally from the **center** of Library, Timeline, Score Dashboard, and Images. AnimeList controls respond normally without opening an Obsidian sidebar.

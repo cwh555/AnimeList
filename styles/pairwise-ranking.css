@@ -1,0 +1,190 @@
+.al-ranking-mode-tabs {
+  display: flex; gap: 4px; margin: 0 0 14px; padding: 4px;
+  border: 1px solid var(--background-modifier-border); border-radius: 11px;
+  background: var(--background-secondary);
+}
+.al-ranking-mode-tabs button {
+  flex: 1; min-width: 0; min-height: 36px; padding: 6px 12px;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--text-muted); font-weight: 600; box-shadow: none;
+}
+.al-ranking-mode-tabs button.is-active {
+  background: var(--interactive-accent); color: var(--text-on-accent);
+}
+.animelist-ranking-view { padding: 0 24px 48px; }
+.al-ranking-panel { width: 100%; min-width: 0; max-width: none; margin: 0; padding: 6px 0 36px; }
+.al-ranking-header { display: grid; gap: 10px; margin-bottom: 12px; }
+.al-ranking-type-tabs {
+  display: flex; width: fit-content; max-width: 100%; gap: 4px;
+  padding: 4px; border: 1px solid var(--background-modifier-border);
+  border-radius: 11px; background: var(--background-secondary);
+}
+.al-ranking-type-tabs button {
+  min-width: 0; min-height: 34px; padding: 0 12px; border: 0;
+  border-radius: 8px; color: var(--text-muted); background: transparent;
+  box-shadow: none; font-size: var(--font-ui-small);
+}
+.al-ranking-type-tabs button.is-active {
+  background: var(--interactive-accent); color: var(--text-on-accent);
+}
+.al-ranking-stats { display: flex; flex-wrap: wrap; gap: 12px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-stats .has-pending { color: var(--text-warning); }
+.al-ranking-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.al-ranking-actions button, .al-ranking-pending-row button {
+  display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+  min-height: 36px; padding: 6px 12px; font-size: var(--font-ui-small);
+}
+.al-ranking-warning { margin: 8px 0; color: var(--text-warning); font-size: var(--font-ui-small); }
+.al-ranking-list {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: 0; min-width: 0; margin: 0; padding: 0; list-style: none;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.al-ranking-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0;
+  min-height: 86px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0; background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.al-ranking-row:hover { background: var(--background-modifier-hover); }
+.al-ranking-row[hidden] { display: none; }
+.al-ranking-position {
+  flex: 0 0 42px; text-align: center; font-size: var(--font-ui-medium);
+  font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.al-ranking-row:nth-child(-n + 3) .al-ranking-position { color: var(--text-accent); }
+.al-ranking-row > .al-ranking-open {
+  display: flex; align-items: center; justify-content: flex-start;
+  gap: 14px; flex: 1 1 auto; min-width: 0; width: 0; height: auto;
+  padding: 0; margin: 0; background: transparent; border: 0; box-shadow: none;
+  text-align: left; color: var(--text-normal); overflow: hidden;
+}
+.al-ranking-row > .al-ranking-open:hover,
+.al-ranking-row > .al-ranking-open:active {
+  background: transparent; border: 0; box-shadow: none; color: var(--text-accent);
+}
+.al-ranking-open:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.al-ranking-row-cover {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 46px; width: 46px; height: 68px; overflow: hidden;
+  border-radius: 5px; background: var(--background-secondary);
+}
+.al-ranking-row-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.al-ranking-row-title, .al-ranking-pending-label strong {
+  display: -webkit-box; min-width: 0; overflow: hidden;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere; word-break: break-word;
+  line-height: 1.45; max-height: 2.9em; font-size: var(--font-ui-medium);
+  font-weight: 550;
+}
+.al-ranking-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0;
+  border: 0; border-radius: var(--radius-s);
+  background: transparent; box-shadow: none; color: var(--text-muted);
+}
+.al-ranking-handle:hover, .al-ranking-handle:focus-visible {
+  background: var(--background-modifier-hover); color: var(--text-normal);
+}
+.al-ranking-handle { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.al-ranking-handle:active { cursor: grabbing; }
+.al-ranking-handle:disabled { opacity: .35; cursor: default; }
+.al-ranking-row.is-rank-moving {
+  opacity: .35; background: var(--background-secondary);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.al-ranking-row.is-rank-target {
+  box-shadow: inset 0 -3px 0 var(--interactive-accent);
+}
+.al-ranking-drag-preview {
+  position: fixed; top: 0; left: 0; z-index: 10000; pointer-events: none;
+  margin: 0; opacity: .97;
+  border: 1px solid var(--interactive-accent); border-radius: 8px;
+  background: var(--background-primary);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .35);
+  will-change: transform;
+}
+.al-ranking-reset { margin-left: auto; }
+.al-ranking-dialog-progress {
+  color: var(--text-muted); text-align: center; font-size: var(--font-ui-smaller);
+  margin: -10px 0 16px;
+}
+.al-ranking-pending { min-width: 0; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--background-modifier-border); }
+.al-ranking-pending h3 { margin: 0 0 10px; font-size: var(--font-ui-medium); }
+.al-ranking-pending-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0;
+  margin: 6px 0; padding: 8px; border-radius: 8px; background: var(--background-secondary);
+}
+.al-ranking-pending-label { display: flex; flex: 1 1 180px; align-items: center; gap: 10px; min-width: 0; }
+.al-ranking-pending-bounds { color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-empty, .al-ranking-loading { padding: 28px 12px; color: var(--text-muted); text-align: center; }
+.al-ranking-error { color: var(--text-error); }
+.al-ranking-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* Focused comparison uses the same Obsidian modal and button primitives. */
+.modal.al-ranking-comparison-modal { width: min(680px, calc(100vw - 24px)); max-width: 680px; }
+.al-ranking-comparison-modal .modal-content { max-width: 100%; min-width: 0; }
+.al-ranking-dialog-title {
+  margin: 0 0 18px; font-size: 1.15rem; font-weight: 700; text-align: center;
+  letter-spacing: normal;
+}
+.al-ranking-choices {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 2vw, 16px); min-width: 0; width: 100%;
+}
+.al-ranking-choice {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  width: 100%; min-width: 0; max-width: 100%; height: auto;
+  padding: 8px; border: 1px solid var(--background-modifier-border);
+  border-radius: 9px; background: var(--background-primary-alt);
+  color: var(--text-normal); box-shadow: none; cursor: pointer;
+  overflow: hidden;
+}
+.al-ranking-choice:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
+.al-ranking-choice:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.al-ranking-choice-cover {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 1 auto; width: 100%; min-width: 0; aspect-ratio: 2 / 3;
+  max-height: min(44dvh, 380px); overflow: hidden;
+  border-radius: 5px; background: var(--background-secondary);
+}
+.al-ranking-choice-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.al-ranking-choice-title {
+  display: -webkit-box; width: 100%; min-width: 0; height: 2.8em;
+  max-height: 2.8em; overflow: hidden;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere; word-break: break-word;
+  font-size: var(--font-ui-small); font-weight: 600; line-height: 1.4;
+  text-align: center;
+}
+.al-ranking-dialog-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px; margin-top: 16px;
+}
+.al-ranking-dialog-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; gap: 6px; padding: 6px 12px; font-size: var(--font-ui-small);
+}
+.al-ranking-dialog-action.al-ranking-skip { min-width: 90px; }
+.al-ranking-dialog-action:disabled { opacity: .45; }
+
+@media (max-width: 600px) {
+  .animelist-ranking-view { padding: 0 12px 32px; }
+  .al-ranking-panel { padding: 4px 0 24px; }
+  .al-ranking-row { min-height: 74px; gap: 8px; padding: 5px 4px; }
+  .al-ranking-position { flex-basis: 30px; font-size: var(--font-ui-small); }
+  .al-ranking-row-cover { flex-basis: 40px; width: 40px; height: 60px; }
+  .al-ranking-row > .al-ranking-open { gap: 10px; }
+  .al-ranking-handle { flex-basis: 44px; }
+  .al-ranking-row-title { font-size: var(--font-ui-small); }
+  .al-ranking-type-tabs { width: 100%; }
+  .al-ranking-type-tabs button { flex: 1; padding: 0 5px; }
+  .modal.al-ranking-comparison-modal { width: calc(100vw - 16px); max-width: calc(100vw - 16px); }
+  .al-ranking-comparison-modal .modal-content { padding: 14px 10px; }
+  .al-ranking-dialog-title { margin-bottom: 12px; }
+  .al-ranking-choice { padding: 5px; gap: 6px; }
+  .al-ranking-choice-cover { max-height: min(41dvh, 300px); }
+  .al-ranking-dialog-toolbar { gap: 4px; margin-top: 12px; }
+  .al-ranking-dialog-action { padding: 6px 8px; }
+}
