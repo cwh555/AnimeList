@@ -158,6 +158,7 @@ try {
     'checks.pendingBatchInitialStats=reviewRoot.textContent.includes("已排 3") && reviewRoot.textContent.includes("待定 3");',
     'const reviewButton=[...reviewRoot.querySelectorAll(".al-ranking-actions button")].find(b=>b.textContent.includes("處理待定"));',
     'checks.pendingBatchOneStart=!!reviewButton;',
+    'checks.pendingRowsHaveNoRepeatButtons=reviewRoot.querySelectorAll(".al-ranking-pending-row button").length===0;',
     'reviewButton.click();await delay();',
     'let reviewQuestions=0;let prematureClose=false;const reviewed=new Set();',
     'for(let i=0;i<40;i++){',
