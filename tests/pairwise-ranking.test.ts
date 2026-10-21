@@ -32,6 +32,20 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.equal(rankingDropPosition(bounds, 1, -10), 1);
     assert.equal(rankingDropPosition(bounds, 1, 10000), 4);
   });
+  it("handles zero completed works and a fully empty ranking without starting comparisons", () => {
+    const list = emptyRankingCollection();
+    const ongoing = media("A", "anime", "ongoing");
+    const eligible = completedRankingItems([ongoing], "anime");
+    assert.deepEqual(eligible, []);
+    reconcileRanking(list, eligible);
+    assert.deepEqual(list.ordered, []);
+    assert.deepEqual(rankingCounts(list, eligible), { ranked: 0, pending: 0, unranked: 0 });
+    assert.equal(nextRankingPair(list), null);
+    prepareRanking(list, eligible, "new");
+    assert.equal(nextRankingPair(list), null);
+    assert.deepEqual(list.ordered, []);
+  });
+
   it("keeps anime/manga/novels separate and excludes unfinished or dropped works", () => {
     const items = [media("A"), media("B", "manga"), media("C", "novel"), media("D", "anime", "ongoing")];
     assert.deepEqual(completedRankingItems(items, "anime").map((item) => item.title), ["A"]);
