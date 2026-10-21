@@ -1,3 +1,4 @@
+import { JA_RANKING_MESSAGES } from "./ranking";
 import type { LocaleCatalogs } from "../zh-TW";
 import { JA_CORE_MESSAGES } from "./core";
 import { JA_SEARCH_MESSAGES } from "./search";
@@ -27,6 +28,7 @@ export const JA_CATALOGS = {
   "progress-unit": JA_PROGRESS_UNIT_MESSAGES,
   masterpiece: JA_MASTERPIECE_MESSAGES,
   "score-dashboard": JA_SCORE_DASHBOARD_MESSAGES,
+  ranking: JA_RANKING_MESSAGES,
   "legacy-metadata": JA_LEGACY_METADATA_MESSAGES,
   "user-tag": JA_USER_TAG_MESSAGES,
   "image-section": JA_IMAGE_SECTION_MESSAGES,

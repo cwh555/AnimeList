@@ -1,3 +1,4 @@
+import "../../features/pairwise-ranking/text";
 import "../../features/release-tracking/text";
 import "../../features/image-sections/text";
 import "../../features/moments/text";
