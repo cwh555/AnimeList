@@ -48,10 +48,13 @@ export function startRankingRound(
   const orderedRuns = kind === "append" && baseline.length
     ? [[...baseline], ...unique.filter((path) => !baseline.includes(path)).map((path) => [path])]
     : unique.map((path) => [path]);
+  const jobs = makeJobs(orderedRuns);
   const round: RankingRound = {
     kind, stage: 1, total: unique.length, comparisons: 0,
-    cursor: 0, jobs: makeJobs(orderedRuns),
-    results: [], baseline: [...baseline], rangeStart, rangeLength,
+    cursor: 0, jobs,
+    // A sparse array serializes its holes as null. Always keep one dense
+    // result slot per merge job, even when only a later job has completed.
+    results: jobs.map(() => []), baseline: [...baseline], rangeStart, rangeLength,
   };
   advanceRound(round);
   return round;
@@ -74,7 +77,7 @@ export function advanceRound(round: RankingRound): string[] | null {
     if (runs.length <= 1) return runs[0] ?? [];
     round.stage += 1;
     round.jobs = makeJobs(runs);
-    round.results = [];
+    round.results = round.jobs.map(() => []);
     round.cursor = 0;
   }
 }

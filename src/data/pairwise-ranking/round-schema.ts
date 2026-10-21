@@ -20,12 +20,24 @@ export function assertStoredRankingRound(value: unknown, type: string): asserts 
     if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name]) || round[name] < 0) corrupted(name);
   }
   if (!paths(round.baseline)) corrupted("baseline");
-  if (!Array.isArray(round.results) || !round.results.every(paths)) corrupted("results");
   if (!Array.isArray(round.jobs)) corrupted("jobs");
-  for (const item of round.jobs as unknown[]) {
+  const jobs: unknown[] = round.jobs;
+  for (const item of jobs) {
     if (!object(item) || !paths(item.left) || !paths(item.right)
       || !paths(item.winners) || typeof item.done !== "boolean") corrupted("jobs.item");
   }
+  // A previously saved sparse results array becomes [null, ...] in JSON.
+  // Array.prototype.every() skips holes, so use an indexed check as well.
+  if (!Array.isArray(round.results) || round.results.length !== jobs.length
+    || !jobs.every((job, index) => {
+      const result = round.results as unknown[];
+      const entry = result[index];
+      if (!paths(entry)) return false;
+      const item = job as { done: boolean; winners: string[] };
+      return item.done
+        ? entry.length === item.winners.length && entry.every((path, i) => path === item.winners[i])
+        : entry.length === 0;
+    })) corrupted("results");
 }
 
 export interface RecoveredRound {
@@ -51,21 +63,27 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
   } catch {
     // Continue to a reconstructive recovery, not a generic "invalid data" error.
   }
-  if (object(value) && (value.results === null || value.results === undefined)
-    && Array.isArray(value.jobs) && value.jobs.every((job) =>
+  // Results are derived entirely from each job's done/winners state. This
+  // handles null whole arrays, null entries from JSON-saved sparse arrays,
+  // missing slots, and older partially-populated results without dropping
+  // any comparison evidence. Other invalid fields are NOT guessed.
+  if (object(value) && Array.isArray(value.jobs)
+    && value.jobs.every((job) =>
       object(job) && paths(job.left) && paths(job.right)
       && paths(job.winners) && typeof job.done === "boolean")) {
-    const restored: RawRecord = { ...value,
-      results: value.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
+    const restored: RawRecord = {
+      ...value,
+      results: value.jobs.map((job: { done: boolean; winners: string[] }) =>
+        job.done ? [...job.winners] : []),
     };
     try {
       assertStoredRankingRound(restored, type);
       return {
-        round: restored as unknown as RankingRound,
+        round: restored as RankingRound,
         recovered: true, needsRecompare: false, pendingPaths: [],
       };
     } catch {
-      // A different field is damaged too; isolate this round below.
+      // Another structural field is damaged. Quarantine just this round below.
     }
   }
 
