@@ -29,6 +29,7 @@ try {
             'export class Modal { constructor(app){this.app=app;this.modalEl=document.createElement("div");this.modalEl.className="modal";this.titleEl=document.createElement("h2");this.contentEl=document.createElement("div");this.contentEl.className="modal-content";this.modalEl.append(this.titleEl,this.contentEl);} open(){document.body.append(this.modalEl);this.onOpen?.()} close(){this.onClose?.();this.modalEl.remove()}}',
             'export class Notice { constructor(message){globalThis.__notices.push(message)} }',
             'export function normalizePath(value){return String(value||"")}',
+            'export function setIcon() {}',
             'export async function requestUrl(options){return globalThis.__mockRequestUrl(options)}',
           ].join("\n"),
         }));
