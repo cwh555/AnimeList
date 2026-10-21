@@ -14,15 +14,15 @@ export function assertStoredRankingRound(value: unknown, type: string): asserts 
   const corrupted = (field: string): never => {
     throw new Error("Invalid saved ranking round (" + type + "." + field + ").");
   };
-  if (!object(value)) corrupted("round");
-  if (value.kind !== "full" && value.kind !== "append" && value.kind !== "range") corrupted("kind");
+  const round: RawRecord = object(value) ? value : corrupted("round");
+  if (round.kind !== "full" && round.kind !== "append" && round.kind !== "range") corrupted("kind");
   for (const name of ["stage", "total", "comparisons", "cursor", "rangeStart", "rangeLength"]) {
-    if (typeof value[name] !== "number" || !Number.isSafeInteger(value[name]) || value[name] < 0) corrupted(name);
+    if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name]) || round[name] < 0) corrupted(name);
   }
-  if (!paths(value.baseline)) corrupted("baseline");
-  if (!Array.isArray(value.results) || !value.results.every(paths)) corrupted("results");
-  if (!Array.isArray(value.jobs)) corrupted("jobs");
-  for (const item of value.jobs as unknown[]) {
+  if (!paths(round.baseline)) corrupted("baseline");
+  if (!Array.isArray(round.results) || !round.results.every(paths)) corrupted("results");
+  if (!Array.isArray(round.jobs)) corrupted("jobs");
+  for (const item of round.jobs as unknown[]) {
     if (!object(item) || !paths(item.left) || !paths(item.right)
       || !paths(item.winners) || typeof item.done !== "boolean") corrupted("jobs.item");
   }
@@ -51,12 +51,12 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
   } catch {
     // Continue to a reconstructive recovery, not a generic "invalid data" error.
   }
-  if (object(value) && (value.results === null || value.results === undefined)
-    && Array.isArray(value.jobs) && value.jobs.every((job) =>
+  if (object(value) && (round.results === null || round.results === undefined)
+    && Array.isArray(round.jobs) && round.jobs.every((job) =>
       object(job) && paths(job.left) && paths(job.right)
       && paths(job.winners) && typeof job.done === "boolean")) {
     const restored: RawRecord = { ...value,
-      results: value.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
+      results: round.jobs.map((job: RawRecord) => job.done ? [...(job.winners as string[])] : []),
     };
     try {
       assertStoredRankingRound(restored, type);
@@ -74,10 +74,10 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
     if (paths(input)) for (const path of input) participants.add(path);
   };
   if (object(value)) {
-    add(value.baseline);
-    if (Array.isArray(value.results)) for (const result of value.results) add(result);
-    if (Array.isArray(value.jobs)) {
-      for (const job of value.jobs) {
+    add(round.baseline);
+    if (Array.isArray(round.results)) for (const result of round.results) add(result);
+    if (Array.isArray(round.jobs)) {
+      for (const job of round.jobs) {
         if (!object(job)) continue;
         add(job.left);
         add(job.right);
