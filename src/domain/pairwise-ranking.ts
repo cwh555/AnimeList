@@ -14,7 +14,7 @@ export interface RankingAttempt {
   comparisons: Record<string, RankingChoice>;
 }
 
-export interface RankingSnapshot {
+export interface RankingCollection {
   ordered: string[];
   pending: Record<string, RankingAttempt>;
   active: RankingAttempt | null;
@@ -23,10 +23,6 @@ export interface RankingSnapshot {
    * An empty array with active set means the last work is still in progress.
    */
   pendingQueue?: string[] | null;
-}
-
-export interface RankingCollection extends RankingSnapshot {
-  history: RankingSnapshot[];
 }
 
 export interface RankingState {
@@ -47,7 +43,7 @@ export interface RankingBounds {
 }
 
 export function emptyRankingCollection(): RankingCollection {
-  return { ordered: [], pending: {}, active: null, round: null, pendingQueue: null, history: [] };
+  return { ordered: [], pending: {}, active: null, round: null, pendingQueue: null };
 }
 
 export function emptyRankingState(): RankingState {
@@ -63,22 +59,6 @@ export function completedRankingItems(items: readonly MediaItem[], type: MediaTy
   return items
     .filter((item) => item.mediaType === type && item.status === "completed")
     .sort((a, b) => a.title.localeCompare(b.title, "zh-Hant", { numeric: true }) || a.filePath.localeCompare(b.filePath));
-}
-
-export function rankingSnapshot(list: RankingCollection): RankingSnapshot {
-  return {
-    ordered: [...list.ordered],
-    pending: Object.fromEntries(Object.entries(list.pending).map(([key, value]) =>
-      [key, { path: value.path, comparisons: { ...value.comparisons } }])),
-    active: list.active ? { path: list.active.path, comparisons: { ...list.active.comparisons } } : null,
-    round: list.round ? JSON.parse(JSON.stringify(list.round)) as RankingRound : null,
-    pendingQueue: list.pendingQueue ? [...list.pendingQueue] : list.pendingQueue ?? null,
-  };
-}
-
-function checkpoint(list: RankingCollection): void {
-  list.history.push(rankingSnapshot(list));
-  if (list.history.length > 30) list.history.shift();
 }
 
 export function rankingBounds(list: RankingCollection, attempt: RankingAttempt): RankingBounds {
@@ -148,7 +128,6 @@ function advancePendingQueue(list: RankingCollection): void {
 
 export function reconcileRanking(list: RankingCollection, eligible: readonly MediaItem[]): void {
   const allowed = new Set(eligible.map((item) => item.filePath));
-  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round, pendingQueue: list.pendingQueue });
   if (list.round) {
     mapRankingRound(list.round, (path) => allowed.has(path) ? path : null);
     const finished = advanceRound(list.round);
@@ -174,8 +153,6 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
     list.active = clean(list.active);
     delete list.pending[list.active.path];
   }
-  // Only invalidate undo if membership or reference evidence actually changed.
-  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round, pendingQueue: list.pendingQueue })) list.history = [];
 }
 
 /** Resolve only entries with exactly one consistent insertion slot, never infer a tie. */
@@ -245,7 +222,6 @@ export function prepareRankingRounds(
     list.pending = {};
     list.active = null;
     list.pendingQueue = null;
-    list.history = [];
   } else {
     if (!newPaths.length) return false;
     participants = newPaths;
@@ -268,7 +244,6 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
     list.pending = {};
     list.active = null;
     list.pendingQueue = null;
-    list.history = [];
   }
   if (mode === "pending") {
     // Snapshot the entire batch once. A skipped item may remain pending, but
@@ -318,7 +293,6 @@ export function decideRanking(
 ): boolean {
   const pair = nextRankingPair(list);
   if (!pair) return false;
-  checkpoint(list);
   if (list.round) {
     const result = answerRound(list.round, choice);
     if (result.skipped) {
@@ -341,17 +315,6 @@ export function decideRanking(
       settleActive(list);
     }
   }
-  return true;
-}
-
-export function undoRanking(list: RankingCollection): boolean {
-  const previous = list.history.pop();
-  if (!previous) return false;
-  list.ordered = previous.ordered;
-  list.pending = previous.pending;
-  list.active = previous.active;
-  list.round = previous.round ?? null;
-  list.pendingQueue = previous.pendingQueue ?? null;
   return true;
 }
 
@@ -395,7 +358,6 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   const oldIndex = list.ordered.indexOf(path);
   const newIndex = Math.max(0, Math.min(list.ordered.length - 1, Math.trunc(position) - 1));
   if (oldIndex < 0 || !Number.isFinite(position) || oldIndex === newIndex) return false;
-  checkpoint(list);
   // Explicit manual movement takes priority over an unfinished automatic round.
   list.round = null;
   list.ordered.splice(oldIndex, 1);
@@ -405,7 +367,6 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
   if (list.active) delete list.active.comparisons[path];
   settleUnambiguousPending(list);
-  list.history = [];
   return true;
 }
 
@@ -417,7 +378,6 @@ export function placePendingItem(list: RankingCollection, path: string, position
   delete list.pending[path];
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
   if (list.active) delete list.active.comparisons[path];
-  list.history = [];
   return true;
 }
 
@@ -429,7 +389,6 @@ export function recompareRankedItem(list: RankingCollection, path: string): bool
   if (list.active?.path === path) list.active = null;
   for (const attempt of Object.values(list.pending)) delete attempt.comparisons[path];
   if (list.active) delete list.active.comparisons[path];
-  list.history = [];
   return true;
 }
 
@@ -471,7 +430,6 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
       changedHere = true;
     }
     if (changedHere) {
-      list.history = [];
       changed = true;
     }
   }
@@ -520,7 +478,6 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
     }
     Object.values(list.pending).forEach(relabel);
     if (list.active) relabel(list.active);
-    if (changedHere) list.history = [];
   }
   return changed;
 }
