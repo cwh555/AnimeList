@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { App } from "obsidian";
 import { PairwiseRankingStore } from "../src/data/pairwise-ranking/store";
-import { emptyRankingState } from "../src/domain/pairwise-ranking";
+import { decideRanking, emptyRankingState, nextRankingPair } from "../src/domain/pairwise-ranking";
+import type { MediaItem } from "../src/domain/media-types";
 import { startRankingRound } from "../src/domain/ranking-rounds";
 
 class FakeAdapter {
@@ -74,6 +75,51 @@ describe("ranking vault storage", () => {
     const result = await new PairwiseRankingStore(app).load();
     assert.deepEqual(result.anime.round?.jobs, original.anime.round.jobs);
     assert.equal(new TextDecoder().decode(adapter.files.get(".obsidian/animelist-ranking.json")), raw);
+  });
+
+  it("recovers legacy sparse JSON [null, winners] and resumes across real store restarts", async () => {
+    const { app, adapter } = setup();
+    const items = ["manga/M1.md", "manga/M2.md", "manga/M3.md",
+      "manga/M4.md", "manga/M5.md"];
+    const path = ".obsidian/animelist-ranking.json";
+    const saved = emptyRankingState();
+    saved.anime.ordered = ["anime/existing.md"];
+    const round = startRankingRound(items, "full");
+    assert.equal(round.jobs.length, 3);
+    // Older code created results holes, serialized as JSON nulls on pause.
+    const legacy = JSON.parse(JSON.stringify(round)) as Record<string, unknown>;
+    legacy.results = [null, null, [items[4]]];
+    (saved.manga as { round?: unknown }).round = legacy;
+    const original = JSON.stringify(saved);
+    adapter.put(path, original);
+
+    let service = new PairwiseRankingStore(app);
+    let resumed = await service.load();
+    assert.deepEqual(resumed.manga.round?.results, [[], [], [items[4]]]);
+    assert.deepEqual(resumed.anime.ordered, ["anime/existing.md"]);
+    const backup = service.getRecoveryInfo()?.backupPath;
+    assert.ok(backup);
+    assert.equal(new TextDecoder().decode(adapter.files.get(backup)), original);
+    // Simulate choosing a cover, then closing the Obsidian X and restarting.
+    // The modal's close must never be required to repair results.
+    let comparisons = 0;
+    while (resumed.manga.round) {
+      const work = items.map((filePath) => ({ filePath, title: filePath,
+        mediaType: "manga", status: "completed" })) as MediaItem[];
+      const pair = nextRankingPair(resumed.manga);
+      assert.ok(pair);
+      await service.mutate((state) => {
+        decideRanking(state.manga, work, "better");
+      });
+      // Reload the adapter after EACH answer, as if X and a plugin restart occurred.
+      service = new PairwiseRankingStore(app);
+      resumed = await service.load();
+      assert.ok(!resumed.manga.round || resumed.manga.round.results.every(Array.isArray));
+      if (++comparisons > 100) throw new Error("Resume made no progress");
+    }
+    assert.equal(resumed.manga.ordered.length, items.length);
+    assert.deepEqual(resumed.anime.ordered, ["anime/existing.md"]);
+    assert.equal(adapter.files.size, 2, "only one backup should be created");
   });
 
   it("recovers manga.results = null while preserving other types and exact round order", async () => {

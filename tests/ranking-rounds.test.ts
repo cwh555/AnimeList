@@ -23,6 +23,30 @@ function finish(list: ReturnType<typeof emptyRankingCollection>, items: MediaIte
 }
 
 describe("round-robin complete ranking", () => {
+  it("never persists sparse results as null after 3, 5 or 7 completed works", () => {
+    for (const size of [3, 5, 7, 8, 11]) {
+      const items = Array.from({ length: size }, (_, index) => item(index));
+      const list = emptyRankingCollection();
+      prepareRankingRounds(list, items, "full");
+      let steps = 0;
+      while (list.round) {
+        const round = list.round;
+        const saved = JSON.parse(JSON.stringify(round)) as typeof round;
+        assert.equal(saved.results.length, saved.jobs.length);
+        assert.ok(saved.results.every((entry) => Array.isArray(entry)),
+          "No job may serialize an uninitialized results hole as null");
+        assert.deepEqual(saved.results,
+          saved.jobs.map((job) => job.done ? job.winners : []));
+        const pair = nextRankingPair(list);
+        if (!pair) throw new Error("Round has no pair but did not finish");
+        assert.ok(decideRanking(list, items, steps % 2 ? "worse" : "better"));
+        if (++steps > 200) throw new Error("Round did not terminate");
+      }
+      assert.equal(list.ordered.length, size);
+      assert.equal(new Set(list.ordered).size, size);
+    }
+  });
+
   it("interleaves all first-round comparisons before repeating a work", () => {
     const items = Array.from({ length: 8 }, (_, i) => item(i));
     const list = emptyRankingCollection();
