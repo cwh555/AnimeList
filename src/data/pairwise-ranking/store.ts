@@ -65,7 +65,7 @@ export class PairwiseRankingStore {
   }
 
   /** An immutable copy of the precise bytes recovered from, for user inspection. */
-  private async backupOriginal(contents: string, raw: ArrayBuffer): Promise<string> {
+  private async backupOriginal(raw: ArrayBuffer): Promise<string> {
     const adapter = this.app.vault.adapter;
     // Hash and copy the original byte sequence, including a possible UTF-8 BOM.
     const originalBytes = new Uint8Array(raw);
@@ -105,7 +105,7 @@ export class PairwiseRankingStore {
       if (loaded.recovered.length) {
         // Never silently overwrite a vault-synced file. Save the exact original
         // first, then keep the fixed round only in memory until the user edits.
-        const backupPath = await this.backupOriginal(contents, raw);
+        const backupPath = await this.backupOriginal(raw);
         this.recovery = {
           types: loaded.recovered,
           incompleteTypes: loaded.needsRecompare,
