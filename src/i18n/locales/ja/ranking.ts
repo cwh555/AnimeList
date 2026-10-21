@@ -45,7 +45,6 @@ export const JA_RANKING_MESSAGES = {
   "drag": "{title}の順位を移動",
   "more": "その他",
   "failed": "ランキング操作に失敗：{reason}",
-  "search": "作品を検索",
   "busy": "読込中…",
   "completed": "未順位付けの作品はありません。",
   "progress": "比較中",

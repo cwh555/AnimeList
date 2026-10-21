@@ -45,7 +45,6 @@ export const RANKING_MESSAGES = {
   "drag": "移動「{title}」的名次",
   "more": "更多",
   "failed": "排名操作失敗：{reason}",
-  "search": "搜尋作品",
   "busy": "載入中…",
   "completed": "此類型已沒有未排序的作品。",
   "progress": "比較中",

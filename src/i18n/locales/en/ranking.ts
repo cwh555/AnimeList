@@ -45,7 +45,6 @@ export const EN_RANKING_MESSAGES = {
   "drag": "Move {title} in the ranking",
   "more": "More",
   "failed": "Ranking operation failed: {reason}",
-  "search": "Search works",
   "busy": "Loading…",
   "completed": "No unranked works remain.",
   "progress": "Comparing",

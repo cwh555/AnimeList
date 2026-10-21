@@ -309,7 +309,7 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] The modal closes on Pause / Escape, then Continue restores the pending comparison without losing answers.
 - [ ] Long Chinese/Japanese/English titles fit within two lines inside modal cards at 320px/390px/desktop widths.
 - [ ] The main ranking page remains visible behind the modal; modal controls and native Obsidian close behavior work.
-- [ ] Rank search survives reorder/rerender, disables misleading drag-in-filtered-order, and resets when switching media type.
+- [ ] Ranking page has no work-search field; all completed ranked works remain visible after edits and category switching.
 - [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
 - [ ] New entries are inserted without reshuffling the existing ranked order.
 - [ ] Tournament-like merge rounds interleave comparisons; full rankings remain strict and skip never fabricates placement.

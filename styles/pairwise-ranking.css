@@ -34,7 +34,6 @@
   display: inline-flex; justify-content: center; align-items: center; gap: 6px;
   min-height: 36px; padding: 6px 12px; font-size: var(--font-ui-small);
 }
-.al-ranking-search { display: block; width: 100%; margin: 12px 0; }
 .al-ranking-warning { margin: 8px 0; color: var(--text-warning); font-size: var(--font-ui-small); }
 .al-ranking-list {
   display: grid; grid-template-columns: minmax(0, 1fr);

@@ -45,7 +45,6 @@ export const KO_RANKING_MESSAGES = {
   "drag": "{title} 순위 이동",
   "more": "더 보기",
   "failed": "순위 작업 실패: {reason}",
-  "search": "작품 검색",
   "busy": "불러오는 중…",
   "completed": "순위를 정하지 않은 작품이 없습니다.",
   "progress": "비교 중",
