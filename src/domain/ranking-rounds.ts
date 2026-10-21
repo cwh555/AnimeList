@@ -105,13 +105,13 @@ export function answerRound(
   const current = round.jobs[selectedIndex];
   let skipped: string | null = null;
   let against: string | null = null;
-  if (choice === "better") current.winners.push(current.left.shift()!);
-  else if (choice === "worse") current.winners.push(current.right.shift()!);
+  if (choice === "better") current.winners.push(current.left.shift());
+  else if (choice === "worse") current.winners.push(current.right.shift());
   else {
     const baseline = new Set(round.kind === "append" ? round.baseline : []);
     // Skipping a comparison must never evict an already-ranked baseline entry.
     const removeLeft = !baseline.has(current.left[0]);
-    skipped = removeLeft ? current.left.shift()! : current.right.shift()!;
+    skipped = removeLeft ? current.left.shift() : current.right.shift();
     against = removeLeft ? current.right[0] : current.left[0];
   }
   round.comparisons += 1;
