@@ -107,7 +107,7 @@ export async function planStoredTitleUpdates(
     source.provider === "bangumi"
       ? bangumi.fetchById(mediaType, source.id)
       : anilist.fetchMediaById(mediaType, source.id));
-  const sleep = options.sleep ?? (async (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const sleep = options.sleep ?? (async (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)));
   const intervalMs = Math.max(0, options.intervalMs ?? 1_200);
   const files = getScopedMarkdownFiles(app, roots);
   const items: TitleUpdateItem[] = [];
