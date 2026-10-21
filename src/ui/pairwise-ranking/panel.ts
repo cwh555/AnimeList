@@ -101,6 +101,8 @@ function cover(item: MediaItem | undefined, className: string): HTMLElement {
     img.alt = "";
     img.loading = "lazy";
     img.decoding = "async";
+    img.draggable = false;
+    if (item.coverSources?.srcset) img.srcset = item.coverSources.srcset;
     img.addEventListener("error", () => { img.remove(); setIcon(shell, "image-off"); }, { once: true });
     shell.append(img);
   } else setIcon(shell, "image-off");

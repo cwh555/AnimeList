@@ -173,6 +173,8 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     showUnrated: false,
   };
   const rankState = RANK_STATES.get(container) ?? { mode: "rating", type: "anime", comparing: false };
+  const preserveRankingScroll = container.querySelector(".al-ranking-panel") !== null;
+  const previousRankingScrollTop = preserveRankingScroll ? container.scrollTop : 0;
   const previous = RATING_MOUNTS.get(container);
   if (previous) disposeScoreDashboardInteractions(previous);
   RATING_MOUNTS.delete(container);
@@ -236,6 +238,13 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     redraw,
     openNote: (path) => dashboardHost.openMediaFile(path),
     showNotice: (message) => dashboardHost.showNotice(message),
+  }).then(() => {
+    // A rank edit may rebuild a long List; retain its scroll position afterward.
+    if (body.isConnected && rankState.mode === "ranking") {
+      container.scrollTop = previousRankingScrollTop;
+    }
+  }).catch((error: unknown) => {
+    dashboardHost.showNotice(rankingText("failed", { reason: errorMessage(error) }));
   });
 }
 
