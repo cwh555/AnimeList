@@ -236,6 +236,11 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => start("new"), "play"));
   }
   if (counts.pending && !options.comparing) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
+  if (!options.comparing && list.history.length) actions.appendChild(button(t("undo"), () => {
+    void mutate((draft) => {
+      if (undoRanking(draft)) options.setComparing(Boolean(nextRankingPair(draft)));
+    });
+  }, "undo-2"));
   const more = button(t("more"), () => {
     const menu = new Menu();
     menu.addItem((entry) => entry.setTitle(t("reset")).setIcon("rotate-ccw").onClick(() => {
@@ -319,10 +324,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       menu.addItem((entry) => entry.setTitle(t("recompare")).setIcon("git-compare")
         .onClick(() => {
           void mutate((draft) => {
+            // A separate unfinished comparison must not disappear on single-item recompare.
+            if (draft.active) draft.pending[draft.active.path] = draft.active;
             recompareRankedItem(draft, path);
             draft.active = { path, comparisons: {} };
             delete draft.pending[path];
-            options.setComparing(true);
+            options.setComparing(Boolean(nextRankingPair(draft)));
           });
         }));
       const rect = menuButton.getBoundingClientRect();
@@ -340,7 +347,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (!list.ordered.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
   search.addEventListener("input", () => {
     const q = search.value.trim().toLocaleLowerCase();
-    for (const row of rows) row.hidden = Boolean(q) && !row.dataset.title?.includes(q);
+    for (const row of rows) {
+      row.hidden = Boolean(q) && !row.dataset.title?.includes(q);
+      // Filtered positions do not correspond to global ranks: use Move to rank instead.
+      const handle = row.querySelector<HTMLButtonElement>(".al-ranking-handle");
+      if (handle) handle.disabled = Boolean(q);
+    }
   });
 
   if (counts.pending) {
