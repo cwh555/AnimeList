@@ -5,7 +5,7 @@ import {
   completedRankingItems, decideRanking, emptyRankingCollection, emptyRankingState,
   moveRankedItem, nextRankingPair, placePendingItem, prepareRanking,
   rankingBounds, rankingCounts, rankingDropPosition, recompareRankedItem, renameRankingPath, resumePendingRanking,
-  undoRanking, reconcileRanking, removeRankingPath, settleUnambiguousPending,
+  reconcileRanking, removeRankingPath, settleUnambiguousPending,
 } from "../src/domain/pairwise-ranking";
 
 function media(title: string, type: MediaType = "anime", status: MediaItem["status"] = "completed"): MediaItem {
@@ -169,7 +169,7 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.ok(nextRankingPair(list));
   });
 
-  it("persists review progress, resumes after pause and restores queue on Undo", () => {
+  it("persists review progress and resumes after pause without extra state snapshots", () => {
     const items = Array.from({ length: 5 }, (_, index) => media("M" + index, "manga"));
     const original = emptyRankingCollection();
     original.ordered = items.slice(0, 2).map((item) => item.filePath);
@@ -184,11 +184,8 @@ describe("pairwise ranking: strict ordered list", () => {
     const savedPair = nextRankingPair(restored);
     prepareRanking(restored, items, "pending");
     assert.deepEqual(nextRankingPair(restored), savedPair);
-    const before = JSON.parse(JSON.stringify(restored)) as typeof restored;
     decideRanking(restored, items, "worse");
-    assert.equal(undoRanking(restored), true);
-    assert.deepEqual(restored.pendingQueue, before.pendingQueue);
-    assert.deepEqual(nextRankingPair(restored), nextRankingPair(before));
+    assert.equal(Object.hasOwn(restored, "history"), false);
     let count = 0;
     while (nextRankingPair(restored)) {
       decideRanking(restored, items, "better");
@@ -239,17 +236,15 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.deepEqual(list.ordered, [a.filePath, x.filePath, b.filePath, c.filePath]);
   });
 
-  it("undoes a comparison including automatic insertion", () => {
+  it("records a decision directly without allocating snapshots", () => {
     const a = media("A"), b = media("B");
     const list = emptyRankingCollection();
     list.ordered = [a.filePath];
     list.active = { path: b.filePath, comparisons: {} };
-    decideRanking(list, [a,b], "better");
+    assert.equal(decideRanking(list, [a,b], "better"), true);
     assert.deepEqual(list.ordered, [b.filePath, a.filePath]);
-    assert.equal(undoRanking(list), true);
-    assert.deepEqual(list.ordered, [a.filePath]);
-    assert.equal(list.active?.path, b.filePath);
-    assert.equal(undoRanking(list), false);
+    assert.equal(list.active, null);
+    assert.equal(Object.hasOwn(list, "history"), false);
   });
 
   it("manual rank moves preserve others' relative order and supersede old evidence", () => {
@@ -297,16 +292,15 @@ describe("pairwise ranking: strict ordered list", () => {
     state.anime.ordered = ["A", "B"];
     state.anime.active = { path: "C", comparisons: { B: "worse" } };
     state.manga.pending.M = { path: "M", comparisons: { B: "skip" } };
-    state.novel.history = [{ ordered: ["novel-unrelated"], pending: {}, active: null }];
     assert.equal(removeRankingPath(state, "B"), true);
     assert.deepEqual(state.anime.ordered, ["A"]);
     assert.deepEqual(state.anime.active?.comparisons, {});
     assert.deepEqual(state.manga.pending.M.comparisons, {});
-    assert.equal(state.novel.history.length, 1, "unrelated novel undo history stays intact");
+    assert.deepEqual(state.novel.ordered, [], "unrelated novel ranking is untouched");
     assert.equal(removeRankingPath(state, "B"), false);
   });
 
-  it("removes entries no longer completed and never resurrects stale undo references", () => {
+  it("removes entries no longer completed and prunes stale ranking references", () => {
     const list = emptyRankingCollection();
     list.ordered = ["anime/A.md", "anime/B.md"];
     list.pending["anime/C.md"] = { path: "anime/C.md", comparisons: { "anime/B.md": "better" } };

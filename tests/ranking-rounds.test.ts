@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { MediaItem } from "../src/domain/media-types";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
-  prepareRankingRounds, rankingCounts, rankingGridDropPosition, undoRanking,
+  prepareRankingRounds, rankingCounts, rankingGridDropPosition,
 } from "../src/domain/pairwise-ranking";
 
 function item(n: number): MediaItem {
@@ -110,14 +110,16 @@ describe("round-robin complete ranking", () => {
     assert.deepEqual(rankingCounts(list, items), { ranked: 3, pending: 1, unranked: 0 });
   });
 
-  it("undoes a round comparison without discarding the current stage", () => {
+  it("retains the current round after a choice without storing snapshots", () => {
     const items = Array.from({ length: 4 }, (_, i) => item(i));
     const list = emptyRankingCollection();
     prepareRankingRounds(list, items, "full");
     const first = nextRankingPair(list);
-    decideRanking(list, items, "worse");
-    assert.equal(undoRanking(list), true);
-    assert.deepEqual(nextRankingPair(list), first);
+    assert.ok(first);
+    assert.equal(decideRanking(list, items, "worse"), true);
+    assert.equal(list.round?.comparisons, 1);
+    assert.notDeepEqual(nextRankingPair(list), first);
+    assert.equal(Object.hasOwn(list, "history"), false);
   });
 
   it("assigns correct grid drop positions both downward and upward", () => {
