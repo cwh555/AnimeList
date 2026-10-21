@@ -1,7 +1,7 @@
 import type { Setting } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
 import { TitleLocalizationModal } from "../../ui/title-localization-modal";
-import { titleLocalizationText as text } from "./text";
+import { titleLocalizationSettingsText as text } from "./text";
 
 export const titleLocalizationSettingsFeature = defineFeature<AnimeListFeatureHost>({
   id: "title-localization-settings",
