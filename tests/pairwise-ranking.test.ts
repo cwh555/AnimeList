@@ -4,7 +4,7 @@ import type { MediaItem, MediaType } from "../src/domain/media-types";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, emptyRankingState,
   moveRankedItem, nextRankingPair, placePendingItem, prepareRanking,
-  rankingBounds, rankingCounts, recompareRankedItem, renameRankingPath, resumePendingRanking,
+  rankingBounds, rankingCounts, rankingDropPosition, recompareRankedItem, renameRankingPath, resumePendingRanking,
   undoRanking, reconcileRanking, removeRankingPath,
 } from "../src/domain/pairwise-ranking";
 
@@ -24,6 +24,14 @@ function finishComparisons(list: ReturnType<typeof emptyRankingCollection>, item
 }
 
 describe("pairwise ranking: strict ordered list", () => {
+  it("converts pointer coordinates to ranks after excluding dragged source", () => {
+    const bounds = [0, 100, 200, 300].map((top) => ({ top, height: 100 }));
+    assert.equal(rankingDropPosition(bounds, 0, 150), 2);
+    assert.equal(rankingDropPosition(bounds, 0, 260), 3);
+    assert.equal(rankingDropPosition(bounds, 3, 120), 2);
+    assert.equal(rankingDropPosition(bounds, 1, -10), 1);
+    assert.equal(rankingDropPosition(bounds, 1, 10000), 4);
+  });
   it("keeps anime/manga/novels separate and excludes unfinished or dropped works", () => {
     const items = [media("A"), media("B", "manga"), media("C", "novel"), media("D", "anime", "ongoing")];
     assert.deepEqual(completedRankingItems(items, "anime").map((item) => item.title), ["A"]);

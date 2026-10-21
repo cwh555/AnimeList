@@ -214,6 +214,19 @@ export function undoRanking(list: RankingCollection): boolean {
   return true;
 }
 
+/** The dragged row is removed before choosing its destination; do not count it. */
+export function rankingDropPosition(
+  rowBounds: readonly { top: number; height: number }[],
+  draggedIndex: number,
+  pointerY: number,
+): number {
+  let target = 1;
+  rowBounds.forEach((rect, index) => {
+    if (index !== draggedIndex && pointerY > rect.top + rect.height / 2) target += 1;
+  });
+  return Math.max(1, Math.min(rowBounds.length, target));
+}
+
 export function moveRankedItem(list: RankingCollection, path: string, position: number): boolean {
   const oldIndex = list.ordered.indexOf(path);
   const newIndex = Math.max(0, Math.min(list.ordered.length - 1, Math.trunc(position) - 1));

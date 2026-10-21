@@ -1,7 +1,7 @@
 import { Menu, Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  completedRankingItems, decideRanking, moveRankedItem, nextRankingPair,
+  completedRankingItems, decideRanking, moveRankedItem, rankingDropPosition, nextRankingPair,
   prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
   reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem, resumePendingRanking,
   type RankingCollection, type RankingChoice, type RankingState,
@@ -137,12 +137,9 @@ function installReorderHandle(
         if (next.clientY < rect.top + 38) scrollHost.scrollTop -= 16;
         if (next.clientY > rect.bottom - 38) scrollHost.scrollTop += 16;
       }
-      let target = 1;
-      for (const entry of rows) {
-        const rect = entry.getBoundingClientRect();
-        if (next.clientY > rect.top + rect.height / 2) target += 1;
-      }
-      highlight(Math.max(1, Math.min(rows.length, target)));
+      const bounds = rows.map((entry) => entry.getBoundingClientRect());
+      const target = rankingDropPosition(bounds, from - 1, next.clientY);
+      highlight(target);
     };
     const finish = (commit: boolean): void => {
       handle.removeEventListener("pointermove", move);
