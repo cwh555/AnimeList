@@ -20,6 +20,10 @@ function validateRankData(input: unknown): LoadedRanking {
     if (!Array.isArray(collection.ordered) || !collection.ordered.every((x) => typeof x === "string")
         || !collection.pending || typeof collection.pending !== "object" || Array.isArray(collection.pending)
         || !Array.isArray(collection.history)) throw new Error("Corrupted ranking collection: " + type);
+    if (collection.pendingQueue != null && (!Array.isArray(collection.pendingQueue)
+      || collection.pendingQueue.some((path: unknown) => typeof path !== "string"))) {
+      throw new Error("Invalid pending review queue: " + type);
+    }
     const recovery = recoverStoredRankingRound(collection.round, type);
     if (recovery.recovered) {
       recovered.push(type);

@@ -197,16 +197,8 @@ export function settleUnambiguousPending(list: RankingCollection): number {
   return resolved;
 }
 
-function pickNext(list: RankingCollection, eligible: readonly MediaItem[], mode: "new" | "pending"): void {
+function pickNext(list: RankingCollection, eligible: readonly MediaItem[]): void {
   if (list.active) return;
-  if (mode === "pending") {
-    const next = eligible.map((item) => item.filePath).find((path) => Object.hasOwn(list.pending, path));
-    if (!next) return;
-    list.active = { path: next, comparisons: Object.fromEntries(Object.entries(list.pending[next].comparisons)
-      .filter(([, choice]) => choice !== "skip")) };
-    delete list.pending[next];
-    return;
-  }
   const seen = new Set([...list.ordered, ...Object.keys(list.pending)]);
   const next = eligible.find((item) => !seen.has(item.filePath));
   if (next) list.active = { path: next.filePath, comparisons: {} };
@@ -252,6 +244,7 @@ export function prepareRankingRounds(
     list.ordered = [];
     list.pending = {};
     list.active = null;
+    list.pendingQueue = null;
     list.history = [];
   } else {
     if (!newPaths.length) return false;
@@ -287,12 +280,12 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
     advancePendingQueue(list);
     return;
   }
-  pickNext(list, eligible, "new");
+  pickNext(list, eligible);
   settleActive(list);
   // Seed entries that need no question (e.g., the first item), then ask the next one.
   for (let i = 0; i < eligible.length && !list.active; i += 1) {
     const previous = list.ordered.length;
-    pickNext(list, eligible, "new");
+    pickNext(list, eligible);
     settleActive(list);
     if (list.ordered.length === previous) break;
   }
@@ -311,7 +304,7 @@ export function resumePendingRanking(
   if (!list.active) {
     if (list.pendingQueue != null) advancePendingQueue(list);
     else {
-      pickNext(list, eligible, "new");
+      pickNext(list, eligible);
       settleActive(list);
     }
   }
@@ -344,7 +337,7 @@ export function decideRanking(
   if (!list.active) {
     if (list.pendingQueue != null) advancePendingQueue(list);
     else {
-      pickNext(list, eligible, "new");
+      pickNext(list, eligible);
       settleActive(list);
     }
   }
@@ -450,7 +443,7 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
       list.pendingQueue = list.pendingQueue.filter((item) => item !== path);
       if (oldLength !== list.pendingQueue.length) changedHere = true;
     }
-if (list.round) {
+    if (list.round) {
       const oldRound = JSON.stringify(list.round);
       mapRankingRound(list.round, (item) => item === path ? null : item);
       if (oldRound !== JSON.stringify(list.round)) {
@@ -499,7 +492,7 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
         changed = true;
       }
     }
-if (list.round) {
+    if (list.round) {
       const oldRound = JSON.stringify(list.round);
       mapRankingRound(list.round, (item) => item === from ? to : item);
       if (oldRound !== JSON.stringify(list.round)) { changed = true; changedHere = true; }
