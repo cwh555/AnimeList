@@ -60,7 +60,7 @@ try {
     'checks.coverSelect=!!root.querySelectorAll(".al-ranking-choice").length && !root.querySelector(".al-ranking-choice").textContent.includes("選左邊");',
     'root.querySelector(".al-ranking-choice").click();await delay();',
     'checks.rankAfterChoice=data.anime.ordered.length===2;',
-    'if(root.querySelector(".al-ranking-choice")){root.querySelector(".al-ranking-skip").click();await delay();}',
+    'for(let i=0;i<5&&root.querySelector(".al-ranking-choice");i++){root.querySelector(".al-ranking-skip").click();await delay();}',
     'checks.skipPending=Object.keys(data.anime.pending).length===1 && data.anime.ordered.length===2;',
     'if(root.querySelector(".al-ranking-actions button")){}',
     'data.anime.ordered=["anime/A.md","anime/B.md","anime/C.md"];data.anime.pending={};data.anime.active=null;comparing=false;opts.comparing=false;await redraw();',
