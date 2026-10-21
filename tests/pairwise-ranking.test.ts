@@ -5,7 +5,7 @@ import {
   completedRankingItems, decideRanking, emptyRankingCollection, emptyRankingState,
   moveRankedItem, nextRankingPair, placePendingItem, prepareRanking,
   rankingBounds, rankingCounts, recompareRankedItem, renameRankingPath, resumePendingRanking,
-  undoRanking, reconcileRanking,
+  undoRanking, reconcileRanking, removeRankingPath,
 } from "../src/domain/pairwise-ranking";
 
 function media(title: string, type: MediaType = "anime", status: MediaItem["status"] = "completed"): MediaItem {
@@ -156,6 +156,18 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.equal(state.anime.active?.comparisons.Renamed, "better");
     assert.equal(state.anime.pending.D.comparisons.Renamed, "skip");
     assert.equal(renameRankingPath(state, "missing", "something"), false);
+  });
+
+  it("deletes a removed note from every ranking relation", () => {
+    const state = emptyRankingState();
+    state.anime.ordered = ["A", "B"];
+    state.anime.active = { path: "C", comparisons: { B: "worse" } };
+    state.manga.pending.M = { path: "M", comparisons: { B: "skip" } };
+    assert.equal(removeRankingPath(state, "B"), true);
+    assert.deepEqual(state.anime.ordered, ["A"]);
+    assert.deepEqual(state.anime.active?.comparisons, {});
+    assert.deepEqual(state.manga.pending.M.comparisons, {});
+    assert.equal(removeRankingPath(state, "B"), false);
   });
 
   it("removes entries no longer completed and never resurrects stale undo references", () => {

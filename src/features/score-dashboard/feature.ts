@@ -91,6 +91,14 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   HOSTS.set(plugin, dashboardHost);
   const rankingStore = new PairwiseRankingStore(plugin.app);
   RANK_STORES.set(plugin, rankingStore);
+  plugin.registerEvent(plugin.app.vault.on("delete", (file) => {
+    if (!(file instanceof TFile)) return;
+    void rankingStore.remove(file.path).then((changed) => {
+      if (changed) plugin.refreshViews();
+    }).catch((error: unknown) => {
+      dashboardHost.showNotice(rankingText("failed", { reason: errorMessage(error) }));
+    });
+  }));
   plugin.registerEvent(plugin.app.vault.on("rename", (file, oldPath) => {
     if (!(file instanceof TFile) || typeof oldPath !== "string") return;
     void rankingStore.rename(oldPath, file.path).then((changed) => {

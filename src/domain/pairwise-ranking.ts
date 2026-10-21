@@ -252,6 +252,33 @@ export function recompareRankedItem(list: RankingCollection, path: string): bool
   return true;
 }
 
+export function removeRankingPath(state: RankingState, path: string): boolean {
+  let changed = false;
+  for (const type of ["anime", "manga", "novel"] as const) {
+    const list = state[type];
+    const previous = list.ordered.length;
+    list.ordered = list.ordered.filter((item) => item !== path);
+    if (previous !== list.ordered.length) changed = true;
+    if (Object.hasOwn(list.pending, path)) {
+      delete list.pending[path];
+      changed = true;
+    }
+    if (list.active?.path === path) { list.active = null; changed = true; }
+    for (const attempt of Object.values(list.pending)) {
+      if (Object.hasOwn(attempt.comparisons, path)) {
+        delete attempt.comparisons[path];
+        changed = true;
+      }
+    }
+    if (list.active && Object.hasOwn(list.active.comparisons, path)) {
+      delete list.active.comparisons[path];
+      changed = true;
+    }
+    if (changed) list.history = [];
+  }
+  return changed;
+}
+
 export function renameRankingPath(state: RankingState, from: string, to: string): boolean {
   if (!from || !to || from === to) return false;
   let changed = false;
