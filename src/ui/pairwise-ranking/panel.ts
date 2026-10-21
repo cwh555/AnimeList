@@ -11,6 +11,7 @@ import { rankingText as t } from "../../features/pairwise-ranking/text";
 import { makeEl } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import { RankingComparisonModal } from "./comparison-modal";
+import { installRankingDrag } from "./drag";
 
 // The workspace scroll host survives list rebuilds; keep searches with it.
 const RANKING_QUERIES = new WeakMap<HTMLElement, string>();
@@ -133,57 +134,6 @@ class RankingRangeModal extends Modal {
     this.contentEl.append(inputs, error, controls);
     fields[0].focus();
   }
-}
-
-function installReorderHandle(
-  handle: HTMLButtonElement, row: HTMLElement, rows: HTMLElement[],
-  from: number, moved: (position: number) => void,
-): void {
-  handle.addEventListener("keydown", (event) => {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-    event.preventDefault();
-    moved(from + (event.key === "ArrowUp" ? -1 : 1));
-  });
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !event.isPrimary) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const pointer = event.pointerId;
-    let destination = from;
-    const highlight = (target: number): void => {
-      rows.forEach((entry, index) => entry.classList.toggle("is-rank-target", index === target - 1));
-      destination = target;
-    };
-    row.classList.add("is-rank-moving");
-    handle.setPointerCapture(pointer);
-    const move = (next: PointerEvent): void => {
-      if (next.pointerId !== pointer) return;
-      const scrollHost = row.closest<HTMLElement>(".al-workspace-page-body")
-        ?? row.closest<HTMLElement>(".view-content");
-      if (scrollHost) {
-        const rect = scrollHost.getBoundingClientRect();
-        if (next.clientY < rect.top + 38) scrollHost.scrollTop -= 16;
-        if (next.clientY > rect.bottom - 38) scrollHost.scrollTop += 16;
-      }
-      const bounds = rows.map((entry) => entry.getBoundingClientRect());
-      const target = rankingDropPosition(bounds, from - 1, next.clientY);
-      highlight(target);
-    };
-    const finish = (commit: boolean): void => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", done);
-      handle.removeEventListener("pointercancel", cancel);
-      row.classList.remove("is-rank-moving");
-      rows.forEach((entry) => entry.classList.remove("is-rank-target"));
-      if (handle.hasPointerCapture(pointer)) handle.releasePointerCapture(pointer);
-      if (commit && from !== destination) moved(destination);
-    };
-    const done = (up: PointerEvent): void => { if (up.pointerId === pointer) finish(true); };
-    const cancel = (up: PointerEvent): void => { if (up.pointerId === pointer) finish(false); };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", done);
-    handle.addEventListener("pointercancel", cancel);
-  });
 }
 
 export async function renderRankingPanel(container: HTMLElement, options: RankingPanelOptions): Promise<void> {
@@ -333,7 +283,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     row.appendChild(moveButton);
     rows.push(row);
     result.appendChild(row);
-    installReorderHandle(handle, row, rows, index + 1, (rank) => {
+    installRankingDrag(handle, row, rows, index + 1, (rank) => {
       void mutate((draft) => { moveRankedItem(draft, path, rank); });
     });
   }
