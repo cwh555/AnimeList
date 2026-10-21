@@ -180,6 +180,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
   RATING_MOUNTS.delete(container);
   container.replaceChildren();
   container.classList.toggle("animelist-score-dashboard-view", rankState.mode === "rating");
+  container.classList.toggle("animelist-ranking-view", rankState.mode === "ranking");
 
   const tabs = createEl("nav");
   tabs.className = "al-ranking-mode-tabs";
