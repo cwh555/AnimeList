@@ -9,6 +9,8 @@ import { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { renderRankingPanel } from "../../ui/pairwise-ranking/panel";
 import { rankingText } from "../pairwise-ranking/text";
 import { errorMessage } from "../../ui/ui-helpers";
+import { pathBelongsToLibraryRoot } from "../../data/library-change-scope";
+import { normalizeMediaStatus } from "../../domain/media-status";
 import type { MediaType } from "../../domain/media-types";
 import { prepareScoreDashboardCoverSources } from "../../ui/score-dashboard/cover-sources";
 import { confirmScoreDashboardClamp } from "../../ui/score-dashboard/operation-ui";
@@ -91,6 +93,20 @@ function activateDashboard(plugin: ScoreDashboardPlugin): void {
   HOSTS.set(plugin, dashboardHost);
   const rankingStore = new PairwiseRankingStore(plugin.app);
   RANK_STORES.set(plugin, rankingStore);
+  plugin.registerEvent(plugin.app.metadataCache.on("changed", (file) => {
+    if (!(file instanceof TFile) || file.extension !== "md"
+      || !plugin.getScanFolders().some((root) => pathBelongsToLibraryRoot(file.path, root))) return;
+    const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+    if (!frontmatter || !Object.hasOwn(frontmatter, "status")
+      || normalizeMediaStatus(frontmatter.status) === "completed") return;
+    // Once a completed work becomes unfinished, its old position is obsolete.
+    // A future completion should enter the "unranked" pool for re-insertion.
+    void rankingStore.remove(file.path).then((changed) => {
+      if (changed) plugin.refreshViews();
+    }).catch((error: unknown) => {
+      dashboardHost.showNotice(rankingText("failed", { reason: errorMessage(error) }));
+    });
+  }));
   plugin.registerEvent(plugin.app.vault.on("delete", (file) => {
     if (!(file instanceof TFile)) return;
     void rankingStore.remove(file.path).then((changed) => {
