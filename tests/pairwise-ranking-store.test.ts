@@ -170,6 +170,26 @@ describe("ranking vault storage", () => {
     assert.equal(new TextDecoder().decode(adapter.files.get(path)), original);
   });
 
+  it("copies the exact original UTF-8 bytes including BOM into recovery backup", async () => {
+    const { app, adapter } = setup();
+    const state = emptyRankingState();
+    state.manga.round = startRankingRound(["M1", "M2"], "full");
+    (state.manga.round as unknown as Record<string, unknown>).results = null;
+    const encoded = new TextEncoder().encode(JSON.stringify(state));
+    const bytes = new Uint8Array(encoded.length + 3);
+    bytes.set([0xef, 0xbb, 0xbf]);
+    bytes.set(encoded, 3);
+    const original = bytes.buffer;
+    adapter.files.set(".obsidian/animelist-ranking.json", original);
+    const service = new PairwiseRankingStore(app);
+    const restored = await service.load();
+    assert.ok(restored.manga.round);
+    const backup = service.getRecoveryInfo()?.backupPath;
+    assert.ok(backup);
+    assert.deepEqual(new Uint8Array(adapter.files.get(backup)), new Uint8Array(original));
+    assert.deepEqual(new Uint8Array(adapter.files.get(".obsidian/animelist-ranking.json")), new Uint8Array(original));
+  });
+
   it("does not replace corrupt ranking state with a blank file", async () => {
     const { app, adapter } = setup();
     adapter.put(".obsidian/animelist-ranking.json", "{not-valid-json");
