@@ -1,4 +1,9 @@
 import type { MediaItem, MediaType } from "./media-types";
+import {
+  startRankingRound, nextRoundPair, answerRound, mapRankingRound, advanceRound,
+  type RankingRound,
+} from "./ranking-rounds";
+export { roundProgress } from "./ranking-rounds";
 
 export type RankingChoice = "better" | "worse" | "skip";
 export type RankingMode = "new" | "pending" | "reset";
@@ -13,6 +18,7 @@ export interface RankingSnapshot {
   ordered: string[];
   pending: Record<string, RankingAttempt>;
   active: RankingAttempt | null;
+  round?: RankingRound | null;
 }
 
 export interface RankingCollection extends RankingSnapshot {
@@ -37,7 +43,7 @@ export interface RankingBounds {
 }
 
 export function emptyRankingCollection(): RankingCollection {
-  return { ordered: [], pending: {}, active: null, history: [] };
+  return { ordered: [], pending: {}, active: null, round: null, history: [] };
 }
 
 export function emptyRankingState(): RankingState {
@@ -61,6 +67,7 @@ export function rankingSnapshot(list: RankingCollection): RankingSnapshot {
     pending: Object.fromEntries(Object.entries(list.pending).map(([key, value]) =>
       [key, { path: value.path, comparisons: { ...value.comparisons } }])),
     active: list.active ? { path: list.active.path, comparisons: { ...list.active.comparisons } } : null,
+    round: list.round ? JSON.parse(JSON.stringify(list.round)) as RankingRound : null,
   };
 }
 
@@ -83,6 +90,7 @@ export function rankingBounds(list: RankingCollection, attempt: RankingAttempt):
 }
 
 export function nextRankingPair(list: RankingCollection): RankingPair | null {
+  if (list.round) return nextRoundPair(list.round);
   if (!list.active) return null;
   const { first, last } = rankingBounds(list, list.active);
   if (first === last) return null;
@@ -116,7 +124,12 @@ function settleActive(list: RankingCollection): void {
 
 export function reconcileRanking(list: RankingCollection, eligible: readonly MediaItem[]): void {
   const allowed = new Set(eligible.map((item) => item.filePath));
-  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active });
+  const before = JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round });
+  if (list.round) {
+    mapRankingRound(list.round, (path) => allowed.has(path) ? path : null);
+    const finished = advanceRound(list.round);
+    if (finished) finishRankingRound(list, finished);
+  }
   list.ordered = [...new Set(list.ordered.filter((path) => allowed.has(path)))];
   const ranked = new Set(list.ordered);
   const clean = (attempt: RankingAttempt): RankingAttempt => ({
@@ -134,7 +147,7 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
     delete list.pending[list.active.path];
   }
   // Only invalidate undo if membership or reference evidence actually changed.
-  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active })) list.history = [];
+  if (before !== JSON.stringify({ ordered: list.ordered, pending: list.pending, active: list.active, round: list.round })) list.history = [];
 }
 
 /** Resolve only entries with exactly one consistent insertion slot, never infer a tie. */
@@ -169,6 +182,62 @@ function pickNext(list: RankingCollection, eligible: readonly MediaItem[], mode:
   const seen = new Set([...list.ordered, ...Object.keys(list.pending)]);
   const next = eligible.find((item) => !seen.has(item.filePath));
   if (next) list.active = { path: next.filePath, comparisons: {} };
+}
+
+function finishRankingRound(list: RankingCollection, sequence: string[]): void {
+  const round = list.round;
+  if (!round) return;
+  if (round.kind === "range") {
+    list.ordered = [
+      ...round.baseline.slice(0, round.rangeStart),
+      ...sequence,
+      ...round.baseline.slice(round.rangeStart + round.rangeLength),
+    ];
+  } else {
+    list.ordered = sequence;
+  }
+  list.round = null;
+  settleUnambiguousPending(list);
+}
+
+/**
+ * Round queues keep independent merge jobs in flight to avoid one work appearing
+ * repeatedly. Existing stable ranks remain visible until a successful commit.
+ */
+export function prepareRankingRounds(
+  list: RankingCollection,
+  eligible: readonly MediaItem[],
+  kind: RankingRound["kind"],
+  first = 1, last = list.ordered.length,
+): boolean {
+  if (list.round) return Boolean(nextRoundPair(list.round));
+  reconcileRanking(list, eligible);
+  const existing = new Set([...list.ordered, ...Object.keys(list.pending)]);
+  if (list.active) existing.add(list.active.path);
+  const newPaths = eligible.map((item) => item.filePath).filter((path) => !existing.has(path));
+  let participants: string[];
+  if (kind === "range") {
+    if (first < 1 || last > list.ordered.length || last - first < 1) return false;
+    participants = list.ordered.slice(first - 1, last);
+  } else if (kind === "full") {
+    participants = eligible.map((item) => item.filePath);
+    list.ordered = [];
+    list.pending = {};
+    list.active = null;
+    list.history = [];
+  } else {
+    if (!newPaths.length) return false;
+    participants = newPaths;
+    if (list.active) {
+      participants.unshift(list.active.path);
+      list.active = null;
+    }
+  }
+  const baseline = kind === "full" ? [] : [...list.ordered];
+  list.round = startRankingRound(participants, kind, baseline, first - 1, participants.length);
+  const finished = advanceRound(list.round);
+  if (finished) finishRankingRound(list, finished);
+  return Boolean(nextRankingPair(list)) || participants.length > 0;
 }
 
 export function prepareRanking(list: RankingCollection, eligible: readonly MediaItem[], mode: RankingMode): void {
@@ -213,8 +282,20 @@ export function decideRanking(
   choice: RankingChoice,
 ): boolean {
   const pair = nextRankingPair(list);
-  if (!pair || !list.active) return false;
+  if (!pair) return false;
   checkpoint(list);
+  if (list.round) {
+    const result = answerRound(list.round, choice);
+    if (result.skipped) {
+      list.pending[result.skipped] = {
+        path: result.skipped,
+        comparisons: result.against ? { [result.against]: "skip" } : {},
+      };
+    }
+    if (result.done) finishRankingRound(list, result.done);
+    return true;
+  }
+  if (!list.active) return false;
   list.active.comparisons[pair.reference] = choice;
   settleActive(list);
   settleUnambiguousPending(list);
@@ -231,6 +312,7 @@ export function undoRanking(list: RankingCollection): boolean {
   list.ordered = previous.ordered;
   list.pending = previous.pending;
   list.active = previous.active;
+  list.round = previous.round ?? null;
   return true;
 }
 
@@ -291,6 +373,15 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
     let changedHere = false;
+    if (list.round) {
+      const oldRound = JSON.stringify(list.round);
+      mapRankingRound(list.round, (item) => item === path ? null : item);
+      if (oldRound !== JSON.stringify(list.round)) {
+        changedHere = true;
+        const done = advanceRound(list.round);
+        if (done) finishRankingRound(list, done);
+      }
+    }
     const previous = list.ordered.length;
     list.ordered = list.ordered.filter((item) => item !== path);
     if (previous !== list.ordered.length) changedHere = true;
@@ -323,6 +414,11 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   for (const type of ["anime", "manga", "novel"] as const) {
     const list = state[type];
     let changedHere = false;
+    if (list.round) {
+      const oldRound = JSON.stringify(list.round);
+      mapRankingRound(list.round, (item) => item === from ? to : item);
+      if (oldRound !== JSON.stringify(list.round)) { changed = true; changedHere = true; }
+    }
     const replace = (value: string): string => value === from ? to : value;
     if (list.ordered.includes(from)) {
       list.ordered = [...new Set(list.ordered.map(replace))];
@@ -355,6 +451,12 @@ export function rankingCounts(list: RankingCollection, eligible: readonly MediaI
   ranked: number; pending: number; unranked: number;
 } {
   const excluded = new Set([...list.ordered, ...Object.keys(list.pending)]);
+  if (list.round) {
+    for (const item of list.round.jobs) {
+      for (const path of [...item.left, ...item.right, ...item.winners]) excluded.add(path);
+    }
+    for (const result of list.round.results) for (const path of result) excluded.add(path);
+  }
   if (list.active) excluded.add(list.active.path);
   return {
     ranked: list.ordered.length,
