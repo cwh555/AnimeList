@@ -1,22 +1,22 @@
 import { Menu, Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  completedRankingItems, decideRanking, moveRankedItem, rankingDropPosition, nextRankingPair,
+  completedRankingItems, moveRankedItem, rankingDropPosition, nextRankingPair,
   prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
   reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem, resumePendingRanking,
-  type RankingCollection, type RankingChoice, type RankingState,
+  type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { rankingText as t } from "../../features/pairwise-ranking/text";
 import { makeEl } from "../ui-helpers";
+import { rankingCover } from "./cover";
+import { RankingComparisonModal } from "./comparison-modal";
 
 interface RankingPanelOptions {
   app: App;
   store: PairwiseRankingStore;
   items: readonly MediaItem[];
   type: MediaType;
-  comparing: boolean;
-  setComparing(value: boolean): void;
   setType(value: MediaType): void;
   redraw(): void;
   openNote(path: string): Promise<void>;
@@ -89,24 +89,6 @@ class RankingMoveModal extends Modal {
     input.focus();
     input.select();
   }
-}
-
-function cover(item: MediaItem | undefined, className: string): HTMLElement {
-  const shell = makeEl("span", className);
-  if (!item) return shell;
-  const src = item.coverSources?.src || item.cover;
-  if (src) {
-    const img = makeEl("img");
-    img.src = src;
-    img.alt = "";
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.draggable = false;
-    if (item.coverSources?.srcset) img.srcset = item.coverSources.srcset;
-    img.addEventListener("error", () => { img.remove(); setIcon(shell, "image-off"); }, { once: true });
-    shell.append(img);
-  } else setIcon(shell, "image-off");
-  return shell;
 }
 
 function installReorderHandle(
@@ -184,26 +166,33 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   container.replaceChildren(panel);
   let busy = false;
 
-  const mutate = async (edit: (list: RankingCollection) => void): Promise<void> => {
+  const compare = (): void => {
+    new RankingComparisonModal(options.app, {
+      store: options.store,
+      type: options.type,
+      eligible,
+      onClose: options.redraw,
+      onError: options.showNotice,
+    }).open();
+  };
+  const mutate = async (edit: (list: RankingCollection) => void, compareAfter = false): Promise<void> => {
     if (busy) return;
     busy = true;
     try {
-      await options.store.mutate((draft) => {
+      const saved = await options.store.mutate((draft) => {
         reconcileRanking(draft[options.type], eligible);
         edit(draft[options.type]);
       });
       options.redraw();
+      if (compareAfter && nextRankingPair(saved[options.type])) compare();
     } catch (error) {
-      busy = false;
       options.showNotice(t("failed", { reason: error instanceof Error ? error.message : String(error) }));
+    } finally {
+      busy = false;
     }
   };
   const start = (mode: "new" | "pending" | "reset"): void => {
-    void mutate((draft) => {
-      prepareRanking(draft, eligible, mode);
-      if (!nextRankingPair(draft)) options.setComparing(false);
-      else options.setComparing(true);
-    });
+    void mutate((draft) => { prepareRanking(draft, eligible, mode); }, true);
   };
 
   const header = makeEl("header", "al-ranking-header");
@@ -230,18 +219,13 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
 
   const actions = makeEl("div", "al-ranking-actions");
   if (pair) {
-    actions.appendChild(button(t(options.comparing ? "exit" : "continue"), () => {
-      options.setComparing(!options.comparing);
-      options.redraw();
-    }, options.comparing ? "save" : "play"));
+    actions.appendChild(button(t("continue"), compare, "play", "mod-cta"));
   } else if (counts.unranked) {
-    actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => start("new"), "play"));
+    actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => start("new"), "play", "mod-cta"));
   }
-  if (counts.pending && !options.comparing) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
-  if (!options.comparing && list.history.length) actions.appendChild(button(t("undo"), () => {
-    void mutate((draft) => {
-      if (undoRanking(draft)) options.setComparing(Boolean(nextRankingPair(draft)));
-    });
+  if (counts.pending) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
+  if (list.history.length) actions.appendChild(button(t("undo"), () => {
+    void mutate((draft) => { undoRanking(draft); });
   }, "undo-2"));
   const more = button(t("more"), () => {
     const menu = new Menu();
@@ -250,8 +234,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
         void mutate((draft) => {
           Object.assign(draft, emptyRankingCollection());
           prepareRanking(draft, eligible, "new");
-          options.setComparing(Boolean(nextRankingPair(draft)));
-        });
+        }, true);
       }).open();
     }));
     const rect = more.getBoundingClientRect();
@@ -259,39 +242,6 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   }, "ellipsis");
   actions.appendChild(more);
   panel.appendChild(actions);
-
-  if (options.comparing && pair) {
-    const prompt = makeEl("div", "al-ranking-comparison");
-    prompt.append(makeEl("div", "al-ranking-subtitle", t("progress")), makeEl("p", "al-ranking-instructions", t("hint")));
-    const choices = makeEl("div", "al-ranking-choices");
-    for (const [path, choice] of [[pair.candidate, "better"], [pair.reference, "worse"]] as const) {
-      const item = byPath.get(path);
-      const card = button("", () => {
-        void mutate((draft) => {
-          decideRanking(draft, eligible, choice as RankingChoice);
-          if (!nextRankingPair(draft)) options.setComparing(false);
-        });
-      }, undefined, "al-ranking-choice");
-      card.setAttribute("aria-label", item?.title ?? path);
-      card.append(cover(item, "al-ranking-choice-cover"), makeEl("span", "al-ranking-choice-title", item?.title ?? path));
-      choices.appendChild(card);
-    }
-    prompt.append(choices, button(t("skip"), () => {
-      void mutate((draft) => {
-        decideRanking(draft, eligible, "skip");
-        if (!nextRankingPair(draft)) options.setComparing(false);
-      });
-    }, "skip-forward", "al-ranking-skip"));
-    const secondary = makeEl("div", "al-ranking-secondary");
-    const undo = button(t("undo"), () => {
-      void mutate((draft) => { undoRanking(draft); options.setComparing(true); });
-    }, "undo-2");
-    undo.disabled = list.history.length === 0;
-    secondary.append(undo, button(t("exit"), () => { options.setComparing(false); options.redraw(); }, "save"));
-    prompt.appendChild(secondary);
-    panel.appendChild(prompt);
-    return;
-  }
 
   if (counts.pending) panel.appendChild(makeEl("p", "al-ranking-warning", t("warning")));
   const search = makeEl("input", "al-ranking-search");
@@ -309,7 +259,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     row.dataset.title = item.title.toLocaleLowerCase();
     row.append(makeEl("span", "al-ranking-position", String(index + 1)));
     const content = button("", () => { void options.openNote(path); }, undefined, "al-ranking-open");
-    content.append(cover(item, "al-ranking-row-cover"), makeEl("span", "al-ranking-row-title", item.title));
+    content.append(rankingCover(item, "al-ranking-row-cover"), makeEl("span", "al-ranking-row-title", item.title));
     row.appendChild(content);
     const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
     handle.setAttribute("aria-label", t("drag", { title: item.title }));
@@ -331,8 +281,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
             recompareRankedItem(draft, path);
             draft.active = { path, comparisons: {} };
             delete draft.pending[path];
-            options.setComparing(Boolean(nextRankingPair(draft)));
-          });
+          }, true);
         }));
       const rect = menuButton.getBoundingClientRect();
       menu.showAtPosition({ x: rect.left, y: rect.bottom });
@@ -366,7 +315,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const bounds = rankingBounds(list, attempt);
       const row = makeEl("div", "al-ranking-pending-row");
       const label = makeEl("div", "al-ranking-pending-label");
-      label.append(cover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
+      label.append(rankingCover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
       const possible = bounds.first === bounds.last
         ? t("onePosition", { first: bounds.first + 1 })
         : t("possible", { first: bounds.first + 1, last: bounds.last + 1 });
@@ -374,8 +323,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const retry = button(t("retry"), () => {
         void mutate((draft) => {
           resumePendingRanking(draft, eligible, path);
-          options.setComparing(Boolean(nextRankingPair(draft)));
-        });
+        }, true);
       }, "refresh-cw");
       const place = button(t("moveTo"), () => {
         new RankingMoveModal(options.app, list.ordered.length + 1, list.ordered.length + 1, (rank) => {
