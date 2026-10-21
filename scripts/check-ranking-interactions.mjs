@@ -49,7 +49,7 @@ try {
     'const items=[note("A"),note("B"),note("C"),note("M","manga"),note("Excluded","anime","ongoing")];',
     'const empty=()=>({ordered:[],pending:{},active:null,history:[]});',
     'let data={version:1,anime:empty(),manga:empty(),novel:empty()};',
-    'const store={mutate:async(fn)=>{const next=structuredClone(data);fn(next);data=next;return data;}};',
+    'const store={load:async()=>data,mutate:async(fn)=>{const next=structuredClone(data);fn(next);data=next;return data;}};',
     'const root=document.querySelector("#root");',
     'let comparing=false;let currentType="anime";const checks={};',
     'const redraw=()=>AnimeListRanking.renderRankingPanel(root,opts);',
