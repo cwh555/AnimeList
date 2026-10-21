@@ -4,7 +4,7 @@ import {
   completedRankingItems, decideRanking, moveRankedItem, nextRankingPair,
   prepareRanking, rankingBounds, rankingCounts, recompareRankedItem,
   reconcileRanking, undoRanking, emptyRankingCollection, placePendingItem,
-  type RankingCollection, type RankingChoice,
+  type RankingCollection, type RankingChoice, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { rankingText as t } from "../../features/pairwise-ranking/text";
@@ -164,7 +164,7 @@ function installReorderHandle(
 export async function renderRankingPanel(container: HTMLElement, options: RankingPanelOptions): Promise<void> {
   container.replaceChildren(makeEl("p", "al-ranking-loading", t("busy")));
   const eligible = completedRankingItems(options.items, options.type);
-  let state;
+  let state: RankingState;
   try {
     state = await options.store.mutate((draft) => { reconcileRanking(draft[options.type], eligible); });
   } catch (error) {
