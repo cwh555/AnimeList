@@ -172,22 +172,24 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     });
     tabs.appendChild(tab);
   }
-  const body = createDiv();
-  body.className = "al-score-mode-content";
-  container.append(tabs, body);
-
   if (rankState.mode === "rating") {
-    RATING_MOUNTS.set(container, body);
-    renderScoreDashboardWithBatchDrag(body, dashboardHost.collectMediaItems(), scoreState, {
+    // Preserve the original scroll host: the existing rating drag/scroll logic
+    // deliberately operates on this exact workspace container.
+    RATING_MOUNTS.set(container, container);
+    renderScoreDashboardWithBatchDrag(container, dashboardHost.collectMediaItems(), scoreState, {
       openFile: (path) => dashboardHost.openMediaFile(path),
       applyChanges: (changes) => dashboardHost.applyScoreChanges(changes),
       confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
       showNotice: (message) => dashboardHost.showNotice(message),
       onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
     });
+    container.prepend(tabs);
     return;
   }
 
+  const body = createDiv();
+  body.className = "al-score-mode-content";
+  container.append(tabs, body);
   const redraw = () => {
     if (!container.isConnected || rankState.mode !== "ranking") return;
     renderWorkspaceScoreDashboard(plugin, container);
