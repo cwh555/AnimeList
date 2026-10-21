@@ -48,7 +48,10 @@ export class RankingComparisonModal extends AnimeListModal {
   onClose(): void {
     this.closed = true;
     this.contentEl.empty();
-    this.options.onClose();
+    // The native X can close the dialog while a choice is being saved.
+    // Defer notifying the panel until that mutation has finished, so it
+    // never races a stale reload against the outstanding write.
+    if (!this.busy) this.options.onClose();
   }
 
   private async refresh(): Promise<void> {
@@ -78,12 +81,12 @@ export class RankingComparisonModal extends AnimeListModal {
         edit(state[this.options.type]);
       });
       this.list = next[this.options.type];
-      if (this.closed) this.options.onClose();
-      else this.render();
+      if (!this.closed) this.render();
     } catch (error) {
       this.fail(error);
     } finally {
       this.busy = false;
+      if (this.closed) this.options.onClose();
     }
   }
 
