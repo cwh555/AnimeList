@@ -11,10 +11,12 @@ import { registerLocaleMessages } from "../catalog";
 import { EN_CATALOGS } from "./en";
 import { JA_CATALOGS } from "./ja";
 import { KO_CATALOGS } from "./ko";
+import { ZH_CN_CATALOGS } from "./zh-CN";
 import { ZH_TW_CATALOGS, type LocaleCatalogs, type ZhTwCatalogNamespace } from "./zh-TW";
 
 export const BUNDLED_LOCALE_CATALOGS = {
   "zh-TW": ZH_TW_CATALOGS,
+  "zh-CN": ZH_CN_CATALOGS,
   en: EN_CATALOGS,
   ja: JA_CATALOGS,
   ko: KO_CATALOGS,

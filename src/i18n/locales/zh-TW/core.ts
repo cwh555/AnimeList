@@ -10,6 +10,7 @@ export const CORE_MESSAGES = {
   "settings.language.desc": "變更 AnimeList 介面使用的語言。不會修改筆記、標籤或作品資料。",
   "settings.language.system": "跟隨 Obsidian",
   "settings.language.zhTW": "繁體中文",
+  "settings.language.zhCN": "簡體中文",
   "settings.language.en": "English",
   "settings.language.ja": "日本語",
   "settings.language.ko": "한국어",

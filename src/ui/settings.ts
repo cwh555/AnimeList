@@ -342,6 +342,7 @@ export class AnimeListSettingTab extends PluginSettingTab {
       dropdown
         .addOption("system", uiText("settings.language.system"))
         .addOption("zh-TW", uiText("settings.language.zhTW"))
+        .addOption("zh-CN", uiText("settings.language.zhCN"))
         .addOption("en", uiText("settings.language.en"))
         .addOption("ja", uiText("settings.language.ja"))
         .addOption("ko", uiText("settings.language.ko"))
