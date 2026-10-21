@@ -27,7 +27,6 @@ export const RANKING_MESSAGES = {
   "hint": "點選較喜歡的作品封面",
   "skip": "跳過",
   "pause": "暫停",
-  "undo": "上一步",
   "exit": "儲存並離開",
   "noCompleted": "沒有已完成的作品",
   "empty": "尚無排名",

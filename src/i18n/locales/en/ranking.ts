@@ -27,7 +27,6 @@ export const EN_RANKING_MESSAGES = {
   "hint": "Tap the cover of the work you prefer",
   "skip": "Skip",
   "pause": "Pause",
-  "undo": "Undo",
   "exit": "Save and exit",
   "noCompleted": "No completed works",
   "empty": "No ranking yet",

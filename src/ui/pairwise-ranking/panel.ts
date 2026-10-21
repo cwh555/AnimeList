@@ -3,7 +3,7 @@ import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
   prepareRanking, rankingBounds, rankingCounts,
-  reconcileRanking, undoRanking, emptyRankingState,
+  reconcileRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -144,9 +144,6 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     }, "play", "mod-cta"));
   }
   if (counts.pending) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
-  if (list.history.length) actions.appendChild(button(t("undo"), () => {
-    void mutate((draft) => { undoRanking(draft); });
-  }, "undo-2"));
   if (list.ordered.length || list.round) {
     actions.appendChild(button(t("reset"), () => {
       new RankingConfirmModal(options.app, () => {

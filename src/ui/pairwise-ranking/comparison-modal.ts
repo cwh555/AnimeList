@@ -4,7 +4,7 @@ import { makeEl, errorMessage } from "../ui-helpers";
 import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
-  decideRanking, nextRankingPair, reconcileRanking, undoRanking,
+  decideRanking, nextRankingPair, reconcileRanking,
   type RankingChoice, type RankingCollection,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -119,16 +119,12 @@ export class RankingComparisonModal extends AnimeListModal {
       choices.appendChild(card);
     }
     const toolbar = makeEl("div", "al-ranking-dialog-toolbar");
-    const undo = action(t("undo"), "undo-2", () => {
-      void this.change((list) => { undoRanking(list); });
-    });
-    undo.disabled = this.list.history.length === 0;
     const skip = action(t("skip"), "skip-forward", () => {
       void this.change((list) => { decideRanking(list, this.options.eligible, "skip"); });
     });
     skip.addClass("al-ranking-skip");
     const pause = action(t("pause"), "pause", () => this.close());
-    toolbar.append(undo, skip, pause);
+    toolbar.append(skip, pause);
     contentEl.append(heading);
     if (progress) contentEl.append(progress);
     contentEl.append(choices, toolbar);

@@ -19,7 +19,7 @@ function validateRankData(input: unknown): LoadedRanking {
     const collection = list as Record<string, unknown>;
     if (!Array.isArray(collection.ordered) || !collection.ordered.every((x) => typeof x === "string")
         || !collection.pending || typeof collection.pending !== "object" || Array.isArray(collection.pending)
-        || !Array.isArray(collection.history)) throw new Error("Corrupted ranking collection: " + type);
+        ) throw new Error("Corrupted ranking collection: " + type);
     if (collection.pendingQueue != null && (!Array.isArray(collection.pendingQueue)
       || collection.pendingQueue.some((path: unknown) => typeof path !== "string"))) {
       throw new Error("Invalid pending review queue: " + type);
@@ -48,8 +48,10 @@ function validateRankData(input: unknown): LoadedRanking {
         throw new Error("Corrupted ranking comparison: " + type);
       }
     }
-    // Older snapshots cannot be trusted after a plugin upgrade; avoid undoing across schema versions.
-    collection.history = [];
+    // Version 1 files may contain obsolete undo snapshots. Ignore them on load
+    // and omit them on the next user-initiated write; do not touch the original
+    // file merely because a plugin update opened it.
+    delete collection.history;
   }
   return { state: state as unknown as RankingState, recovered, needsRecompare };
 }
