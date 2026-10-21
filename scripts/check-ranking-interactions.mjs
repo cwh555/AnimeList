@@ -14,7 +14,7 @@ try {
   await build({
     absWorkingDir: root,
     stdin: {
-      contents: 'export { renderRankingPanel } from "./src/ui/pairwise-ranking/panel";',
+      contents: 'export { renderRankingPanel } from "./src/ui/pairwise-ranking/panel"; export { PairwiseRankingStore } from "./src/data/pairwise-ranking/store";',
       resolveDir: root,
       loader: "ts",
     },
@@ -31,7 +31,7 @@ try {
         ctx.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "stub" }));
         ctx.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
           loader: "js",
-          contents: 'export function setIcon() {} export class Menu {addItem(){return this;} showAtPosition(){}} export class Modal {constructor(){this.modalEl=document.createElement("div");this.modalEl.className="modal";this.contentEl=document.createElement("div");this.contentEl.className="modal-content";this.modalEl.append(this.contentEl);} open(){document.body.append(this.modalEl);this.onOpen?.()} close(){this.onClose?.();this.modalEl.remove()}}',
+          contents: 'export function normalizePath(p){return p} export function setIcon() {} export class Menu {addItem(){return this;} showAtPosition(){}} export class Modal {constructor(){this.modalEl=document.createElement("div");this.modalEl.className="modal";this.contentEl=document.createElement("div");this.contentEl.className="modal-content";this.modalEl.append(this.contentEl);} open(){document.body.append(this.modalEl);this.onOpen?.()} close(){this.onClose?.();this.modalEl.remove()}}',
         }));
       },
     }],
@@ -118,6 +118,32 @@ try {
     'checks.noWorksEmptyState=!!emptyRoot.querySelector(".al-ranking-empty") && !emptyRoot.querySelector(".al-ranking-error");',
     'checks.noWorksDoesNotReadDamagedRound=emptyStoreReads===0;',
     'emptyRoot.remove();',
+    // Exercise the real vault-backed store from malformed manga.results on the
+    // same browser page: no fake load() implementation can hide this failure.
+    'const damaged={version:1,anime:{ordered:["anime/A.md"],pending:{},active:null,history:[]},manga:{ordered:[],pending:{},active:null,history:[],round:{kind:"full",stage:1,total:2,comparisons:0,cursor:0,baseline:[],rangeStart:0,rangeLength:0,jobs:[{left:["manga/M.md"],right:["manga/M2.md"],winners:[],done:false}],results:null}},novel:empty()};',
+    'const damagedRaw=JSON.stringify(damaged);const rankingPath=".obsidian/animelist-ranking.json";',
+    'const binary=new TextEncoder().encode(damagedRaw).buffer;const persistedFiles=new Map([[rankingPath,binary]]);',
+    'const adapter={exists:async(path)=>persistedFiles.has(path)||path===".obsidian",readBinary:async(path)=>persistedFiles.get(path),writeBinary:async(path,bytes)=>{persistedFiles.set(path,bytes)},mkdir:async()=>{}};',
+    'const persistedApp={vault:{configDir:".obsidian",adapter}};',
+    'const persistedStore=new AnimeListRanking.PairwiseRankingStore(persistedApp);',
+    'const damagedRoot=document.createElement("section");document.body.append(damagedRoot);',
+    'const persistedOpts={...opts,app:persistedApp,store:persistedStore,type:"manga",items:[note("M","manga"),note("M2","manga")],redraw:()=>AnimeListRanking.renderRankingPanel(damagedRoot,persistedOpts)};',
+    'await AnimeListRanking.renderRankingPanel(damagedRoot,persistedOpts);',
+    'checks.mangaNullResultsRenders=!damagedRoot.querySelector(".al-ranking-error")&&!!damagedRoot.querySelector(".al-ranking-actions button");',
+    'const normalized=await persistedStore.load();',
+    'checks.mangaQueueRecovered=normalized.manga.round?.results?.length===1&&normalized.manga.round?.jobs?.[0]?.left?.[0]==="manga/M.md";',
+    'checks.animeRankingPreserved=normalized.anime.ordered[0]==="anime/A.md";',
+    'checks.originalSavedUnchanged=new TextDecoder().decode(persistedFiles.get(rankingPath))===damagedRaw;',
+    'checks.recoveryBackupExists=[...persistedFiles.keys()].filter(key=>key.includes(".recovery-")).length===1;',
+    'damagedRoot.querySelector(".al-ranking-actions button").click();await delay();',
+    'const damagedModal=document.querySelector(".al-ranking-comparison-modal");',
+    'checks.recoveredComparisonOpens=!!damagedModal&&damagedModal.querySelectorAll(".al-ranking-choice").length===2;',
+    'damagedModal.querySelector(".al-ranking-choice").click();await delay();',
+    'checks.recoveredComparisonSaves=!(await persistedStore.load()).manga.round&&persistedStore.getRecoveryInfo().types.includes("manga");',
+    'const afterRestart=await new AnimeListRanking.PairwiseRankingStore(persistedApp).load();',
+    'checks.recoveredDataSurvivesRestart=afterRestart.manga.ordered.length===2&&afterRestart.anime.ordered[0]==="anime/A.md";',
+    'checks.onlyOneRecoveryBackup=[...persistedFiles.keys()].filter(key=>key.includes(".recovery-")).length===1;',
+    'damagedRoot.remove();',
     'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail";});',
     '</script></body></html>',
