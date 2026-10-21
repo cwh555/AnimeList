@@ -16,8 +16,9 @@ export function assertStoredRankingRound(value: unknown, type: string): void {
   }
   if (!isPaths(round.baseline)) corrupted("baseline");
   if (!Array.isArray(round.results) || !round.results.every(isPaths)) corrupted("results");
-  if (!Array.isArray(round.jobs)) corrupted("jobs");
-  for (const item of round.jobs) {
+  const jobs = round.jobs;
+  if (!Array.isArray(jobs)) corrupted("jobs");
+  for (const item of jobs as unknown[]) {
     if (!item || typeof item !== "object" || Array.isArray(item)) corrupted("jobs.item");
     const job = item as Record<string, unknown>;
     if (!isPaths(job.left) || !isPaths(job.right) || !isPaths(job.winners)
