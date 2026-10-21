@@ -114,7 +114,7 @@ function installReorderHandle(
   handle.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
-    moved(from + (event.key === "ArrowUp" ? 0 : 2));
+    moved(from + (event.key === "ArrowUp" ? -1 : 1));
   });
   handle.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || !event.isPrimary) return;
