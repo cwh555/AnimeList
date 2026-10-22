@@ -1,4 +1,4 @@
-import { collectChineseDiscoveryQueries } from "../../domain/search/chinese-variants";
+import { buildSearchQueryPlan } from "../../domain/search/query-plan";
 import {
   filterRelevantSearchResults,
   normalizeSearchComparable,
@@ -223,7 +223,8 @@ export async function searchMultilingualProviders(
 
   const languages = normalizeSearchLanguageSettings(options.languages);
   const dedupe = options.dedupe ?? defaultDedupe;
-  const initialQueries = searchQueryVariants(query);
+  const plan = buildSearchQueryPlan(query, languages);
+  const initialQueries = [...plan.initial];
   const initial = await runProviderQueries(options.providers, initialQueries);
   const initialUnique = dedupe(initial.results);
   const initialSeeds = rankSearchResults(initialUnique, query)
@@ -233,12 +234,7 @@ export async function searchMultilingualProviders(
   const discoveryProviders = languages.chinese && initialSeeds.length < 2
     ? options.providers.filter((provider) => provider.supportsChineseDiscovery)
     : [];
-  const discoveryQueries = discoveryProviders.length
-    ? collectChineseDiscoveryQueries(query)
-      .filter((candidate) => !initialQueries.some((initialQuery) => (
-        normalizeSearchComparable(initialQuery) === normalizeSearchComparable(candidate)
-      )))
-    : [];
+  const discoveryQueries = discoveryProviders.length ? [...plan.discovery] : [];
   const discovery = discoveryQueries.length
     ? await runProviderQueries(discoveryProviders, discoveryQueries)
     : { results: [], warnings: [] };
