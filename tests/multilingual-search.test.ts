@@ -188,6 +188,37 @@ describe("multilingual provider search", () => {
     assert.equal(response.results[0]?.title, "想成為影之實力者");
   });
 
+  it("recovers the real Bangumi novel title even when its translation inserts 要", async () => {
+    const input = "我想成為影之強者";
+    const variants = collectChineseDiscoveryQueries(input);
+    assert.ok(variants.includes("成为影之"));
+    assert.ok(variants.length <= 5);
+
+    const searched: string[] = [];
+    const response = await searchMultilingualProviders({
+      query: input,
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          searched.push(query);
+          // The real Bangumi series is 270200; its cataloged Chinese title
+          // includes the extra 要, which defeats the naive 5-char prefix.
+          if (!"想要成为影之实力者！".includes(query)) return [];
+          return [result({
+            provider: "bangumi", sourceId: "270200", mediaType: "novel",
+            format: "light_novel",
+            title: "想要成為影之實力者！",
+            originalTitle: "陰の実力者になりたくて!",
+            searchTitles: ["我想要成為影之強者！"],
+          })];
+        },
+      }],
+    });
+    assert.ok(searched.includes("成为影之"));
+    assert.equal(response.results[0]?.sourceId, "270200");
+  });
+
   it("serializes variants for one provider and preserves results before an API failure", async () => {
     const calls: string[] = [];
     let concurrent = 0;
