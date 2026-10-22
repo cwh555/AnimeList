@@ -1,6 +1,8 @@
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
+import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory } from "../data/cleanup-scan-history";
+import { getScopedMarkdownFiles } from "../data/vault-scope";
 import {
   applyDuplicateDefaultCoverCleanup,
   planDuplicateDefaultCoverCleanup,
@@ -32,9 +34,12 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
     appendRule(rules, "Notes using a custom note_template are skipped.");
     appendRule(rules, "Frontmatter, image sections, other images, headings, and prose are not changed.");
 
-    const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: "Scanning media notes…" });
+    const scope = createScanModeControl(this.contentEl);
+    const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: "Select scan scope and start." });
     const list = this.contentEl.createDiv({ cls: "al-version-cleanup-list" });
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
+    const scan = footer.createEl("button", { text: "Scan" });
+    scan.type = "button";
     const cancel = footer.createEl("button", { text: "Cancel" });
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
@@ -43,7 +48,21 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
     confirm.disabled = true;
 
     let plan: VersionCleanupPlan | null = null;
-    void planDuplicateDefaultCoverCleanup(this.host.app, this.host.getScanFolders()).then((value) => {
+    scan.addEventListener("click", () => {
+      scan.disabled = true;
+      scope.disabled = true;
+      status.setText("Scanning media notes…");
+      void readCleanupScanHistory(this.host.app).then(async history => {
+        const roots = this.host.getScanFolders();
+        const value = await planDuplicateDefaultCoverCleanup(this.host.app, roots,
+          file => history.needsScan("covers", file, scope.value === "all" ? "all" : "pending"));
+        const candidates = new Set(value.items.map(item => item.path));
+        const checked = getScopedMarkdownFiles(this.host.app, roots)
+          .filter(file => history.needsScan("covers", file, scope.value === "all" ? "all" : "pending")
+            && !candidates.has(file.path));
+        await saveCleanupScanHistory(this.host.app, "covers", checked);
+        return value;
+      }).then((value) => {
       plan = value;
       list.empty();
       status.setText(`Scanned ${value.scanned} media notes. ${value.items.length} note(s) can be updated.`);
@@ -62,6 +81,7 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
     }).catch((error) => {
       console.error("AnimeList version cleanup scan failed", error);
       status.setText(`Scan failed: ${error instanceof Error ? error.message : String(error)}`);
+    }).finally(() => { scan.disabled = false; scope.disabled = false; });
     });
 
     confirm.addEventListener("click", () => {
@@ -69,7 +89,10 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
       confirm.disabled = true;
       cancel.disabled = true;
       status.setText("Applying reviewed cleanup…");
-      void applyDuplicateDefaultCoverCleanup(this.host.app, plan).then((result) => {
+      void applyDuplicateDefaultCoverCleanup(this.host.app, plan).then(async (result) => {
+        const updated = new Set(result.details.filter(detail => detail.status === "updated").map(detail => detail.path));
+        await saveCleanupScanHistory(this.host.app, "covers",
+          getScopedMarkdownFiles(this.host.app, this.host.getScanFolders()).filter(file => updated.has(file.path)));
         status.setText(`Updated ${result.updated}; skipped ${result.skipped}; failed ${result.failed}.`);
         list.empty();
         for (const detail of result.details) {
