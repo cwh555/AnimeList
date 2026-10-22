@@ -63,7 +63,10 @@ export function planMediaNoteFilenameCleanup(
       "md",
       { ignorePath: file.path, reservedPaths },
     );
-    if (targetPath === file.path) continue;
+    if (targetPath === file.path) {
+      reservedPaths.add(targetPath);
+      continue;
+    }
     reservedPaths.add(targetPath);
     // Reserve paths across the *entire* library even in incremental mode.
     if (selected) items.push({ path: file.path, title: identity.title, targetPath });

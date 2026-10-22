@@ -107,7 +107,7 @@ Do not infer completeness from a name search: not all Wikidata items carry AniLi
 ## Incremental Settings operations
 
 All four operations in **Updates & cleanup** expose the same scan-scope choice:
-- **Only new or unfinished items** (default): skip successful checks whose file mtime/size and operation have not changed. Title checks additionally distinguish target language. Proposed but unconfirmed changes and API errors remain pending.
+- **Only new or unfinished items** (default): skip successful checks whose file mtime/size and operation have not changed. Title checks additionally distinguish target language. Proposed but unconfirmed changes, unavailable language evidence (no-source/no-translation), ambiguous matches and API errors remain pending. A deliberate user-specified title can be recognized as a completed no-change decision.
 - **Rescan all items**: ignore checkpoints and inspect all eligible notes in the configured Library roots.
 
 Checkpoints reside in `.obsidian/plugins/animelist/cleanup-scan-history.json` and are not frontmatter, not part of the note body, and not a record of media activity. Each successful write is checkpointed against the **updated** file version so the new file content is not immediately rescanned. Failed writes, inconclusive provider upgrades and unconfirmed proposals are never marked complete. A separate full scan remains available whenever the upstream metadata source changes. File moves/renames and content edits naturally invalidate path/version-based checkpoints. No scanning runs automatically merely because Settings was opened.

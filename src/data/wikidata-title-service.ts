@@ -98,7 +98,10 @@ export class WikidataTitleService {
     if (existing !== undefined) return existing;
     const work = this.lookupExact(result, locale, property).then(evidence => {
       this.cache.set(key, evidence);
-      if (this.cache.size > 256) this.cache.delete(this.cache.keys().next().value ?? "");
+      if (this.cache.size > 256) {
+        const oldest: string | undefined = this.cache.keys().next().value as string | undefined;
+        if (oldest !== undefined) this.cache.delete(oldest);
+      }
       return evidence;
     }).catch((error: unknown) => {
       this.unavailableUntil = Date.now() + 60_000;

@@ -95,7 +95,7 @@ export class TitleLocalizationModal extends AnimeListModal {
       // Only finished checks are cached; an unconfirmed proposal or API error
       // must remain visible on the next incremental scan.
       const checkedPaths = new Set(plan.rows
-        .filter(row => !row.proposal && row.status !== "lookup-failed")
+        .filter(row => row.status === "unchanged" || row.status === "custom-title")
         .map(row => row.path));
       const checked = getScopedMarkdownFiles(this.host.app, this.host.getScanFolders())
         .filter(file => checkedPaths.has(file.path));
