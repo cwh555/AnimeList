@@ -96,11 +96,14 @@ function ids(fm: Record<string, unknown>): { bangumi: string; anilist: string } 
       || links.map(anilistId).find(Boolean) || "",
   };
 }
-function preferredSource(fm: Record<string, unknown>, locale: SupportedLocale): TitleSource | null {
-  const idMap = ids(fm);
-  const provider = locale === "zh-TW" || locale === "zh-CN" ? "bangumi" : "anilist";
-  const id = idMap[provider];
-  return /^\d+$/.test(id) ? { provider, id } : null;
+function preferredSource(fm: Record<string, unknown>): TitleSource | null {
+  const all = ids(fm);
+  const primary = field(fm.source_provider);
+  if (primary === "bangumi" && /^\d+$/.test(all.bangumi)) return { provider: "bangumi", id: all.bangumi };
+  if (primary === "anilist" && /^\d+$/.test(all.anilist)) return { provider: "anilist", id: all.anilist };
+  if (/^\d+$/.test(all.bangumi)) return { provider: "bangumi", id: all.bangumi };
+  if (/^\d+$/.test(all.anilist)) return { provider: "anilist", id: all.anilist };
+  return null;
 }
 function identity(fm: Record<string, unknown>): readonly [string, string, string] {
   return [field(fm.source_provider), field(fm.source_id), field(fm.anilist_id)];
@@ -180,22 +183,50 @@ export async function planStoredTitleUpdates(
     if (!fm || !type || !old) return row(file.path, old || file.basename, "no-source", "Media title or type is missing.");
     const stored = knownTitles(fm.title_localizations);
     const approvedConversions = knownTitles(fm.title_script_conversions);
-    const source = preferredSource(fm, locale);
+    const source = preferredSource(fm);
     let candidate: ExternalMediaResult | null = null;
     let target = stored[locale] ?? "";
     let requiresReview = false;
     let scriptConverted = false;
     let reusedConversion = false;
     let selectedSource: TitleSource | null = source;
+    let crossProvider = false;
+    const trustedNames: string[] = [];
     if (!target && source) {
       candidate = await fetchCached(type, source);
       if (!candidate) return row(file.path, old, "no-translation", "The provider returned no work for the saved ID.");
       if (candidate.sourceId !== source.id || candidate.provider !== source.provider || candidate.mediaType !== type) {
         throw new Error("Provider returned unexpected media identity (work ID or type).");
       }
+      trustedNames.push(...providerTitles(candidate));
       target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
     }
-    if (!target && !source && (locale === "zh-TW" || locale === "zh-CN") && ids(fm).anilist) {
+    // A known exact ID is preferred independently of locale. Look up a second
+    // verified ID only if the primary provider has no localized title.
+    const known = ids(fm);
+    if (!target && source?.provider === "anilist" && /^\d+$/.test(known.bangumi)) {
+      const secondary = { provider: "bangumi" as const, id: known.bangumi };
+      const secondaryCandidate = await fetchCached(type, secondary);
+      if (secondaryCandidate?.provider === "bangumi" && secondaryCandidate.sourceId === secondary.id
+        && secondaryCandidate.mediaType === type) {
+        candidate = secondaryCandidate;
+        selectedSource = secondary;
+        trustedNames.push(...providerTitles(candidate));
+        target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
+      }
+    }
+    if (!target && source?.provider === "bangumi" && /^\d+$/.test(known.anilist)) {
+      const secondary = { provider: "anilist" as const, id: known.anilist };
+      const secondaryCandidate = await fetchCached(type, secondary);
+      if (secondaryCandidate?.provider === "anilist" && secondaryCandidate.sourceId === secondary.id
+        && secondaryCandidate.mediaType === type) {
+        candidate = secondaryCandidate;
+        selectedSource = secondary;
+        trustedNames.push(...providerTitles(candidate));
+        target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
+      }
+    }
+    if (!target && (locale === "zh-TW" || locale === "zh-CN") && known.anilist && !known.bangumi) {
       const query = field(fm.title_original) || field(fm.title_romaji) || old;
       const results = crossProviderCandidates(await apiCall(() => lookup(type, query)), fm);
       if (results.length > 1) return row(file.path, old, "ambiguous", "Several Bangumi works match; no automatic selection.");
@@ -206,9 +237,12 @@ export async function planStoredTitleUpdates(
           throw new Error("Cross-provider match could not be verified by Bangumi ID.");
         }
         requiresReview = true;
+        crossProvider = true;
         target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
       }
-      if (!results.length) return row(file.path, old, "no-source", "AniList has no Chinese title; no unique Bangumi title match was found.");
+      if (!results.length && !candidate) {
+        return row(file.path, old, "no-source", "No matching language variant in known providers.");
+      }
     }
     if (!target && approvedConversions[locale]) {
       target = approvedConversions[locale];
@@ -231,12 +265,11 @@ export async function planStoredTitleUpdates(
         : "The provider has no verified title in the chosen language.");
     }
     if (normalizeTitle(target) === normalizeTitle(old)) return row(file.path, old, "unchanged", "Already matches the requested title.");
-    const owned = candidate
-      ? [...providerTitles(candidate), ...Object.values(approvedConversions)].some(name => normalizeTitle(name) === normalizeTitle(old))
-      : [...Object.values(stored), ...Object.values(approvedConversions), field(fm.title_original), ...values(fm.title_aliases)]
-        .some(name => normalizeTitle(name) === normalizeTitle(old));
+    const owned = [...trustedNames, ...Object.values(stored), ...Object.values(approvedConversions),
+      field(fm.title_original), ...values(fm.title_aliases)]
+      .some(name => normalizeTitle(name) === normalizeTitle(old));
     if (!owned) return row(file.path, old, "custom-title", "Current title is not recognized as a source title; preserving customization.");
-    const merged = mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
+    const merged = crossProvider ? stored : mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
     const scriptConversions = scriptConverted
       ? { ...approvedConversions, [locale]: target }
       : approvedConversions;
