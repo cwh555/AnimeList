@@ -215,6 +215,57 @@ describe("external media search service", () => {
     assert.equal(response.results.some((item) => item.sourceId === "425211"), true);
   });
 
+  it("continues from expanded Chinese search queries instead of restarting with the input title", async () => {
+    const calls: string[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, query, page) => {
+          calls.push(`${query}:${page}`);
+          if (query !== "想成為影之") return { results: [], hasMore: false };
+          if (page === 1) return {
+            results: [result("bangumi", "novel-1", "想成為影之實力者", "novel")],
+            hasMore: true,
+          };
+          return {
+            results: [result("bangumi", "novel-2", "想成為影之實力者 後篇", "novel")],
+            hasMore: false,
+          };
+        }, true),
+      }),
+    );
+    const first = await service.search("novel", "我想成為影之強者");
+    assert.deepEqual(first.results.map(x => x.sourceId), ["novel-1"]);
+    const next = await service.searchPage("novel", "我想成為影之強者", 2);
+    assert.deepEqual(next.results.map(x => x.sourceId), ["novel-2"]);
+    assert.ok(calls.includes("想成為影之:2"));
+    assert.equal(calls.includes("我想成為影之強者:2"), false);
+    assert.equal(next.hasMore, false);
+  });
+
+  it("serves first-page overflow before sending further provider requests", async () => {
+    let calls = 0;
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async () => {
+          calls += 1;
+          return {
+            results: Array.from({ length: 30 }, (_, i) => result("bangumi", String(i), "Title " + i)),
+            hasMore: false,
+          };
+        }, true),
+      }),
+    );
+    const first = await service.search("anime", "Title");
+    const callsAfterFirst = calls;
+    const second = await service.searchPage("anime", "Title", 2);
+    assert.equal(first.results.length, 24);
+    assert.equal(second.results.length, 6);
+    assert.equal(calls, callsAfterFirst);
+    assert.equal(second.hasMore, false);
+  });
+
   it("uses the same provider clients for pagination and keeps partial provider success", async () => {
     const calls: string[] = [];
     const service = new ExternalMediaSearchService(
