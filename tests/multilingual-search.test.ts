@@ -173,7 +173,7 @@ describe("multilingual provider search", () => {
         supportsChineseDiscovery: true,
         async search(query: string): Promise<ExternalMediaResult[]> {
           calls.push(query);
-          if (query !== "想成為影之") return [];
+          if (query !== "成为影之") return [];
           return [result({
             mediaType: "novel", sourceId: "shadow-1",
             title: "想成為影之實力者",
@@ -183,7 +183,7 @@ describe("multilingual provider search", () => {
         },
       }],
     });
-    assert.ok(calls.includes("想成為影之"));
+    assert.ok(calls.includes("成为影之"));
     assert.equal(response.results[0]?.sourceId, "shadow-1");
     assert.equal(response.results[0]?.title, "想成為影之實力者");
   });
@@ -232,6 +232,7 @@ describe("multilingual provider search", () => {
           peak = Math.max(peak, concurrent);
           calls.push(query);
           try {
+            await Promise.resolve();
             if (query === "作品") throw new Error("provider temporarily unavailable");
             return [result({ sourceId: "test-1", title: "作品 第二季", searchTitles: [] })];
           } finally {
@@ -239,12 +240,62 @@ describe("multilingual provider search", () => {
           }
         },
       }],
-      languages: { chinese: false, english: false, original: false },
+      languages: { chinese: true, english: true, original: true },
     });
-    assert.equal(peak, 1);
+    assert.equal(peak, 2);
     assert.deepEqual(calls, ["作品 第二季", "作品"]);
     assert.equal(response.results.some(x => x.sourceId === "test-1"), true);
     assert.match(response.warnings[0], /temporarily unavailable/);
+  });
+
+  it("bounds impossible and ambiguous searches independently of the input length", async () => {
+    for (const term of ["不存在的漫畫暫稱甲乙丙丁", "我想成為影之強者"]) {
+      const requests: string[] = [];
+      const response = await searchMultilingualProviders({
+        query: term,
+        providers: [{
+          label: "Bangumi",
+          supportsChineseDiscovery: true,
+          async search(query): Promise<ExternalMediaResult[]> {
+            requests.push(query);
+            return [];
+          },
+        }],
+      });
+      assert.deepEqual(response.results, []);
+      assert.ok(requests.length <= 4, JSON.stringify(requests));
+      assert.equal(new Set(requests).size, requests.length);
+    }
+  });
+
+  it("emits first-provider results while a second provider is still in flight", async () => {
+    let release!: () => void;
+    const delayed = new Promise<void>(resolve => { release = resolve; });
+    const events: string[] = [];
+    const waiting = searchMultilingualProviders({
+      query: "輝夜姬想讓人告白",
+      providers: [{
+        label: "Bangumi",
+        async search(): Promise<ExternalMediaResult[]> {
+          return [result()];
+        },
+      }, {
+        label: "AniList",
+        async search(): Promise<ExternalMediaResult[]> {
+          await delayed;
+          return [];
+        },
+      }],
+      onProgress(results) {
+        if (results.some(candidate => candidate.sourceId === "248175")) events.push("first-result");
+      },
+    });
+    // Yield a microtask so the fast provider can publish its matches.
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.ok(events.includes("first-result"));
+    release();
+    await waiting;
   });
 
   it("does not issue disabled language discovery or alias expansions", async () => {
