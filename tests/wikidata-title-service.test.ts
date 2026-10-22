@@ -21,7 +21,7 @@ function source(type: "anime" | "manga" = "anime"): ExternalMediaResult {
 }
 function matches(items: string[] = [qid]) {
   return { results: { bindings: items.map(item => ({
-    item: { type: "uri", value: "https://www.wikidata.org/entity/" + item },
+    item: { type: "uri", value: "http://www.wikidata.org/entity/" + item },
   })) } };
 }
 function entity(labels: Record<string,string>, sitelinks: Record<string,string> = {}) {

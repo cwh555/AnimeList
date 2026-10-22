@@ -57,7 +57,7 @@ export function parseWikidataTitleEvidence(
   const bindings = object(object(queryResult).results).bindings;
   if (!Array.isArray(bindings) || bindings.length !== 1) return null;
   const url = string(object(object(bindings[0]).item).value);
-  const match = /^https:\/\/www\.wikidata\.org\/entity\/(Q[1-9]\d*)$/.exec(url);
+  const match = /^https?:\/\/www\.wikidata\.org\/entity\/(Q[1-9]\d*)$/.exec(url);
   if (!match) return null;
   const itemId = match[1];
   const entity = object(object(entityResult).entities)[itemId];
@@ -122,7 +122,7 @@ export class WikidataTitleService {
     const bindings = object(object(matches).results).bindings;
     if (!Array.isArray(bindings) || bindings.length !== 1) return null;
     const itemUrl = string(object(object(bindings[0]).item).value);
-    const id = /^https:\/\/www\.wikidata\.org\/entity\/(Q[1-9]\d*)$/.exec(itemUrl)?.[1];
+    const id = /^https?:\/\/www\.wikidata\.org\/entity\/(Q[1-9]\d*)$/.exec(itemUrl)?.[1];
     if (!id) return null;
     const langs = ["zh-tw", "zh-hant", "zh-cn", "zh-hans", "zh", "en", "ja", "ko"].join("|");
     const entityUrl = "https://www.wikidata.org/w/api.php?action=wbgetentities&ids="
