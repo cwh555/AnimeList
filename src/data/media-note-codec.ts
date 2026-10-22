@@ -283,6 +283,15 @@ export function buildMediaMarkdown(
     lines.push("title_script_conversions:");
     for (const [locale, value] of convertedEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
   }
+  const evidence = result.wikidataTitleEvidence;
+  if (evidence && evidence.title === title) {
+    lines.push("title_external_evidence:");
+    lines.push(`  locale: ${yamlScalar(evidence.locale)}`);
+    lines.push(`  title: ${yamlScalar(evidence.title)}`);
+    lines.push(`  source: ${yamlScalar(evidence.kind)}`);
+    lines.push(`  wikidata_id: ${yamlScalar(evidence.itemId)}`);
+    lines.push(`  identity_property: ${yamlScalar(evidence.identityProperty)}`);
+  }
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(format)}`);
   lines.push(`status: ${yamlScalar(status)}`);

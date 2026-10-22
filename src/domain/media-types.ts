@@ -86,6 +86,14 @@ export interface ExternalMediaSearchPage {
   hasMore: boolean;
 }
 
+export interface WikidataTitleEvidence {
+  readonly title: string;
+  readonly locale: SupportedLocale;
+  readonly itemId: string;
+  readonly kind: "wikidata-label" | "wikipedia-title" | "script-conversion";
+  readonly identityProperty: string;
+}
+
 export interface TitleSuggestion {
   readonly title: string;
   readonly locale: SupportedLocale;
@@ -119,6 +127,8 @@ export interface ExternalMediaResult {
   titleVariants?: MediaTitleVariants;
   /** Cross-provider title suggestion only: never official without identity proof. */
   titleSuggestion?: TitleSuggestion;
+  /** External-ID matched Wikidata name; distinct from provider-verified titles. */
+  wikidataTitleEvidence?: WikidataTitleEvidence;
   /** Prevent duplicate cross-provider lookups during create-note submission. */
   titleEvidenceChecked?: SupportedLocale;
   /** Auto script conversion is not a provider-verified official title. */

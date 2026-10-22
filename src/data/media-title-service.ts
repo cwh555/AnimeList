@@ -16,7 +16,10 @@ export function localizeExternalMediaResult(
     romaji: result.romajiTitle,
   };
   const selected = selectNewMediaTitle(variants, locale);
-  const title = selected.title || result.title;
+  const wikidata = result.wikidataTitleEvidence?.locale === locale
+    ? result.wikidataTitleEvidence : undefined;
+  const sourceOfficial = variants.localized?.[locale]?.trim();
+  const title = sourceOfficial || wikidata?.title || selected.title || result.title;
   const aliases = [...new Set([
     ...(result.searchTitles ?? []),
     result.title, title, result.originalTitle, result.romajiTitle,
@@ -27,9 +30,10 @@ export function localizeExternalMediaResult(
     ...result,
     title,
     titleSuggestion: result.titleSuggestion?.locale === locale ? result.titleSuggestion : undefined,
+    wikidataTitleEvidence: wikidata,
     titleVariants: variants,
     searchTitles: aliases,
-    ...(selected.scriptConversion
+    ...(!sourceOfficial && !wikidata && selected.scriptConversion
       ? { titleScriptConversions: { [locale]: selected.scriptConversion } }
       : { titleScriptConversions: undefined }),
   };

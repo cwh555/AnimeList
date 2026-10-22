@@ -16,6 +16,7 @@ import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import { localizeActiveMediaResult } from "../data/media-title-service";
 import { suggestCrossProviderTitle } from "../domain/media-title-suggestion";
+import { WikidataTitleService } from "../data/wikidata-title-service";
 import { chineseScriptCandidate } from "../domain/media-title-localization";
 import { normalizeSupportedLocale } from "../i18n/locale";
 import { getActiveLocale } from "../i18n/catalog";
@@ -34,6 +35,7 @@ export class AnimeListApplicationServices {
   private mediaRepository?: MediaRepository;
   private mediaIndex?: MediaLibraryIndex;
   private classificationService?: MediaClassificationService;
+  private wikidataTitles?: WikidataTitleService;
   private storage?: LibraryStorage;
   private providerClients?: HttpMetadataProviderClients;
   private searchService?: ExternalMediaSearchService;
@@ -270,12 +272,26 @@ export class AnimeListApplicationServices {
     const enriched = await this.mediaClassification().enrichOrOriginal(base, (error) => {
       console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
     });
-    const localized = localizeActiveMediaResult(enriched);
     const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    let localized = localizeActiveMediaResult(enriched);
+    if (localized.provider !== MANUAL_MEDIA_PROVIDER
+      && !localized.titleVariants?.localized?.[locale]
+      && localized.wikidataTitleEvidence?.locale !== locale) {
+      try {
+        this.wikidataTitles ??= new WikidataTitleService();
+        const evidence = await this.wikidataTitles.lookup(localized, locale);
+        if (evidence) localized = localizeActiveMediaResult({
+          ...localized, wikidataTitleEvidence: evidence,
+        });
+      } catch (error) {
+        console.warn("AnimeList Wikidata title lookup unavailable; keeping source title", error);
+      }
+    }
     if ((locale !== "zh-TW" && locale !== "zh-CN")
       || !this.settings().providers.bangumi || localized.provider === "bangumi"
       || localized.provider === MANUAL_MEDIA_PROVIDER
-      || localized.titleEvidenceChecked === locale) return localized;
+      || localized.titleEvidenceChecked === locale
+      || localized.wikidataTitleEvidence?.locale === locale) return localized;
     // The other source provides *candidate evidence*, not an authoritative ID
     // mapping. Do not silently change the media title or original source.
     try {

@@ -1,16 +1,8 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../app-metadata";
 import { convertChineseScriptForReview } from "../domain/chinese-title-conversion";
-import type { ExternalMediaResult } from "../domain/media-types";
+import type { ExternalMediaResult, WikidataTitleEvidence } from "../domain/media-types";
 import type { SupportedLocale } from "../i18n/locale";
-
-export interface WikidataTitleEvidence {
-  readonly title: string;
-  readonly locale: SupportedLocale;
-  readonly itemId: string;
-  readonly kind: "wikidata-label" | "wikipedia-title";
-  readonly identityProperty: string;
-}
 
 const PROPERTY = {
   bangumi: () => "P5732",
@@ -43,7 +35,7 @@ function titleForLocale(entity: Record<string, unknown>, locale: SupportedLocale
     const other = locale === "zh-TW" ? ["zh-hans", "zh-cn"] : ["zh-hant", "zh-tw"];
     const fallback = site || labeled(labels, "zh") || other.map(lang => labeled(labels, lang)).find(Boolean) || "";
     const title = fallback ? convertChineseScriptForReview(fallback, locale) ?? fallback : "";
-    return title ? { title, kind: site ? "wikipedia-title" : "wikidata-label" } : null;
+    return title ? { title, kind: "script-conversion" } : null;
   }
   const label = labeled(labels, locale);
   if (label) return { title: label, kind: "wikidata-label" };
@@ -76,7 +68,7 @@ export class WikidataTitleService {
     private readonly request: (url: string) => Promise<unknown> = async url =>
       (await requestUrl({ url, headers: {
         Accept: "application/json", "User-Agent": USER_AGENT,
-      } })).json as unknown,
+      } } )).json,
   ) {}
 
   lookup(result: ExternalMediaResult, locale: SupportedLocale): Promise<WikidataTitleEvidence | null> {
