@@ -4,9 +4,10 @@ import { convertChineseScriptForReview } from "../domain/chinese-title-conversio
 import type { ExternalMediaResult, WikidataTitleEvidence } from "../domain/media-types";
 import type { SupportedLocale } from "../i18n/locale";
 
+type TitleIdentity = Pick<ExternalMediaResult, "provider" | "sourceId" | "mediaType">;
 const PROPERTY = {
   bangumi: () => "P5732",
-  anilist: (result: ExternalMediaResult) => result.mediaType === "anime" ? "P8729" : "P8731",
+  anilist: (result: TitleIdentity) => result.mediaType === "anime" ? "P8729" : "P8731",
 } as const;
 
 function object(value: unknown): Record<string, unknown> {
@@ -44,7 +45,7 @@ function titleForLocale(entity: Record<string, unknown>, locale: SupportedLocale
   return title ? { title, kind: "wikipedia-title" } : null;
 }
 export function parseWikidataTitleEvidence(
-  queryResult: unknown, entityResult: unknown, result: ExternalMediaResult, locale: SupportedLocale,
+  queryResult: unknown, entityResult: unknown, result: TitleIdentity, locale: SupportedLocale,
 ): WikidataTitleEvidence | null {
   const property = result.provider === "bangumi" ? PROPERTY.bangumi()
     : result.provider === "anilist" ? PROPERTY.anilist(result) : null;
@@ -71,7 +72,7 @@ export class WikidataTitleService {
       } } )).json,
   ) {}
 
-  lookup(result: ExternalMediaResult, locale: SupportedLocale): Promise<WikidataTitleEvidence | null> {
+  lookup(result: TitleIdentity, locale: SupportedLocale): Promise<WikidataTitleEvidence | null> {
     const property = result.provider === "bangumi" ? PROPERTY.bangumi()
       : result.provider === "anilist" ? PROPERTY.anilist(result) : null;
     if (!property || !/^\d+$/.test(result.sourceId)) return Promise.resolve(null);
@@ -87,7 +88,7 @@ export class WikidataTitleService {
     return work;
   }
 
-  private async lookupExact(result: ExternalMediaResult, locale: SupportedLocale,
+  private async lookupExact(result: TitleIdentity, locale: SupportedLocale,
     property: string): Promise<WikidataTitleEvidence | null> {
     const query = `SELECT DISTINCT ?item WHERE { ?item wdt:${property} "${result.sourceId}". } LIMIT 2`;
     const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(query);

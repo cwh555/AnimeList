@@ -1,5 +1,6 @@
 import { TFile, type App } from "obsidian";
-import type { ExternalMediaResult, MediaType } from "../domain/media-types";
+import type { ExternalMediaResult, MediaType, WikidataTitleEvidence } from "../domain/media-types";
+import { WikidataTitleService } from "./wikidata-title-service";
 import { chineseScriptCandidate, mergeOfficialTitles, verifiedMediaTitle } from "../domain/media-title-localization";
 import type { SupportedLocale } from "../i18n/locale";
 import { getScopedMarkdownFiles } from "./vault-scope";
@@ -25,6 +26,7 @@ export interface TitleUpdateItem {
   readonly localized: Partial<Record<SupportedLocale, string>>;
   /** Accepted script conversions are distinct from verified provider titles. */
   readonly scriptConversions: Partial<Record<SupportedLocale, string>>;
+  readonly wikidataEvidence?: WikidataTitleEvidence;
 }
 export interface TitleScanRow {
   readonly path: string;
@@ -51,6 +53,7 @@ export interface TitleUpdateResult {
 export interface TitleUpdateOptions {
   fetch?: (mediaType: MediaType, source: TitleSource) => Promise<ExternalMediaResult | null>;
   lookup?: (mediaType: MediaType, title: string) => Promise<ExternalMediaResult[]>;
+  lookupWikidata?: (type: MediaType, source: TitleSource, locale: SupportedLocale) => Promise<WikidataTitleEvidence | null>;
   intervalMs?: number;
   concurrency?: number;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -140,6 +143,9 @@ export async function planStoredTitleUpdates(
 ): Promise<TitleUpdatePlan> {
   const bangumi = new BangumiClient();
   const anilist = new AniListClient();
+  const wikidata = new WikidataTitleService();
+  const lookupWikidata = options.lookupWikidata ?? ((type: MediaType, source: TitleSource, lang: SupportedLocale) =>
+    wikidata.lookup({ provider: source.provider, sourceId: source.id, mediaType: type }, lang));
   const fetch = options.fetch ?? (async (mediaType: MediaType, source: TitleSource) =>
     source.provider === "bangumi"
       ? bangumi.fetchTitleById(mediaType, source.id)
@@ -191,15 +197,24 @@ export async function planStoredTitleUpdates(
     let reusedConversion = false;
     let selectedSource: TitleSource | null = source;
     let crossProvider = false;
+    let wikidataEvidence: WikidataTitleEvidence | undefined;
+    let directFetchError = "";
     const trustedNames: string[] = [];
     if (!target && source) {
-      candidate = await fetchCached(type, source);
-      if (!candidate) return row(file.path, old, "no-translation", "The provider returned no work for the saved ID.");
-      if (candidate.sourceId !== source.id || candidate.provider !== source.provider || candidate.mediaType !== type) {
-        throw new Error("Provider returned unexpected media identity (work ID or type).");
+      try {
+        candidate = await fetchCached(type, source);
+        if (candidate) {
+          if (candidate.sourceId !== source.id || candidate.provider !== source.provider || candidate.mediaType !== type) {
+            throw new Error("Provider returned unexpected media identity (work ID or type).");
+          }
+          trustedNames.push(...providerTitles(candidate));
+          target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        if (reason.includes("unexpected media identity")) throw error;
+        directFetchError = reason;
       }
-      trustedNames.push(...providerTitles(candidate));
-      target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
     }
     // A known exact ID is preferred independently of locale. Look up a second
     // verified ID only if the primary provider has no localized title.
@@ -226,6 +241,19 @@ export async function planStoredTitleUpdates(
         target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
       }
     }
+    if (!target && source) {
+      try {
+        const evidence = await apiCall(() => lookupWikidata(type, source, locale));
+        if (evidence?.title) {
+          wikidataEvidence = evidence;
+          target = evidence.title;
+          requiresReview = true;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        directFetchError = directFetchError ? directFetchError + "; Wikidata: " + message : "Wikidata: " + message;
+      }
+    }
     if (!target && (locale === "zh-TW" || locale === "zh-CN") && known.anilist && !known.bangumi) {
       const query = field(fm.title_original) || field(fm.title_romaji) || old;
       const results = crossProviderCandidates(await apiCall(() => lookup(type, query)), fm);
@@ -240,7 +268,7 @@ export async function planStoredTitleUpdates(
         crossProvider = true;
         target = verifiedMediaTitle(candidate.titleVariants, locale) ?? "";
       }
-      if (!results.length && !candidate) {
+      if (!results.length && !candidate && !directFetchError) {
         return row(file.path, old, "no-source", "No matching language variant in known providers.");
       }
     }
@@ -256,6 +284,9 @@ export async function planStoredTitleUpdates(
         scriptConverted = true;
         requiresReview = true;
       }
+    }
+    if (!target && directFetchError) {
+      return row(file.path, old, "lookup-failed", directFetchError);
     }
     if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");
     if (!target) {
@@ -282,9 +313,11 @@ export async function planStoredTitleUpdates(
       expectedAniListId: field(fm.anilist_id), expectedMtime: file.stat.mtime,
       originalTitle: field(fm.title_original) || candidate?.originalTitle || "",
       aliases, localized: merged, scriptConversions,
+      ...(wikidataEvidence ? { wikidataEvidence } : {}),
     };
     return row(file.path, old, requiresReview ? "review" : "ready",
-      scriptConverted ? "OpenCC script conversion only (NOT an official localized release title); verify before applying."
+      wikidataEvidence ? "Wikidata/Wikipedia language title (not an official licensed translation); review before applying."
+        : scriptConverted ? "OpenCC script conversion only (NOT an official localized release title); verify before applying."
         : reusedConversion ? "Previously approved OpenCC conversion (NOT an official translated title); review before applying."
         : requiresReview ? "Cross-provider title match: manually verify this identity." : "Verified provider ID and title.",
       proposal);
@@ -338,6 +371,15 @@ export async function applyStoredTitleUpdates(
             ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations))
               ? fm.title_localizations as Record<string, unknown> : {}),
             ...item.localized,
+          };
+        }
+        if (item.wikidataEvidence?.title === item.newTitle) {
+          fm.title_external_evidence = {
+            locale: item.wikidataEvidence.locale,
+            title: item.wikidataEvidence.title,
+            source: item.wikidataEvidence.kind,
+            wikidata_id: item.wikidataEvidence.itemId,
+            identity_property: item.wikidataEvidence.identityProperty,
           };
         }
         if (Object.keys(item.scriptConversions).length) {

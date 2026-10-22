@@ -137,6 +137,12 @@ export class TitleLocalizationModal extends AnimeListModal {
       checks.set(proposal.path, checkbox);
       entry.createDiv({ cls: "al-result-meta", text: outcome.status + ": " + outcome.reason });
       entry.createDiv({ cls: "al-result-meta", text: outcome.path });
+      if (proposal.wikidataEvidence) {
+        const link = entry.createEl("a", { text: "Wikidata " + proposal.wikidataEvidence.itemId });
+        link.href = "https://www.wikidata.org/wiki/" + proposal.wikidataEvidence.itemId;
+        link.setAttribute("rel", "noopener noreferrer");
+        link.setAttribute("target", "_blank");
+      }
       if (proposal.source?.provider === "bangumi") {
         const source = proposal.source;
         const href = "https://bgm.tv/subject/" + source.id;
