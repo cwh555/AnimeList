@@ -79,12 +79,13 @@ export class ExternalMediaSearchService {
           return page.results;
         },
       };
-      if (client.searchPages) {
-        const searchPages = client.searchPages.bind(client);
+      if (client.searchPages !== undefined) {
         adapter.searchMany = async candidates => {
-          const pages = await searchPages(mediaType, candidates, 1);
-          pages.forEach((page, index) => rememberPage(client.id, candidates[index], page));
-          return pages.map(page => page.results);
+          const pages = await client.searchPages?.(mediaType, candidates, 1);
+          for (const [index, page] of (pages ?? []).entries()) {
+            rememberPage(client.id, candidates[index], page);
+          }
+          return (pages ?? []).map(page => page.results);
         };
       }
       return adapter;
@@ -105,7 +106,7 @@ export class ExternalMediaSearchService {
     this.sessions.delete(sessionKey);
     this.sessions.set(sessionKey, session);
     while (this.sessions.size > MAX_CACHED_SESSIONS) {
-      const oldest = this.sessions.keys().next().value;
+      const oldest = this.sessions.keys().next().value as string | undefined;
       if (oldest === undefined) break;
       this.sessions.delete(oldest);
     }
