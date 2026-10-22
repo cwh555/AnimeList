@@ -103,6 +103,7 @@ export const TEST_TARGETS = [
   { path: "tests/wikidata-title-service.test.ts", kind: "test", suite: "integration", features: ["search", "text", "markdown"] },
   { path: "tests/title-localization-service.test.ts", kind: "test", suite: "integration", features: ["search", "text", "markdown"] },
   { path: "tests/title-localization-settings.test.ts", kind: "test", suite: "unit", features: ["text", "settings"] },
+  { path: "tests/search-entity-resolution.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-pagination.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-settings.test.ts", kind: "test", suite: "integration", features: ["search", "settings"] },
