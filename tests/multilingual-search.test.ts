@@ -248,6 +248,34 @@ describe("multilingual provider search", () => {
     assert.match(response.warnings[0], /temporarily unavailable/);
   });
 
+  it("shows Bangumi's Korean-title hit before another source returns, even without an exposed Chinese alias", async () => {
+    const progress: ExternalMediaResult[][] = [];
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const run = searchMultilingualProviders({
+      query: "漫畫裡的羅康林",
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query) {
+          if (query !== "漫画里的罗康林") return [];
+          return [naKangLim({ searchTitles: ["수요웹툰의 나강림"], title: "수요웹툰의 나강림" })];
+        },
+      }, {
+        label: "AniList",
+        async search() {
+          await pending;
+          return [];
+        },
+      }],
+      onProgress(results) { progress.push(results); },
+    });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.ok(progress.some(results => results.some(item => item.sourceId === "399671")));
+    release();
+    await run;
+  });
+
   it("bounds impossible and ambiguous searches independently of the input length", async () => {
     for (const term of ["不存在的漫畫暫稱甲乙丙丁", "我想成為影之強者"]) {
       const requests: string[] = [];
