@@ -79,11 +79,11 @@ export class WikidataTitleService {
       return await Promise.race([
         this.request(url),
         new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => reject(new Error("Wikidata title lookup timed out")), 5_000);
+          timer = window.setTimeout(() => reject(new Error("Wikidata title lookup timed out")), 5_000);
         }),
       ]);
     } finally {
-      if (timer !== undefined) clearTimeout(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
     }
   }
 
