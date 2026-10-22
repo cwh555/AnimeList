@@ -33,17 +33,11 @@ export interface MultilingualSearchResponse {
   expandedQueries: string[];
 }
 
-interface ProviderQuerySuccess {
-  provider: string;
-  results: ExternalMediaResult[];
+interface ProviderQueryOutcome {
+  readonly provider: string;
+  readonly results: ExternalMediaResult[];
+  readonly error?: unknown;
 }
-
-interface ProviderQueryFailure {
-  provider: string;
-  error: unknown;
-}
-
-type ProviderQueryOutcome = ProviderQuerySuccess | ProviderQueryFailure;
 
 export const DEFAULT_SEARCH_LANGUAGES: SearchLanguageSettings = {
   chinese: true,
@@ -178,35 +172,33 @@ async function runProviderQueries(
   providers: SearchProviderAdapter[],
   queries: string[],
 ): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-  const tasks: Array<Promise<ProviderQueryOutcome>> = providers.flatMap((provider) => {
+  // Keep providers independent, but avoid bursts of concurrent searches to a
+  // single provider. AniList can still batch variants in one GraphQL call.
+  const settled: ProviderQueryOutcome[] = await Promise.all(providers.map(async provider => {
     if (provider.searchMany && queries.length > 1) {
-      return [provider.searchMany(queries).then(
-        (batches) => ({ provider: provider.label, results: batches.flat() }) satisfies ProviderQuerySuccess,
-        (error: unknown) => ({ provider: provider.label, error }) satisfies ProviderQueryFailure,
-      )];
-    }
-    return queries.map(async (query) => {
       try {
-        const results = await provider.search(query);
-        return { provider: provider.label, results } satisfies ProviderQuerySuccess;
+        return { provider: provider.label, results: (await provider.searchMany(queries)).flat() };
       } catch (error: unknown) {
-        return { provider: provider.label, error } satisfies ProviderQueryFailure;
+        return { provider: provider.label, results: [], error };
       }
-    });
-  });
-  const settled = await Promise.all(tasks);
-  const warningByProvider = new Map<string, string>();
-  const results: ExternalMediaResult[] = [];
-  for (const entry of settled) {
-    if ("error" in entry) {
-      if (!warningByProvider.has(entry.provider)) {
-        warningByProvider.set(entry.provider, `${entry.provider}: ${errorMessage(entry.error)}`);
-      }
-    } else {
-      results.push(...entry.results);
     }
-  }
-  return { results, warnings: [...warningByProvider.values()] };
+    const results: ExternalMediaResult[] = [];
+    for (const query of queries) {
+      try {
+        results.push(...await provider.search(query));
+      } catch (error: unknown) {
+        // Preserve successful variants, but do not repeatedly hit a failing API.
+        return { provider: provider.label, results, error };
+      }
+    }
+    return { provider: provider.label, results };
+  }));
+  return {
+    results: settled.flatMap(outcome => outcome.results),
+    warnings: settled
+      .filter(outcome => outcome.error !== undefined)
+      .map(outcome => `${outcome.provider}: ${errorMessage(outcome.error)}`),
+  };
 }
 
 export async function searchMultilingualProviders(
