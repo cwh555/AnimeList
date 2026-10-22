@@ -16,6 +16,7 @@ import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import { localizeActiveMediaResult } from "../data/media-title-service";
 import { suggestCrossProviderTitle } from "../domain/media-title-suggestion";
+import { chineseScriptCandidate } from "../domain/media-title-localization";
 import { normalizeSupportedLocale } from "../i18n/locale";
 import { getActiveLocale } from "../i18n/catalog";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
@@ -280,7 +281,8 @@ export class AnimeListApplicationServices {
     try {
       const query = localized.originalTitle.trim();
       if (!query || !Number(localized.year)
-        || localized.titleVariants?.localized?.[locale]) return localized;
+        || localized.titleVariants?.localized?.[locale]
+        || (localized.titleVariants && chineseScriptCandidate(localized.titleVariants, locale))) return localized;
       const matches = (await this.metadataProviders().bangumi.searchPage(localized.mediaType, query, 1)).results;
       const titleSuggestion = suggestCrossProviderTitle(localized, matches, locale);
       return { ...localized, titleEvidenceChecked: locale, titleSuggestion: titleSuggestion ?? undefined };

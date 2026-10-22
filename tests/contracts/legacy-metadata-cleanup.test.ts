@@ -181,6 +181,25 @@ describe("legacy metadata cleanup", () => {
     assert.equal(secondPass.cleaned, 0);
   });
 
+  it("incremental metadata mode skips finished notes without writing or provider requests", async () => {
+    const file = new TFile();
+    file.path = "AnimeList/Anime/checked.md";
+    file.basename = "checked";
+    file.extension = "md";
+    const frontmatter = { media_type: "anime", title: "Original", schema_version: 6 };
+    const app = {
+      vault: { getRoot: () => ({ children: [file] }) },
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      fileManager: { processFrontMatter: async () => { throw Error("No writes"); } },
+    } as any;
+    const done = await cleanupLegacyMetadataNotes(app, [""], {
+      shouldScan: () => false,
+      enrich: async () => { throw Error("No API"); },
+    });
+    assert.equal(done.scanned, 0);
+    assert.equal(done.cleaned, 0);
+  });
+
   it("preserves stable v1.2.1 source fields and personal/unknown frontmatter during enrichment", async () => {
     const frontmatter: Record<string, unknown> = {
       schema_version: 6,

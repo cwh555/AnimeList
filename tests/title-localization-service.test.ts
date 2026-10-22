@@ -70,6 +70,21 @@ describe("safe existing-title localization", () => {
     assert.equal(note.file.path, "AnimeList/Show.md");
   });
 
+  it("incremental title scans skip checked works without network I/O", async () => {
+    const note = testNote("AnimeList/Show.md", {
+      media_type: "anime", source_provider: "bangumi", source_id: "88", title: "原題",
+    });
+    const result = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      intervalMs: 0,
+      shouldScan: () => false,
+      fetch: async () => { throw new Error("No network request is allowed"); },
+    });
+    assert.equal(result.scanned, 0);
+    assert.equal(result.rows.length, 0);
+    assert.equal(result.items.length, 0);
+    assert.equal(note.written.length, 0);
+  });
+
   it("reuses verified stored variants across languages without a network call", async () => {
     const note = testNote("anime.md", {
       media_type: "anime", source_provider: "bangumi", source_id: "88",

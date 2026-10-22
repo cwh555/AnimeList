@@ -161,6 +161,21 @@ describe("legacy update: duplicate default note covers", () => {
     assert.match(store.content.get("AnimeList/Anime/Changed.md")!, /User changed this after preview/);
   });
 
+  it("skips previously completed cover checks but a full rescan returns every eligible proposal", async () => {
+    const old = legacyNote();
+    const store = fakeApp([
+      { path: "AnimeList/Anime/NeedsUpdate.md", ...old },
+      { path: "AnimeList/Anime/Checked.md", ...old },
+    ]);
+    const pending = await planDuplicateDefaultCoverCleanup(store.app, ["AnimeList/Anime"],
+      file => file.basename !== "Checked");
+    assert.equal(pending.scanned, 1);
+    assert.deepEqual(pending.items.map(x => x.path), ["AnimeList/Anime/NeedsUpdate.md"]);
+    const full = await planDuplicateDefaultCoverCleanup(store.app, ["AnimeList/Anime"]);
+    assert.equal(full.scanned, 2);
+    assert.equal(full.items.length, 2);
+  });
+
   it("keeps version fixes and legacy note tools in separate compact sections", () => {
     const host = { app: {}, getScanFolders: () => [], refreshViews() {} } as any;
     const version = createVersionCleanupSettingsSection(host, () => {});
@@ -184,6 +199,21 @@ describe("legacy update: duplicate default note covers", () => {
 });
 
 describe("legacy update: media note filenames", () => {
+  it("keeps global filename collision reservations when only scanning unprocessed items", () => {
+    const store = filenameCleanupApp([
+      { path: "AnimeList/Anime/Old A.md", frontmatter: { media_type: "anime", title: "Shared" } },
+      { path: "AnimeList/Anime/Old B.md", frontmatter: { media_type: "anime", title: "Shared" } },
+    ]);
+    const pending = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"],
+      file => file.path.endsWith("Old B.md"));
+    assert.equal(pending.items.length, 1);
+    assert.equal(pending.items[0].targetPath, "AnimeList/Anime/Shared (2).md");
+    const all = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"]);
+    assert.deepEqual(all.items.map(x => x.targetPath), [
+      "AnimeList/Anime/Shared.md", "AnimeList/Anime/Shared (2).md",
+    ]);
+  });
+
   it("plans collision-safe same-folder renames and never rewrites note content", async () => {
     const store = filenameCleanupApp([
       { path: "AnimeList/Anime/Old Frieren.md", frontmatter: { media_type: "anime", title: "Frieren" } },
