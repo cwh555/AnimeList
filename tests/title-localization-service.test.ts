@@ -330,7 +330,7 @@ describe("safe existing-title localization", () => {
         return aniListResult();
       },
     });
-    assert.equal(plan.rows[0].status, "no-source");
+    assert.equal(plan.rows[0].status, "no-translation");
     assert.equal(plan.items.length, 0);
   });
 
