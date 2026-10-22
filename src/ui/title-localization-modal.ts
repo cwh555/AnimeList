@@ -1,3 +1,4 @@
+import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
@@ -5,7 +6,7 @@ import { SUPPORTED_LOCALES, normalizeSupportedLocale, type SupportedLocale } fro
 import { getActiveLocale } from "../i18n/catalog";
 import { applyStoredTitleUpdates, planStoredTitleUpdates, type TitleUpdatePlan } from "../data/title-localization-service";
 import { titleLocalizationSettingsText as text } from "../features/title-localization/text";
-import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
+import { readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
 
 const NAMES: Record<SupportedLocale, string> = {

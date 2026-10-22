@@ -1,8 +1,9 @@
+import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import { cleanupLegacyMetadataNotes } from "../data/legacy-metadata-cleanup";
-import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
+import { readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
 import type {
   LegacyMetadataCleanupDetail,
   LegacyMetadataCleanupProgress,

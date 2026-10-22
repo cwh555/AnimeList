@@ -1,7 +1,8 @@
+import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
-import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory } from "../data/cleanup-scan-history";
+import { readCleanupScanHistory, saveCleanupScanHistory } from "../data/cleanup-scan-history";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
 import {
   applyDuplicateDefaultCoverCleanup,
