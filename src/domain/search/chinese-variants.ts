@@ -40,25 +40,17 @@ export function collectChineseDiscoveryQueries(value: string, limit = 5): string
   const simplifiedSignificant = traditionalToSimplifiedQuery(significant);
 
   add(simplified);
-  add(significant);
-  add(simplifiedSignificant);
-
-  // The registered translation can insert a short function word, such as
-  // 想要成为 versus 想成为. Longer five-character spans are precise, while
-  // a four-character interior span can still recover the same work without
-  // rewriting synonyms or hardcoding a particular title.
-  const chars = [...significant];
-  if (chars.length >= 6) {
-    const longFragment = chars.slice(1, 6).join("");
-    add(traditionalToSimplifiedQuery(longFragment));
-    add(longFragment);
-    // Leave one slot for an overlap that survives a one-character insertion.
-    const overlappingCore = chars.slice(2, 6).join("");
-    add(traditionalToSimplifiedQuery(overlappingCore));
-    add(overlappingCore);
+  // More discriminative than short two-character suffixes: first retain the
+  // meaningful core in Simplified Chinese (Bangumi's primary search corpus).
+  if (significant.length >= 6) {
+    const chars = [...significant];
+    add(traditionalToSimplifiedQuery(chars.slice(2, 6).join("")));
+    add(traditionalToSimplifiedQuery(chars.slice(1, 6).join("")));
   }
+  add(simplifiedSignificant);
+  add(significant);
 
-  for (const candidate of [significant, simplifiedSignificant]) {
+  for (const candidate of [simplifiedSignificant, significant]) {
     const characters = [...candidate];
     if (characters.length > 3) add(characters.slice(-3).join(""));
     if (characters.length > 2) add(characters.slice(-2).join(""));
