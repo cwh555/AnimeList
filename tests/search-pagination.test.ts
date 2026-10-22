@@ -42,6 +42,21 @@ describe("search pagination", () => {
     assert.deepEqual(SEARCH_PAGINATION_LIMITS, { pageSize: 24, maxLoads: 2, maxResults: 72 });
   });
 
+  it("keeps Load more available after an empty initial page when the provider has a cursor", () => {
+    const modal = {
+      mediaType: "novel", query: "different title", results: [], warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 }, renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "", results: [result(100)], warnings: [],
+      loads: 0, hasMore: false, loading: false, sourceResults: null,
+    };
+    synchronizePaginationState(modal as never, state);
+    assert.equal(state.hasMore, true);
+    assert.deepEqual(state.results, []);
+  });
+
   it("appends unique pages without moving existing results", () => {
     const merged = mergeSearchPages([result(1), result(2)], [[result(2), result(3)], [result(4)]]);
     assert.deepEqual(merged.map((item) => item.sourceId), ["1", "2", "3", "4"]);
