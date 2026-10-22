@@ -43,17 +43,19 @@ export function collectChineseDiscoveryQueries(value: string, limit = 5): string
   add(significant);
   add(simplifiedSignificant);
 
-  // Prefer meaningful interior fragments before very short suffixes. This
-  // recovers alternate title wording (e.g. 我想成為影之強者 versus
-  // 想成為影之實力者) without a hard-coded dictionary of individual works.
-  if ([...significant].length >= 7) {
-    const chars = [...significant];
-    for (const start of [1, 2]) {
-      const fragment = chars.slice(start, start + 5).join("");
-      if ([...fragment].length < 5) continue;
-      add(fragment);
-      add(traditionalToSimplifiedQuery(fragment));
-    }
+  // The registered translation can insert a short function word, such as
+  // 想要成为 versus 想成为. Longer five-character spans are precise, while
+  // a four-character interior span can still recover the same work without
+  // rewriting synonyms or hardcoding a particular title.
+  const chars = [...significant];
+  if (chars.length >= 6) {
+    const longFragment = chars.slice(1, 6).join("");
+    add(traditionalToSimplifiedQuery(longFragment));
+    add(longFragment);
+    // Leave one slot for an overlap that survives a one-character insertion.
+    const overlappingCore = chars.slice(2, 6).join("");
+    add(traditionalToSimplifiedQuery(overlappingCore));
+    add(overlappingCore);
   }
 
   for (const candidate of [significant, simplifiedSignificant]) {
