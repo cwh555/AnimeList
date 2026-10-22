@@ -4,7 +4,7 @@ import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import { SUPPORTED_LOCALES, normalizeSupportedLocale, type SupportedLocale } from "../i18n/locale";
 import { getActiveLocale } from "../i18n/catalog";
-import { applyStoredTitleUpdates, planStoredTitleUpdates, type TitleUpdatePlan } from "../data/title-localization-service";
+import { applyStoredTitleUpdates, planStoredTitleUpdates, completedTitleScan, type TitleUpdatePlan } from "../data/title-localization-service";
 import { titleLocalizationSettingsText as text } from "../features/title-localization/text";
 import { readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
@@ -95,7 +95,7 @@ export class TitleLocalizationModal extends AnimeListModal {
       // Only finished checks are cached; an unconfirmed proposal or API error
       // must remain visible on the next incremental scan.
       const checkedPaths = new Set(plan.rows
-        .filter(row => row.status === "unchanged" || row.status === "custom-title")
+        .filter(row => completedTitleScan(row.status))
         .map(row => row.path));
       const checked = getScopedMarkdownFiles(this.host.app, this.host.getScanFolders())
         .filter(file => checkedPaths.has(file.path));

@@ -11,6 +11,11 @@ type Provider = "bangumi" | "anilist";
 export type TitleSource = Readonly<{ provider: Provider; id: string }>;
 export type TitleScanStatus = "ready" | "review" | "unchanged" | "no-source" |
   "no-translation" | "custom-title" | "ambiguous" | "lookup-failed";
+
+/** Only a resolved no-op can be checkpointed before user confirmation. */
+export function completedTitleScan(status: TitleScanStatus): boolean {
+  return status === "unchanged" || status === "custom-title";
+}
 export interface TitleUpdateItem {
   readonly path: string;
   readonly oldTitle: string;

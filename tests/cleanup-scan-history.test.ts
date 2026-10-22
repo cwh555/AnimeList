@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { TFile } from "obsidian";
 import type { App } from "obsidian";
 import { CleanupScanHistory, readCleanupScanHistory, saveCleanupScanHistory } from "../src/data/cleanup-scan-history";
+import { completedTitleScan } from "../src/data/title-localization-service";
 import { suggestCrossProviderTitle } from "../src/domain/media-title-suggestion";
 import { normalizeAniListMedia, normalizeBangumiSubject } from "../src/data/provider-normalizers";
 import { withActiveLocale } from "../src/i18n/catalog";
@@ -63,6 +64,17 @@ describe("shared Settings scan checkpoints", () => {
     second.stat.size++;
     assert.equal(reloaded.needsScan("titles:zh-TW", second, "pending"), true);
     assert.equal(storage.size, 1);
+  });
+});
+
+describe("title scan checkpoint contract", () => {
+  it("rechecks unresolved sources, rejected proposals, ambiguous matches and failed lookups", () => {
+    for (const status of ["ready", "review", "no-source", "no-translation",
+      "ambiguous", "lookup-failed"] as const) {
+      assert.equal(completedTitleScan(status), false, status);
+    }
+    assert.equal(completedTitleScan("unchanged"), true);
+    assert.equal(completedTitleScan("custom-title"), true);
   });
 });
 
