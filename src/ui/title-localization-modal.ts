@@ -70,6 +70,9 @@ export class TitleLocalizationModal extends AnimeListModal {
     this.abort = controller;
     void planStoredTitleUpdates(this.host.app, this.host.getScanFolders(), locale, {
       signal: controller.signal,
+      onStart: (completed, total, title) => {
+        if (!this.closed) status.setText(text("modal.scanning", { completed, total }) + " — Fetching: " + title);
+      },
       onProgress: (completed, total, row) => {
         if (this.closed) return;
         status.setText(text("modal.scanning", { completed, total }) + " — " + row.title);

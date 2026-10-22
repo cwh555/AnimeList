@@ -56,6 +56,7 @@ export interface TitleUpdateOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   signal?: AbortSignal;
   onProgress?: (completed: number, total: number, row: TitleScanRow) => void;
+  onStart?: (completed: number, total: number, title: string, path: string) => void;
 }
 function field(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -261,6 +262,8 @@ export async function planStoredTitleUpdates(
       assertNotAborted(options.signal);
       const idx = next++;
       const file = files[idx];
+      const title = field(app.metadataCache.getFileCache(file)?.frontmatter?.title) || file.basename;
+      options.onStart?.(completed, files.length, title, file.path);
       try {
         rows[idx] = await evaluate(file);
       } catch (error) {

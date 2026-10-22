@@ -314,8 +314,10 @@ describe("safe existing-title localization", () => {
     let active = 0;
     let peak = 0;
     const updates: TitleScanRow[] = [];
+    const started: string[] = [];
     const plan = await planStoredTitleUpdates(app, [""], "zh-CN", {
       intervalMs: 0, concurrency: 3,
+      onStart: (_completed, _total, title) => started.push(title),
       fetch: async (_type, source) => {
         active++;
         peak = Math.max(peak, active);
@@ -329,6 +331,8 @@ describe("safe existing-title localization", () => {
     assert.equal(plan.items.length, 8);
     assert.equal(peak, 3);
     assert.equal(updates.length, 8);
+    assert.equal(started.length, 8);
+    assert.ok(started.every(title => title === "原題"));
     assert.ok(updates.every(r => r.status === "ready"));
   });
 
