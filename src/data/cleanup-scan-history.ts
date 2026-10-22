@@ -51,8 +51,9 @@ export async function readCleanupScanHistory(app: App): Promise<CleanupScanHisto
     return new CleanupScanHistory(entries);
   } catch (error) {
     // First install: the plugin has no scan record yet.
-    if (typeof error === "object" && error !== null && "code" in error
-      && error.code === "ENOENT") return new CleanupScanHistory();
+    const code: unknown = typeof error === "object" && error !== null
+      ? (error as { code?: unknown }).code : undefined;
+    if (code === "ENOENT") return new CleanupScanHistory();
     throw error;
   }
 }
