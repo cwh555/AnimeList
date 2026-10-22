@@ -212,6 +212,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
   const englishTitle = stringValue(title.english).trim();
   const romajiTitle = stringValue(title.romaji).trim();
   const originalTitle = stringValue(title.native, romajiTitle).trim();
+  const country = stringValue(media.countryOfOrigin).toUpperCase();
   const providerFallback = englishTitle || romajiTitle || originalTitle || uiText("media.untitled");
   const staff = asArray(record(media.staff).edges)
     .map((rawEdge) => record(rawEdge))
@@ -250,8 +251,10 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
       romaji: romajiTitle,
       localized: {
         ...(englishTitle ? { en: englishTitle } : {}),
-        ...(stringValue(media.countryOfOrigin).toUpperCase() === "JP" && originalTitle ? { ja: originalTitle } : {}),
-        ...(stringValue(media.countryOfOrigin).toUpperCase() === "KR" && originalTitle ? { ko: originalTitle } : {}),
+        ...(country === "JP" && originalTitle ? { ja: originalTitle } : {}),
+        ...(country === "KR" && originalTitle ? { ko: originalTitle } : {}),
+        ...(country === "CN" && originalTitle ? { "zh-CN": originalTitle } : {}),
+        ...((country === "TW" || country === "HK") && originalTitle ? { "zh-TW": originalTitle } : {}),
       },
     },
     format: mapFormat(media.format, mediaType),

@@ -62,6 +62,28 @@ describe("cross-provider title localization contract", () => {
     assert.equal(koreanOnJapaneseInterface.titleVariants?.localized?.ko, "한국어 원제");
   });
 
+  it("handles Chinese-origin AniList native titles and converts script without treating synonyms as translation", () => {
+    const mainland = { id: 29, countryOfOrigin: "CN", title: {
+      native: "简体标题", romaji: "Jianti Biaoti", english: "English",
+    }, synonyms: ["另一個名字"] };
+    const taiwan = { ...mainland, id: 30, countryOfOrigin: "TW", title: {
+      native: "臺灣正式標題", romaji: "Taiwan", english: "English",
+    } };
+    const zhTw = withActiveLocale("zh-TW", () => normalizeAniListMedia(mainland, "anime"));
+    assert.equal(zhTw.title, "簡體標題");
+    assert.deepEqual(zhTw.titleScriptConversions, { "zh-TW": "簡體標題" });
+    assert.equal(zhTw.titleVariants?.localized?.["zh-CN"], "简体标题");
+    assert.equal(zhTw.titleVariants?.localized?.["zh-TW"], undefined);
+    const zhCn = withActiveLocale("zh-CN", () => normalizeAniListMedia(taiwan, "anime"));
+    assert.equal(zhCn.title, "台湾正式标题");
+    assert.deepEqual(zhCn.titleScriptConversions, { "zh-CN": "台湾正式标题" });
+    assert.equal(zhCn.titleVariants?.localized?.["zh-TW"], "臺灣正式標題");
+    const original = withActiveLocale("zh-TW", () => normalizeAniListMedia(taiwan, "anime"));
+    assert.equal(original.title, "臺灣正式標題");
+    assert.equal(original.titleScriptConversions, undefined);
+    assert.ok(original.searchTitles?.includes("另一個名字"));
+  });
+
   it("retains Open Library work titles and authors without inventing translations", () => {
     const raw = {
       key: "/works/OL321W", title: "The Original Work", first_publish_year: 2011,

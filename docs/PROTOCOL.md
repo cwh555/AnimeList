@@ -71,7 +71,7 @@ For **new** imports, in order:
 
 Provider-specific evidence:
 - **Bangumi:** `name_cn` is Simplified Chinese, an explicitly labelled infobox title can be Traditional Chinese. Both can be converted when the other script is requested.
-- **AniList:** `english` is verified English, `native` is tagged as Japanese/Korean only with matching `countryOfOrigin`. Neither `romaji` nor `synonyms` provides trustworthy Chinese language attribution, so do not invent Chinese translations.
+- **AniList:** `english` is official English; `native` is attributed to its native-script locale when `countryOfOrigin` identifies JP, KR, CN, TW or HK. Chinese-origin native titles can use script conversion, with conversion provenance recorded separately. Country-of-origin attribution is not evidence of a separate licensed translation. Neither `romaji` nor `synonyms` provides trustworthy Chinese language attribution for Japanese/Korean-origin works, so do not invent Chinese translations.
 - **Open Library:** Work `title` is a fallback, not presumed to be an official Chinese translation. Search's `lang` now follows the interface's language preference (zh-TW/zh-CN → zh, en → en, ja → ja, ko → ko), which influences edition preference but **does not certify the title language**.
 - **Manually entered media:** User-entered title is authoritative; the adapter skips manual items entirely.
 
