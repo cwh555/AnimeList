@@ -44,6 +44,7 @@ export class AddMediaModal extends AnimeListModal {
   query = "";
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
+  hasMore = false;
   private searchGeneration = 0;
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
@@ -105,6 +106,7 @@ export class AddMediaModal extends AnimeListModal {
         this.mediaType = value;
         this.results = [];
         this.warnings = [];
+        this.hasMore = false;
         this.renderSearch();
       });
       typeTabs.appendChild(button);
@@ -149,7 +151,7 @@ export class AddMediaModal extends AnimeListModal {
 
     const resultsEl = createDiv();
     resultsEl.className = "al-search-results";
-    if (!this.results.length && this.query) {
+    if (!this.results.length && this.query && !this.hasMore) {
       const empty = createDiv();
       empty.className = "al-search-empty";
       empty.textContent = uiText("add.emptyResult");
@@ -172,11 +174,13 @@ export class AddMediaModal extends AnimeListModal {
       if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       this.results = response.results;
       this.warnings = response.warnings;
+      this.hasMore = response.hasMore ?? this.results.length > 0;
       if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
       if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       console.error("AnimeList external search failed", error);
       this.results = [];
+      this.hasMore = false;
       this.warnings = [errorMessage(error)];
       new Notice(uiText("notice.searchUnavailable"));
     }
