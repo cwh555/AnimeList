@@ -266,7 +266,7 @@ export async function searchMultilingualProviders(
       results => publishProgress(results, [...initialQueries, ...discoveryQueries, ...aliasQueries]))
     : { results: [], warnings: [] };
 
-  const relatedQueries = uniqueQueries([...initialQueries, ...discoveryQueries, ...aliasQueries]);
+  const relatedQueries = uniqueQueries([...discoveryQueries, ...aliasQueries]);
   const merged = dedupe([...initial.results, ...discovery.results, ...expanded.results]);
   const relevant = filterRelevantSearchResults(merged, query, relatedQueries);
   return {
