@@ -222,7 +222,7 @@ describe("external media search service", () => {
       clients({
         bangumi: client("bangumi", "Bangumi", () => true, async (_type, query, page) => {
           calls.push(`${query}:${page}`);
-          if (query !== "想成為影之") return { results: [], hasMore: false };
+          if (query !== "成为影之") return { results: [], hasMore: false };
           if (page === 1) return {
             results: [result("bangumi", "novel-1", "想成為影之實力者", "novel")],
             hasMore: true,
@@ -238,7 +238,7 @@ describe("external media search service", () => {
     assert.deepEqual(first.results.map(x => x.sourceId), ["novel-1"]);
     const next = await service.searchPage("novel", "我想成為影之強者", 2);
     assert.deepEqual(next.results.map(x => x.sourceId), ["novel-2"]);
-    assert.ok(calls.includes("想成為影之:2"));
+    assert.ok(calls.includes("成为影之:2"));
     assert.equal(calls.includes("我想成為影之強者:2"), false);
     assert.equal(next.hasMore, false);
   });
