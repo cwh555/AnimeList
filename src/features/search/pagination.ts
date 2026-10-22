@@ -83,7 +83,7 @@ function resetFromInitialSearch(modal: PaginatedSearchModal, state: PaginationSt
   state.results = [...modal.results];
   state.warnings = [...modal.warnings];
   state.loads = 0;
-  state.hasMore = modal.results.length > 0;
+  state.hasMore = modal.hasMore ?? modal.results.length > 0;
   state.loading = false;
   state.sourceResults = modal.results;
 }
@@ -127,6 +127,7 @@ export async function appendNextSearchPage(
     state.sourceResults = merged;
     modal.results = merged;
     modal.warnings = [...state.warnings];
+    modal.hasMore = state.hasMore;
 
     const scrollTop = modal.contentEl.scrollTop;
     appendSearchResultRows(resultsEl, appended, (result) => modal.createResultRow(result));
