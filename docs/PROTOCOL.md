@@ -66,8 +66,9 @@ A single typed selector owns the rules in `src/domain/media-title-localization.t
 
 For **new** imports, in order:
 1. Prefer an explicit, provider-labelled title for the interface locale.
-2. If the locale is Chinese and **the same record** has a title explicitly labelled in the other Chinese script, use offline OpenCC for script conversion. Mark that result as `title_script_conversions`, **never** `title_localizations`.
-3. Otherwise keep a safe source title. Unlabelled synonyms are searchable aliases, not verified translations; do not infer a work's identity from its title.
+2. Use a localized Wikidata/Wikipedia name **only when a unique QID is linked by the work's exact AniList/Bangumi external ID**. Record QID, locale and source separately in `title_external_evidence`—not in the provider-verified `title_localizations` map.
+3. If the locale is Chinese and the source has an explicitly labeled name in the other Chinese script, use offline OpenCC as a fallback. Record the conversion in `title_script_conversions`, **never** `title_localizations`.
+4. Otherwise keep a safe source title. Unlabelled synonyms are searchable aliases, not verified translations; do not infer a work's identity from its title.
 
 Provider-specific evidence:
 - **Bangumi:** `name_cn` is Simplified Chinese, an explicitly labelled infobox title can be Traditional Chinese. Both can be converted when the other script is requested.
@@ -99,7 +100,7 @@ The title resolver is independent of the metadata provider. First prefer a title
 
 The supported Wikidata property mapping is AniList anime `P8729`, AniList manga/light novels `P8731`, and Bangumi subjects `P5732`. The resolver queries WDQS for a unique `QID` (rejecting absent/duplicate matches) and retrieves localized labels and Wikipedia sitelinks with `wbgetentities`. The QID, identifying property, text, locale and source category are recorded as `title_external_evidence` only when that title is chosen. A Wikidata label or Wikipedia article name is **community-curated multilingual naming evidence**, not necessarily an official licensed release title; script-converted variants are labeled separately. The `title_localizations` map remains reserved for provider-labeled variants.
 
-The same identifier-based Wikidata service is used in the **new-note** enrichment flow and the existing-note Title Update **review** flow. New-note defaults may adopt a unique QID-linked name; existing notes are *never rewritten automatically*. A title/year-only Bangumi matching heuristic remains a review-only last resort, never a verified cross-provider identity. Manually entered or edited names remain authoritative. If Wikidata is unavailable or has no exact ID link, preserve the provider title rather than inventing a translation.
+The same identifier-based Wikidata service is used in the **new-note** enrichment flow and the existing-note Title Update **review** flow. The separate legacy-metadata repair flow requests **classification only**, so it does not add Wikidata/Bangumi title lookups for every note being migrated. New-note defaults may adopt a unique QID-linked name; existing notes are *never rewritten automatically*. A title/year-only Bangumi matching heuristic remains a review-only last resort, never a verified cross-provider identity. Manually entered or edited names remain authoritative. If Wikidata is unavailable or has no exact ID link, preserve the provider title rather than inventing a translation.
 
 Do not infer completeness from a name search: not all Wikidata items carry AniList/Bangumi properties. Queries should be narrowly scoped to one external ID, cached by property/ID/locale, and should not be retried aggressively on upstream errors. See [Wikidata data access guidance](https://www.wikidata.org/wiki/Help:Data_access).
 
