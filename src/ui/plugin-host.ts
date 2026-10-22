@@ -20,7 +20,7 @@ export interface AnimeListUiHost {
   collectMediaItems(source?: string): MediaItem[];
   getScanFolders(): string[];
   resolveMediaCoverPath(value: unknown, sourcePath: string): string;
-  searchExternal(mediaType: MediaType, query: string): Promise<{
+  searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
     hasMore?: boolean;
