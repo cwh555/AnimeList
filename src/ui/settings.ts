@@ -309,9 +309,11 @@ export class AnimeListSettingTab extends PluginSettingTab {
       for (const section of this.getSettingsPageSections(this.activePage)) {
         const sectionEl = panel.createEl("section", { cls: "animelist-settings-section" });
         if (section.heading) {
-          const headerEl = sectionEl.createDiv({ cls: "animelist-settings-section-header" });
-          const heading = new Setting(headerEl).setName(section.heading).setHeading();
-          if (section.description) heading.setDesc(section.description);
+          const headerEl = sectionEl.createEl("header", { cls: "animelist-settings-section-header" });
+          headerEl.createEl("h3", { cls: "animelist-settings-section-title", text: section.heading });
+          if (section.description) {
+            headerEl.createEl("p", { cls: "animelist-settings-section-description", text: section.description });
+          }
         }
 
         const bodyEl = sectionEl.createDiv({ cls: "animelist-settings-section-body" });

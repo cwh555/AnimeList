@@ -53,11 +53,27 @@
 }
 
 .animelist-settings-section-header {
+  padding: var(--size-4-5) clamp(var(--size-4-4), 3vw, var(--size-4-6));
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary-alt);
 }
 
-.animelist-settings-section-header > .setting-item,
+.animelist-settings-section-title {
+  margin: 0;
+  padding: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+  line-height: 1.35;
+}
+
+.animelist-settings-section-description {
+  margin: var(--size-4-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
 .animelist-settings-section-body > .setting-item {
   margin: 0;
   padding: var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5));
@@ -65,11 +81,6 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.animelist-settings-section-header > .setting-item .setting-item-description {
-  margin-top: var(--size-4-1);
-  color: var(--text-muted);
 }
 
 .animelist-settings-section-body > .setting-item + .setting-item {

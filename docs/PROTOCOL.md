@@ -59,3 +59,13 @@ Older notes without title_localizations remain usable and are not automatically 
 Behavior tests must cover source-URL IDs, stored variants, AniList-only records, cross-provider ambiguity, custom titles, missing translations, 429 errors, cancellation, stale preview protection, bounded concurrency, and unrelated frontmatter preservation. Human Test Vault validation must additionally check Settings English, large-library scanning responsiveness, and exact update previews.
 
 See ARCHITECTURE.md and VERIFICATION.md for module and release contracts, plus MANUAL_TEST_CHECKLIST.md for manual sign-off.
+
+## New-note title selection
+
+Newly imported Bangumi media are localized during the search/result normalization **before the create-note form is shown**. If a verified title exists for the selected interface language, that title is preferred. If a Traditional Chinese title is absent but the source explicitly labels its Simplified Chinese title, OpenCC converts only the Chinese writing system to Traditional. The resulting title is saved directly on the new note (no legacy-migration button) and separately marked as `title_script_conversions.zh-TW`; `title_localizations` contains only verified provider names. If the user edits the proposed title before creating the note, the edit is authoritative and is **not** incorrectly recorded as an auto conversion.
+
+OpenCC cannot translate Japanese/English/Korean names into Chinese. When AniList or another provider has no trustworthy Chinese variant, AnimeList must retain a known source title rather than invent a licensed translation. Users may edit the title in the collection form; old data remains independent of new imports.
+
+## Settings layout
+
+Imperative Obsidian Settings pages use plain, semantic section headings with explicit padding and line-height rather than relying on Obsidian's setting-heading default margins. The same settings section definitions are retained for the 1.13+ declarative path.

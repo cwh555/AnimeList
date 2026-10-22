@@ -2,8 +2,8 @@
 #animelist-settings-panel-updates-cleanup .animelist-settings-section {
   margin-bottom: var(--size-4-5);
 }
-#animelist-settings-panel-updates-cleanup .animelist-settings-section-header > .setting-item {
-  padding-block: var(--size-4-3);
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-header {
+  padding-block: var(--size-4-5);
 }
 #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
   gap: var(--size-4-3);
