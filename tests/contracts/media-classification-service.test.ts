@@ -116,58 +116,37 @@ describe("media classification service", () => {
     }
   });
 
-  it("uses at most one batched lookup request when no AniList identity survived search", async () => {
+  it("never infers an AniList identity from only a similar name and year", async () => {
     let calls = 0;
-    let body: any;
-    setRequestUrlMock((options) => {
-      calls += 1;
-      body = JSON.parse(options.body ?? "{}");
-      return {
-        headers: {},
-        json: {
-          data: {
-            q0: { pageInfo: { hasNextPage: false }, media: [aniListMedia(88)] },
-            q1: { pageInfo: { hasNextPage: false }, media: [] },
-            q2: { pageInfo: { hasNextPage: false }, media: [] },
-          },
-        },
-        text: "",
-      };
-    });
+    setRequestUrlMock(() => { calls += 1; throw new Error("unexpected cross-provider lookup"); });
     try {
-      const enriched = await new MediaClassificationService(new AniListClient()).enrich(result());
-      assert.equal(calls, 1);
-      assert.match(body.query, /q0: Page/);
-      assert.equal(enriched.classification?.anilistId, "88");
-      assert.equal(enriched.sources?.some((source) => source.provider === "anilist" && source.sourceId === "88"), true);
+      const source = result();
+      const enriched = await new MediaClassificationService(new AniListClient()).enrich(source);
+      assert.equal(enriched, source);
+      assert.equal(calls, 0);
     } finally {
       setRequestUrlMock(null);
     }
   });
 
-  it("refuses ambiguous title matches instead of attaching metadata to the wrong work", async () => {
-    setRequestUrlMock(() => ({
-      headers: {},
-      json: {
-        data: {
-          q0: { pageInfo: { hasNextPage: false }, media: [aniListMedia(90), aniListMedia(91)] },
-          q1: { pageInfo: { hasNextPage: false }, media: [] },
-          q2: { pageInfo: { hasNextPage: false }, media: [] },
-        },
-      },
-      text: "",
-    }));
+  it("does not enrich even a uniquely named work without a verified provider ID", async () => {
+    setRequestUrlMock(() => { throw new Error("must not guess an AniList ID"); });
     try {
       const enriched = await new MediaClassificationService(new AniListClient()).enrich(result());
       assert.equal(enriched.classification, undefined);
-      assert.equal(enriched.sources?.some((source) => source.provider === "anilist"), false);
+      assert.equal(enriched.sources?.some(source => source.provider === "anilist"), false);
     } finally {
       setRequestUrlMock(null);
     }
   });
 
   it("preserves AniList identity and classification when cross-provider search results deduplicate", () => {
-    const bangumi = result();
+    const bangumi = result({
+      sources: [
+        { provider: "bangumi", sourceId: "bgm-1", sourceUrl: "https://bgm.tv/subject/1" },
+        { provider: "anilist", sourceId: "101", sourceUrl: "https://anilist.co/anime/101" },
+      ],
+    });
     const anilist = result({
       provider: "anilist",
       sourceId: "101",
@@ -200,7 +179,12 @@ describe("media classification service", () => {
       throw error;
     });
     try {
-      const source = result();
+      const source = result({
+        sources: [
+          { provider: "bangumi", sourceId: "bgm-1", sourceUrl: "https://bgm.tv/subject/1" },
+          { provider: "anilist", sourceId: "42", sourceUrl: "https://anilist.co/anime/42" },
+        ],
+      });
       const errors: unknown[] = [];
       const enriched = await new MediaClassificationService(new AniListClient()).enrichOrOriginal(
         source,
