@@ -54,6 +54,10 @@ export class MediaNoteFilenameCleanupModal extends AnimeListModal {
     scan.addEventListener("click", () => {
       scan.disabled = true;
       scope.disabled = true;
+      plan = null;
+      confirm.disabled = true;
+      list.empty();
+      status.setText("Scanning note filenames…");
       void readCleanupScanHistory(this.host.app).then(async history => {
         const roots = this.host.getScanFolders();
         const scopeMode = scope.value === "all" ? "all" : "pending";
@@ -66,11 +70,11 @@ export class MediaNoteFilenameCleanupModal extends AnimeListModal {
         return plan;
       }).then(value => {
         if (!value) return;
-      status.setText(`Scanned ${plan.scanned} AnimeList media notes. ${plan.items.length} note(s) can be renamed.`);
-      if (!plan.items.length) {
+        status.setText(`Scanned ${value.scanned} AnimeList media notes. ${value.items.length} note(s) can be renamed.`);
+      if (!value.items.length) {
         list.createDiv({ cls: "al-search-empty", text: "All scanned note filenames already match their titles or safe collision names." });
       } else {
-        for (const item of plan.items) {
+        for (const item of value.items) {
           const row = list.createDiv({ cls: "al-version-cleanup-item" });
           row.createEl("strong", { text: item.title });
           row.createDiv({ cls: "al-result-meta", text: item.path });

@@ -373,3 +373,13 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Search and add an Open Library novel under zh, en, ja or ko; verify the edition preference follows the UI language, and missing translations do not overwrite the original book title or author.
 - [ ] Edit the proposed title in the new-note form; verify the custom name is preserved and no automatic conversion is falsely claimed. Repeat the search with an existing duplicate to verify source identity checking remains unchanged.
 - [ ] Change locale between searching and opening note details; ensure the create-note form resolves the chosen locale consistently, without losing original aliases or switching metadata sources.
+
+## Wikidata / incremental-cleanup final review
+
+- [ ] Add AniList-only anime with a **known Wikidata external-ID mapping** and a different target-language label; ensure the initial form prefers the matched QID name and frontmatter stores `title_external_evidence`, **not** an invented `title_localizations` entry.
+- [ ] Test an ID with no QID mapping and another with missing language data; preserve source title, avoid unsafe guesses. An API outage must leave other provider searches available.
+- [ ] Confirm user-edited names override the proposal, with original/romanized names retained and no incorrect `title_external_evidence` field.
+- [ ] In Settings → Updates & cleanup, open each of the **four** scanners and verify default 'Only new or unfinished items' versus 'Rescan all items'. After successful checks, repeat pending mode: those unchanged notes should be skipped; full scan should still inspect them.
+- [ ] If a note changes or is renamed, incremental mode should scan it again. A failed API lookup, unconfirmed candidate or failed write must not become a completed checkpoint.
+- [ ] Run filename scans with two works competing for the same filename; a partial scan must preserve global collision-safe naming.
+- [ ] Close and reopen Settings and restart Obsidian; successful scan checkpoints persist outside Markdown frontmatter.

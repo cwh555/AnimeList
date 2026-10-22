@@ -52,6 +52,9 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
     scan.addEventListener("click", () => {
       scan.disabled = true;
       scope.disabled = true;
+      plan = null;
+      confirm.disabled = true;
+      list.empty();
       status.setText("Scanning media notes…");
       void readCleanupScanHistory(this.host.app).then(async history => {
         const roots = this.host.getScanFolders();

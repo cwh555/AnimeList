@@ -158,3 +158,10 @@ All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.str
 - `data/providers/open-library-client.ts`: interface-locale edition preference, not an assertion of an official localized name.
 - `app/anime-list-application.ts`: reapplies the common selector after metadata enrichment before displaying the create-note form; manually edited form titles remain authoritative.
 - The existing-title migration remains opt-in. Provenance-verified translations and script conversions are stored separately for compatibility.
+
+## Unified name lookup and scan checkpoints
+
+- `data/wikidata-title-service.ts`: exact external-ID to QID mapping, locale labels/sitelinks, bounded per-session cached lookup; no heuristic title-to-ID guessing.
+- `data/media-title-service.ts`: applies ordered language evidence without mutating source names, authors, provider IDs or original variants.
+- `domain/media-title-suggestion.ts`: last-resort cross-provider heuristic suggestions for human review only.
+- `data/cleanup-scan-history.ts`: versioned, task/locale-specific checkpoint persistence independent from Markdown; `ui/cleanup-scan-controls.ts` owns the shared Settings selector. Each migration service accepts an optional file-selection predicate and avoids rewriting unrelated content.

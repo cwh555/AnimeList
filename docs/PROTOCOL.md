@@ -92,3 +92,21 @@ All AniList GraphQL calls, including search, exact-ID enrichment and manga relea
 For HTTP 403 / GraphQL status 403: do not retry, bypass the upstream restriction or switch to an undocumented proxy. Surface the provider error and stop additional requests from the same client for a 60-second cooldown; queued calls fail without contacting AniList. 429 follows `Retry-After` where provided, otherwise pauses 60 seconds; retry only once when the remaining delay is short enough for interactive use. An interactive request timeout also causes a temporary cooldown, because Obsidian's `requestUrl` has no physical abort capability. 5xx may be retried at most once. Other providers are independent and remain searchable.
 
 This is intentionally **request-load mitigation, not a claim to fix AniList's server-side 403 availability**. Offline unit/contract tests simulate successful calls, 403, 429, timeouts and queued workloads; real-user network conditions and upstream outages require manual observation.
+
+## Unified language evidence via Wikidata / Wikipedia
+
+The title resolver is independent of the metadata provider. First prefer a title explicitly labeled for the selected interface language in the original provider; then look up a **unique Wikidata entity through the exact external work ID**, rather than choosing the first text-search result; then use Chinese script conversion from a reliably labeled Chinese variant; finally retain the source name. English/Japanese/Korean aliases without language attribution are *not* Chinese translations.
+
+The supported Wikidata property mapping is AniList anime `P8729`, AniList manga/light novels `P8731`, and Bangumi subjects `P5732`. The resolver queries WDQS for a unique `QID` (rejecting absent/duplicate matches) and retrieves localized labels and Wikipedia sitelinks with `wbgetentities`. The QID, identifying property, text, locale and source category are recorded as `title_external_evidence` only when that title is chosen. A Wikidata label or Wikipedia article name is **community-curated multilingual naming evidence**, not necessarily an official licensed release title; script-converted variants are labeled separately. The `title_localizations` map remains reserved for provider-labeled variants.
+
+The same identifier-based Wikidata service is used in the **new-note** enrichment flow and the existing-note Title Update **review** flow. New-note defaults may adopt a unique QID-linked name; existing notes are *never rewritten automatically*. A title/year-only Bangumi matching heuristic remains a review-only last resort, never a verified cross-provider identity. Manually entered or edited names remain authoritative. If Wikidata is unavailable or has no exact ID link, preserve the provider title rather than inventing a translation.
+
+Do not infer completeness from a name search: not all Wikidata items carry AniList/Bangumi properties. Queries should be narrowly scoped to one external ID, cached by property/ID/locale, and should not be retried aggressively on upstream errors. See [Wikidata data access guidance](https://www.wikidata.org/wiki/Help:Data_access).
+
+## Incremental Settings operations
+
+All four operations in **Updates & cleanup** expose the same scan-scope choice:
+- **Only new or unfinished items** (default): skip successful checks whose file mtime/size and operation have not changed. Title checks additionally distinguish target language. Proposed but unconfirmed changes and API errors remain pending.
+- **Rescan all items**: ignore checkpoints and inspect all eligible notes in the configured Library roots.
+
+Checkpoints reside in `.obsidian/plugins/animelist/cleanup-scan-history.json` and are not frontmatter, not part of the note body, and not a record of media activity. Each successful write is checkpointed against the **updated** file version so the new file content is not immediately rescanned. Failed writes, inconclusive provider upgrades and unconfirmed proposals are never marked complete. A separate full scan remains available whenever the upstream metadata source changes. File moves/renames and content edits naturally invalidate path/version-based checkpoints. No scanning runs automatically merely because Settings was opened.

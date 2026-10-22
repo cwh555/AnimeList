@@ -54,7 +54,8 @@ export function planMediaNoteFilenameCleanup(
   for (const file of files) {
     const identity = noteIdentity(app, file);
     if (!identity) continue;
-    scanned += 1;
+    const selected = shouldScan(file);
+    if (selected) scanned += 1;
     const targetPath = uniqueVaultFilePath(
       app.vault,
       mediaNoteFolder(file.path),
@@ -65,7 +66,7 @@ export function planMediaNoteFilenameCleanup(
     if (targetPath === file.path) continue;
     reservedPaths.add(targetPath);
     // Reserve paths across the *entire* library even in incremental mode.
-    if (shouldScan(file)) items.push({ path: file.path, title: identity.title, targetPath });
+    if (selected) items.push({ path: file.path, title: identity.title, targetPath });
   }
 
   return { scanned, items };
