@@ -126,6 +126,28 @@ describe("safe existing-title localization", () => {
     assert.equal((note.data.title_localizations as Record<string,string> | undefined)?.["zh-TW"], undefined);
   });
 
+  it("supports old Open Library work titles through exact Wikidata work ID", async () => {
+    const note = testNote("novel.md", {
+      media_type: "novel", title: "Original Novel", title_original: "Original Novel",
+      source_provider: "openlibrary", source_id: "OL321W",
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      intervalMs: 0,
+      fetch: async () => { throw Error("Do not send Open Library ID to other providers"); },
+      lookupWikidata: async (_type, source, locale) => {
+        assert.deepEqual(source, { provider: "openlibrary", id: "OL321W" });
+        return { title: "維基小說名", locale, itemId: "Q11",
+          kind: "wikidata-label", identityProperty: "P648" };
+      },
+    });
+    assert.equal(plan.items.length, 1);
+    assert.equal(plan.items[0].requiresReview, true);
+    const result = await applyStoredTitleUpdates(note.app, plan, new Set([note.file.path]));
+    assert.equal(result.updated, 1);
+    assert.equal(note.data.title, "維基小說名");
+    assert.equal((note.data.title_external_evidence as Record<string, string>).identity_property, "P648");
+  });
+
   it("reuses verified stored variants across languages without a network call", async () => {
     const note = testNote("anime.md", {
       media_type: "anime", source_provider: "bangumi", source_id: "88",

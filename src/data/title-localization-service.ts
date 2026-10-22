@@ -7,7 +7,7 @@ import { getScopedMarkdownFiles } from "./vault-scope";
 import { BangumiClient } from "./providers/bangumi-client";
 import { AniListClient } from "./providers/anilist-client";
 
-type Provider = "bangumi" | "anilist";
+type Provider = "bangumi" | "anilist" | "openlibrary";
 export type TitleSource = Readonly<{ provider: Provider; id: string }>;
 export type TitleScanStatus = "ready" | "review" | "unchanged" | "no-source" |
   "no-translation" | "custom-title" | "ambiguous" | "lookup-failed";
@@ -93,7 +93,10 @@ function bangumiId(url: string): string {
 function anilistId(url: string): string {
   return /https?:\/\/(?:www\.)?anilist\.co\/(?:anime|manga)\/(\d+)(?:[/?#]|$)/i.exec(url)?.[1] ?? "";
 }
-function ids(fm: Record<string, unknown>): { bangumi: string; anilist: string } {
+function openLibraryId(url: string): string {
+  return /https?:\/\/openlibrary\.org\/works\/(OL[1-9]\d*W)(?:[/?#]|$)/i.exec(url)?.[1] ?? "";
+}
+function ids(fm: Record<string, unknown>): { bangumi: string; anilist: string; openlibrary: string } {
   const provider = field(fm.source_provider);
   const sourceId = field(fm.source_id);
   const links = values(fm.source_urls);
@@ -102,6 +105,8 @@ function ids(fm: Record<string, unknown>): { bangumi: string; anilist: string } 
       || links.map(bangumiId).find(Boolean) || "",
     anilist: field(fm.anilist_id) || (provider === "anilist" && /^\d+$/.test(sourceId) ? sourceId : "")
       || links.map(anilistId).find(Boolean) || "",
+    openlibrary: (provider === "openlibrary" && /^OL[1-9]\d*W$/.test(sourceId) ? sourceId : "")
+      || links.map(openLibraryId).find(Boolean) || "",
   };
 }
 function preferredSource(fm: Record<string, unknown>): TitleSource | null {
@@ -109,8 +114,10 @@ function preferredSource(fm: Record<string, unknown>): TitleSource | null {
   const primary = field(fm.source_provider);
   if (primary === "bangumi" && /^\d+$/.test(all.bangumi)) return { provider: "bangumi", id: all.bangumi };
   if (primary === "anilist" && /^\d+$/.test(all.anilist)) return { provider: "anilist", id: all.anilist };
+  if (primary === "openlibrary" && all.openlibrary) return { provider: "openlibrary", id: all.openlibrary };
   if (/^\d+$/.test(all.bangumi)) return { provider: "bangumi", id: all.bangumi };
   if (/^\d+$/.test(all.anilist)) return { provider: "anilist", id: all.anilist };
+  if (all.openlibrary) return { provider: "openlibrary", id: all.openlibrary };
   return null;
 }
 function identity(fm: Record<string, unknown>): readonly [string, string, string] {
@@ -152,9 +159,9 @@ export async function planStoredTitleUpdates(
   const lookupWikidata = options.lookupWikidata ?? ((type: MediaType, source: TitleSource, lang: SupportedLocale) =>
     wikidata.lookup({ provider: source.provider, sourceId: source.id, mediaType: type }, lang));
   const fetch = options.fetch ?? (async (mediaType: MediaType, source: TitleSource) =>
-    source.provider === "bangumi"
-      ? bangumi.fetchTitleById(mediaType, source.id)
-      : anilist.fetchMediaById(mediaType, source.id));
+    source.provider === "bangumi" ? bangumi.fetchTitleById(mediaType, source.id)
+      : source.provider === "anilist" ? anilist.fetchMediaById(mediaType, source.id)
+        : null);
   const lookup = options.lookup ?? (async (mediaType: MediaType, title: string) =>
     (await bangumi.searchPage(mediaType, title, 1)).results);
   const sleep = options.sleep ?? (async (ms: number) =>
@@ -205,7 +212,7 @@ export async function planStoredTitleUpdates(
     let wikidataEvidence: WikidataTitleEvidence | undefined;
     let directFetchError = "";
     const trustedNames: string[] = [];
-    if (!target && source) {
+    if (!target && source && source.provider !== "openlibrary") {
       try {
         candidate = await fetchCached(type, source);
         if (candidate) {
