@@ -31,15 +31,22 @@ export function buildSearchQueryPlan(
   };
   // Original query and a useful locale conversion can be sent in parallel.
   add(source, initial, SEARCH_REQUEST_BUDGET.initialQueries);
-  if (languages.chinese) {
-    add(traditionalToSimplifiedQuery(source), initial, SEARCH_REQUEST_BUDGET.initialQueries);
-  }
-  for (const variant of searchQueryVariants(source).slice(1)) {
-    add(variant, initial, SEARCH_REQUEST_BUDGET.initialQueries);
+  if (languages.chinese || languages.english || languages.original) {
+    // A seasonless/subtitle prefix is essential for known media editions.
+    // Try it ahead of script conversion when the two compete for one slot.
+    for (const variant of searchQueryVariants(source).slice(1)) {
+      add(variant, initial, SEARCH_REQUEST_BUDGET.initialQueries);
+    }
+    if (languages.chinese) {
+      add(traditionalToSimplifiedQuery(source), initial, SEARCH_REQUEST_BUDGET.initialQueries);
+    }
   }
 
   const discovery: string[] = [];
   if (languages.chinese) {
+    // When a broad seasonless query consumed the fast slot, the Chinese
+    // conversion is the highest-value fallback.
+    add(traditionalToSimplifiedQuery(source), discovery, SEARCH_REQUEST_BUDGET.discoveryQueries);
     for (const variant of collectChineseDiscoveryQueries(source, 8)) {
       add(variant, discovery, SEARCH_REQUEST_BUDGET.discoveryQueries);
     }
