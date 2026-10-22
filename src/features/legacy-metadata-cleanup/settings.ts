@@ -1,5 +1,5 @@
 import { type Setting, type SettingDefinition } from "obsidian";
-import { defineFeature, type AnimeListFeatureHost, type FeatureSettingsSection } from "../../app/feature-types";
+import type { AnimeListFeatureHost } from "../../app/feature-types";
 import { LegacyMetadataCleanupModal } from "../../ui/legacy-metadata-cleanup-modal";
 import { legacyMetadataSettingsText as legacyMetadataText } from "./text";
 
@@ -9,7 +9,7 @@ export function createLegacyMetadataSettingDefinition(
 ): SettingDefinition {
   return {
     name: legacyMetadataText("settings.name"),
-    desc: legacyMetadataText("settings.desc"),
+    desc: "Repair older tag, studio and classification fields with verified AniList data.",
     render: (setting: Setting) => {
       setting.addButton((button) => {
         button.setButtonText(legacyMetadataText("settings.button"));
@@ -19,25 +19,3 @@ export function createLegacyMetadataSettingDefinition(
     },
   };
 }
-
-export function createLegacyMetadataSettingsSection(
-  host: AnimeListFeatureHost,
-  openCleanup: () => void = () => new LegacyMetadataCleanupModal(host).open(),
-): FeatureSettingsSection {
-  return {
-    page: "updates-cleanup",
-    heading: legacyMetadataText("settings.heading"),
-    description: legacyMetadataText("settings.description"),
-    definitions: [createLegacyMetadataSettingDefinition(host, openCleanup)],
-  };
-}
-
-export const legacyMetadataSettingsFeature = defineFeature<AnimeListFeatureHost>({
-  id: "legacy-metadata-cleanup-settings",
-  contributions: [{
-    kind: "settings",
-    sections(host) {
-      return createLegacyMetadataSettingsSection(host);
-    },
-  }],
-});
