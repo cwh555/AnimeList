@@ -100,6 +100,26 @@ describe("external-ID Wikidata title evidence", () => {
     assert.ok(ids[2].includes("wdt:P5732"));
   });
 
+  it("resolves Open Library work IDs through P648, excluding edition and author IDs", async () => {
+    const urls: string[] = [];
+    const service = new WikidataTitleService(async url => {
+      urls.push(decodeURIComponent(url));
+      return urls.length === 1 ? matches() : entity({ "zh-tw": "繁中小說名稱" });
+    });
+    const work = { ...source("manga"), provider: "openlibrary",
+      sourceId: "OL321W", mediaType: "novel" as const,
+      sourceUrl: "https://openlibrary.org/works/OL321W",
+      title: "Original Novel", originalTitle: "Original Novel" };
+    const evidence = await service.lookup(work, "zh-TW");
+    assert.equal(evidence?.title, "繁中小說名稱");
+    assert.equal(evidence?.identityProperty, "P648");
+    assert.match(urls[0], /wdt:P648 "OL321W"/);
+    assert.equal(await service.lookup({ ...work, sourceId: "OL321M" }, "zh-TW"), null);
+    assert.equal(await service.lookup({ ...work, sourceId: "OL321A" }, "zh-TW"), null);
+    assert.equal(await service.lookup({ ...work, sourceId: "321" }, "zh-TW"), null);
+    assert.equal(urls.length, 2);
+  });
+
   it("provider-verified titles take precedence over Wikidata; manual items are unchanged", () => {
     const original={ ...source(), titleVariants: {
       fallback:"Original English", localized: {"zh-TW":"正式譯名"},

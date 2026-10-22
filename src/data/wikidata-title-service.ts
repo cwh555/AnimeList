@@ -5,10 +5,15 @@ import type { ExternalMediaResult, WikidataTitleEvidence } from "../domain/media
 import type { SupportedLocale } from "../i18n/locale";
 
 type TitleIdentity = Pick<ExternalMediaResult, "provider" | "sourceId" | "mediaType">;
-const PROPERTY = {
-  bangumi: () => "P5732",
-  anilist: (result: TitleIdentity) => result.mediaType === "anime" ? "P8729" : "P8731",
-} as const;
+/** Externally stable work identifiers only, never author or edition records. */
+function identityProperty(result: TitleIdentity): string | null {
+  if (result.provider === "bangumi" && /^[1-9]\\d*$/.test(result.sourceId)) return "P5732";
+  if (result.provider === "anilist" && /^[1-9]\\d*$/.test(result.sourceId)) {
+    return result.mediaType === "anime" ? "P8729" : "P8731";
+  }
+  if (result.provider === "openlibrary" && /^OL[1-9]\\d*W$/.test(result.sourceId)) return "P648";
+  return null;
+}
 
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -47,9 +52,8 @@ function titleForLocale(entity: Record<string, unknown>, locale: SupportedLocale
 export function parseWikidataTitleEvidence(
   queryResult: unknown, entityResult: unknown, result: TitleIdentity, locale: SupportedLocale,
 ): WikidataTitleEvidence | null {
-  const property = result.provider === "bangumi" ? PROPERTY.bangumi()
-    : result.provider === "anilist" ? PROPERTY.anilist(result) : null;
-  if (!property || !/^\d+$/.test(result.sourceId)) return null;
+  const property = identityProperty(result);
+    if (!property) return null;
   const bindings = object(object(queryResult).results).bindings;
   if (!Array.isArray(bindings) || bindings.length !== 1) return null;
   const url = string(object(object(bindings[0]).item).value);
@@ -88,9 +92,8 @@ export class WikidataTitleService {
   }
 
   lookup(result: TitleIdentity, locale: SupportedLocale): Promise<WikidataTitleEvidence | null> {
-    const property = result.provider === "bangumi" ? PROPERTY.bangumi()
-      : result.provider === "anilist" ? PROPERTY.anilist(result) : null;
-    if (!property || !/^\d+$/.test(result.sourceId)) return Promise.resolve(null);
+    const property = identityProperty(result);
+    if (!property) return Promise.resolve(null);
     const key = `${property}:${result.sourceId}:${locale}`;
     if (this.cache.has(key)) return Promise.resolve(this.cache.get(key) ?? null);
     if (Date.now() < this.unavailableUntil) return Promise.resolve(null);
