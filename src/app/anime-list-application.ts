@@ -15,6 +15,9 @@ import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
 import { localizeActiveMediaResult } from "../data/media-title-service";
+import { suggestCrossProviderTitle } from "../domain/media-title-suggestion";
+import { normalizeSupportedLocale } from "../i18n/locale";
+import { getActiveLocale } from "../i18n/catalog";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { MANUAL_MEDIA_PROVIDER, type MediaCoverAssetInput } from "../domain/manual-media";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
@@ -266,7 +269,22 @@ export class AnimeListApplicationServices {
     const enriched = await this.mediaClassification().enrichOrOriginal(base, (error) => {
       console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
     });
-    return localizeActiveMediaResult(enriched);
+    const localized = localizeActiveMediaResult(enriched);
+    const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    if ((locale !== "zh-TW" && locale !== "zh-CN")
+      || !this.settings().providers.bangumi || localized.provider === "bangumi") return localized;
+    // The other source provides *candidate evidence*, not an authoritative ID
+    // mapping. Do not silently change the media title or original source.
+    try {
+      const query = localized.originalTitle.trim();
+      if (!query || !Number(localized.year)) return localized;
+      const matches = (await this.metadataProviders().bangumi.searchPage(localized.mediaType, query, 1)).results;
+      const titleSuggestion = suggestCrossProviderTitle(localized, matches, locale);
+      return titleSuggestion ? { ...localized, titleSuggestion } : localized;
+    } catch (error) {
+      console.warn("AnimeList cross-provider title suggestion unavailable; keeping original title", error);
+      return localized;
+    }
   }
   async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
     return this.enrichExternalMedia(storedMediaExternalResult(frontmatter, mediaType));

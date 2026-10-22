@@ -1,6 +1,7 @@
 import type { MediaStatus } from "./media-status";
 import type { MediaType } from "./media-primitives";
 import type { MediaTitleVariants } from "./media-title-localization";
+import type { TitleSuggestion } from "./media-title-suggestion";
 import type { SupportedLocale } from "../i18n/locale";
 import type { MediaClassification } from "./media-classification";
 
@@ -108,6 +109,8 @@ export interface ExternalMediaResult {
   releaseStatus: ReleaseStatus;
   searchTitles?: string[];
   titleVariants?: MediaTitleVariants;
+  /** Cross-provider title suggestion only: never official without identity proof. */
+  titleSuggestion?: TitleSuggestion;
   /** Auto script conversion is not a provider-verified official title. */
   titleScriptConversions?: Partial<Record<SupportedLocale, string>>;
   sources?: ExternalMediaSourceRef[];
