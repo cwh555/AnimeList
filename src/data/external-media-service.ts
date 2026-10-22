@@ -128,7 +128,7 @@ export class ExternalMediaSearchService {
     if (session && page === session.nextPage) {
       const warnings: string[] = [];
       let attempts = 0;
-      while (!session.hasPending && session.hasMore && attempts < MAX_CURSOR_REQUESTS_PER_PAGE) {
+      while (session.pendingCount < PAGE_RESULT_LIMIT && session.hasMore && attempts < MAX_CURSOR_REQUESTS_PER_PAGE) {
         const cursor = session.nextCursor();
         if (!cursor) break;
         attempts += 1;
