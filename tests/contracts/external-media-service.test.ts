@@ -266,6 +266,33 @@ describe("external media search service", () => {
     assert.equal(second.hasMore, false);
   });
 
+  it("fills a partially buffered page from the original provider cursor", async () => {
+    const calls: number[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, query, page) => {
+          calls.push(page);
+          if (page === 1) return {
+            results: Array.from({ length: 25 }, (_, index) => result("bangumi", String(index), query)),
+            hasMore: true,
+          };
+          return {
+            results: Array.from({ length: 23 }, (_, index) => result("bangumi", String(index + 25), query)),
+            hasMore: false,
+          };
+        }),
+      }),
+    );
+    const first = await service.search("anime", "Example");
+    const second = await service.searchPage("anime", "Example", 2);
+    assert.equal(first.results.length, 24);
+    assert.equal(second.results.length, 24);
+    assert.equal(new Set([...first.results, ...second.results].map(value => value.sourceId)).size, 48);
+    assert.deepEqual(calls, [1, 2]);
+    assert.equal(second.hasMore, false);
+  });
+
   it("uses the same provider clients for pagination and keeps partial provider success", async () => {
     const calls: string[] = [];
     const service = new ExternalMediaSearchService(
