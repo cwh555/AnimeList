@@ -78,7 +78,7 @@ export class WikidataTitleService {
     const key = `${property}:${result.sourceId}:${locale}`;
     if (this.cache.has(key)) return Promise.resolve(this.cache.get(key) ?? null);
     const existing = this.pending.get(key);
-    if (existing) return existing;
+    if (existing !== undefined) return existing;
     const work = this.lookupExact(result, locale, property).then(evidence => {
       this.cache.set(key, evidence);
       return evidence;
