@@ -1,5 +1,6 @@
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { rankSearchResults, scoreSearchResult } from "../domain/search/ranking";
+import { sameMediaIdentity } from "../domain/search/entity-resolution";
 import type { MetadataProviderId, MetadataProviderPage } from "./external-media-provider";
 import { dedupeSearchResults } from "./provider-normalizers";
 
@@ -22,7 +23,7 @@ export class SearchSession {
   readonly relatedQueries: readonly string[];
   nextPage = 2;
   private pending: ExternalMediaResult[];
-  private readonly delivered = new Set<string>();
+  private readonly delivered: ExternalMediaResult[] = [];
   private readonly cursors: SearchCursor[];
 
   constructor(
@@ -39,18 +40,16 @@ export class SearchSession {
     this.cursors = cursors.map(cursor => ({ ...cursor }));
   }
 
-  private key(result: ExternalMediaResult): string {
-    return JSON.stringify([result.provider, result.sourceId]);
+  private wasDelivered(candidate: ExternalMediaResult): boolean {
+    return this.delivered.some(previous => sameMediaIdentity(previous, candidate));
   }
 
   takePage(): ExternalMediaResult[] {
     const output: ExternalMediaResult[] = [];
-    while (output.length < PAGE_LIMIT && this.pending.length && this.delivered.size < TOTAL_LIMIT) {
+    while (output.length < PAGE_LIMIT && this.pending.length && this.delivered.length < TOTAL_LIMIT) {
       const candidate = this.pending.shift();
-      if (!candidate) break;
-      const key = this.key(candidate);
-      if (this.delivered.has(key)) continue;
-      this.delivered.add(key);
+      if (!candidate || this.wasDelivered(candidate)) continue;
+      this.delivered.push(candidate);
       output.push(candidate);
     }
     return output;
@@ -60,10 +59,10 @@ export class SearchSession {
     if (!results.length) return;
     const all = dedupeSearchResults([...this.pending, ...results]);
     this.pending = rankSearchResults(
-      all.filter(result => !this.delivered.has(this.key(result)))
+      all.filter(result => !this.wasDelivered(result))
         .filter(result => scoreSearchResult(result, this.query, [...this.relatedQueries]) >= 36),
       this.query, [...this.relatedQueries],
-    ).slice(0, TOTAL_LIMIT - this.delivered.size);
+    ).slice(0, TOTAL_LIMIT - this.delivered.length);
   }
 
   nextCursor(): SearchCursor | undefined {
@@ -75,8 +74,8 @@ export class SearchSession {
     this.cursors.push({ ...cursor, nextPage: cursor.nextPage + 1 });
   }
 
-  get hasPending(): boolean {
-    return this.pending.length > 0;
+  get pendingCount(): number {
+    return this.pending.length;
   }
 
   discardProvider(provider: MetadataProviderId): void {
@@ -86,6 +85,6 @@ export class SearchSession {
   }
 
   get hasMore(): boolean {
-    return this.delivered.size < TOTAL_LIMIT && (this.pending.length > 0 || this.cursors.length > 0);
+    return this.delivered.length < TOTAL_LIMIT && (this.pending.length > 0 || this.cursors.length > 0);
   }
 }
