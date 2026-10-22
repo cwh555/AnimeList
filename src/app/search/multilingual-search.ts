@@ -1,4 +1,4 @@
-import { buildSearchQueryPlan } from "../../domain/search/query-plan";
+import { buildSearchQueryPlan, SEARCH_REQUEST_BUDGET } from "../../domain/search/query-plan";
 import {
   filterRelevantSearchResults,
   normalizeSearchComparable,
@@ -25,6 +25,8 @@ export interface MultilingualSearchOptions {
   languages?: SearchLanguageSettings;
   dedupe?: (results: ExternalMediaResult[]) => ExternalMediaResult[];
   maxResults?: number;
+  /** Display reliable candidates without waiting for optional alias requests. */
+  onProgress?: (results: ExternalMediaResult[]) => void;
 }
 
 export interface MultilingualSearchResponse {
@@ -171,27 +173,32 @@ function defaultDedupe(results: ExternalMediaResult[]): ExternalMediaResult[] {
 async function runProviderQueries(
   providers: SearchProviderAdapter[],
   queries: string[],
+  onProviderResult?: (results: ExternalMediaResult[]) => void,
 ): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-  // Keep providers independent, but avoid bursts of concurrent searches to a
-  // single provider. AniList can still batch variants in one GraphQL call.
+  if (!providers.length || !queries.length) return { results: [], warnings: [] };
+  // At most two simultaneous requests per provider. Cross-provider tasks run
+  // independently, while AniList packs variants into a single GraphQL call.
   const settled: ProviderQueryOutcome[] = await Promise.all(providers.map(async provider => {
     if (provider.searchMany && queries.length > 1) {
       try {
-        return { provider: provider.label, results: (await provider.searchMany(queries)).flat() };
+        const results = (await provider.searchMany(queries)).flat();
+        onProviderResult?.(results);
+        return { provider: provider.label, results };
       } catch (error: unknown) {
         return { provider: provider.label, results: [], error };
       }
     }
-    const results: ExternalMediaResult[] = [];
-    for (const query of queries) {
+    const candidates = queries.slice(0, SEARCH_REQUEST_BUDGET.parallelRequestsPerProvider);
+    const outcomes = await Promise.all(candidates.map(async query => {
       try {
-        results.push(...await provider.search(query));
+        return { results: await provider.search(query) };
       } catch (error: unknown) {
-        // Preserve successful variants, but do not repeatedly hit a failing API.
-        return { provider: provider.label, results, error };
+        return { results: [] as ExternalMediaResult[], error };
       }
-    }
-    return { provider: provider.label, results };
+    }));
+    const results = outcomes.flatMap(outcome => outcome.results);
+    onProviderResult?.(results);
+    return { provider: provider.label, results, error: outcomes.find(outcome => outcome.error !== undefined)?.error };
   }));
   return {
     results: settled.flatMap(outcome => outcome.results),
@@ -217,30 +224,49 @@ export async function searchMultilingualProviders(
   const dedupe = options.dedupe ?? defaultDedupe;
   const plan = buildSearchQueryPlan(query, languages);
   const initialQueries = [...plan.initial];
-  const initial = await runProviderQueries(options.providers, initialQueries);
+  const seenCandidates: ExternalMediaResult[] = [];
+  const publishProgress = (results: ExternalMediaResult[], related: string[]): void => {
+    if (!options.onProgress || !results.length) return;
+    seenCandidates.push(...results);
+    const relevant = dedupe(seenCandidates).filter(item =>
+      scoreSearchResult(item, query, related) >= 36);
+    if (relevant.length) options.onProgress(
+      rankSearchResults(relevant, query, related).slice(0, options.maxResults ?? 24),
+    );
+  };
+  const initial = await runProviderQueries(options.providers, initialQueries,
+    results => publishProgress(results, [...initialQueries]));
   const initialUnique = dedupe(initial.results);
   const initialSeeds = rankSearchResults(initialUnique, query)
-    .filter((result) => scoreSearchResult(result, query) >= 36)
-    .slice(0, 6);
+    .filter(result => scoreSearchResult(result, query, initialQueries) >= 36).slice(0, 6);
 
   const discoveryProviders = languages.chinese && initialSeeds.length < 2
-    ? options.providers.filter((provider) => provider.supportsChineseDiscovery)
+    ? options.providers.filter(provider => provider.supportsChineseDiscovery)
     : [];
   const discoveryQueries = discoveryProviders.length ? [...plan.discovery] : [];
   const discovery = discoveryQueries.length
-    ? await runProviderQueries(discoveryProviders, discoveryQueries)
+    ? await runProviderQueries(discoveryProviders, discoveryQueries,
+      results => publishProgress(results, [...initialQueries, ...discoveryQueries]))
     : { results: [], warnings: [] };
 
   const seedPool = dedupe([...initial.results, ...discovery.results]);
   const seedResults = rankSearchResults(seedPool, query, discoveryQueries)
-    .filter((result) => scoreSearchResult(result, query, discoveryQueries) >= 36)
+    .filter(result => scoreSearchResult(result, query, [...initialQueries, ...discoveryQueries]) >= 36)
     .slice(0, 8);
   const aliasQueries = collectMultilingualSearchQueries(query, seedResults, languages);
-  const expanded = aliasQueries.length
-    ? await runProviderQueries(options.providers, aliasQueries)
+  // Do not re-query a source that already found a relevant candidate.
+  // Enrichment targets sources still missing the work (e.g. AniList after Bangumi).
+  const missingProviders = options.providers.filter(provider => {
+    const owned = seedResults.some(result => result.provider.toLowerCase() === provider.label.toLowerCase());
+    return !owned;
+  });
+  const aliasToSearch = aliasQueries.slice(0, SEARCH_REQUEST_BUDGET.aliasQueries);
+  const expanded = aliasToSearch.length && missingProviders.length
+    ? await runProviderQueries(missingProviders, aliasToSearch,
+      results => publishProgress(results, [...initialQueries, ...discoveryQueries, ...aliasQueries]))
     : { results: [], warnings: [] };
 
-  const relatedQueries = uniqueQueries([...discoveryQueries, ...aliasQueries]);
+  const relatedQueries = uniqueQueries([...initialQueries, ...discoveryQueries, ...aliasQueries]);
   const merged = dedupe([...initial.results, ...discovery.results, ...expanded.results]);
   const relevant = filterRelevantSearchResults(merged, query, relatedQueries);
   return {
