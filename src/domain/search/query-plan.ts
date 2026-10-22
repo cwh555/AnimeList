@@ -1,8 +1,15 @@
 import type { SearchLanguageSettings } from "../settings-types";
-import { collectChineseDiscoveryQueries } from "./chinese-variants";
+import { collectChineseDiscoveryQueries, traditionalToSimplifiedQuery } from "./chinese-variants";
 import { normalizeSearchComparable, searchQueryVariants } from "./ranking";
 
-/** One search plan shared by provider orchestration and pagination. */
+/** Strict per-interaction budgets: more ambiguous queries never spawn unbounded requests. */
+export const SEARCH_REQUEST_BUDGET = {
+  initialQueries: 2,
+  discoveryQueries: 2,
+  aliasQueries: 2,
+  parallelRequestsPerProvider: 2,
+} as const;
+
 export interface SearchQueryPlan {
   readonly source: string;
   readonly initial: readonly string[];
@@ -14,15 +21,32 @@ export function buildSearchQueryPlan(
   languages: SearchLanguageSettings,
 ): SearchQueryPlan {
   const source = input.normalize("NFKC").replace(/\s+/gu, " ").trim();
-  const initial = searchQueryVariants(source);
-  const known = new Set(initial.map(normalizeSearchComparable));
-  const discovery = languages.chinese
-    ? collectChineseDiscoveryQueries(source).filter(value => {
-      const key = normalizeSearchComparable(value);
-      if (!key || known.has(key)) return false;
-      known.add(key);
-      return true;
-    })
-    : [];
+  const initial: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string, target: string[], max: number): void => {
+    const key = normalizeSearchComparable(value);
+    if (!value.trim() || !key || seen.has(key) || target.length >= max) return;
+    seen.add(key);
+    target.push(value);
+  };
+  // Original query and a useful locale conversion can be sent in parallel.
+  add(source, initial, SEARCH_REQUEST_BUDGET.initialQueries);
+  if (languages.chinese) {
+    add(traditionalToSimplifiedQuery(source), initial, SEARCH_REQUEST_BUDGET.initialQueries);
+  }
+  for (const variant of searchQueryVariants(source).slice(1)) {
+    add(variant, initial, SEARCH_REQUEST_BUDGET.initialQueries);
+  }
+
+  const discovery: string[] = [];
+  if (languages.chinese) {
+    for (const variant of collectChineseDiscoveryQueries(source, 8)) {
+      add(variant, discovery, SEARCH_REQUEST_BUDGET.discoveryQueries);
+    }
+  } else {
+    for (const variant of searchQueryVariants(source).slice(1)) {
+      add(variant, discovery, SEARCH_REQUEST_BUDGET.discoveryQueries);
+    }
+  }
   return { source, initial, discovery };
 }
