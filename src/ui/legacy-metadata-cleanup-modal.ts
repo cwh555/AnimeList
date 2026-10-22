@@ -7,7 +7,7 @@ import type {
   LegacyMetadataCleanupProgress,
   LegacyMetadataCleanupResult,
 } from "../domain/legacy-metadata-types";
-import { legacyMetadataText } from "../features/legacy-metadata-cleanup/text";
+import { legacyMetadataSettingsText as legacyMetadataText } from "../features/legacy-metadata-cleanup/text";
 
 function phaseLabel(phase: LegacyMetadataCleanupProgress["phase"]): string {
   return legacyMetadataText(`settings.phase.${phase}` as const);

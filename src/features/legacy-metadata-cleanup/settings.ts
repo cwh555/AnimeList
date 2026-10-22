@@ -1,7 +1,7 @@
 import { type Setting, type SettingDefinition } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost, type FeatureSettingsSection } from "../../app/feature-types";
 import { LegacyMetadataCleanupModal } from "../../ui/legacy-metadata-cleanup-modal";
-import { legacyMetadataText } from "./text";
+import { legacyMetadataSettingsText as legacyMetadataText } from "./text";
 
 export function createLegacyMetadataSettingDefinition(
   host: AnimeListFeatureHost,
