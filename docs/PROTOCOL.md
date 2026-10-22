@@ -60,11 +60,24 @@ Behavior tests must cover source-URL IDs, stored variants, AniList-only records,
 
 See ARCHITECTURE.md and VERIFICATION.md for module and release contracts, plus MANUAL_TEST_CHECKLIST.md for manual sign-off.
 
-## New-note title selection
+## Provider-neutral title selection
 
-Newly imported Bangumi media are localized during the search/result normalization **before the create-note form is shown**. If a verified title exists for the selected interface language, that title is preferred. If a Traditional Chinese title is absent but the source explicitly labels its Simplified Chinese title, OpenCC converts only the Chinese writing system to Traditional. The resulting title is saved directly on the new note (no legacy-migration button) and separately marked as `title_script_conversions.zh-TW`; `title_localizations` contains only verified provider names. If the user edits the proposed title before creating the note, the edit is authoritative and is **not** incorrectly recorded as an auto conversion.
+A single typed selector owns the rules in `src/domain/media-title-localization.ts`. The data adapter in `src/data/media-title-service.ts` applies it to `ExternalMediaResult`, without modifying source identity, metadata, author/studio names, or authoritative title variants. Each provider normalizer **only extracts title evidence**; all three then use the same adapter. The create-note enrichment boundary reapplies this selection before the form is populated, so a second API call cannot silently revert the name.
 
-OpenCC cannot translate Japanese/English/Korean names into Chinese. When AniList or another provider has no trustworthy Chinese variant, AnimeList must retain a known source title rather than invent a licensed translation. Users may edit the title in the collection form; old data remains independent of new imports.
+For **new** imports, in order:
+1. Prefer an explicit, provider-labelled title for the interface locale.
+2. If the locale is Chinese and **the same record** has a title explicitly labelled in the other Chinese script, use offline OpenCC for script conversion. Mark that result as `title_script_conversions`, **never** `title_localizations`.
+3. Otherwise keep a safe source title. Unlabelled synonyms are searchable aliases, not verified translations; do not infer a work's identity from its title.
+
+Provider-specific evidence:
+- **Bangumi:** `name_cn` is Simplified Chinese, an explicitly labelled infobox title can be Traditional Chinese. Both can be converted when the other script is requested.
+- **AniList:** `english` is verified English, `native` is tagged as Japanese/Korean only with matching `countryOfOrigin`. Neither `romaji` nor `synonyms` provides trustworthy Chinese language attribution, so do not invent Chinese translations.
+- **Open Library:** Work `title` is a fallback, not presumed to be an official Chinese translation. Search's `lang` now follows the interface's language preference (zh-TW/zh-CN → zh, en → en, ja → ja, ko → ko), which influences edition preference but **does not certify the title language**.
+- **Manually entered media:** User-entered title is authoritative; the adapter skips manual items entirely.
+
+This contract applies to search results, metadata enrichment, and the initial creation form; no legacy-data action is needed for new imports. If the user changes the suggested title manually before saving, the note stores that exact title and does not falsely claim a script conversion. `title_original`, `title_aliases`, verified `title_localizations`, and actual creators are preserved.
+
+Cross-provider matching by title/year is **not** sufficient evidence to auto-fill verified titles. Legacy title reconciliation can offer potential cross-provider matches for explicit review, but a new import must not silently adopt an unverified match. Machine translation is not currently provided.
 
 ## Settings layout
 

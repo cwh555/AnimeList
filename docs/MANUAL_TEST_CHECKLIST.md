@@ -364,3 +364,12 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Changing the interface language does not rewrite existing titles.
 
 - [ ] Accept a review-only OpenCC suggestion, explicitly switch to another verified language, then switch back. The accepted conversion must remain available but must **not** appear inside the official `title_localizations` map.
+
+## Multisource title resolution, new imports
+
+- [ ] On all Settings interface languages, create a Bangumi anime, manga and novel with a verified translated name. The verified name takes precedence; original titles and all non-title metadata remain unchanged.
+- [ ] With zh-TW selected, create a Bangumi item containing only `name_cn`; the initial form and saved note should show Traditional script without pressing the Legacy data button, and frontmatter must identify this as a script conversion rather than an official translation.
+- [ ] Add AniList Japanese and Korean works with locale ja/ko/en; verify correct provider native/English title only where language attribution exists. With zh-TW/zh-CN and no verified Chinese title, ensure the original source name remains usable and unknown synonyms do not become made-up translations.
+- [ ] Search and add an Open Library novel under zh, en, ja or ko; verify the edition preference follows the UI language, and missing translations do not overwrite the original book title or author.
+- [ ] Edit the proposed title in the new-note form; verify the custom name is preserved and no automatic conversion is falsely claimed. Repeat the search with an existing duplicate to verify source identity checking remains unchanged.
+- [ ] Change locale between searching and opening note details; ensure the create-note form resolves the chosen locale consistently, without losing original aliases or switching metadata sources.
