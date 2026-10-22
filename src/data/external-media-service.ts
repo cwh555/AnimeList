@@ -61,6 +61,7 @@ export class ExternalMediaSearchService {
   async search(mediaType: MediaType, query: string): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
+    hasMore: boolean;
   }> {
     const sessionKey = this.sessionKey(mediaType, query);
     const cursors = new Map<string, SearchCursor>();
@@ -92,7 +93,7 @@ export class ExternalMediaSearchService {
     });
     if (!providers.length) {
       this.sessions.delete(sessionKey);
-      return { results: [], warnings: [searchFeatureText("provider.noneEnabled")] };
+      return { results: [], warnings: [searchFeatureText("provider.noneEnabled")], hasMore: false };
     }
 
     const response = await searchMultilingualProviders({
@@ -110,7 +111,8 @@ export class ExternalMediaSearchService {
       if (oldest === undefined) break;
       this.sessions.delete(oldest);
     }
-    return { results: session.takePage(), warnings: response.warnings };
+    const results = session.takePage();
+    return { results, warnings: response.warnings, hasMore: session.hasMore };
   }
 
   /**
