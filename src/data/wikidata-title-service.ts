@@ -7,11 +7,11 @@ import type { SupportedLocale } from "../i18n/locale";
 type TitleIdentity = Pick<ExternalMediaResult, "provider" | "sourceId" | "mediaType">;
 /** Externally stable work identifiers only, never author or edition records. */
 function identityProperty(result: TitleIdentity): string | null {
-  if (result.provider === "bangumi" && /^[1-9]\\d*$/.test(result.sourceId)) return "P5732";
-  if (result.provider === "anilist" && /^[1-9]\\d*$/.test(result.sourceId)) {
+  if (result.provider === "bangumi" && /^[1-9]\d*$/.test(result.sourceId)) return "P5732";
+  if (result.provider === "anilist" && /^[1-9]\d*$/.test(result.sourceId)) {
     return result.mediaType === "anime" ? "P8729" : "P8731";
   }
-  if (result.provider === "openlibrary" && /^OL[1-9]\\d*W$/.test(result.sourceId)) return "P648";
+  if (result.provider === "openlibrary" && /^OL[1-9]\d*W$/.test(result.sourceId)) return "P648";
   return null;
 }
 
