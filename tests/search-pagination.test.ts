@@ -174,6 +174,67 @@ describe("search pagination", () => {
     assert.deepEqual(rows.children, ["1", "3"]);
   });
 
+  it("ignores an old Load more response after a new search replaces the result list", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    const host = {
+      async searchExternalPage() {
+        return await new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const original = [result(1)];
+    const modal = {
+      mediaType: "anime", query: "First",
+      results: original, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 },
+      renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000First", results: [...original], warnings: [],
+      loads: 0, hasMore: true, loading: false, sourceResults: original,
+    };
+    const rows = { children: ["1"], appendChild(value: string) { this.children.push(value); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    const replacement = [result(20)];
+    modal.results = replacement;
+    modal.query = "Second";
+    synchronizePaginationState(modal as never, state);
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.deepEqual(modal.results.map(item => item.sourceId), ["20"]);
+    assert.equal(state.signature, "anime\u0000Second");
+  });
+
+  it("rejects prior Load more results even when the same query is searched again", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    const host = {
+      async searchExternalPage() {
+        return await new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const first = [result(1)];
+    const modal = {
+      mediaType: "anime", query: "Title",
+      results: first, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 },
+      renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title", results: [...first], warnings: [],
+      loads: 0, hasMore: true, loading: false, sourceResults: first,
+    };
+    const rows = { children: ["1"], appendChild(value: string) { this.children.push(value); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    modal.results = [result(10)];
+    synchronizePaginationState(modal as never, state);
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.deepEqual(modal.results.map(item => item.sourceId), ["10"]);
+  });
+
   it("stops requesting after two additional pages", async () => {
     let requests = 0;
     const host = {
