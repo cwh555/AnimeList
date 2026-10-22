@@ -240,7 +240,7 @@ export async function searchMultilingualProviders(
   const initialSeeds = rankSearchResults(initialUnique, query)
     .filter(result => scoreSearchResult(result, query, initialQueries) >= 36).slice(0, 6);
 
-  const discoveryProviders = languages.chinese && initialSeeds.length < 2
+  const discoveryProviders = languages.chinese && initialSeeds.length === 0
     ? options.providers.filter(provider => provider.supportsChineseDiscovery)
     : [];
   const discoveryQueries = discoveryProviders.length ? [...plan.discovery] : [];
