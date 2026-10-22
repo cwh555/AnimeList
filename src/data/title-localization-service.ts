@@ -56,6 +56,7 @@ export interface TitleUpdateOptions {
   signal?: AbortSignal;
   onProgress?: (completed: number, total: number, row: TitleScanRow) => void;
   onStart?: (completed: number, total: number, title: string, path: string) => void;
+  shouldScan?: (file: TFile) => boolean;
 }
 function field(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -166,7 +167,8 @@ export async function planStoredTitleUpdates(
     return pending;
   }
   const files = getScopedMarkdownFiles(app, roots).filter(f =>
-    mediaTypeOf(app.metadataCache.getFileCache(f)?.frontmatter?.media_type) !== null);
+    mediaTypeOf(app.metadataCache.getFileCache(f)?.frontmatter?.media_type) !== null
+      && (options.shouldScan?.(f) ?? true));
   const rows: TitleScanRow[] = [];
   let next = 0;
   let completed = 0;

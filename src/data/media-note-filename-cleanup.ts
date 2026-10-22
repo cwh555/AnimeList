@@ -44,6 +44,7 @@ function noteIdentity(app: App, file: TFile): { title: string; mediaType: MediaT
 export function planMediaNoteFilenameCleanup(
   app: App,
   roots: string[],
+  shouldScan: (file: TFile) => boolean = () => true,
 ): MediaNoteFilenameCleanupPlan {
   const files = getScopedMarkdownFiles(app, roots).sort((left, right) => left.path.localeCompare(right.path));
   const reservedPaths = new Set<string>();
@@ -63,7 +64,8 @@ export function planMediaNoteFilenameCleanup(
     );
     if (targetPath === file.path) continue;
     reservedPaths.add(targetPath);
-    items.push({ path: file.path, title: identity.title, targetPath });
+    // Reserve paths across the *entire* library even in incremental mode.
+    if (shouldScan(file)) items.push({ path: file.path, title: identity.title, targetPath });
   }
 
   return { scanned, items };
