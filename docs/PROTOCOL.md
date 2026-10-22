@@ -147,3 +147,39 @@ Limits: substring discovery does not guarantee Google-like semantic search for
 all unknown aliases; source API indexing determines whether a partial query
 returns the work. Verify recall and request counts against real providers in
 Obsidian Test Vault rather than assuming mocked coverage proves availability.
+
+## Interactive search latency and nonofficial Chinese aliases (PR #243 follow-up)
+
+Search latency must not scale linearly with the number of guessed aliases:
+
+- Query planning limits first-phase variants to two, Chinese discovery variants to
+  two, and cross-language alias variants to three. Sources run independently,
+  with up to two simultaneous requests within each provider. AniList continues
+  using a single batched GraphQL operation where supported and retains its
+  published 30/min limiter; never bypass upstream 403/429 protections.
+- Stop discovery after the first sufficiently relevant source candidate. Avoid
+  further alias requests to a source that already returned that work.
+  When a different source remains unresolved, its supplemental lookup is
+  optional and may finish later; the UI displays first-source results immediately
+  without replacing the input control or changing focus.
+- An upstream Bangumi search can index an infobox alias but only return an
+  original Korean title in its compact result payload. Display this hit early.
+  When the user selects it, fetch the **same Bangumi subject ID** to obtain its
+  full infobox, rather than guessing a different Bangumi/AniList ID.
+- If that exact Bangumi record provides an unambiguous Han-only alias while
+  the original is Hangul/Kana, the alias may be used as a **nonofficial display
+  and newly imported note title**. Keep it in the distinct `displayAliases`
+  field, never in provider-verified `localized` or `title_localizations`.
+  If OpenCC is used, persist its conversion provenance separately. Existing
+  user-owned titles and manually typed names remain authoritative.
+- If the exact Bangumi record contains no recognizable Chinese alias, there is
+  **no automatic machine translation**: preserve the original title and expose
+  other candidates only with their real provenance.
+- Display latency still depends on the first responding provider. Do not claim
+  a fixed millisecond SLA from mocked requests or confuse first-result time with
+  the total time required to finish all optional metadata sources.
+
+Regression tests must verify worst-case request counts, the first-result callback
+while a second provider is pending, Korean-origin + Chinese-infobox-alias
+selection (Bangumi subject 399671), seasons and subtitles, pagination loading
+state, and preservation of the original note metadata.
