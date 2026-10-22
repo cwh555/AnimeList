@@ -114,8 +114,15 @@ export async function appendNextSearchPage(
   if (!canLoadMore(state)) return 0;
   state.loading = true;
   const page = state.loads + 2;
+  const signature = state.signature;
+  const requestMediaType = modal.mediaType;
+  const requestQuery = modal.query;
   try {
-    const response = await host.searchExternalPage(modal.mediaType, modal.query, page);
+    const response = await host.searchExternalPage(requestMediaType, requestQuery, page);
+    // A new search may have started while a provider request was pending.
+    // Never insert stale rows into a different query's result container.
+    if (state.signature !== signature
+      || searchSignature(modal.mediaType, modal.query) !== signature) return 0;
     const existingKeys = new Set(state.results.map(resultKey));
     const merged = mergeSearchPages(state.results, [response.results]);
     const appended = merged.filter((result) => !existingKeys.has(resultKey(result)));
