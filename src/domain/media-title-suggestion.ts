@@ -1,4 +1,4 @@
-import type { ExternalMediaResult, MediaType } from "./media-types";
+import type { ExternalMediaResult } from "./media-types";
 import type { SupportedLocale } from "../i18n/locale";
 import { chineseScriptCandidate, verifiedMediaTitle } from "./media-title-localization";
 
