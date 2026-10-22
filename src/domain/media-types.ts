@@ -111,6 +111,8 @@ export interface ExternalMediaResult {
   titleVariants?: MediaTitleVariants;
   /** Cross-provider title suggestion only: never official without identity proof. */
   titleSuggestion?: TitleSuggestion;
+  /** Prevent duplicate cross-provider lookups during create-note submission. */
+  titleEvidenceChecked?: SupportedLocale;
   /** Auto script conversion is not a provider-verified official title. */
   titleScriptConversions?: Partial<Record<SupportedLocale, string>>;
   sources?: ExternalMediaSourceRef[];

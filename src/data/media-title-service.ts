@@ -26,6 +26,7 @@ export function localizeExternalMediaResult(
   return {
     ...result,
     title,
+    titleSuggestion: result.titleSuggestion?.locale === locale ? result.titleSuggestion : undefined,
     titleVariants: variants,
     searchTitles: aliases,
     ...(selected.scriptConversion

@@ -272,15 +272,18 @@ export class AnimeListApplicationServices {
     const localized = localizeActiveMediaResult(enriched);
     const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
     if ((locale !== "zh-TW" && locale !== "zh-CN")
-      || !this.settings().providers.bangumi || localized.provider === "bangumi") return localized;
+      || !this.settings().providers.bangumi || localized.provider === "bangumi"
+      || localized.provider === MANUAL_MEDIA_PROVIDER
+      || localized.titleEvidenceChecked === locale) return localized;
     // The other source provides *candidate evidence*, not an authoritative ID
     // mapping. Do not silently change the media title or original source.
     try {
       const query = localized.originalTitle.trim();
-      if (!query || !Number(localized.year)) return localized;
+      if (!query || !Number(localized.year)
+        || localized.titleVariants?.localized?.[locale]) return localized;
       const matches = (await this.metadataProviders().bangumi.searchPage(localized.mediaType, query, 1)).results;
       const titleSuggestion = suggestCrossProviderTitle(localized, matches, locale);
-      return titleSuggestion ? { ...localized, titleSuggestion } : localized;
+      return { ...localized, titleEvidenceChecked: locale, titleSuggestion: titleSuggestion ?? undefined };
     } catch (error) {
       console.warn("AnimeList cross-provider title suggestion unavailable; keeping original title", error);
       return localized;
