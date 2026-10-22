@@ -6,7 +6,7 @@ import { normalizeSearchComparable, searchQueryVariants } from "./ranking";
 export const SEARCH_REQUEST_BUDGET = {
   initialQueries: 2,
   discoveryQueries: 2,
-  aliasQueries: 2,
+  aliasQueries: 3,
   parallelRequestsPerProvider: 2,
 } as const;
 
