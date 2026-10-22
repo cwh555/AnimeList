@@ -30,6 +30,7 @@ export interface PaginationState {
   hasMore: boolean;
   loading: boolean;
   sourceResults: ExternalMediaResult[] | null;
+  loadToken?: object;
 }
 
 function resultKey(result: ExternalMediaResult): string {
@@ -85,6 +86,7 @@ function resetFromInitialSearch(modal: PaginatedSearchModal, state: PaginationSt
   state.loads = 0;
   state.hasMore = modal.hasMore ?? modal.results.length > 0;
   state.loading = false;
+  state.loadToken = undefined;
   state.sourceResults = modal.results;
 }
 
@@ -113,6 +115,8 @@ export async function appendNextSearchPage(
 ): Promise<number> {
   if (!canLoadMore(state)) return 0;
   state.loading = true;
+  const token = {};
+  state.loadToken = token;
   const page = state.loads + 2;
   const signature = state.signature;
   const startingResults = state.sourceResults;
@@ -142,7 +146,10 @@ export async function appendNextSearchPage(
     modal.contentEl.scrollTop = scrollTop;
     return appended.length;
   } finally {
-    if (state.signature === signature && state.sourceResults === startingResults) state.loading = false;
+    if (state.loadToken === token) {
+      state.loading = false;
+      state.loadToken = undefined;
+    }
   }
 }
 
