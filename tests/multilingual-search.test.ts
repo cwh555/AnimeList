@@ -290,9 +290,9 @@ describe("multilingual provider search", () => {
         if (results.some(candidate => candidate.sourceId === "248175")) events.push("first-result");
       },
     });
-    // Yield a microtask so the fast provider can publish its matches.
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait until the current event-loop turn finishes; this must publish
+    // before the deferred second provider has been released.
+    await new Promise<void>(resolve => setImmediate(resolve));
     assert.ok(events.includes("first-result"));
     release();
     await waiting;
