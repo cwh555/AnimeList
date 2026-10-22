@@ -68,4 +68,4 @@ OpenCC cannot translate Japanese/English/Korean names into Chinese. When AniList
 
 ## Settings layout
 
-Imperative Obsidian Settings pages use plain, semantic section headings with explicit padding and line-height rather than relying on Obsidian's setting-heading default margins. The same settings section definitions are retained for the 1.13+ declarative path.
+Imperative Obsidian Settings pages retain Obsidian's Setting.setHeading API for accessibility and lint compatibility. Card headings now normalize default heading-item margins and use explicit container padding and line-height; the 1.13+ declarative path still uses the same settings section definitions.

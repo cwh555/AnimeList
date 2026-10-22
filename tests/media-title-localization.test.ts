@@ -79,9 +79,9 @@ describe("provenance-aware media title localization", () => {
     const note = buildMediaMarkdown(media, form, "", "");
     assert.match(note, /title: "簡體標題"/);
     assert.match(note, /title_original: "原題"/);
-    assert.match(note, /title_localizations:\\n  zh-CN: "简体标题"/);
-    assert.match(note, /title_script_conversions:\\n  zh-TW: "簡體標題"/);
-    assert.ok(!note.includes("title_localizations:\\n  zh-TW"));
+    assert.match(note, /title_localizations:\n  zh-CN: "简体标题"/);
+    assert.match(note, /title_script_conversions:\n  zh-TW: "簡體標題"/);
+    assert.ok(!note.includes("title_localizations:\n  zh-TW"));
     assert.match(note, /原作会社/);
     const manuallyEdited = buildMediaMarkdown(media, { ...form, title: "使用者指定名稱" }, "", "");
     assert.match(manuallyEdited, /title: "使用者指定名稱"/);
