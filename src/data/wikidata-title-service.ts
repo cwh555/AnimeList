@@ -65,6 +65,7 @@ export function parseWikidataTitleEvidence(
 export class WikidataTitleService {
   private readonly pending = new Map<string, Promise<WikidataTitleEvidence | null>>();
   private readonly cache = new Map<string, WikidataTitleEvidence | null>();
+  private unavailableUntil = 0;
   constructor(
     private readonly request: (url: string) => Promise<unknown> = async url =>
       (await requestUrl({ url, headers: {
@@ -72,17 +73,36 @@ export class WikidataTitleService {
       } } )).json,
   ) {}
 
+  private async requestWithTimeout(url: string): Promise<unknown> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        this.request(url),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error("Wikidata title lookup timed out")), 5_000);
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
   lookup(result: TitleIdentity, locale: SupportedLocale): Promise<WikidataTitleEvidence | null> {
     const property = result.provider === "bangumi" ? PROPERTY.bangumi()
       : result.provider === "anilist" ? PROPERTY.anilist(result) : null;
     if (!property || !/^\d+$/.test(result.sourceId)) return Promise.resolve(null);
     const key = `${property}:${result.sourceId}:${locale}`;
     if (this.cache.has(key)) return Promise.resolve(this.cache.get(key) ?? null);
+    if (Date.now() < this.unavailableUntil) return Promise.resolve(null);
     const existing = this.pending.get(key);
     if (existing !== undefined) return existing;
     const work = this.lookupExact(result, locale, property).then(evidence => {
       this.cache.set(key, evidence);
+      if (this.cache.size > 256) this.cache.delete(this.cache.keys().next().value ?? "");
       return evidence;
+    }).catch((error: unknown) => {
+      this.unavailableUntil = Date.now() + 60_000;
+      throw error;
     }).finally(() => { this.pending.delete(key); });
     this.pending.set(key, work);
     return work;
@@ -92,7 +112,7 @@ export class WikidataTitleService {
     property: string): Promise<WikidataTitleEvidence | null> {
     const query = `SELECT DISTINCT ?item WHERE { ?item wdt:${property} "${result.sourceId}". } LIMIT 2`;
     const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(query);
-    const matches = await this.request(url);
+    const matches = await this.requestWithTimeout(url);
     const bindings = object(object(matches).results).bindings;
     if (!Array.isArray(bindings) || bindings.length !== 1) return null;
     const itemUrl = string(object(object(bindings[0]).item).value);
@@ -102,6 +122,6 @@ export class WikidataTitleService {
     const entityUrl = "https://www.wikidata.org/w/api.php?action=wbgetentities&ids="
       + encodeURIComponent(id) + "&props=labels%7Csitelinks&languages="
       + encodeURIComponent(langs) + "&format=json";
-    return parseWikidataTitleEvidence(matches, await this.request(entityUrl), result, locale);
+    return parseWikidataTitleEvidence(matches, await this.requestWithTimeout(entityUrl), result, locale);
   }
 }
