@@ -162,7 +162,7 @@ export class LegacyMetadataCleanupModal extends AnimeListModal {
     void readCleanupScanHistory(this.host.app).then(async history => {
       const checkedPaths = new Set<string>();
       const summary = await cleanupLegacyMetadataNotes(this.host.app, this.host.getScanFolders(), {
-        enrich: result => this.host.enrichExternalMedia(result),
+        enrich: result => this.host.enrichExternalMedia(result, "metadata-only"),
         onProgress: update,
         shouldScan: file => history.needsScan("metadata", file, mode),
         onChecked: (file, success) => { if (success) checkedPaths.add(file.path); },

@@ -260,7 +260,9 @@ export class AnimeListApplicationServices {
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }
-  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
+  async enrichExternalMedia(
+    result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media",
+  ): Promise<ExternalMediaResult> {
     let base = result;
     if (result.provider === "bangumi" && result.sourceId && (!result.people.length || !result.rawGenres.length)) {
       try {
@@ -274,6 +276,9 @@ export class AnimeListApplicationServices {
     });
     const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
     let localized = localizeActiveMediaResult(enriched);
+    // Legacy metadata repair needs classification only, not an additional
+    // Wikidata + Bangumi title lookup for every note in a bulk scan.
+    if (purpose === "metadata-only") return localized;
     if (localized.provider !== MANUAL_MEDIA_PROVIDER
       && !localized.titleVariants?.localized?.[locale]
       && localized.wikidataTitleEvidence?.locale !== locale) {

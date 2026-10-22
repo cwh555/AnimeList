@@ -305,8 +305,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.services().searchOpenLibrary(query);
   }
 
-  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
-    return this.services().enrichExternalMedia(result);
+  async enrichExternalMedia(result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media"): Promise<ExternalMediaResult> {
+    return this.services().enrichExternalMedia(result, purpose);
   }
 
   async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
