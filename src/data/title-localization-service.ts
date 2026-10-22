@@ -46,6 +46,7 @@ export interface TitleUpdateResult {
   skipped: number;
   failed: number;
   errors: Array<{ path: string; message: string }>;
+  updatedPaths: string[];
 }
 export interface TitleUpdateOptions {
   fetch?: (mediaType: MediaType, source: TitleSource) => Promise<ExternalMediaResult | null>;
@@ -284,7 +285,7 @@ export async function planStoredTitleUpdates(
 export async function applyStoredTitleUpdates(
   app: App, plan: TitleUpdatePlan, selectedPaths: ReadonlySet<string>,
 ): Promise<TitleUpdateResult> {
-  const result: TitleUpdateResult = { updated: 0, skipped: 0, failed: 0, errors: [] };
+  const result: TitleUpdateResult = { updated: 0, skipped: 0, failed: 0, errors: [], updatedPaths: [] };
   for (const item of plan.items) {
     if (!selectedPaths.has(item.path)) continue;
     const file = app.vault.getAbstractFileByPath(item.path);
@@ -315,8 +316,10 @@ export async function applyStoredTitleUpdates(
         }
         changed = true;
       });
-      if (changed) result.updated++;
-      else result.skipped++;
+      if (changed) {
+        result.updated++;
+        result.updatedPaths.push(file.path);
+      } else result.skipped++;
     } catch (error) {
       result.failed++;
       result.errors.push({ path: item.path, message: error instanceof Error ? error.message : String(error) });

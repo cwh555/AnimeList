@@ -5,6 +5,8 @@ import { SUPPORTED_LOCALES, normalizeSupportedLocale, type SupportedLocale } fro
 import { getActiveLocale } from "../i18n/catalog";
 import { applyStoredTitleUpdates, planStoredTitleUpdates, type TitleUpdatePlan } from "../data/title-localization-service";
 import { titleLocalizationSettingsText as text } from "../features/title-localization/text";
+import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
+import { getScopedMarkdownFiles } from "../data/vault-scope";
 
 const NAMES: Record<SupportedLocale, string> = {
   "zh-TW": "Traditional Chinese",
@@ -42,6 +44,7 @@ export class TitleLocalizationModal extends AnimeListModal {
     }
     select.value = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
     this.contentEl.createEl("p", { cls: "al-modal-hint", text: text("modal.warning") });
+    const scanMode = createScanModeControl(this.contentEl);
 
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
     const cancel = footer.createEl("button", { text: text("modal.cancel") });
@@ -53,11 +56,11 @@ export class TitleLocalizationModal extends AnimeListModal {
       if (this.busy) return;
       const locale = normalizeSupportedLocale(select.value);
       if (!locale) return;
-      this.renderPreview(locale);
+      this.renderPreview(locale, scanMode.value === "all" ? "all" : "pending");
     });
   }
 
-  private renderPreview(locale: SupportedLocale): void {
+  private renderPreview(locale: SupportedLocale, mode: CleanupScanMode): void {
     this.busy = true;
     this.contentEl.empty();
     const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: text("modal.scanning", { completed: 0, total: 0 }) });
@@ -68,8 +71,11 @@ export class TitleLocalizationModal extends AnimeListModal {
     cancel.addEventListener("click", () => this.close());
     const controller = new AbortController();
     this.abort = controller;
-    void planStoredTitleUpdates(this.host.app, this.host.getScanFolders(), locale, {
+    const task = `titles:${locale}` as const;
+    void readCleanupScanHistory(this.host.app).then(async history => {
+      const plan = await planStoredTitleUpdates(this.host.app, this.host.getScanFolders(), locale, {
       signal: controller.signal,
+      shouldScan: file => history.needsScan(task, file, mode),
       onStart: (completed, total, title) => {
         if (!this.closed) status.setText(text("modal.scanning", { completed, total }) + " — Fetching: " + title);
       },
@@ -84,6 +90,16 @@ export class TitleLocalizationModal extends AnimeListModal {
         while (activity.childElementCount > 40) activity.firstElementChild?.remove();
         activity.scrollTop = activity.scrollHeight;
       },
+      });
+      // Only finished checks are cached; an unconfirmed proposal or API error
+      // must remain visible on the next incremental scan.
+      const checkedPaths = new Set(plan.rows
+        .filter(row => !row.proposal && row.status !== "lookup-failed")
+        .map(row => row.path));
+      const checked = getScopedMarkdownFiles(this.host.app, this.host.getScanFolders())
+        .filter(file => checkedPaths.has(file.path));
+      if (!controller.signal.aborted) await saveCleanupScanHistory(this.host.app, task, checked);
+      return plan;
     }).then((plan) => {
       if (!this.closed) this.renderReview(plan);
     }).catch((error) => {
@@ -145,7 +161,10 @@ export class TitleLocalizationModal extends AnimeListModal {
       this.busy = true;
       apply.disabled = true;
       back.disabled = true;
-      void applyStoredTitleUpdates(this.host.app, plan, selected).then((result) => {
+      void applyStoredTitleUpdates(this.host.app, plan, selected).then(async (result) => {
+        const written = new Set(result.updatedPaths);
+        await saveCleanupScanHistory(this.host.app, `titles:${plan.locale}`,
+          getScopedMarkdownFiles(this.host.app, this.host.getScanFolders()).filter(file => written.has(file.path)));
         if (result.updated) this.host.refreshViews();
         if (this.closed) {
           new Notice(text("modal.done", { updated: result.updated, skipped: result.skipped, failed: result.failed }));
