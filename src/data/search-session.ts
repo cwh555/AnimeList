@@ -75,6 +75,16 @@ export class SearchSession {
     this.cursors.push({ ...cursor, nextPage: cursor.nextPage + 1 });
   }
 
+  get hasPending(): boolean {
+    return this.pending.length > 0;
+  }
+
+  discardProvider(provider: MetadataProviderId): void {
+    for (let i = this.cursors.length - 1; i >= 0; i -= 1) {
+      if (this.cursors[i].provider === provider) this.cursors.splice(i, 1);
+    }
+  }
+
   get hasMore(): boolean {
     return this.delivered.size < TOTAL_LIMIT && (this.pending.length > 0 || this.cursors.length > 0);
   }
