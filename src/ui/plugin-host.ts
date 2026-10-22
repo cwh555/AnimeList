@@ -23,6 +23,7 @@ export interface AnimeListUiHost {
   searchExternal(mediaType: MediaType, query: string): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
+    hasMore?: boolean;
   }>;
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;
