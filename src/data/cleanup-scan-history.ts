@@ -37,6 +37,8 @@ function storagePath(app: App): string {
 }
 
 export async function readCleanupScanHistory(app: App): Promise<CleanupScanHistory> {
+  if (!app.vault.adapter?.read || !app.vault.configDir) return new CleanupScanHistory();
+  if (!(await app.vault.adapter.exists(storagePath(app)))) return new CleanupScanHistory();
   try {
     const json: unknown = JSON.parse(await app.vault.adapter.read(storagePath(app)));
     if (!json || typeof json !== "object" || Array.isArray(json)) return new CleanupScanHistory();
@@ -59,6 +61,7 @@ export async function readCleanupScanHistory(app: App): Promise<CleanupScanHisto
 export async function saveCleanupScanHistory(
   app: App, task: CleanupScanTask, completed: readonly TFile[],
 ): Promise<void> {
+  if (!completed.length || !app.vault.adapter?.write || !app.vault.configDir) return;
   const previous = inFlight.get(app) ?? Promise.resolve();
   const current = previous.catch(() => {}).then(async () => {
     const history = await readCleanupScanHistory(app);
