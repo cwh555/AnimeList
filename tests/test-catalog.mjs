@@ -100,6 +100,7 @@ export const TEST_TARGETS = [
   { path: "tests/media-title-localization.test.ts", kind: "test", suite: "unit", features: ["search", "text"] },
   { path: "tests/provider-title-service.test.ts", kind: "test", suite: "integration", features: ["search", "text", "markdown"] },
   { path: "tests/cleanup-scan-history.test.ts", kind: "test", suite: "integration", features: ["settings", "search"] },
+  { path: "tests/wikidata-title-service.test.ts", kind: "test", suite: "integration", features: ["search", "text", "markdown"] },
   { path: "tests/title-localization-service.test.ts", kind: "test", suite: "integration", features: ["search", "text", "markdown"] },
   { path: "tests/title-localization-settings.test.ts", kind: "test", suite: "unit", features: ["text", "settings"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
