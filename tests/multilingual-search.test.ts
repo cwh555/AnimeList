@@ -164,6 +164,30 @@ describe("multilingual provider search", () => {
     assert.equal(response.results.some((item) => item.provider === "anilist" && item.sourceId === "138705"), true);
   });
 
+  it("discovers an alternate Chinese localization without hard-coded title synonyms", async () => {
+    const calls: string[] = [];
+    const response = await searchMultilingualProviders({
+      query: "我想成為影之強者",
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          calls.push(query);
+          if (query !== "想成為影之") return [];
+          return [result({
+            mediaType: "novel", sourceId: "shadow-1",
+            title: "想成為影之實力者",
+            originalTitle: "陰の実力者になりたくて！",
+            searchTitles: ["想成為影之實力者"],
+          })];
+        },
+      }],
+    });
+    assert.ok(calls.includes("想成為影之"));
+    assert.equal(response.results[0]?.sourceId, "shadow-1");
+    assert.equal(response.results[0]?.title, "想成為影之實力者");
+  });
+
   it("does not issue disabled language discovery or alias expansions", async () => {
     const queries: string[] = [];
     const response = await searchMultilingualProviders({
