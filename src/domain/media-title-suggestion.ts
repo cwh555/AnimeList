@@ -1,14 +1,7 @@
-import type { ExternalMediaResult } from "./media-types";
+import type { ExternalMediaResult, TitleSuggestion } from "./media-types";
 import type { SupportedLocale } from "../i18n/locale";
 import { chineseScriptCandidate, verifiedMediaTitle } from "./media-title-localization";
 
-export interface TitleSuggestion {
-  readonly title: string;
-  readonly locale: SupportedLocale;
-  readonly provider: string;
-  readonly sourceId: string;
-  readonly sourceUrl: string;
-}
 
 /**
  * An original-title/year match is a potential cross-provider work match, NOT

@@ -1,7 +1,7 @@
 import type { MediaStatus } from "./media-status";
 import type { MediaType } from "./media-primitives";
 import type { MediaTitleVariants } from "./media-title-localization";
-import type { TitleSuggestion } from "./media-title-suggestion";
+
 import type { SupportedLocale } from "../i18n/locale";
 import type { MediaClassification } from "./media-classification";
 
@@ -84,6 +84,14 @@ export interface ExternalMediaSearchPage {
   results: ExternalMediaResult[];
   warnings: string[];
   hasMore: boolean;
+}
+
+export interface TitleSuggestion {
+  readonly title: string;
+  readonly locale: SupportedLocale;
+  readonly provider: string;
+  readonly sourceId: string;
+  readonly sourceUrl: string;
 }
 
 export interface ExternalMediaResult {
