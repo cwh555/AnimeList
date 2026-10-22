@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { withActiveLocale } from "../src/i18n/catalog";
 import { resolveMediaTitle } from "../src/domain/media-title-localization";
+import { buildMediaMarkdown } from "../src/data/media-note-codec";
+import type { MediaNoteForm } from "../src/domain/media-types";
 import { normalizeAniListMedia, normalizeBangumiSubject } from "../src/data/provider-normalizers";
 
 describe("provenance-aware media title localization", () => {
@@ -62,6 +64,39 @@ describe("provenance-aware media title localization", () => {
     const tw = withActiveLocale("zh-TW", () => normalizeBangumiSubject(raw, "anime"));
     assert.equal(tw.title, "臺灣正式名稱");
     assert.equal(tw.titleScriptConversions, undefined);
+  });
+
+  it("persists a default new-note conversion separately and never attributes an edited title to OpenCC", () => {
+    const raw = {
+      id: 88, name: "原題", name_cn: "简体标题", infobox: [{ key: "動畫製作", value: "原作会社" }],
+    };
+    const media = withActiveLocale("zh-TW", () => normalizeBangumiSubject(raw, "anime"));
+    const form: MediaNoteForm = {
+      title: media.title, status: "planned", releaseStatus: "unknown", progress: 0,
+      total: 12, unit: "episode", score: "", favorite: false,
+      startedAt: "", completedAt: "", genres: [], templatePath: "", volumeLog: [],
+    };
+    const note = buildMediaMarkdown(media, form, "", "");
+    assert.match(note, /title: "簡體標題"/);
+    assert.match(note, /title_original: "原題"/);
+    assert.match(note, /title_localizations:\\n  zh-CN: "简体标题"/);
+    assert.match(note, /title_script_conversions:\\n  zh-TW: "簡體標題"/);
+    assert.ok(!note.includes("title_localizations:\\n  zh-TW"));
+    assert.match(note, /原作会社/);
+    const manuallyEdited = buildMediaMarkdown(media, { ...form, title: "使用者指定名稱" }, "", "");
+    assert.match(manuallyEdited, /title: "使用者指定名稱"/);
+    assert.ok(!manuallyEdited.includes("title_script_conversions:"));
+  });
+
+  it("converts Traditional to Simplified on new imports only when provider labels a Chinese source", () => {
+    const subject = { id: 91, name: "日本名", name_cn: "", infobox: [
+      { key: "繁體中文名", value: "臺灣名稱" },
+    ] };
+    const cn = withActiveLocale("zh-CN", () => normalizeBangumiSubject(subject, "anime"));
+    assert.equal(cn.title, "台湾名称");
+    assert.deepEqual(cn.titleScriptConversions, { "zh-CN": "台湾名称" });
+    assert.equal(cn.titleVariants?.localized?.["zh-CN"], undefined);
+    assert.equal(cn.titleVariants?.localized?.["zh-TW"], "臺灣名稱");
   });
 
   it("uses AniList English/native only where their language is known", () => {

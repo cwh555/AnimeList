@@ -149,11 +149,12 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   const simplifiedTitle = stringValue(subject.name_cn).trim();
   const traditionalTitle = bangumiInfoboxValues(subject.infobox, ["繁體中文名", "繁体中文名"])[0] ?? "";
   const providerFallback = simplifiedTitle || originalTitle || uiText("media.untitled");
+  const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
   const titleSelection = selectNewMediaTitle({
     fallback: providerFallback,
     original: originalTitle,
     localized: { "zh-CN": simplifiedTitle, "zh-TW": traditionalTitle, ja: originalTitle },
-  }, normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW");
+  }, locale);
   const localTitle = titleSelection.title;
   const images = record(subject.images);
   const people = mediaType === "anime"
@@ -178,7 +179,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     sourceUrl: subjectId ? `https://bgm.tv/subject/${subjectId}` : "",
     mediaType,
     title: localTitle,
-    ...(titleSelection.scriptConversion ? { titleScriptConversions: { "zh-TW": titleSelection.scriptConversion } } : {}),
+    ...(titleSelection.scriptConversion ? { titleScriptConversions: { [locale]: titleSelection.scriptConversion } } : {}),
     originalTitle,
     romajiTitle: "",
     titleVariants: {
