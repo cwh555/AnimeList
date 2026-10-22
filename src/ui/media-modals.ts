@@ -169,8 +169,21 @@ export class AddMediaModal extends AnimeListModal {
     const query = this.query;
     button.disabled = true;
     button.textContent = uiText("add.searching");
+    this.results = [];
+    this.warnings = [];
+    this.hasMore = false;
+
+    // Show first matching provider immediately, without waiting for fallback
+    // aliases or a rate-limited second metadata service. Do not replace the
+    // search form: this preserves keyboard focus and current input text.
+    const onProgress = (results: ExternalMediaResult[]): void => {
+      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
+      this.results = results;
+      const panel = this.contentEl.querySelector<HTMLElement>(".al-search-results");
+      if (panel) panel.replaceChildren(...results.map(result => this.createResultRow(result)));
+    };
     try {
-      const response = await this.plugin.searchExternal(mediaType, query);
+      const response = await this.plugin.searchExternal(mediaType, query, onProgress);
       if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       this.results = response.results;
       this.warnings = response.warnings;
@@ -387,6 +400,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {
+    this.searchGeneration += 1;
     this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
