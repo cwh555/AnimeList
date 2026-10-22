@@ -227,7 +227,7 @@ export class AniListClient implements MetadataProviderClient {
   }
 
   /** Requests of different query keys share the same queue and burst budget. */
-  private async pacedRequest(options: Parameters<typeof requestUrl>[0]): Promise<Awaited<ReturnType<typeof requestUrl>>> {
+  private async pacedRequest<T>(request: () => Promise<T>): Promise<T> {
     const previous = this.requestQueue;
     let release!: () => void;
     this.requestQueue = new Promise<void>(resolve => { release = resolve; });
@@ -238,7 +238,20 @@ export class AniListClient implements MetadataProviderClient {
       if (delay > 0) await this.sleep(delay);
       this.assertAvailable();
       this.lastRequestStartedAt = this.now();
-      return await this.requestWithDeadline(options);
+      try {
+        return await request();
+      } catch (error) {
+        // Publish the cooldown *before* releasing the queue so queued queries
+        // cannot race past a forbidden/limited response.
+        const status = errorStatus(error);
+        if (status === 403) {
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + this.forbiddenCooldownMs);
+        } else if (status === 429) {
+          const delay = retryAfterMilliseconds(error) ?? 60_000;
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + delay);
+        }
+        throw error;
+      }
     } finally {
       release();
     }
@@ -260,22 +273,24 @@ export class AniListClient implements MetadataProviderClient {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const response = await this.pacedRequest({
-          url: ANILIST_GRAPHQL_ENDPOINT,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "User-Agent": USER_AGENT,
-          },
-          body: JSON.stringify({ query, variables }),
+        return await this.pacedRequest(async () => {
+          const response = await this.requestWithDeadline({
+            url: ANILIST_GRAPHQL_ENDPOINT,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "User-Agent": USER_AGENT,
+            },
+            body: JSON.stringify({ query, variables }),
+          });
+          this.observeRateLimit(response.headers);
+          const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+          const payload = record(parsed);
+          const graphError = graphQlError(payload);
+          if (graphError) throw graphError;
+          return payload;
         });
-        this.observeRateLimit(response.headers);
-        const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
-        const payload = record(parsed);
-        const graphError = graphQlError(payload);
-        if (graphError) throw graphError;
-        return payload;
       } catch (error) {
         lastError = error;
         const status = errorStatus(error);
@@ -286,7 +301,7 @@ export class AniListClient implements MetadataProviderClient {
           throw new Error(`AniList returned HTTP 403 (API disabled or access denied). ${error instanceof Error ? error.message : String(error)}. Further requests are paused temporarily.`);
         }
         if (status === 429) {
-          const delay = retryAfterMilliseconds(error) ?? 0;
+          const delay = retryAfterMilliseconds(error) ?? 60_000;
           this.blockedUntil = Math.max(this.blockedUntil, this.now() + delay);
           if (attempt === 0 && delay > 0 && delay <= this.maxInteractiveRetryDelayMs) {
             await this.sleep(delay);
