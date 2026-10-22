@@ -256,10 +256,12 @@ export async function searchMultilingualProviders(
   const aliasQueries = collectMultilingualSearchQueries(query, seedResults, languages);
   // Do not re-query a source that already found a relevant candidate.
   // Enrichment targets sources still missing the work (e.g. AniList after Bangumi).
-  const missingProviders = options.providers.filter(provider => {
-    const owned = seedResults.some(result => result.provider.toLowerCase() === provider.label.toLowerCase());
-    return !owned;
-  });
+  const missingProviders = options.providers.length > 1
+    ? options.providers.filter(provider => {
+      const owned = seedResults.some(result => result.provider.toLowerCase() === provider.label.toLowerCase());
+      return !owned;
+    })
+    : [];
   const aliasToSearch = aliasQueries.slice(0, SEARCH_REQUEST_BUDGET.aliasQueries);
   const expanded = aliasToSearch.length && missingProviders.length
     ? await runProviderQueries(missingProviders, aliasToSearch,
