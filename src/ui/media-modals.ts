@@ -172,6 +172,9 @@ export class AddMediaModal extends AnimeListModal {
     this.results = [];
     this.warnings = [];
     this.hasMore = false;
+    this.contentEl.querySelector(".al-search-pagination")?.remove();
+    const current = this.contentEl.querySelector<HTMLElement>(".al-search-results");
+    if (current) current.replaceChildren(makeEl("p", "al-modal-hint", uiText("add.searching")));
 
     // Show first matching provider immediately, without waiting for fallback
     // aliases or a rate-limited second metadata service. Do not replace the
