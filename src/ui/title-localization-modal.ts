@@ -104,31 +104,23 @@ export class TitleLocalizationModal extends AnimeListModal {
       cls: "al-version-cleanup-status",
       text: text("modal.summary", { scanned: plan.scanned, available: plan.items.length, skipped: plan.skipped, failed: plan.failures.length }),
     });
-    if (plan.failures.length) {
-      const failures = this.contentEl.createEl("details");
-      failures.createEl("summary", { text: text("modal.failures", { count: plan.failures.length }) });
-      const list = failures.createEl("ul");
-      for (const failure of plan.failures) list.createEl("li", { text: `${failure.path}: ${failure.message}` });
-    }
     const list = this.contentEl.createDiv({ cls: "al-version-cleanup-list" });
     const checks = new Map<string, HTMLInputElement>();
     if (!plan.items.length) list.createDiv({ cls: "al-search-empty", text: text("modal.empty") });
+    // Scan diagnostics remain in the live view; the review list shows only actionable changes.
     for (const outcome of plan.rows) {
-      const entry = list.createDiv({ cls: "al-version-cleanup-item" });
       const proposal = outcome.proposal;
-      if (proposal) {
-        const label = entry.createEl("label");
-        const checkbox = label.createEl("input", { type: "checkbox" });
-        checkbox.checked = !proposal.requiresReview;
-        label.append(" ");
-        label.createEl("strong", { text: proposal.oldTitle + " → " + proposal.newTitle });
-        checks.set(proposal.path, checkbox);
-      } else {
-        entry.createEl("strong", { text: outcome.title });
-      }
+      if (!proposal) continue;
+      const entry = list.createDiv({ cls: "al-version-cleanup-item" });
+      const label = entry.createEl("label");
+      const checkbox = label.createEl("input", { type: "checkbox" });
+      checkbox.checked = !proposal.requiresReview;
+      label.append(" ");
+      label.createEl("strong", { text: proposal.oldTitle + " → " + proposal.newTitle });
+      checks.set(proposal.path, checkbox);
       entry.createDiv({ cls: "al-result-meta", text: outcome.status + ": " + outcome.reason });
       entry.createDiv({ cls: "al-result-meta", text: outcome.path });
-      if (proposal?.source?.provider === "bangumi") {
+      if (proposal.source?.provider === "bangumi") {
         const source = proposal.source;
         const href = "https://bgm.tv/subject/" + source.id;
         const link = entry.createEl("a", { text: source.provider + " #" + source.id });

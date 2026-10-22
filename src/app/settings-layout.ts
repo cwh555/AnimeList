@@ -38,7 +38,7 @@ export const SETTINGS_PAGES: readonly SettingsPageDefinition[] = [
   {
     id: "updates-cleanup",
     label: "Updates & cleanup",
-    description: "Tools for update-related migrations and cleaning up legacy or obsolete AnimeList data.",
+    description: "Review version-specific fixes or update older library data.",
   },
 ];
 

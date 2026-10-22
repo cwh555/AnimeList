@@ -6357,4 +6357,37 @@ button.al-moment-stack-strip:focus-visible {
     height: 28px;
   }
 }
+
+/* Updates & cleanup only: shorter, clearer rows without changing other Settings pages. */
+#animelist-settings-panel-updates-cleanup .animelist-settings-section {
+  margin-bottom: var(--size-4-5);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-header > .setting-item {
+  padding-block: var(--size-4-3);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+  gap: var(--size-4-3);
+  align-items: center;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-description {
+  max-width: 66ch;
+  line-height: 1.55;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+  flex: 0 0 auto;
+}
+@media (max-width: 680px) {
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--size-4-2);
+  }
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+    align-self: flex-start;
+  }
+}
 /* END GENERATED FEATURE STYLES */
