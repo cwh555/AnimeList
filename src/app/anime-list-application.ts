@@ -14,6 +14,7 @@ import { MediaAssetGarbageCollector } from "../data/media-asset-garbage-collecto
 import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
+import { localizeActiveMediaResult } from "../data/media-title-service";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { MANUAL_MEDIA_PROVIDER, type MediaCoverAssetInput } from "../domain/manual-media";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
@@ -262,9 +263,10 @@ export class AnimeListApplicationServices {
         console.warn("AnimeList Bangumi metadata refresh failed; continuing with stored metadata", error);
       }
     }
-    return this.mediaClassification().enrichOrOriginal(base, (error) => {
+    const enriched = await this.mediaClassification().enrichOrOriginal(base, (error) => {
       console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
     });
+    return localizeActiveMediaResult(enriched);
   }
   async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
     return this.enrichExternalMedia(storedMediaExternalResult(frontmatter, mediaType));
