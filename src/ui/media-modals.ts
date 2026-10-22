@@ -44,6 +44,7 @@ export class AddMediaModal extends AnimeListModal {
   query = "";
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
+  private searchGeneration = 0;
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
@@ -60,6 +61,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   onClose(): void {
+    this.searchGeneration += 1;
     this.disposeActiveForm();
     if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
     this.manualCoverPreviewUrl = null;
@@ -99,6 +101,7 @@ export class AddMediaModal extends AnimeListModal {
       button.className = `al-modal-type${this.mediaType === value ? " is-active" : ""}`;
       button.textContent = text;
       button.addEventListener("click", () => {
+        this.searchGeneration += 1;
         this.mediaType = value;
         this.results = [];
         this.warnings = [];
@@ -159,14 +162,19 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   async search(button: HTMLButtonElement): Promise<void> {
+    const generation = ++this.searchGeneration;
+    const mediaType = this.mediaType;
+    const query = this.query;
     button.disabled = true;
     button.textContent = uiText("add.searching");
     try {
-      const response = await this.plugin.searchExternal(this.mediaType, this.query);
+      const response = await this.plugin.searchExternal(mediaType, query);
+      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       this.results = response.results;
       this.warnings = response.warnings;
       if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
+      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       console.error("AnimeList external search failed", error);
       this.results = [];
       this.warnings = [errorMessage(error)];
