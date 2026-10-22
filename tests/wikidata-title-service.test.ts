@@ -7,6 +7,11 @@ import { normalizeAniListMedia, normalizeBangumiSubject } from "../src/data/prov
 import { buildMediaMarkdown } from "../src/data/media-note-codec";
 import type { ExternalMediaResult, MediaNoteForm } from "../src/domain/media-types";
 
+// Obsidian provides window timers; Node contract tests emulate that runtime.
+if (typeof window === "undefined") {
+  Object.defineProperty(globalThis, "window", { configurable: true, value: globalThis });
+}
+
 const qid = "Q232246";
 function source(type: "anime" | "manga" = "anime"): ExternalMediaResult {
   return withActiveLocale("en", () => normalizeAniListMedia({

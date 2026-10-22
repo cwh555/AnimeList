@@ -74,7 +74,7 @@ export class WikidataTitleService {
   ) {}
 
   private async requestWithTimeout(url: string): Promise<unknown> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
     try {
       return await Promise.race([
         this.request(url),
