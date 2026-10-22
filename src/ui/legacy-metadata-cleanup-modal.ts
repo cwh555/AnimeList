@@ -2,6 +2,7 @@ import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import { cleanupLegacyMetadataNotes } from "../data/legacy-metadata-cleanup";
+import { createScanModeControl, readCleanupScanHistory, saveCleanupScanHistory, type CleanupScanMode } from "../data/cleanup-scan-history";
 import type {
   LegacyMetadataCleanupDetail,
   LegacyMetadataCleanupProgress,
@@ -98,16 +99,17 @@ export class LegacyMetadataCleanupModal extends AnimeListModal {
     rules.createEl("li", { text: "Preserve unrelated frontmatter and note body content." });
     rules.createEl("li", { text: "This operation can modify many notes; Cancel makes no changes." });
 
+    const scope = createScanModeControl(this.contentEl);
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
     const cancel = footer.createEl("button", { text: "Cancel" });
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
     const confirm = footer.createEl("button", { cls: "mod-cta", text: "Confirm and run" });
     confirm.type = "button";
-    confirm.addEventListener("click", () => this.runCleanup());
+    confirm.addEventListener("click", () => this.runCleanup(scope.value === "all" ? "all" : "pending"));
   }
 
-  private runCleanup(): void {
+  private runCleanup(mode: CleanupScanMode): void {
     this.contentEl.empty();
     this.contentEl.createEl("p", {
       cls: "al-modal-hint",
@@ -156,9 +158,20 @@ export class LegacyMetadataCleanupModal extends AnimeListModal {
       percent.setText(`${setProgress(progressFill, completed, total)}%`);
     };
 
-    void cleanupLegacyMetadataNotes(this.host.app, this.host.getScanFolders(), {
-      enrich: (result) => this.host.enrichExternalMedia(result),
-      onProgress: update,
+    void readCleanupScanHistory(this.host.app).then(async history => {
+      const checkedPaths = new Set<string>();
+      const summary = await cleanupLegacyMetadataNotes(this.host.app, this.host.getScanFolders(), {
+        enrich: result => this.host.enrichExternalMedia(result),
+        onProgress: update,
+        shouldScan: file => history.needsScan("metadata", file, mode),
+        onChecked: (file, success) => { if (success) checkedPaths.add(file.path); },
+      });
+      // Save only known successes. Failed or unavailable remote lookups remain pending.
+      const { getScopedMarkdownFiles } = await import("../data/vault-scope");
+      const checked = getScopedMarkdownFiles(this.host.app, this.host.getScanFolders())
+        .filter(file => checkedPaths.has(file.path));
+      await saveCleanupScanHistory(this.host.app, "metadata", checked);
+      return summary;
     }).then((summary) => {
       phase.setText(legacyMetadataText("settings.phase.completed"));
       message.setText(summaryText(summary));
