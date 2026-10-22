@@ -115,13 +115,14 @@ export async function appendNextSearchPage(
   state.loading = true;
   const page = state.loads + 2;
   const signature = state.signature;
+  const startingResults = state.sourceResults;
   const requestMediaType = modal.mediaType;
   const requestQuery = modal.query;
   try {
     const response = await host.searchExternalPage(requestMediaType, requestQuery, page);
     // A new search may have started while a provider request was pending.
     // Never insert stale rows into a different query's result container.
-    if (state.signature !== signature
+    if (state.signature !== signature || state.sourceResults !== startingResults
       || searchSignature(modal.mediaType, modal.query) !== signature) return 0;
     const existingKeys = new Set(state.results.map(resultKey));
     const merged = mergeSearchPages(state.results, [response.results]);
@@ -141,7 +142,7 @@ export async function appendNextSearchPage(
     modal.contentEl.scrollTop = scrollTop;
     return appended.length;
   } finally {
-    state.loading = false;
+    if (state.signature === signature && state.sourceResults === startingResults) state.loading = false;
   }
 }
 
