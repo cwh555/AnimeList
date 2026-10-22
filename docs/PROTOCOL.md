@@ -82,3 +82,13 @@ Cross-provider matching by title/year is **not** sufficient evidence to auto-fil
 ## Settings layout
 
 Imperative Obsidian Settings pages retain Obsidian's Setting.setHeading API for accessibility and lint compatibility. Card headings now normalize default heading-item margins and use explicit container padding and line-height; the 1.13+ declarative path still uses the same settings section definitions.
+
+## AniList API availability and request contract
+
+AniList's official API documentation (https://docs.anilist.co/guide/rate-limiting and https://docs.anilist.co/guide/considerations) describes a temporary degraded limit of **30 requests/minute**, burst limits, 429 responses with Retry-After, and 403 responses while the API is disabled for stability. AniList may also exceptionally block excessively active IPs. No API client can guarantee availability during an upstream outage.
+
+All AniList GraphQL calls, including search, exact-ID enrichment and manga release links, use the single POST endpoint `https://graphql.anilist.co`. `AniListClient` coalesces duplicate in-flight queries, maintains a bounded response cache and **serializes different-key HTTP calls** with at least 2100 ms between request starts. Search query variants are batched through GraphQL aliases when supported, rather than launching one HTTP request per variant.
+
+For HTTP 403 / GraphQL status 403: do not retry, bypass the upstream restriction or switch to an undocumented proxy. Surface the provider error and stop additional requests from the same client for a 60-second cooldown; queued calls fail without contacting AniList. 429 follows `Retry-After` where provided, otherwise pauses 60 seconds; retry only once when the remaining delay is short enough for interactive use. An interactive request timeout also causes a temporary cooldown, because Obsidian's `requestUrl` has no physical abort capability. 5xx may be retried at most once. Other providers are independent and remain searchable.
+
+This is intentionally **request-load mitigation, not a claim to fix AniList's server-side 403 availability**. Offline unit/contract tests simulate successful calls, 403, 429, timeouts and queued workloads; real-user network conditions and upstream outages require manual observation.

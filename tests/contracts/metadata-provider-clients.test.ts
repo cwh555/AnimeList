@@ -447,6 +447,28 @@ describe("metadata provider clients", () => {
     }
   });
 
+  it("does not create replacement transport requests while a timed-out request remains pending", async () => {
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls++;
+      return new Promise(() => {});
+    });
+    try {
+      const client = new AniListClient({ requestTimeoutMs: 5, requestIntervalMs: 0 });
+      const [first, second] = await Promise.allSettled([
+        client.searchPage("anime", "Stuck A", 1),
+        client.searchPage("anime", "Stuck B", 1),
+      ]);
+      assert.equal(first.status, "rejected");
+      assert.equal(second.status, "rejected");
+      assert.equal(calls, 1);
+      assert.match((first as PromiseRejectedResult).reason.message, /timed out/);
+      assert.match((second as PromiseRejectedResult).reason.message, /cooling down/);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("honors a short AniList Retry-After once without starting a retry loop", async () => {
     let calls = 0;
     const sleeps: number[] = [];

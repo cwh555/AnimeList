@@ -249,6 +249,11 @@ export class AniListClient implements MetadataProviderClient {
         } else if (status === 429) {
           const delay = retryAfterMilliseconds(error) ?? 60_000;
           this.blockedUntil = Math.max(this.blockedUntil, this.now() + delay);
+        } else if (error instanceof Error && error.message.startsWith("AniList request timed out")) {
+          // Obsidian requestUrl has no abort signal. Its physical request may
+          // remain alive after the interactive deadline; do not start a burst
+          // of replacements for an unresolved transport request.
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + 60_000);
         }
         throw error;
       }
