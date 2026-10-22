@@ -354,7 +354,7 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 ## Language and title migration
 
 - [ ] Every Obsidian Settings section and Settings-launched dialog (buttons, status, failure and completion) remains English regardless of AnimeList UI locale.
-- [ ] Settings → Updates & cleanup → Preview title updates displays each scanned title, status, path and reason live; it never reports only a total skipped count.
+- [ ] Settings → Updates & cleanup → Preview title updates reports each work live while scanning; after scanning, review contains **only proposed changes**. Unchanged, missing and failed entries contribute only to the summary counters, not individual review rows.
 - [ ] An AniList-only work with a verified Bangumi candidate is offered as manual review, unchecked by default; ambiguous/mismatched-year candidates are not automatically selected.
 - [ ] A Bangumi result with Simplified Chinese but no verified Traditional title visibly explains the missing translation.
 - [ ] A Bangumi ID found in an AniList record's source_urls is usable for a direct lookup.

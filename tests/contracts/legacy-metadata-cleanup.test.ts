@@ -6,7 +6,7 @@ import {
   cleanupLegacyMediaFrontmatter,
   cleanupLegacyMetadataNotes,
 } from "../../src/data/legacy-metadata-cleanup";
-import { createLegacyMetadataSettingsSection } from "../../src/features/legacy-metadata-cleanup/settings";
+import { createLegacyMetadataSettingDefinition } from "../../src/features/legacy-metadata-cleanup/settings";
 import { legacyMetadataText } from "../../src/features/legacy-metadata-cleanup/text";
 import type { AnimeListFeatureHost } from "../../src/app/feature-types";
 
@@ -345,12 +345,8 @@ describe("legacy metadata cleanup", () => {
       enrichExternalMedia: async (result: ExternalMediaResult) => result,
     } as unknown as AnimeListFeatureHost;
     let opened = 0;
-    const section = createLegacyMetadataSettingsSection(host, () => { opened += 1; });
-    assert.equal(section.heading, "Legacy metadata cleanup");
-    assert.match(section.description ?? "", /current metadata schema/i);
+    const definition = createLegacyMetadataSettingDefinition(host, () => { opened += 1; });
     assert.equal(legacyMetadataText("settings.button"), "Scan and upgrade");
-
-    const definition = section.definitions[0];
     if (!definition?.render) throw new Error("Legacy cleanup setting is not renderable");
     let handler: (() => void | Promise<void>) | undefined;
     const setting = {

@@ -62,9 +62,10 @@ try {
     '  const select=root.querySelector("select");select.value="zh-CN";',
     '  [...root.querySelectorAll("button")].find(x=>x.textContent==="Scan and preview").click();',
     '  for(let i=0;i<60&&!root.textContent.includes("Scanned 2");i++)await new Promise(resolve=>setTimeout(resolve,25));',
-    '  checks.scanReview=root.textContent.includes("Scanned 2")&&root.textContent.includes("no-source")&&root.textContent.includes("ready:");',
-    '  checks.workRows=root.querySelectorAll(".al-version-cleanup-item").length===2;',
-    '  checks.noWritesBeforeConfirm=notes[0].title==="日本語原題"&&notes[1].title==="Custom novel";',
+    '  checks.scanReview=root.textContent.includes("scanned")&&root.textContent.includes("unchanged/unavailable")&&root.textContent.includes("ready:")&&!root.textContent.includes("no-source");',
+    '  checks.workRows=root.querySelectorAll(".al-version-cleanup-item").length===1;',
+    '  checks.onlyProposed=root.textContent.includes("日本語原題 → 简体标题")&&!root.textContent.includes("Custom novel");
+  checks.noWritesBeforeConfirm=notes[0].title==="日本語原題"&&notes[1].title==="Custom novel";',
     '  checks.sourceLink=!!root.querySelector("a[href=\\"https://bgm.tv/subject/88\\"]");',
     '  const confirm=[...root.querySelectorAll("button")].find(x=>x.textContent==="Update selected titles");',
     '  checks.explicitApply=!!confirm&&!confirm.disabled;confirm?.click();',
