@@ -58,7 +58,7 @@ export class ExternalMediaSearchService {
     return JSON.stringify([mediaType, query.normalize("NFKC").trim(), this.providers(), this.languages()]);
   }
 
-  async search(mediaType: MediaType, query: string): Promise<{
+  async search(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
     hasMore: boolean;
@@ -102,6 +102,7 @@ export class ExternalMediaSearchService {
       languages: this.languages(),
       dedupe: dedupeSearchResults,
       maxResults: MAX_RESULTS,
+      onProgress,
     });
     const session = new SearchSession(mediaType, query, response.expandedQueries, response.results, [...cursors.values()]);
     this.sessions.delete(sessionKey);
