@@ -68,13 +68,14 @@ describe("shared Settings scan checkpoints", () => {
 });
 
 describe("title scan checkpoint contract", () => {
-  it("rechecks unresolved sources, rejected proposals, ambiguous matches and failed lookups", () => {
-    for (const status of ["ready", "review", "no-source", "no-translation",
-      "ambiguous", "lookup-failed"] as const) {
+  it("does not requery confirmed no-match scans, but revisits errors and unapplied proposals", () => {
+    for (const status of ["ready", "review", "lookup-failed"] as const) {
       assert.equal(completedTitleScan(status), false, status);
     }
-    assert.equal(completedTitleScan("unchanged"), true);
-    assert.equal(completedTitleScan("custom-title"), true);
+    for (const status of ["unchanged", "custom-title", "no-source",
+      "no-translation", "ambiguous"] as const) {
+      assert.equal(completedTitleScan(status), true, status);
+    }
   });
 });
 

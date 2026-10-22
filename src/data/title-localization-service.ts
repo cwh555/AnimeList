@@ -12,9 +12,9 @@ export type TitleSource = Readonly<{ provider: Provider; id: string }>;
 export type TitleScanStatus = "ready" | "review" | "unchanged" | "no-source" |
   "no-translation" | "custom-title" | "ambiguous" | "lookup-failed";
 
-/** Only a resolved no-op can be checkpointed before user confirmation. */
+/** A definitive check (including no match) is complete; errors and unapplied proposals are not. */
 export function completedTitleScan(status: TitleScanStatus): boolean {
-  return status === "unchanged" || status === "custom-title";
+  return status !== "lookup-failed" && status !== "ready" && status !== "review";
 }
 export interface TitleUpdateItem {
   readonly path: string;
