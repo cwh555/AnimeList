@@ -52,6 +52,7 @@ const FEATURE_SETTINGS_PAGES: Readonly<Record<string, SettingsPageId>> = Object.
   "user-tag-catalog": "features",
   masterpiece: "features",
   "legacy-data-settings": "updates-cleanup",
+  "legacy-metadata-cleanup-settings": "updates-cleanup",
   "version-cleanup-settings": "updates-cleanup",
 });
 
