@@ -122,7 +122,8 @@ export async function appendNextSearchPage(
     state.loads += 1;
     state.results = merged;
     state.warnings = [...new Set([...state.warnings, ...response.warnings])];
-    state.hasMore = response.hasMore && appended.length > 0;
+    // A provider page can contain only duplicates; later pages may still have matches.
+    state.hasMore = response.hasMore;
     state.sourceResults = merged;
     modal.results = merged;
     modal.warnings = [...state.warnings];
