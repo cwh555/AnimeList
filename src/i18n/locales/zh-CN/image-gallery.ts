@@ -1,0 +1,18 @@
+export const IMAGE_GALLERY_MESSAGES = {
+  title: "图库",
+  description: "集中浏览各作品图片区块（Image Sections）中的图片，不生成重复文件。",
+  allImages: "全部图片",
+  byWork: "按作品",
+  searchPlaceholder: "搜索作品或图片路径…",
+  columns: "图片列数",
+  summary: "{images} 张图片 · {works} 部作品",
+  workSummary: "{images} 张图片 · {sessions} 个图片组",
+  allSessions: "全部图片组",
+  session: "第 {number} 组",
+  backToWorks: "返回作品看板",
+  openSource: "打开来源作品",
+  emptyTitle: "暂无图片",
+  emptyDescription: "在作品笔记中添加图片区块后，图片将自动显示在此处。",
+  loading: "正在整理图库…",
+  open: "打开图库",
+} as const;

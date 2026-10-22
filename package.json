@@ -52,7 +52,8 @@
     "test:browser:image-order-session": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-order-session.mjs",
     "test:browser:image-empty-target": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-empty-drop-target.mjs",
     "test:browser:image-final-slot": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-final-slot.mjs",
-    "test:browser:cover-upload": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-media-cover-picker.mjs"
+    "test:browser:cover-upload": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-media-cover-picker.mjs",
+    "test:browser:title-localization": "node scripts/check-title-localization-modal.mjs"
   },
   "keywords": [
     "obsidian",
@@ -77,5 +78,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "opencc-js": "1.4.2"
   }
 }

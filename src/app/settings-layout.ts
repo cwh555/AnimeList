@@ -38,7 +38,7 @@ export const SETTINGS_PAGES: readonly SettingsPageDefinition[] = [
   {
     id: "updates-cleanup",
     label: "Updates & cleanup",
-    description: "Tools for update-related migrations and cleaning up legacy or obsolete AnimeList data.",
+    description: "Review version-specific fixes or update older library data.",
   },
 ];
 
@@ -51,6 +51,7 @@ const FEATURE_SETTINGS_PAGES: Readonly<Record<string, SettingsPageId>> = Object.
   "serial-cover-settings": "features",
   "user-tag-catalog": "features",
   masterpiece: "features",
+  "legacy-data-settings": "updates-cleanup",
   "legacy-metadata-cleanup-settings": "updates-cleanup",
   "version-cleanup-settings": "updates-cleanup",
 });

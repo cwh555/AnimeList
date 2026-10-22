@@ -651,11 +651,30 @@
 }
 
 .animelist-settings-section-header {
+  padding: var(--size-4-5) clamp(var(--size-4-4), 3vw, var(--size-4-6));
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary-alt);
 }
 
-.animelist-settings-section-header > .setting-item,
+/* Normalize Obsidian's heading-item margins inside a card; preserve Setting API. */
+.animelist-settings-section-header > .setting-item {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-height: 0;
+  background: transparent;
+}
+.animelist-settings-section-header > .setting-item .setting-item-name {
+  margin: 0;
+  padding: 0;
+  line-height: 1.35;
+}
+.animelist-settings-section-header > .setting-item .setting-item-description {
+  margin: var(--size-4-2) 0 0;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .animelist-settings-section-body > .setting-item {
   margin: 0;
   padding: var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5));
@@ -663,11 +682,6 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.animelist-settings-section-header > .setting-item .setting-item-description {
-  margin-top: var(--size-4-1);
-  color: var(--text-muted);
 }
 
 .animelist-settings-section-body > .setting-item + .setting-item {
@@ -6355,6 +6369,39 @@ button.al-moment-stack-strip:focus-visible {
   .is-mobile .animelist-native-view .al-timeline-overview-chart,
   .is-mobile .animelist-native-view .al-timeline-density-svg {
     height: 28px;
+  }
+}
+
+/* Updates & cleanup only: shorter, clearer rows without changing other Settings pages. */
+#animelist-settings-panel-updates-cleanup .animelist-settings-section {
+  margin-bottom: var(--size-4-5);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-header {
+  padding-block: var(--size-4-5);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+  gap: var(--size-4-3);
+  align-items: center;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-description {
+  max-width: 66ch;
+  line-height: 1.55;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+  flex: 0 0 auto;
+}
+@media (max-width: 680px) {
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--size-4-2);
+  }
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+    align-self: flex-start;
   }
 }
 /* END GENERATED FEATURE STYLES */

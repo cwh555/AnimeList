@@ -14,7 +14,7 @@ import {
   planMediaNoteFilenameCleanup,
 } from "../../src/data/media-note-filename-cleanup";
 import { createVersionCleanupSettingsSection } from "../../src/features/version-cleanup/settings";
-import { createLegacyMetadataSettingsSection } from "../../src/features/legacy-metadata-cleanup/settings";
+import { createLegacyDataSettingsSection } from "../../src/features/legacy-data/settings";
 
 function legacyNote(extraFrontmatter: Record<string, unknown> = {}): { markdown: string; frontmatter: Record<string, unknown> } {
   const frontmatter = {
@@ -161,27 +161,59 @@ describe("legacy update: duplicate default note covers", () => {
     assert.match(store.content.get("AnimeList/Anime/Changed.md")!, /User changed this after preview/);
   });
 
-  it("groups version migrations together on the rightmost Updates & cleanup page", () => {
-    const host = { app: {}, getScanFolders: () => [], refreshViews() {} } as any;
-    const section = createVersionCleanupSettingsSection(host, () => {}, () => {});
-    const legacy = createLegacyMetadataSettingsSection(host, () => {});
-    assert.equal(section.page, "updates-cleanup");
-    assert.equal(section.heading, "Version updates");
-    assert.deepEqual(section.definitions.map((definition) => definition.name), [
-      "Sync note filenames with titles",
-      "Remove duplicate note covers",
-      "Upgrade legacy metadata",
+  it("skips previously completed cover checks but a full rescan returns every eligible proposal", async () => {
+    const old = legacyNote();
+    const store = fakeApp([
+      { path: "AnimeList/Anime/NeedsUpdate.md", ...old },
+      { path: "AnimeList/Anime/Checked.md", ...old },
     ]);
-    const filenameDescription = String(section.definitions[0].desc);
-    assert.match(filenameDescription, /filenames changed manually/);
-    assert.match(filenameDescription, /remain valid in the Library/);
-    assert.match(filenameDescription, /same folder/);
-    assert.match(filenameDescription, /frontmatter are not rewritten/);
-    assert.equal(legacy.heading, "Legacy metadata cleanup");
+    const pending = await planDuplicateDefaultCoverCleanup(store.app, ["AnimeList/Anime"],
+      file => file.basename !== "Checked");
+    assert.equal(pending.scanned, 1);
+    assert.deepEqual(pending.items.map(x => x.path), ["AnimeList/Anime/NeedsUpdate.md"]);
+    const full = await planDuplicateDefaultCoverCleanup(store.app, ["AnimeList/Anime"]);
+    assert.equal(full.scanned, 2);
+    assert.equal(full.items.length, 2);
+  });
+
+  it("keeps version fixes and legacy note tools in separate compact sections", () => {
+    const host = { app: {}, getScanFolders: () => [], refreshViews() {} } as any;
+    const version = createVersionCleanupSettingsSection(host, () => {});
+    const legacy = createLegacyDataSettingsSection(host, () => {});
+    assert.equal(version.page, "updates-cleanup");
+    assert.equal(legacy.page, "updates-cleanup");
+    assert.equal(version.heading, "Version updates");
+    assert.equal(legacy.heading, "Legacy data");
+    assert.deepEqual(version.definitions.map(d => d.name), ["Remove duplicate note covers"]);
+    assert.deepEqual(legacy.definitions.map(d => d.name), [
+      "Sync note filenames with titles", "Upgrade legacy metadata", "Update existing titles",
+    ]);
+    assert.match(String(legacy.definitions[0].desc), /without changing note content or frontmatter/);
+    for (const section of [version, legacy]) {
+      assert.ok((section.description ?? "").length < 90);
+      for (const definition of section.definitions) {
+        assert.ok(String(definition.desc ?? "").length < 120, definition.name);
+      }
+    }
   });
 });
 
 describe("legacy update: media note filenames", () => {
+  it("keeps global filename collision reservations when only scanning unprocessed items", () => {
+    const store = filenameCleanupApp([
+      { path: "AnimeList/Anime/Old A.md", frontmatter: { media_type: "anime", title: "Shared" } },
+      { path: "AnimeList/Anime/Old B.md", frontmatter: { media_type: "anime", title: "Shared" } },
+    ]);
+    const pending = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"],
+      file => file.path.endsWith("Old B.md"));
+    assert.equal(pending.items.length, 1);
+    assert.equal(pending.items[0].targetPath, "AnimeList/Anime/Shared (2).md");
+    const all = planMediaNoteFilenameCleanup(store.app, ["AnimeList/Anime"]);
+    assert.deepEqual(all.items.map(x => x.targetPath), [
+      "AnimeList/Anime/Shared.md", "AnimeList/Anime/Shared (2).md",
+    ]);
+  });
+
   it("plans collision-safe same-folder renames and never rewrites note content", async () => {
     const store = filenameCleanupApp([
       { path: "AnimeList/Anime/Old Frieren.md", frontmatter: { media_type: "anime", title: "Frieren" } },

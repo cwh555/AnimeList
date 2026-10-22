@@ -1,3 +1,4 @@
+import { TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
 import { RANKING_MESSAGES } from "./ranking";
 import { CORE_MESSAGES } from "./core";
 import { LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
@@ -56,6 +57,7 @@ export const ZH_TW_CATALOGS = {
   "library-export": LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": MANUAL_MEDIA_MESSAGES,
+  "title-localization": TITLE_LOCALIZATION_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

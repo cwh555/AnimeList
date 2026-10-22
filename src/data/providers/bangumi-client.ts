@@ -31,6 +31,20 @@ export class BangumiClient implements MetadataProviderClient {
   supports(_mediaType: MediaType): boolean { return true; }
 
 
+
+  /** Only the subject detail endpoint is needed for title normalization. */
+  async fetchTitleById(mediaType: MediaType, sourceId: string): Promise<ReturnType<typeof normalizeBangumiSubject> | null> {
+    const id = sourceId.trim();
+    if (!/^\d+$/.test(id)) return null;
+    const response = await requestUrl({
+      url: BANGUMI_SUBJECT_ENDPOINT + "/" + encodeURIComponent(id),
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    });
+    const subject = record(response.json ?? JSON.parse(response.text || "{}"));
+    return Object.keys(subject).length ? normalizeBangumiSubject(subject, mediaType) : null;
+  }
+
   async fetchById(mediaType: MediaType, sourceId: string): Promise<ReturnType<typeof normalizeBangumiSubject> | null> {
     const id = sourceId.trim();
     if (!id) return null;

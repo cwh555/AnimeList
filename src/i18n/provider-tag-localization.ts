@@ -3,10 +3,12 @@ import type { SupportedLocale } from "./locale";
 import { EN_PROVIDER_TAG_LABELS, type ProviderTagKey } from "./locales/en/provider-tags";
 import { JA_PROVIDER_TAG_LABELS } from "./locales/ja/provider-tags";
 import { KO_PROVIDER_TAG_LABELS } from "./locales/ko/provider-tags";
+import { ZH_CN_PROVIDER_TAG_LABELS } from "./locales/zh-CN/provider-tags";
 import { ZH_TW_PROVIDER_TAG_LABELS } from "./locales/zh-TW/provider-tags";
 
 const PROVIDER_TAG_LABELS = {
   "zh-TW": ZH_TW_PROVIDER_TAG_LABELS,
+  "zh-CN": ZH_CN_PROVIDER_TAG_LABELS,
   en: EN_PROVIDER_TAG_LABELS,
   ja: JA_PROVIDER_TAG_LABELS,
   ko: KO_PROVIDER_TAG_LABELS,
@@ -26,7 +28,7 @@ for (const apiTag of Object.keys(EN_PROVIDER_TAG_LABELS) as ProviderTagKey[]) {
 }
 
 function resolvedLocale(locale: string = getActiveLocale()): SupportedLocale {
-  return locale === "en" || locale === "ja" || locale === "ko" ? locale : "zh-TW";
+  return locale === "zh-CN" || locale === "en" || locale === "ja" || locale === "ko" ? locale : "zh-TW";
 }
 
 export function localizeProviderTag(value: unknown, locale?: string): string {

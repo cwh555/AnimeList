@@ -12,6 +12,9 @@ export const ANILIST_REQUEST_TIMEOUT_MS = 5_000;
 export const ANILIST_CACHE_TTL_MS = 60_000;
 export const ANILIST_MAX_CACHE_ENTRIES = 32;
 export const ANILIST_MAX_INTERACTIVE_RETRY_DELAY_MS = 2_500;
+/** Official degraded limit: 30/min plus burst limiting. Keep modest headroom. */
+export const ANILIST_REQUEST_INTERVAL_MS = 2_100;
+export const ANILIST_FORBIDDEN_COOLDOWN_MS = 60_000;
 
 const ANILIST_MEDIA_FIELDS = `
   id siteUrl type format status episodes chapters volumes averageScore description(asHtml: false) genres synonyms
@@ -62,6 +65,8 @@ export interface AniListClientOptions {
   cacheTtlMs?: number;
   maxCacheEntries?: number;
   maxInteractiveRetryDelayMs?: number;
+  requestIntervalMs?: number;
+  forbiddenCooldownMs?: number;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
 }
@@ -153,17 +158,24 @@ export class AniListClient implements MetadataProviderClient {
   private readonly cacheTtlMs: number;
   private readonly maxCacheEntries: number;
   private readonly maxInteractiveRetryDelayMs: number;
+  private readonly requestIntervalMs: number;
+  private readonly forbiddenCooldownMs: number;
   private readonly now: () => number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly cache = new Map<string, CachedPayload>();
   private readonly inFlight = new Map<string, Promise<Record<string, unknown>>>();
   private blockedUntil = 0;
+  private lastRequestStartedAt = -Infinity;
+  /** Serializes physical requests, including queries with different keys. */
+  private requestQueue: Promise<void> = Promise.resolve();
 
   constructor(options: AniListClientOptions = {}) {
     this.requestTimeoutMs = options.requestTimeoutMs ?? ANILIST_REQUEST_TIMEOUT_MS;
     this.cacheTtlMs = options.cacheTtlMs ?? ANILIST_CACHE_TTL_MS;
     this.maxCacheEntries = options.maxCacheEntries ?? ANILIST_MAX_CACHE_ENTRIES;
     this.maxInteractiveRetryDelayMs = options.maxInteractiveRetryDelayMs ?? ANILIST_MAX_INTERACTIVE_RETRY_DELAY_MS;
+    this.requestIntervalMs = Math.max(0, options.requestIntervalMs ?? ANILIST_REQUEST_INTERVAL_MS);
+    this.forbiddenCooldownMs = Math.max(0, options.forbiddenCooldownMs ?? ANILIST_FORBIDDEN_COOLDOWN_MS);
     this.now = options.now ?? Date.now;
     this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds)));
   }
@@ -208,43 +220,93 @@ export class AniListClient implements MetadataProviderClient {
     }
   }
 
+  private assertAvailable(): void {
+    if (this.blockedUntil > this.now()) {
+      throw new Error(`AniList API cooling down until ${new Date(this.blockedUntil).toISOString()}; no further request sent.`);
+    }
+  }
+
+  /** Requests of different query keys share the same queue and burst budget. */
+  private async pacedRequest<T>(request: () => Promise<T>): Promise<T> {
+    const previous = this.requestQueue;
+    let release!: () => void;
+    this.requestQueue = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try {
+      this.assertAvailable();
+      const delay = Math.max(0, this.lastRequestStartedAt + this.requestIntervalMs - this.now());
+      if (delay > 0) await this.sleep(delay);
+      this.assertAvailable();
+      this.lastRequestStartedAt = this.now();
+      try {
+        return await request();
+      } catch (error) {
+        // Publish the cooldown *before* releasing the queue so queued queries
+        // cannot race past a forbidden/limited response.
+        const status = errorStatus(error);
+        if (status === 403) {
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + this.forbiddenCooldownMs);
+        } else if (status === 429) {
+          const delay = retryAfterMilliseconds(error) ?? 60_000;
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + delay);
+        } else if (error instanceof Error && error.message.startsWith("AniList request timed out")) {
+          // Obsidian requestUrl has no abort signal. Its physical request may
+          // remain alive after the interactive deadline; do not start a burst
+          // of replacements for an unresolved transport request.
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + 60_000);
+        }
+        throw error;
+      }
+    } finally {
+      release();
+    }
+  }
+
   private observeRateLimit(headers: unknown): void {
-    const remaining = Number(headerValue(headers, "x-ratelimit-remaining"));
-    const resetSeconds = Number(headerValue(headers, "x-ratelimit-reset"));
+    const remainingHeader = headerValue(headers, "x-ratelimit-remaining");
+    const resetHeader = headerValue(headers, "x-ratelimit-reset");
+    const remaining = remainingHeader ? Number(remainingHeader) : NaN;
+    const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
     if (remaining === 0 && Number.isFinite(resetSeconds) && resetSeconds > 0) {
       this.blockedUntil = Math.max(this.blockedUntil, resetSeconds * 1000);
     }
   }
 
   private async executeGraphQl(query: string, variables: Record<string, unknown>): Promise<Record<string, unknown>> {
-    if (this.blockedUntil > this.now()) {
-      throw new Error(`AniList rate limit is cooling down until ${new Date(this.blockedUntil).toISOString()}`);
-    }
+    this.assertAvailable();
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const response = await this.requestWithDeadline({
-          url: ANILIST_GRAPHQL_ENDPOINT,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "User-Agent": USER_AGENT,
-          },
-          body: JSON.stringify({ query, variables }),
+        return await this.pacedRequest(async () => {
+          const response = await this.requestWithDeadline({
+            url: ANILIST_GRAPHQL_ENDPOINT,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "User-Agent": USER_AGENT,
+            },
+            body: JSON.stringify({ query, variables }),
+          });
+          this.observeRateLimit(response.headers);
+          const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
+          const payload = record(parsed);
+          const graphError = graphQlError(payload);
+          if (graphError) throw graphError;
+          return payload;
         });
-        this.observeRateLimit(response.headers);
-        const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
-        const payload = record(parsed);
-        const graphError = graphQlError(payload);
-        if (graphError) throw graphError;
-        return payload;
       } catch (error) {
         lastError = error;
         const status = errorStatus(error);
+        if (status === 403) {
+          this.blockedUntil = Math.max(this.blockedUntil, this.now() + this.forbiddenCooldownMs);
+          // AniList explicitly returns 403 during severe API outages, or for manually blocked IPs.
+          // Retrying or changing endpoints here would make the upstream problem worse.
+          throw new Error(`AniList returned HTTP 403 (API disabled or access denied). ${error instanceof Error ? error.message : String(error)}. Further requests are paused temporarily.`);
+        }
         if (status === 429) {
-          const delay = retryAfterMilliseconds(error) ?? 0;
+          const delay = retryAfterMilliseconds(error) ?? 60_000;
           this.blockedUntil = Math.max(this.blockedUntil, this.now() + delay);
           if (attempt === 0 && delay > 0 && delay <= this.maxInteractiveRetryDelayMs) {
             await this.sleep(delay);

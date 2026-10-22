@@ -1,3 +1,4 @@
+import { KO_TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
 import { KO_RANKING_MESSAGES } from "./ranking";
 import type { LocaleCatalogs } from "../zh-TW";
 import { KO_CORE_MESSAGES } from "./core";
@@ -38,4 +39,5 @@ export const KO_CATALOGS = {
   "library-export": KO_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": KO_TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": KO_MANUAL_MEDIA_MESSAGES,
+  "title-localization": KO_TITLE_LOCALIZATION_MESSAGES,
 } as const satisfies LocaleCatalogs;

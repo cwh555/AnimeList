@@ -1,0 +1,15 @@
+export const SEARCH_MESSAGES = {
+  "settings.languages.heading": "标题搜索语言",
+  "settings.languages.chinese.name": "中文标题",
+  "settings.languages.chinese.desc": "使用简体中文与繁体中文别名检索匹配作品。",
+  "settings.languages.english.name": "英文标题",
+  "settings.languages.english.desc": "使用英文标题与提供商同义词扩展搜索范围。",
+  "settings.languages.original.name": "原语言标题",
+  "settings.languages.original.desc": "使用原生标题与罗马字标题（日文、韩文或其他原文）。",
+  "library.openFailed": "AnimeList 无法打开媒体库：{message}",
+  "library.setupFailed": "媒体库已打开，但无法创建配置的文件夹：{message}",
+  "provider.noneEnabled": "未启用任何元数据提供商。",
+  "duplicate.warning.title": "媒体库中已有相同作品",
+  "duplicate.warning.description": "已找到「{title}」。仅在原文标题、别名、年份、格式与已知集数均一致时才会提示此警告。",
+  "duplicate.warning.open": "打开既有笔记",
+} as const;

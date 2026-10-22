@@ -53,11 +53,30 @@
 }
 
 .animelist-settings-section-header {
+  padding: var(--size-4-5) clamp(var(--size-4-4), 3vw, var(--size-4-6));
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary-alt);
 }
 
-.animelist-settings-section-header > .setting-item,
+/* Normalize Obsidian's heading-item margins inside a card; preserve Setting API. */
+.animelist-settings-section-header > .setting-item {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-height: 0;
+  background: transparent;
+}
+.animelist-settings-section-header > .setting-item .setting-item-name {
+  margin: 0;
+  padding: 0;
+  line-height: 1.35;
+}
+.animelist-settings-section-header > .setting-item .setting-item-description {
+  margin: var(--size-4-2) 0 0;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .animelist-settings-section-body > .setting-item {
   margin: 0;
   padding: var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5));
@@ -65,11 +84,6 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.animelist-settings-section-header > .setting-item .setting-item-description {
-  margin-top: var(--size-4-1);
-  color: var(--text-muted);
 }
 
 .animelist-settings-section-body > .setting-item + .setting-item {

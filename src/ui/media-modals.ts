@@ -446,6 +446,24 @@ export class AddMediaModal extends AnimeListModal {
     });
     this.contentEl.appendChild(form);
 
+    if (enrichedResult.titleSuggestion) {
+      const suggestion = enrichedResult.titleSuggestion;
+      const proposal = createDiv();
+      proposal.className = "al-source-note";
+      proposal.appendChild(makeEl("p", "al-modal-hint",
+        "Possible translated title from " + suggestion.provider
+        + " (name/year match; identity not verified): " + suggestion.title));
+      const use = createEl("button");
+      use.type = "button";
+      use.textContent = "Use suggested title";
+      use.addEventListener("click", () => {
+        fields.title.value = suggestion.title;
+        fields.title.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proposal.appendChild(use);
+      this.contentEl.appendChild(proposal);
+    }
+
     const context = createMediaFormContext({
       mode: "create",
       plugin: this.plugin,

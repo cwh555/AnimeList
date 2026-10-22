@@ -51,6 +51,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `media-classification-service.ts`: optional classification enrichment after a work is selected; failure never blocks note creation.
 - `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
 - `media-note-service.ts`: note creation and series-cover download workflow.
+- `title-localization-service.ts`: preview-first per-work title migration with bounded provider I/O and selective frontmatter writes; see docs/PROTOCOL.md for the language contract.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
 - `special-label-state-service.ts`: the single Favorite/Masterpiece metadata writer and compatibility cleanup path.
 - `image-section-service.ts`: Image Section asset import, exact/canonical-raster duplicate checks, thumbnail requests, Markdown updates, Set as cover, and reference-aware deletion.
@@ -148,3 +149,19 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 - Test Vault validation covers real Obsidian lifecycle, external-provider flows, Markdown rendering, note-media interaction, Settings, and DOM behavior.
 
 All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.strict.json` in addition to repository-wide TypeScript, lint, architecture, compatibility, Community, and release checks.
+
+## Provider-neutral localization boundary
+
+- `domain/media-title-localization.ts`: single typed rule for verified variants, Chinese script conversion, and fallback; the conversion candidate is reused by existing-note migration.
+- `data/media-title-service.ts`: immutable `ExternalMediaResult` adapter, including provenance-aware title selection and searchable aliases; reads the active locale only in a thin integration helper.
+- `data/provider-normalizers.ts`: Bangumi, AniList and Open Library extract provider-specific language evidence, but do not implement their own selection policies.
+- `data/providers/open-library-client.ts`: interface-locale edition preference, not an assertion of an official localized name.
+- `app/anime-list-application.ts`: reapplies the common selector after metadata enrichment before displaying the create-note form; manually edited form titles remain authoritative.
+- The existing-title migration remains opt-in. Provenance-verified translations and script conversions are stored separately for compatibility.
+
+## Unified name lookup and scan checkpoints
+
+- `data/wikidata-title-service.ts`: exact external-ID to QID mapping, locale labels/sitelinks, bounded per-session cached lookup; no heuristic title-to-ID guessing.
+- `data/media-title-service.ts`: applies ordered language evidence without mutating source names, authors, provider IDs or original variants.
+- `domain/media-title-suggestion.ts`: last-resort cross-provider heuristic suggestions for human review only.
+- `data/cleanup-scan-history.ts`: versioned, task/locale-specific checkpoint persistence independent from Markdown; `ui/cleanup-scan-controls.ts` owns the shared Settings selector. Each migration service accepts an optional file-selection predicate and avoids rewriting unrelated content.

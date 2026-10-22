@@ -350,3 +350,36 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Each operation changes only its owned fields/block and preserves unrelated frontmatter/body content.
 - [ ] No optional feature introduced by the current release performs a vault-wide automatic rewrite on startup.
 - [ ] Disabling optional features leaves stored Markdown readable and does not delete user data.
+
+## Language and title migration
+
+- [ ] Every Obsidian Settings section and Settings-launched dialog (buttons, status, failure and completion) remains English regardless of AnimeList UI locale.
+- [ ] Settings → Updates & cleanup → Preview title updates reports each work live while scanning; after scanning, review contains **only proposed changes**. Unchanged, missing and failed entries contribute only to the summary counters, not individual review rows.
+- [ ] An AniList-only work with a verified Bangumi candidate is offered as manual review, unchecked by default; ambiguous/mismatched-year candidates are not automatically selected.
+- [ ] A Bangumi result with Simplified Chinese but no verified Traditional title visibly explains the missing translation.
+- [ ] A Bangumi ID found in an AniList record's source_urls is usable for a direct lookup.
+- [ ] Custom titles, unavailable translations, HTTP 429 failures and cancelled scans never silently modify notes.
+- [ ] Applying a checked result leaves note path, body, unrelated frontmatter, tags, scores, progress and ranking unchanged. The previous name remains searchable in title_aliases, with title_original retained.
+- [ ] A 50+ work test vault scans progressively without blocking the settings dialog or flooding API requests; closing a scan cancels its remaining queued work.
+- [ ] Changing the interface language does not rewrite existing titles.
+
+- [ ] Accept a review-only OpenCC suggestion, explicitly switch to another verified language, then switch back. The accepted conversion must remain available but must **not** appear inside the official `title_localizations` map.
+
+## Multisource title resolution, new imports
+
+- [ ] On all Settings interface languages, create a Bangumi anime, manga and novel with a verified translated name. The verified name takes precedence; original titles and all non-title metadata remain unchanged.
+- [ ] With zh-TW selected, create a Bangumi item containing only `name_cn`; the initial form and saved note should show Traditional script without pressing the Legacy data button, and frontmatter must identify this as a script conversion rather than an official translation.
+- [ ] Add AniList Japanese and Korean works with locale ja/ko/en; verify correct provider native/English title only where language attribution exists. With zh-TW/zh-CN and no verified Chinese title, ensure the original source name remains usable and unknown synonyms do not become made-up translations.
+- [ ] Search and add an Open Library novel under zh, en, ja or ko; verify the edition preference follows the UI language, and missing translations do not overwrite the original book title or author.
+- [ ] Edit the proposed title in the new-note form; verify the custom name is preserved and no automatic conversion is falsely claimed. Repeat the search with an existing duplicate to verify source identity checking remains unchanged.
+- [ ] Change locale between searching and opening note details; ensure the create-note form resolves the chosen locale consistently, without losing original aliases or switching metadata sources.
+
+## Wikidata / incremental-cleanup final review
+
+- [ ] Add AniList-only anime with a **known Wikidata external-ID mapping** and a different target-language label; ensure the initial form prefers the matched QID name and frontmatter stores `title_external_evidence`, **not** an invented `title_localizations` entry.
+- [ ] Test an ID with no QID mapping and another with missing language data; preserve source title, avoid unsafe guesses. An API outage must leave other provider searches available.
+- [ ] Confirm user-edited names override the proposal, with original/romanized names retained and no incorrect `title_external_evidence` field.
+- [ ] In Settings → Updates & cleanup, open each of the **four** scanners and verify default 'Only new or unfinished items' versus 'Rescan all items'. After successful checks, repeat pending mode: those unchanged notes should be skipped; full scan should still inspect them.
+- [ ] If a note changes or is renamed, incremental mode should scan it again. A failed API lookup, unconfirmed candidate or failed write must not become a completed checkpoint.
+- [ ] Run filename scans with two works competing for the same filename; a partial scan must preserve global collision-safe naming.
+- [ ] Close and reopen Settings and restart Obsidian; successful scan checkpoints persist outside Markdown frontmatter.

@@ -3,6 +3,7 @@ import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres, normalize
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
 import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
+import { localizeActiveMediaResult } from "./media-title-service";
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -143,7 +144,9 @@ function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string
 export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): ExternalMediaResult {
   const subject = record(value);
   const originalTitle = stringValue(subject.name).trim();
-  const localTitle = stringValue(subject.name_cn, originalTitle || uiText("media.untitled")).trim();
+  const simplifiedTitle = stringValue(subject.name_cn).trim();
+  const traditionalTitle = bangumiInfoboxValues(subject.infobox, ["繁體中文名", "繁体中文名"])[0] ?? "";
+  const providerFallback = simplifiedTitle || originalTitle || uiText("media.untitled");
   const images = record(subject.images);
   const people = mediaType === "anime"
     ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, BANGUMI_ANIMATION_STUDIO_FIELDS))
@@ -161,14 +164,24 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   const genres = normalizeBroadGenres(providerTags);
   const subjectId = stringValue(subject.id);
   const rating = record(subject.rating);
-  return {
+  return localizeActiveMediaResult({
     provider: "bangumi",
     sourceId: subjectId,
     sourceUrl: subjectId ? `https://bgm.tv/subject/${subjectId}` : "",
     mediaType,
-    title: localTitle,
+    title: providerFallback,
     originalTitle,
     romajiTitle: "",
+    titleVariants: {
+      fallback: providerFallback,
+      original: originalTitle,
+      localized: {
+        ...(simplifiedTitle ? { "zh-CN": simplifiedTitle } : {}),
+        ...(traditionalTitle ? { "zh-TW": traditionalTitle } : {}),
+        ...(bangumiInfoboxValues(subject.infobox, ["日文名", "日本語名"])[0]
+          ? { ja: bangumiInfoboxValues(subject.infobox, ["日文名", "日本語名"])[0] } : {}),
+      },
+    },
     format,
     year: yearValue(date.slice(0, 4)),
     startDate: dateParts(date),
@@ -183,19 +196,24 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     externalScore: optionalNumber(rating.score),
     releaseStatus: "unknown",
     searchTitles: [...new Set([
-      localTitle,
+      providerFallback,
       originalTitle,
+      simplifiedTitle,
+      traditionalTitle,
       ...bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
     ].map((title) => title.trim()).filter(Boolean))],
     sources: subjectId ? [{ provider: "bangumi", sourceId: subjectId, sourceUrl: `https://bgm.tv/subject/${subjectId}` }] : [],
-  };
+  });
 }
 
 export function normalizeAniListMedia(value: unknown, mediaType: MediaType): ExternalMediaResult {
   const media = record(value);
   const title = record(media.title);
-  const localTitle = stringValue(title.english, stringValue(title.romaji, stringValue(title.native, uiText("media.untitled")))).trim();
-  const originalTitle = stringValue(title.native, stringValue(title.romaji)).trim();
+  const englishTitle = stringValue(title.english).trim();
+  const romajiTitle = stringValue(title.romaji).trim();
+  const originalTitle = stringValue(title.native, romajiTitle).trim();
+  const country = stringValue(media.countryOfOrigin).toUpperCase();
+  const providerFallback = englishTitle || romajiTitle || originalTitle || uiText("media.untitled");
   const staff = asArray(record(media.staff).edges)
     .map((rawEdge) => record(rawEdge))
     .filter((edge) => /creator|story|art|author|original/i.test(stringValue(edge.role)))
@@ -219,14 +237,26 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
   const cover = record(media.coverImage);
   const averageScore = optionalNumber(media.averageScore);
   const classification = normalizeAniListClassification(media);
-  return {
+  return localizeActiveMediaResult({
     provider: "anilist",
     sourceId: mediaId,
     sourceUrl: siteUrl,
     mediaType,
-    title: localTitle,
+    title: providerFallback,
     originalTitle,
     romajiTitle: stringValue(title.romaji),
+    titleVariants: {
+      fallback: providerFallback,
+      original: originalTitle,
+      romaji: romajiTitle,
+      localized: {
+        ...(englishTitle ? { en: englishTitle } : {}),
+        ...(country === "JP" && originalTitle ? { ja: originalTitle } : {}),
+        ...(country === "KR" && originalTitle ? { ko: originalTitle } : {}),
+        ...(country === "CN" && originalTitle ? { "zh-CN": originalTitle } : {}),
+        ...((country === "TW" || country === "HK") && originalTitle ? { "zh-TW": originalTitle } : {}),
+      },
+    },
     format: mapFormat(media.format, mediaType),
     year: yearValue(record(media.startDate).year),
     startDate: dateParts(media.startDate),
@@ -241,7 +271,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     externalScore: averageScore === null ? null : averageScore / 10,
     releaseStatus: statusMap[stringValue(media.status).toUpperCase()] ?? "unknown",
     searchTitles: [...new Set([
-      localTitle,
+      providerFallback,
       originalTitle,
       stringValue(title.romaji),
       stringValue(title.english),
@@ -250,7 +280,7 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
     ].map((entry) => entry.trim()).filter(Boolean))],
     sources: mediaId ? [{ provider: "anilist", sourceId: mediaId, sourceUrl: siteUrl }] : [],
     ...(classification ? { classification } : {}),
-  };
+  });
 }
 
 export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
@@ -260,7 +290,7 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
   const genres = normalizeBroadGenres(providerSubjects);
   const title = stringValue(book.title, uiText("media.untitled"));
   const coverId = stringValue(book.cover_i);
-  return {
+  return localizeActiveMediaResult({
     provider: "openlibrary",
     sourceId: key,
     sourceUrl: key ? `https://openlibrary.org/works/${key}` : "",
@@ -268,6 +298,7 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     title,
     originalTitle: stringValue(book.title),
     romajiTitle: "",
+    titleVariants: { fallback: title, original: stringValue(book.title) },
     format: "novel",
     year: yearValue(book.first_publish_year),
     coverUrl: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false` : "",
@@ -281,7 +312,7 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
     externalScore: null,
     releaseStatus: "unknown",
     sources: key ? [{ provider: "openlibrary", sourceId: key, sourceUrl: `https://openlibrary.org/works/${key}` }] : [],
-  };
+  });
 }
 
 export function dedupeSearchResults(results: readonly ExternalMediaResult[]): ExternalMediaResult[] {

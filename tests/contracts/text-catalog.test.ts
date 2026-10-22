@@ -94,6 +94,7 @@ describe("user-visible text catalog compatibility", () => {
     registerBundledLocales();
     const cases = [
       ["zh-TW", "收藏庫", "儲存", "Tags"],
+      ["zh-CN", "媒体库", "保存", "作品标签"],
       ["en", "Library", "Save", "Tags"],
       ["ja", "ライブラリ", "保存", "タグ"],
       ["ko", "라이브러리", "저장", "태그"],
@@ -115,6 +116,10 @@ describe("user-visible text catalog compatibility", () => {
 
   it("normalizes explicit and system locale preferences deterministically", () => {
     assert.equal(normalizeSupportedLocale("zh-Hant-TW"), "zh-TW");
+    assert.equal(normalizeSupportedLocale("zh-Hans-CN"), "zh-CN");
+    assert.equal(normalizeSupportedLocale("zh_CN"), "zh-CN");
+    assert.equal(normalizeSupportedLocale("zh-SG"), "zh-CN");
+    assert.equal(resolveInterfaceLocale("system", "zh-Hans"), "zh-CN");
     assert.equal(normalizeSupportedLocale("en-US"), "en");
     assert.equal(normalizeSupportedLocale("ja_JP"), "ja");
     assert.equal(normalizeSupportedLocale("ko-KR"), "ko");
@@ -165,6 +170,7 @@ describe("user-visible text catalog compatibility", () => {
   });
 
   it("keeps unknown provider values unchanged instead of guessing a translation", () => {
+    assert.equal(localizeProviderTag("Action", "zh-CN"), "动作");
     assert.equal(localizeProviderTag("Unknown provider tag", "zh-TW"), "Unknown provider tag");
     assert.equal(localizeProviderTag("Unknown provider tag", "ja"), "Unknown provider tag");
   });

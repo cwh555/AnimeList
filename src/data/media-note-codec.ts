@@ -268,6 +268,30 @@ export function buildMediaMarkdown(
   if (result.romajiTitle && result.romajiTitle !== result.originalTitle) {
     lines.push(`title_romaji: ${yamlScalar(result.romajiTitle)}`);
   }
+  const localizedTitles = result.titleVariants?.localized ?? {};
+  const localeEntries = (["zh-TW", "zh-CN", "en", "ja", "ko"] as const)
+    .flatMap((locale) => localizedTitles[locale]?.trim() ? [[locale, localizedTitles[locale].trim()] as const] : []);
+  if (localeEntries.length) {
+    lines.push("title_localizations:");
+    for (const [locale, value] of localeEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
+  }
+  // A default auto-converted title has provenance; an edited title is user-owned.
+  const scriptConversions = result.titleScriptConversions ?? {};
+  const convertedEntries = (["zh-TW", "zh-CN"] as const).flatMap(locale =>
+    scriptConversions[locale]?.trim() === title ? [[locale, title] as const] : []);
+  if (convertedEntries.length) {
+    lines.push("title_script_conversions:");
+    for (const [locale, value] of convertedEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
+  }
+  const evidence = result.wikidataTitleEvidence;
+  if (evidence && evidence.title === title) {
+    lines.push("title_external_evidence:");
+    lines.push(`  locale: ${yamlScalar(evidence.locale)}`);
+    lines.push(`  title: ${yamlScalar(evidence.title)}`);
+    lines.push(`  source: ${yamlScalar(evidence.kind)}`);
+    lines.push(`  wikidata_id: ${yamlScalar(evidence.itemId)}`);
+    lines.push(`  identity_property: ${yamlScalar(evidence.identityProperty)}`);
+  }
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(format)}`);
   lines.push(`status: ${yamlScalar(status)}`);

@@ -1,3 +1,4 @@
+import { JA_TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
 import { JA_RANKING_MESSAGES } from "./ranking";
 import type { LocaleCatalogs } from "../zh-TW";
 import { JA_CORE_MESSAGES } from "./core";
@@ -38,4 +39,5 @@ export const JA_CATALOGS = {
   "library-export": JA_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": JA_TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": JA_MANUAL_MEDIA_MESSAGES,
+  "title-localization": JA_TITLE_LOCALIZATION_MESSAGES,
 } as const satisfies LocaleCatalogs;

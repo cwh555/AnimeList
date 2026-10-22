@@ -447,6 +447,28 @@ describe("metadata provider clients", () => {
     }
   });
 
+  it("does not create replacement transport requests while a timed-out request remains pending", async () => {
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls++;
+      return new Promise(() => {});
+    });
+    try {
+      const client = new AniListClient({ requestTimeoutMs: 5, requestIntervalMs: 0 });
+      const [first, second] = await Promise.allSettled([
+        client.searchPage("anime", "Stuck A", 1),
+        client.searchPage("anime", "Stuck B", 1),
+      ]);
+      assert.equal(first.status, "rejected");
+      assert.equal(second.status, "rejected");
+      assert.equal(calls, 1);
+      assert.match((first as PromiseRejectedResult).reason.message, /timed out/);
+      assert.match((second as PromiseRejectedResult).reason.message, /cooling down/);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
   it("honors a short AniList Retry-After once without starting a retry loop", async () => {
     let calls = 0;
     const sleeps: number[] = [];
@@ -470,6 +492,7 @@ describe("metadata provider clients", () => {
     try {
       const client = new AniListClient({
         maxInteractiveRetryDelayMs: 1_500,
+        requestIntervalMs: 0,
         sleep: async (milliseconds) => { sleeps.push(milliseconds); },
       });
       const page = await client.searchPage("anime", "Rate Retry", 1);
@@ -526,10 +549,131 @@ describe("metadata provider clients", () => {
       };
     });
     try {
-      const client = new AniListClient({ sleep: async () => {} });
+      const client = new AniListClient({ requestIntervalMs: 0, sleep: async () => {} });
       const page = await client.searchPage("anime", "Retry", 1);
       assert.equal(calls, 2);
       assert.equal(page.results[0]?.sourceId, "30");
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("paces different AniList queries using one sequential queue at the degraded 30/min limit", async () => {
+    let clock = 10_000;
+    const starts: number[] = [];
+    const sleeps: number[] = [];
+    setRequestUrlMock(() => {
+      starts.push(clock);
+      return {
+        headers: { "X-RateLimit-Limit": "30", "X-RateLimit-Remaining": "28" },
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [aniListMedia(42)] } } },
+        text: "",
+      };
+    });
+    try {
+      const client = new AniListClient({
+        now: () => clock,
+        sleep: async (ms) => { sleeps.push(ms); clock += ms; },
+      });
+      const pages = await Promise.all([
+        client.searchPage("anime", "First", 1),
+        client.searchPage("anime", "Second", 1),
+        client.searchPage("anime", "Third", 1),
+      ]);
+      assert.deepEqual(starts, [10_000, 12_100, 14_200]);
+      assert.deepEqual(sleeps, [2_100, 2_100]);
+      assert.ok(pages.every(page => page.results[0]?.sourceId === "42"));
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("stops every queued query after a 403 GraphQL outage response", async () => {
+    let clock = 20_000;
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls++;
+      if (calls === 1) {
+        return {
+          headers: {},
+          json: { data: null, errors: [{
+            status: 403,
+            message: "The AniList API has been temporarily disabled due to severe stability issues.",
+          }] },
+          text: "",
+        };
+      }
+      return {
+        headers: {},
+        json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [aniListMedia(44)] } } },
+        text: "",
+      };
+    });
+    try {
+      const client = new AniListClient({
+        requestIntervalMs: 0, now: () => clock, forbiddenCooldownMs: 60_000,
+      });
+      const attempted = await Promise.allSettled([
+        client.searchPage("anime", "One", 1),
+        client.searchPage("anime", "Two", 1),
+        client.searchPage("anime", "Three", 1),
+      ]);
+      assert.equal(calls, 1);
+      assert.ok(attempted.every(x => x.status === "rejected"));
+      assert.match((attempted[0] as PromiseRejectedResult).reason.message, /HTTP 403/);
+      assert.match((attempted[0] as PromiseRejectedResult).reason.message, /temporarily disabled/);
+      await assert.rejects(() => client.searchPage("anime", "Four", 1), /cooling down/);
+      assert.equal(calls, 1);
+      clock += 60_001;
+      const recovered = await client.searchPage("anime", "After cooldown", 1);
+      assert.equal(recovered.results[0]?.sourceId, "44");
+      assert.equal(calls, 2);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("handles direct HTTP 403 without retrying, and does not affect another provider", async () => {
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls++;
+      const error = new Error("Request failed with status 403") as Error & { status: number };
+      error.status = 403;
+      throw error;
+    });
+    try {
+      const client = new AniListClient({ requestIntervalMs: 0 });
+      await assert.rejects(() => client.fetchMediaById("anime", 15), /HTTP 403/);
+      await assert.rejects(() => client.searchPage("anime", "Other", 1), /cooling down/);
+      assert.equal(calls, 1);
+    } finally {
+      setRequestUrlMock(null);
+    }
+  });
+
+  it("honors a long 429 Retry-After as a circuit pause without repeated calls", async () => {
+    let clock = 1_000;
+    let calls = 0;
+    setRequestUrlMock(() => {
+      calls++;
+      if (calls === 1) {
+        const error = new Error("Request failed with status 429") as Error & {
+          status: number; response: { headers: Record<string, string> };
+        };
+        error.status = 429;
+        error.response = { headers: { "Retry-After": "30" } };
+        throw error;
+      }
+      return { headers: {}, json: { data: { Page: { pageInfo: { hasNextPage: false }, media: [] } } }, text: "" };
+    });
+    try {
+      const client = new AniListClient({ requestIntervalMs: 0, now: () => clock });
+      await assert.rejects(() => client.searchPage("anime", "One", 1), /429/);
+      await assert.rejects(() => client.searchPage("anime", "Two", 1), /cooling down/);
+      assert.equal(calls, 1);
+      clock += 30_001;
+      await client.searchPage("anime", "Recovered", 1);
+      assert.equal(calls, 2);
     } finally {
       setRequestUrlMock(null);
     }
