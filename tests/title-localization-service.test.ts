@@ -59,6 +59,7 @@ describe("safe existing-title localization", () => {
     });
     let calls = 0;
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, fetch: async () => { calls += 1; return bangumiResult("原題", "简体标题"); },
     });
     assert.equal(calls, 1);
@@ -86,6 +87,7 @@ describe("safe existing-title localization", () => {
       media_type: "anime", source_provider: "bangumi", source_id: "88", title: "原題",
     });
     const result = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       shouldScan: () => false,
       fetch: async () => { throw new Error("No network request is allowed"); },
@@ -96,6 +98,34 @@ describe("safe existing-title localization", () => {
     assert.equal(note.written.length, 0);
   });
 
+  it("uses exact Wikidata evidence as a review proposal without claiming an official translation", async () => {
+    const note = testNote("wiki.md", {
+      media_type: "anime", title: "原題", source_provider: "anilist", source_id: "42",
+    });
+    const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      intervalMs: 0,
+      fetch: async () => aniListResult(),
+      lookupWikidata: async (_type, source, locale) => {
+        assert.equal(source.provider, "anilist");
+        assert.equal(source.id, "42");
+        assert.equal(locale, "zh-TW");
+        return { title: "維基名稱", locale, itemId: "Q123", kind: "wikidata-label", identityProperty: "P8729" };
+      },
+      lookup: async () => { throw Error("Verified-ID Wikidata lookup must precede fuzzy matches"); },
+    });
+    assert.equal(plan.items.length, 1);
+    assert.equal(plan.items[0].requiresReview, true);
+    assert.equal(plan.items[0].newTitle, "維基名稱");
+    assert.equal(plan.items[0].localized["zh-TW"], undefined);
+    assert.equal(note.written.length, 0);
+    assert.equal((await applyStoredTitleUpdates(note.app, plan, new Set([note.file.path]))).updated, 1);
+    assert.deepEqual(note.data.title_external_evidence, {
+      locale: "zh-TW", title: "維基名稱", source: "wikidata-label",
+      wikidata_id: "Q123", identity_property: "P8729",
+    });
+    assert.equal((note.data.title_localizations as Record<string,string> | undefined)?.["zh-TW"], undefined);
+  });
+
   it("reuses verified stored variants across languages without a network call", async () => {
     const note = testNote("anime.md", {
       media_type: "anime", source_provider: "bangumi", source_id: "88",
@@ -103,6 +133,7 @@ describe("safe existing-title localization", () => {
       title_localizations: { "zh-TW": "繁體標題", "zh-CN": "简体标题" },
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      lookupWikidata: async () => null,
       fetch: async () => { throw new Error("Should not refetch stored translations"); },
     });
     assert.equal(plan.items.length, 1);
@@ -117,6 +148,7 @@ describe("safe existing-title localization", () => {
       title: "Romanized Title",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       fetch: async () => ({
         ...bangumiResult("原題", "简体标题"),
@@ -134,6 +166,7 @@ describe("safe existing-title localization", () => {
       title: "我自己起的名字", custom: "keep",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, fetch: async () => bangumiResult("原題", "简体标题"),
     });
     assert.equal(plan.items.length, 0);
@@ -150,6 +183,7 @@ describe("safe existing-title localization", () => {
       media_type: "anime", source_provider: "bangumi", source_id: "88", title: "原題",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, fetch: async () => ({ ...bangumiResult("原題", "简体标题"), sourceId: "99" }),
     });
     assert.equal(plan.items.length, 0);
@@ -163,6 +197,7 @@ describe("safe existing-title localization", () => {
       media_type: "anime", source_provider: "bangumi", source_id: "88", title: "原題",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, fetch: async () => bangumiResult("原題", "简体标题"),
     });
     note.data.title = "User edit";
@@ -185,6 +220,7 @@ describe("safe existing-title localization", () => {
     });
     const progress: TitleScanRow[] = [];
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       fetch: async () => ({
         ...bangumiResult("原題", "简体标题"),
@@ -209,6 +245,7 @@ describe("safe existing-title localization", () => {
       media_type: "anime", title: "原題", source_provider: "bangumi", source_id: "88",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-TW", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       fetch: async () => ({
         ...bangumiResult("原題", ""),
@@ -249,6 +286,7 @@ describe("safe existing-title localization", () => {
     assert.deepEqual(note.data.title_script_conversions, { "zh-TW": "簡體標題" });
 
     const simplified = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       fetch: async () => { throw new Error("Verified stored title should avoid network fetch"); },
     });
@@ -273,6 +311,7 @@ describe("safe existing-title localization", () => {
     });
     const seen: string[] = [];
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       fetch: async (_type, source) => {
         seen.push(source.provider + ":" + source.id);
@@ -291,6 +330,7 @@ describe("safe existing-title localization", () => {
     });
     const progress: string[] = [];
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       lookup: async (_type, title) => {
         progress.push(title);
@@ -306,6 +346,7 @@ describe("safe existing-title localization", () => {
     assert.equal(plan.rows[0].status, "review");
     assert.equal(plan.items[0].requiresReview, true);
     const ambiguous = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       lookup: async () => [bangumiResult("原題", "简体标题"), { ...bangumiResult("原題", "繁體標題"), sourceId: "99" }],
       fetch: async (_type, source) => {
@@ -323,6 +364,7 @@ describe("safe existing-title localization", () => {
       title: "原題", year: 2022, media_type: "anime", source_provider: "anilist", source_id: "42",
     });
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0,
       lookup: async () => [bangumiResult("原題", "简体标题")],
       fetch: async (_type, source) => {
@@ -348,6 +390,7 @@ describe("safe existing-title localization", () => {
     const updates: TitleScanRow[] = [];
     const started: string[] = [];
     const plan = await planStoredTitleUpdates(app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, concurrency: 3,
       onStart: (_completed, _total, title) => started.push(title),
       fetch: async (_type, source) => {
@@ -376,6 +419,7 @@ describe("safe existing-title localization", () => {
       title: "原題", media_type: "anime", source_provider: "bangumi", source_id: "88",
     });
     const broken = await planStoredTitleUpdates(bad.app, [""], "zh-CN", {
+      lookupWikidata: async () => null,
       intervalMs: 0, fetch: async () => { throw new Error("HTTP 429"); },
     });
     assert.equal(broken.rows[0].status, "lookup-failed");
