@@ -39,6 +39,17 @@ function bangumiResult(title: string, titleCN: string): ExternalMediaResult {
   };
 }
 
+function aniListResult(): ExternalMediaResult {
+  return {
+    ...bangumiResult("原題", "简体标题"),
+    provider: "anilist", sourceId: "42",
+    sourceUrl: "https://anilist.co/anime/42",
+    title: "Original English",
+    titleVariants: { fallback: "Original English", original: "原題", localized: { en: "Original English", ja: "原題" } },
+    searchTitles: ["原題", "Original English"],
+  };
+}
+
 describe("safe existing-title localization", () => {
   it("plans without writing; applies only selected titles preserving metadata, aliases and content", async () => {
     const note = testNote("AnimeList/Show.md", {
@@ -265,10 +276,10 @@ describe("safe existing-title localization", () => {
       intervalMs: 0,
       fetch: async (_type, source) => {
         seen.push(source.provider + ":" + source.id);
-        return bangumiResult("原題", "简体标题");
+        return source.provider === "anilist" ? aniListResult() : bangumiResult("原題", "简体标题");
       },
     });
-    assert.deepEqual(seen, ["bangumi:88"]);
+    assert.deepEqual(seen, ["anilist:42", "bangumi:88"]);
     assert.equal(plan.rows[0].status, "ready");
     assert.equal(plan.items[0].newTitle, "简体标题");
   });
@@ -286,8 +297,8 @@ describe("safe existing-title localization", () => {
         return [bangumiResult("原題", "简体标题")];
       },
       fetch: async (_type, source) => {
-        assert.equal(source.id, "88");
-        return bangumiResult("原題", "简体标题");
+        assert.ok(source.id === "42" || source.id === "88");
+        return source.id === "42" ? aniListResult() : bangumiResult("原題", "简体标题");
       },
     });
     assert.deepEqual(progress, ["原題"]);
@@ -297,7 +308,10 @@ describe("safe existing-title localization", () => {
     const ambiguous = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
       intervalMs: 0,
       lookup: async () => [bangumiResult("原題", "简体标题"), { ...bangumiResult("原題", "繁體標題"), sourceId: "99" }],
-      fetch: async () => { throw Error("Must not fetch ambiguous candidates"); },
+      fetch: async (_type, source) => {
+        if (source.provider !== "anilist") throw Error("Must not fetch ambiguous candidates");
+        return aniListResult();
+      },
     });
     assert.equal(ambiguous.items.length, 0);
     assert.equal(ambiguous.rows[0].status, "ambiguous");
@@ -311,7 +325,10 @@ describe("safe existing-title localization", () => {
     const plan = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
       intervalMs: 0,
       lookup: async () => [bangumiResult("原題", "简体标题")],
-      fetch: async () => { throw Error("A different release year must not be fetched"); },
+      fetch: async (_type, source) => {
+        if (source.provider !== "anilist") throw Error("A different release year must not be fetched");
+        return aniListResult();
+      },
     });
     assert.equal(plan.rows[0].status, "no-source");
     assert.equal(plan.items.length, 0);
