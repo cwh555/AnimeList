@@ -1,7 +1,6 @@
 import { TFile, type App } from "obsidian";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
-import { mergeOfficialTitles, verifiedMediaTitle } from "../domain/media-title-localization";
-import { convertChineseScriptForReview } from "../domain/chinese-title-conversion";
+import { chineseScriptCandidate, mergeOfficialTitles, verifiedMediaTitle } from "../domain/media-title-localization";
 import type { SupportedLocale } from "../i18n/locale";
 import { getScopedMarkdownFiles } from "./vault-scope";
 import { BangumiClient } from "./providers/bangumi-client";
@@ -214,14 +213,11 @@ export async function planStoredTitleUpdates(
       requiresReview = true;
     }
     if (!target && (locale === "zh-TW" || locale === "zh-CN")) {
-      const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
-      const input = candidate?.titleVariants?.localized?.[otherLocale] || stored[otherLocale];
-      if (input) {
-        target = convertChineseScriptForReview(input, locale) ?? "";
-        if (target) {
-          scriptConverted = true;
-          requiresReview = true;
-        }
+      const alternatives = mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
+      target = chineseScriptCandidate({ fallback: "", localized: alternatives }, locale) ?? "";
+      if (target) {
+        scriptConverted = true;
+        requiresReview = true;
       }
     }
     if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");

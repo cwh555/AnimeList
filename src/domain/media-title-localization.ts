@@ -44,6 +44,17 @@ export function mergeOfficialTitles(
   return result;
 }
 
+/** Convert only explicitly labeled Chinese titles; never infer a language from synonyms. */
+export function chineseScriptCandidate(
+  variants: MediaTitleVariants,
+  locale: SupportedLocale,
+): string | null {
+  if (locale !== "zh-TW" && locale !== "zh-CN") return null;
+  const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
+  const source = variants.localized?.[otherLocale]?.trim();
+  return source ? convertChineseScriptForReview(source, locale) : null;
+}
+
 /** Resolve a new import once; keep converted script separate from verified provider titles. */
 export function selectNewMediaTitle(
   variants: MediaTitleVariants,
@@ -51,11 +62,7 @@ export function selectNewMediaTitle(
 ): { title: string; scriptConversion?: string } {
   const verified = verifiedMediaTitle(variants, locale);
   if (verified) return { title: verified };
-  if (locale === "zh-TW" || locale === "zh-CN") {
-    const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
-    const source = variants.localized?.[otherLocale]?.trim();
-    const converted = source ? convertChineseScriptForReview(source, locale) : null;
-    if (converted) return { title: converted, scriptConversion: converted };
-  }
+  const converted = chineseScriptCandidate(variants, locale);
+  if (converted) return { title: converted, scriptConversion: converted };
   return { title: resolveMediaTitle(variants, locale) };
 }
