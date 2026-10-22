@@ -264,7 +264,14 @@ export class AnimeListApplicationServices {
     result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media",
   ): Promise<ExternalMediaResult> {
     let base = result;
-    if (result.provider === "bangumi" && result.sourceId && (!result.people.length || !result.rawGenres.length)) {
+    const requestedLocale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    const needsChineseAlias = purpose === "new-media"
+      && (requestedLocale === "zh-TW" || requestedLocale === "zh-CN")
+      && !result.titleVariants?.localized?.[requestedLocale]
+      && !result.titleVariants?.displayAliases?.[requestedLocale]
+      && /[\\p{Script=Hangul}\\p{Script=Hiragana}\\p{Script=Katakana}]/u.test(result.originalTitle);
+    if (result.provider === "bangumi" && result.sourceId
+      && (!result.people.length || !result.rawGenres.length || needsChineseAlias)) {
       try {
         base = await this.metadataProviders().bangumi.fetchById(result.mediaType, result.sourceId) ?? result;
       } catch (error) {
@@ -281,6 +288,7 @@ export class AnimeListApplicationServices {
     if (purpose === "metadata-only") return localized;
     if (localized.provider !== MANUAL_MEDIA_PROVIDER
       && !localized.titleVariants?.localized?.[locale]
+      && !localized.titleVariants?.displayAliases?.[locale]
       && localized.wikidataTitleEvidence?.locale !== locale) {
       try {
         this.wikidataTitles ??= new WikidataTitleService();
