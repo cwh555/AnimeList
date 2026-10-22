@@ -25,6 +25,7 @@ export function localizeExternalMediaResult(
     result.title, title, result.originalTitle, result.romajiTitle,
     variants.fallback, variants.original ?? "", variants.romaji ?? "",
     ...Object.values(variants.localized ?? {}),
+    ...Object.values(variants.displayAliases ?? {}),
   ].map(value => value.trim()).filter(Boolean))];
   return {
     ...result,
