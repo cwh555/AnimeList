@@ -24,6 +24,8 @@ export interface TitleUpdateItem {
   readonly originalTitle: string;
   readonly aliases: readonly string[];
   readonly localized: Partial<Record<SupportedLocale, string>>;
+  /** Accepted script conversions are distinct from verified provider titles. */
+  readonly scriptConversions: Partial<Record<SupportedLocale, string>>;
 }
 export interface TitleScanRow {
   readonly path: string;
@@ -174,11 +176,13 @@ export async function planStoredTitleUpdates(
     const old = field(fm?.title);
     if (!fm || !type || !old) return row(file.path, old || file.basename, "no-source", "Media title or type is missing.");
     const stored = knownTitles(fm.title_localizations);
+    const approvedConversions = knownTitles(fm.title_script_conversions);
     const source = preferredSource(fm, locale);
     let candidate: ExternalMediaResult | null = null;
     let target = stored[locale] ?? "";
     let requiresReview = false;
     let scriptConverted = false;
+    let reusedConversion = false;
     let selectedSource: TitleSource | null = source;
     if (!target && source) {
       candidate = await fetchCached(type, source);
@@ -214,6 +218,11 @@ export async function planStoredTitleUpdates(
         }
       }
     }
+    if (!target && approvedConversions[locale]) {
+      target = approvedConversions[locale];
+      reusedConversion = true;
+      requiresReview = true;
+    }
     if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");
     if (!target) {
       const onlySimplified = locale === "zh-TW" && candidate?.titleVariants?.localized?.["zh-CN"];
@@ -223,11 +232,14 @@ export async function planStoredTitleUpdates(
     }
     if (normalizeTitle(target) === normalizeTitle(old)) return row(file.path, old, "unchanged", "Already matches the requested title.");
     const owned = candidate
-      ? providerTitles(candidate).some(name => normalizeTitle(name) === normalizeTitle(old))
-      : [...Object.values(stored), field(fm.title_original), ...values(fm.title_aliases)]
+      ? [...providerTitles(candidate), ...Object.values(approvedConversions)].some(name => normalizeTitle(name) === normalizeTitle(old))
+      : [...Object.values(stored), ...Object.values(approvedConversions), field(fm.title_original), ...values(fm.title_aliases)]
         .some(name => normalizeTitle(name) === normalizeTitle(old));
     if (!owned) return row(file.path, old, "custom-title", "Current title is not recognized as a source title; preserving customization.");
     const merged = mergeOfficialTitles(stored, candidate?.titleVariants?.localized);
+    const scriptConversions = scriptConverted
+      ? { ...approvedConversions, [locale]: target }
+      : approvedConversions;
     const aliases = [...new Set([...values(fm.title_aliases), old, field(fm.title_original),
       field(fm.title_romaji), ...(candidate ? providerTitles(candidate) : []), target]
       .map(name => name.trim()).filter(Boolean))];
@@ -236,10 +248,11 @@ export async function planStoredTitleUpdates(
       expectedProvider: field(fm.source_provider), expectedSourceId: field(fm.source_id),
       expectedAniListId: field(fm.anilist_id), expectedMtime: file.stat.mtime,
       originalTitle: field(fm.title_original) || candidate?.originalTitle || "",
-      aliases, localized: merged,
+      aliases, localized: merged, scriptConversions,
     };
     return row(file.path, old, requiresReview ? "review" : "ready",
       scriptConverted ? "OpenCC script conversion only (NOT an official localized release title); verify before applying."
+        : reusedConversion ? "Previously approved OpenCC conversion (NOT an official translated title); review before applying."
         : requiresReview ? "Cross-provider title match: manually verify this identity." : "Verified provider ID and title.",
       proposal);
   }
@@ -285,11 +298,20 @@ export async function applyStoredTitleUpdates(
         fm.title = item.newTitle;
         if (!field(fm.title_original) && item.originalTitle) fm.title_original = item.originalTitle;
         fm.title_aliases = [...new Set([...values(fm.title_aliases), ...item.aliases])];
-        fm.title_localizations = {
-          ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations))
-            ? fm.title_localizations as Record<string, unknown> : {}),
-          ...item.localized,
-        };
+        if (Object.keys(item.localized).length) {
+          fm.title_localizations = {
+            ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations))
+              ? fm.title_localizations as Record<string, unknown> : {}),
+            ...item.localized,
+          };
+        }
+        if (Object.keys(item.scriptConversions).length) {
+          fm.title_script_conversions = {
+            ...((fm.title_script_conversions && typeof fm.title_script_conversions === "object" && !Array.isArray(fm.title_script_conversions))
+              ? fm.title_script_conversions as Record<string, unknown> : {}),
+            ...item.scriptConversions,
+          };
+        }
         changed = true;
       });
       if (changed) result.updated++;

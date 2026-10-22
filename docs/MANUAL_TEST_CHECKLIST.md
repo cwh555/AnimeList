@@ -362,3 +362,5 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Applying a checked result leaves note path, body, unrelated frontmatter, tags, scores, progress and ranking unchanged. The previous name remains searchable in title_aliases, with title_original retained.
 - [ ] A 50+ work test vault scans progressively without blocking the settings dialog or flooding API requests; closing a scan cancels its remaining queued work.
 - [ ] Changing the interface language does not rewrite existing titles.
+
+- [ ] Accept a review-only OpenCC suggestion, explicitly switch to another verified language, then switch back. The accepted conversion must remain available but must **not** appear inside the official `title_localizations` map.

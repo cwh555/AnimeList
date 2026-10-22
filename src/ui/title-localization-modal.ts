@@ -77,6 +77,8 @@ export class TitleLocalizationModal extends AnimeListModal {
         entry.createEl("strong", { text: row.title });
         entry.createDiv({ cls: "al-result-meta", text: row.status + ": " + row.reason });
         entry.createDiv({ cls: "al-result-meta", text: row.path });
+        // Keep the live log bounded; the review screen contains the full report.
+        while (activity.childElementCount > 40) activity.firstElementChild?.remove();
         activity.scrollTop = activity.scrollHeight;
       },
     }).then((plan) => {

@@ -141,7 +141,7 @@ The **Images** page is a derived view over the `animelist-images` blocks already
 - Reusing the same image path across multiple Image Sections in one work does not duplicate it in the work-level aggregate, while the original session references remain intact.
 - Editing, reordering, adding, or removing an Image Section updates the derived Images page on refresh without introducing a separate image database.
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current workspace and data-service boundaries.
+See [`IMAGES_WORKSPACE.md`](IMAGES_WORKSPACE.md) for the workspace/Images layout contract.
 
 ## Image Sections
 

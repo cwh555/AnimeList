@@ -25,6 +25,7 @@ Legacy tag limitation: historical genres mixes provider terms and manually enter
 - title_romaji: romanized spelling when available.
 - title_aliases: historical names and search aliases.
 - title_localizations: optional locale-to-verified-title dictionary from the provider.
+- title_script_conversions: optional locale-to-OpenCC-converted-name dictionary, written **only after the user explicitly accepts a suggestion**. It never claims the conversion is official, and allows round-trip selection without mistaking the previously accepted result for an unknown custom title.
 
 Bangumi name_cn is Simplified Chinese, not necessarily an official Taiwanese Traditional title. A verified Traditional title must have explicit provenance from Bangumi infobox. AniList provides English/native/romaji, with JP/KR native attribution only if origin information supports it. Never invent an official translation from unlabelled synonyms. OpenCC (opencc-js 1.4.2) is available **only** as an offline Chinese-script-conversion fallback. It is **not** a provider-verified localized title or general machine translation.
 
@@ -38,7 +39,7 @@ Settings → Updates & cleanup → Existing media titles → Preview title updat
 4. For an AniList-only work needing a Chinese name, a unique original-title matching Bangumi search result can be proposed **for explicit review only**. Ambiguous or mismatched-year results are rejected; such proposals are unchecked by default.
 5. Every work shows its status: ready, review, unchanged, no-source, no-translation, custom-title, ambiguous, or lookup-failed. A Bangumi result with Simplified Chinese but no verified Traditional Chinese title may provide an OpenCC conversion as an **unchecked review-only proposal**; the UI must never mislabel it as an official translation. No Chinese source means a visible missing-translation status.
 6. The user reviews old → proposed name and selects works. Preview never writes.
-7. On apply, recheck source identity, original title and file modification time. Write only title, optional missing title_original, title_aliases, and title_localizations, through Obsidian processFrontMatter.
+7. On apply, recheck source identity, original title and file modification time. Write only title, optional missing title_original, title_aliases, title_localizations and accepted title_script_conversions, through Obsidian processFrontMatter.
 8. Do not alter filenames, Markdown bodies, headings, personal scores, progress, authors, tags, covers, rankings, or unrelated YAML. This protects Obsidian links and note ownership.
 9. Each write outcome is reported. Closing the modal after confirmation does not cancel already-running writes, and a final notification still appears.
 

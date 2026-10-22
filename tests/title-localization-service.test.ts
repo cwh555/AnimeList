@@ -204,6 +204,42 @@ describe("safe existing-title localization", () => {
     assert.deepEqual(plan.items[0].localized, { "zh-TW": "傳統文字" });
   });
 
+  it("remembers accepted OpenCC names separately from official titles and supports round trips", async () => {
+    const note = testNote("round-trip.md", {
+      title: "原題", media_type: "anime", source_provider: "bangumi", source_id: "88",
+      title_localizations: { "zh-CN": "简体标题" },
+    });
+    const fetched = async () => ({
+      ...bangumiResult("原題", "简体标题"),
+      titleVariants: { fallback: "简体标题", original: "原題", localized: { "zh-CN": "简体标题" } },
+    });
+    const traditional = await planStoredTitleUpdates(note.app, [""], "zh-TW", { intervalMs: 0, fetch: fetched });
+    assert.equal(traditional.items[0].requiresReview, true);
+    assert.equal(traditional.items[0].newTitle, "簡體標題");
+    assert.equal(traditional.items[0].scriptConversions["zh-TW"], "簡體標題");
+    assert.equal(traditional.items[0].localized["zh-TW"], undefined);
+    assert.equal((await applyStoredTitleUpdates(note.app, traditional, new Set([note.file.path]))).updated, 1);
+    assert.deepEqual(note.data.title_localizations, { "zh-CN": "简体标题" });
+    assert.deepEqual(note.data.title_script_conversions, { "zh-TW": "簡體標題" });
+
+    const simplified = await planStoredTitleUpdates(note.app, [""], "zh-CN", {
+      intervalMs: 0,
+      fetch: async () => { throw new Error("Verified stored title should avoid network fetch"); },
+    });
+    assert.equal(simplified.items.length, 1);
+    assert.equal(simplified.items[0].newTitle, "简体标题");
+    assert.equal((await applyStoredTitleUpdates(note.app, simplified, new Set([note.file.path]))).updated, 1);
+
+    const back = await planStoredTitleUpdates(note.app, [""], "zh-TW", { intervalMs: 0, fetch: fetched });
+    assert.equal(back.items.length, 1);
+    assert.equal(back.items[0].requiresReview, true);
+    assert.match(back.rows[0].reason, /Previously approved OpenCC/);
+    assert.equal(back.items[0].newTitle, "簡體標題");
+    assert.equal((await applyStoredTitleUpdates(note.app, back, new Set([note.file.path]))).updated, 1);
+    assert.equal(note.data.title, "簡體標題");
+    assert.deepEqual(note.data.title_localizations, { "zh-CN": "简体标题" });
+  });
+
   it("resolves Bangumi ID from source URLs even when primary provider is AniList", async () => {
     const note = testNote("links.md", {
       title: "原題", media_type: "anime", source_provider: "anilist", source_id: "42",
