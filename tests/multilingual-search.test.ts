@@ -188,6 +188,34 @@ describe("multilingual provider search", () => {
     assert.equal(response.results[0]?.title, "想成為影之實力者");
   });
 
+  it("serializes variants for one provider and preserves results before an API failure", async () => {
+    const calls: string[] = [];
+    let concurrent = 0;
+    let peak = 0;
+    const response = await searchMultilingualProviders({
+      query: "作品 第二季",
+      providers: [{
+        label: "Sample",
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          concurrent += 1;
+          peak = Math.max(peak, concurrent);
+          calls.push(query);
+          try {
+            if (query === "作品") throw new Error("provider temporarily unavailable");
+            return [result({ sourceId: "test-1", title: "作品 第二季", searchTitles: [] })];
+          } finally {
+            concurrent -= 1;
+          }
+        },
+      }],
+      languages: { chinese: false, english: false, original: false },
+    });
+    assert.equal(peak, 1);
+    assert.deepEqual(calls, ["作品 第二季", "作品"]);
+    assert.equal(response.results.some(x => x.sourceId === "test-1"), true);
+    assert.match(response.warnings[0], /temporarily unavailable/);
+  });
+
   it("does not issue disabled language discovery or alias expansions", async () => {
     const queries: string[] = [];
     const response = await searchMultilingualProviders({
