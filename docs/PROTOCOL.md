@@ -111,3 +111,39 @@ All four operations in **Updates & cleanup** expose the same scan-scope choice:
 - **Rescan all items**: ignore checkpoints and inspect all eligible notes in the configured Library roots.
 
 Checkpoints reside in `.obsidian/plugins/animelist/cleanup-scan-history.json` and are not frontmatter, not part of the note body, and not a record of media activity. Each successful write is checkpointed against the **updated** file version so the new file content is not immediately rescanned. Failed writes, inconclusive provider upgrades and unconfirmed proposals are never marked complete. A separate full scan remains available whenever the upstream metadata source changes. File moves/renames and content edits naturally invalidate path/version-based checkpoints. No scanning runs automatically merely because Settings was opened.
+
+## External media search and identity protocol
+
+The Search API contract distinguishes **discovery** (finding potentially related
+results) from **verified identity** (proving two source records are the same).
+No note or external ID is changed merely because a candidate ranked highly.
+
+- Initial queries use the original title and the existing season/subtitle variants.
+  When the first results are insufficient, Bangumi can receive a bounded set
+  of Chinese OpenCC and distinctive substring queries. This is a discovery
+  heuristic, not a translation or a synonym dictionary.
+- Related provider titles may expand a search after a plausible seed is found.
+  Queries and provider requests must be deduplicated; provider-side cooldown,
+  rate limits, and network failures remain isolated per source.
+- A match on title, original title, year, season, or format **never** establishes
+  cross-provider identity. Automatic merging requires an overlapping provider
+  identifier, no conflicting identifiers, and compatible media types. Ambiguous
+  candidates remain separate. Verified IDs are also required before AniList
+  classification can be attached to Bangumi-only works.
+- Bangumi Book type 1 covers both novels and manga. Only explicit platform,
+  categorization tags, and recognized infobox keys may establish a subtype.
+  Unknown subtype results remain candidates; explicit opposite subtypes are
+  excluded. Work titles and adaptation tags are not classification evidence.
+- A search session preserves the actual expanded queries, undisplayed results,
+  per-provider cursors and search category across Load more requests. It does not
+  restart pagination from only the user's original string. Provider failures are
+  surfaced and must not block successful results from the others.
+- Searches are read-only. In particular, changes to this search layer never
+  migrate titles, alter source IDs in existing notes, rename Markdown files,
+  or mutate user-owned metadata. Provider-neutral display title selection and
+  Wikidata exact-ID title evidence continue to use their existing services.
+
+Limits: substring discovery does not guarantee Google-like semantic search for
+all unknown aliases; source API indexing determines whether a partial query
+returns the work. Verify recall and request counts against real providers in
+Obsidian Test Vault rather than assuming mocked coverage proves availability.
