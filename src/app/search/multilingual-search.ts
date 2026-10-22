@@ -228,11 +228,13 @@ export async function searchMultilingualProviders(
   const publishProgress = (results: ExternalMediaResult[], related: string[]): void => {
     if (!options.onProgress || !results.length) return;
     seenCandidates.push(...results);
-    const relevant = dedupe(seenCandidates).filter(item =>
-      scoreSearchResult(item, query, related) >= 36);
-    if (relevant.length) options.onProgress(
-      rankSearchResults(relevant, query, related).slice(0, options.maxResults ?? 24),
-    );
+    const ranked = rankSearchResults(dedupe(seenCandidates), query, related);
+    const relevant = ranked.filter(item => scoreSearchResult(item, query, related) >= 36);
+    // Bangumi can match an infobox alias yet return ONLY the Korean name in
+    // its search payload. Do not hide those candidates while exact-ID detail
+    // lookup (on selection) can recover the verified subject's Chinese alias.
+    const visible = relevant.length ? relevant : ranked.slice(0, 8);
+    if (visible.length) options.onProgress(visible.slice(0, options.maxResults ?? 24));
   };
   const initial = await runProviderQueries(options.providers, initialQueries,
     results => publishProgress(results, [...initialQueries]));
