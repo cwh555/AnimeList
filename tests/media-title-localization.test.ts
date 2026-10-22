@@ -42,6 +42,28 @@ describe("provenance-aware media title localization", () => {
     assert.deepEqual(traditional.people, simplified.people);
   });
 
+  it("automatically converts Bangumi simplified-only titles for newly imported Traditional Chinese notes", () => {
+    const raw = { id: 88, name: "日本語原題", name_cn: "简体标题", infobox: [] };
+    const tw = withActiveLocale("zh-TW", () => normalizeBangumiSubject(raw, "anime"));
+    const cn = withActiveLocale("zh-CN", () => normalizeBangumiSubject(raw, "anime"));
+    assert.equal(tw.title, "簡體標題");
+    assert.equal(cn.title, "简体标题");
+    assert.deepEqual(tw.titleScriptConversions, { "zh-TW": "簡體標題" });
+    assert.equal(tw.titleVariants?.localized?.["zh-TW"], undefined);
+    assert.equal(tw.titleVariants?.localized?.["zh-CN"], "简体标题");
+    assert.equal(tw.originalTitle, "日本語原題");
+    assert.equal(cn.titleScriptConversions, undefined);
+  });
+
+  it("prioritizes verified Traditional Chinese titles over script conversion on new imports", () => {
+    const raw = { id: 88, name: "原題", name_cn: "简体标题", infobox: [
+      { key: "繁體中文名", value: "臺灣正式名稱" },
+    ] };
+    const tw = withActiveLocale("zh-TW", () => normalizeBangumiSubject(raw, "anime"));
+    assert.equal(tw.title, "臺灣正式名稱");
+    assert.equal(tw.titleScriptConversions, undefined);
+  });
+
   it("uses AniList English/native only where their language is known", () => {
     const media = {
       id: 42,

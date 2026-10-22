@@ -5,7 +5,7 @@ import { asArray, numeric, stringValue } from "../domain/value-normalization";
 import { uiText } from "../ui-text";
 import { getActiveLocale } from "../i18n/catalog";
 import { normalizeSupportedLocale } from "../i18n/locale";
-import { resolveMediaTitle } from "../domain/media-title-localization";
+import { resolveMediaTitle, selectNewMediaTitle } from "../domain/media-title-localization";
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -148,11 +148,13 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
   const originalTitle = stringValue(subject.name).trim();
   const simplifiedTitle = stringValue(subject.name_cn).trim();
   const traditionalTitle = bangumiInfoboxValues(subject.infobox, ["繁體中文名", "繁体中文名"])[0] ?? "";
-  const localTitle = resolveMediaTitle({
-    fallback: simplifiedTitle || originalTitle || uiText("media.untitled"),
+  const providerFallback = simplifiedTitle || originalTitle || uiText("media.untitled");
+  const titleSelection = selectNewMediaTitle({
+    fallback: providerFallback,
     original: originalTitle,
     localized: { "zh-CN": simplifiedTitle, "zh-TW": traditionalTitle, ja: originalTitle },
   }, normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW");
+  const localTitle = titleSelection.title;
   const images = record(subject.images);
   const people = mediaType === "anime"
     ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, BANGUMI_ANIMATION_STUDIO_FIELDS))
@@ -176,10 +178,11 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     sourceUrl: subjectId ? `https://bgm.tv/subject/${subjectId}` : "",
     mediaType,
     title: localTitle,
+    ...(titleSelection.scriptConversion ? { titleScriptConversions: { "zh-TW": titleSelection.scriptConversion } } : {}),
     originalTitle,
     romajiTitle: "",
     titleVariants: {
-      fallback: localTitle,
+      fallback: providerFallback,
       original: originalTitle,
       localized: {
         ...(simplifiedTitle ? { "zh-CN": simplifiedTitle } : {}),

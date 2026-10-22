@@ -1,4 +1,5 @@
 import type { SupportedLocale } from "../i18n/locale";
+import { convertChineseScriptForReview } from "./chinese-title-conversion";
 
 /** Provider-supplied title variants. Never treat an unlabelled synonym as a translation. */
 export interface MediaTitleVariants {
@@ -41,4 +42,20 @@ export function mergeOfficialTitles(
     if (value) result[locale] = value;
   }
   return result;
+}
+
+/** Resolve a new import once; keep converted script separate from verified provider titles. */
+export function selectNewMediaTitle(
+  variants: MediaTitleVariants,
+  locale: SupportedLocale,
+): { title: string; scriptConversion?: string } {
+  const verified = verifiedMediaTitle(variants, locale);
+  if (verified) return { title: verified };
+  if (locale === "zh-TW" || locale === "zh-CN") {
+    const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
+    const source = variants.localized?.[otherLocale]?.trim();
+    const converted = source ? convertChineseScriptForReview(source, locale) : null;
+    if (converted) return { title: converted, scriptConversion: converted };
+  }
+  return { title: resolveMediaTitle(variants, locale) };
 }

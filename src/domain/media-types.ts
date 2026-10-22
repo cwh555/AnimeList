@@ -1,6 +1,7 @@
 import type { MediaStatus } from "./media-status";
 import type { MediaType } from "./media-primitives";
 import type { MediaTitleVariants } from "./media-title-localization";
+import type { SupportedLocale } from "../i18n/locale";
 import type { MediaClassification } from "./media-classification";
 
 export type { MediaType } from "./media-primitives";
@@ -107,6 +108,8 @@ export interface ExternalMediaResult {
   releaseStatus: ReleaseStatus;
   searchTitles?: string[];
   titleVariants?: MediaTitleVariants;
+  /** Auto script conversion is not a provider-verified official title. */
+  titleScriptConversions?: Partial<Record<SupportedLocale, string>>;
   sources?: ExternalMediaSourceRef[];
   classification?: MediaClassification;
 }

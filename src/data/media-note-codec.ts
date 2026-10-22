@@ -275,6 +275,14 @@ export function buildMediaMarkdown(
     lines.push("title_localizations:");
     for (const [locale, value] of localeEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
   }
+  // A default auto-converted title has provenance; an edited title is user-owned.
+  const scriptConversions = result.titleScriptConversions ?? {};
+  const convertedEntries = (["zh-TW", "zh-CN"] as const).flatMap(locale =>
+    scriptConversions[locale]?.trim() === title ? [[locale, title] as const] : []);
+  if (convertedEntries.length) {
+    lines.push("title_script_conversions:");
+    for (const [locale, value] of convertedEntries) lines.push(`  ${locale}: ${yamlScalar(value)}`);
+  }
   lines.push(`media_type: ${yamlScalar(result.mediaType)}`);
   lines.push(`format: ${yamlScalar(format)}`);
   lines.push(`status: ${yamlScalar(status)}`);

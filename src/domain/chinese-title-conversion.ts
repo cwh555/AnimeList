@@ -6,7 +6,8 @@ let toSimplified: ((value: string) => string) | undefined;
 
 /**
  * Script conversion only, NOT a verified localized release title.
- * Callers must label the result as unverified and require user confirmation.
+ * Callers must record the result as script conversion, never as an official translation.
+ * Legacy-note changes require review; new imports can apply the preferred script directly.
  */
 export function convertChineseScriptForReview(value: string, locale: SupportedLocale): string | null {
   if (!value.trim()) return null;
