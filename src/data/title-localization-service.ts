@@ -207,6 +207,11 @@ export async function planStoredTitleUpdates(
       }
       if (!results.length) return row(file.path, old, "no-source", "AniList has no Chinese title; no unique Bangumi title match was found.");
     }
+    if (!target && approvedConversions[locale]) {
+      target = approvedConversions[locale];
+      reusedConversion = true;
+      requiresReview = true;
+    }
     if (!target && (locale === "zh-TW" || locale === "zh-CN")) {
       const otherLocale = locale === "zh-TW" ? "zh-CN" : "zh-TW";
       const input = candidate?.titleVariants?.localized?.[otherLocale] || stored[otherLocale];
@@ -217,11 +222,6 @@ export async function planStoredTitleUpdates(
           requiresReview = true;
         }
       }
-    }
-    if (!target && approvedConversions[locale]) {
-      target = approvedConversions[locale];
-      reusedConversion = true;
-      requiresReview = true;
     }
     if (!target && !source && !candidate) return row(file.path, old, "no-source", "No trusted source ID or stored title for this language.");
     if (!target) {
