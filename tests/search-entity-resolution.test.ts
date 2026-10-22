@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ExternalMediaResult } from "../src/domain/media-types";
 import { deduplicateMediaIdentities, sameMediaIdentity } from "../src/domain/search/entity-resolution";
+import { SearchSession } from "../src/data/search-session";
 
 function media(provider: string, sourceId: string, overrides: Partial<ExternalMediaResult> = {}): ExternalMediaResult {
   return {
@@ -69,6 +70,29 @@ describe("search entity resolution", () => {
       ],
     });
     assert.equal(deduplicateMediaIdentities([b, conflict]).length, 2);
+  });
+
+  it("keeps a later-page alias from reappearing after a verified identity was shown", () => {
+    const linked = media("bangumi", "1");
+    const session = new SearchSession("anime", "Same", [], [linked], []);
+    assert.deepEqual(session.takePage().map(item => item.sourceId), ["1"]);
+    session.addCandidates([
+      media("anilist", "5", {
+        sources: [
+          { provider: "anilist", sourceId: "5", sourceUrl: "" },
+          { provider: "bangumi", sourceId: "1", sourceUrl: "" },
+        ],
+      }),
+    ]);
+    assert.deepEqual(session.takePage(), []);
+    assert.equal(session.hasMore, false);
+  });
+
+  it("retains distinct same-title records across search pages without shared IDs", () => {
+    const session = new SearchSession("anime", "Same", [], [media("bangumi", "1")], []);
+    session.takePage();
+    session.addCandidates([media("anilist", "5")]);
+    assert.deepEqual(session.takePage().map(item => item.sourceId), ["5"]);
   });
 
   it("never merges records without a stable ID", () => {
