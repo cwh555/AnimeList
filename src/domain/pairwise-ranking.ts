@@ -5,6 +5,7 @@ import {
 } from "./ranking-rounds";
 export { roundProgress } from "./ranking-rounds";
 import { diverseRankingOrder, rankingSeriesKey } from "./ranking-scheduler";
+import { certifiedAbsoluteRankingPositions, type AbsoluteRankingPosition } from "./ranking-certification";
 import {
   type RankingEvidence, recordRankingEvidence, provesBefore, legacyRankingEvidence,
   certifyRankingOrder, declareManualPosition, renameRankingEvidencePath, removeRankingEvidencePaths,
@@ -603,16 +604,29 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   return changed;
 }
 
-/** Complete, disjoint view partition: all eligible work is either proven
- * against the ranked chain or explicitly visible as unresolved.
+/** Exact absolute ranks are proved against *all* eligible entries, not just
+ * the already sorted subset. This is a read-only projection for the UI.
  */
+export function rankingConfirmedPositions(
+  list: RankingCollection, eligible: readonly MediaItem[],
+): AbsoluteRankingPosition[] {
+  return certifiedAbsoluteRankingPositions(
+    list.ordered,
+    eligible.map(item => item.filePath),
+    list.evidence,
+    [...Object.values(list.pending), ...(list.active ? [list.active] : [])],
+  );
+}
+
+/** Confirmed and pending form a disjoint exhaustive partition of eligible work. */
 export function rankingUnresolvedPaths(list: RankingCollection, eligible: readonly MediaItem[]): string[] {
-  const ranked = new Set(list.ordered);
-  return [...new Set(eligible.map(item => item.filePath).filter(path => !ranked.has(path)))];
+  const confirmed = new Set(rankingConfirmedPositions(list, eligible).map(entry => entry.path));
+  return [...new Set(eligible.map(item => item.filePath).filter(path => !confirmed.has(path)))];
 }
 
 export function rankingCounts(list: RankingCollection, eligible: readonly MediaItem[]): {
   ranked: number; pending: number; unranked: number;
 } {
-  return { ranked: list.ordered.length, pending: rankingUnresolvedPaths(list, eligible).length, unranked: 0 };
+  const ranked = rankingConfirmedPositions(list, eligible).length;
+  return { ranked, pending: new Set(eligible.map(item => item.filePath)).size - ranked, unranked: 0 };
 }
