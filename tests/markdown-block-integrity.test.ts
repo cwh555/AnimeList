@@ -70,4 +70,28 @@ describe("fenced Markdown edit identity", () => {
     assert.throws(() => replaceMoments(current, locator, []), /Could not safely locate/);
     assert.equal(findMomentsBlocks(current)[0].moments[0].text, "edited");
   });
+  it("refuses multiple identical image sections even when a stale line hint appears valid", () => {
+    const original = ["# Note", "```animelist-images", "- a.png", "```"].join("\n");
+    const locator = findImageSectionBlocks(original)[0];
+    const now = [original, "", "```animelist-images", "- a.png", "```"].join("\n");
+    assert.throws(() => replaceImageSectionPaths(now, locator, ["new.png"]), /Could not safely locate/);
+    assert.deepEqual(findImageSectionBlocks(now).map(b => b.paths), [["a.png"], ["a.png"]]);
+  });
+
+  it("does not overwrite a user comment added inside the target image section", () => {
+    const original = ["```animelist-images", "- a.png", "```"].join("\n");
+    const locator = findImageSectionBlocks(original)[0];
+    const latest = original.replace("- a.png", "- a.png\n# user annotation");
+    assert.throws(() => replaceImageSectionPaths(latest, locator, ["new.png"]), /Could not safely locate/);
+    assert.match(latest, /# user annotation/);
+  });
+
+  it("does not overwrite new YAML comments inside an existing Moments section", () => {
+    const original = ["```animelist-moments", "moments: []", "```"].join("\n");
+    const locator = findMomentsBlocks(original)[0];
+    const latest = original.replace("moments: []", "moments: []\n# manually documented");
+    assert.throws(() => replaceMoments(latest, locator, []), /Could not safely locate/);
+    assert.match(latest, /# manually documented/);
+  });
+
 });
