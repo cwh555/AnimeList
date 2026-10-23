@@ -55,6 +55,8 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > - **Maintain older libraries with more control:** Incremental or full rescan choices, review-first updates, and stronger protection for existing notes, images, and ranking data.
 > - **Smoother day-to-day use:** More consistent Add/Edit dialogs, faster first-result presentation, and refined touch navigation on phones while preserving desktop behavior.
 
+**1.6.1 maintenance update:** Ranking now supports reversible comparisons, more diverse pairings, evidence-backed confirmed positions, and visible possible-rank ranges for every unresolved work. Mobile Ranking displays full work titles, and the Score Dashboard supports long-press poster dragging. See [Changelog](CHANGELOG.md) for details. The main 1.6.0 feature overview above is retained.
+
 ## Features
 
 - One Markdown-based library for anime, manga, and novels.

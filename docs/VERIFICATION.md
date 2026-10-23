@@ -55,6 +55,17 @@ A successful older SHA is not sufficient after the branch changes. If a validati
 
 The Community preflight must stay free of suppressions and browser-feature workarounds that exceed the minimum supported Obsidian baseline. Release CSS should avoid unsupported or partially supported features when an equivalent baseline layout exists. The current preflight explicitly protects against reintroducing CSS multi-column layout and `scrollbar-width` / `scrollbar-color` into the generated release stylesheet.
 
+## 1.6.1 preview → main fast-forward release gate
+
+The 1.6.1 release candidate must be reviewed and accepted in the Test Vault while on `preview`. The user must explicitly authorize publication before advancing `main`; a successful PR or `preview` CI alone is insufficient.
+
+1. Verify `preview` contains the feature squash and version-preparation squash commits, with `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` consistently set to `1.6.1`. Keep the README's 1.6.0 major-feature overview; the patch details live in CHANGELOG and a separate README maintenance note.
+2. Confirm the `preview` push-triggered CI on its exact SHA succeeds, including `npm ci`, `npm run check`, `npm run release:check`, the mobile/Ranking Chromium suites, and production Test Vault packaging. Test the real Obsidian Test Vault before granting publication approval.
+3. When the user approves, fetch both branch heads and require that the current `main` is an ancestor of the verified `preview`. Advance `main` **with fast-forward only**, preserving the two `preview` squash commits and every existing `main` commit. Do not squash again, create a merge commit, or force-push shared branches.
+4. Wait for the **main push CI** at exactly the fast-forwarded SHA to pass. The release-promotion workflow checks the triggering run is a successful `main` push CI and still matches the current `main` head, verifies version metadata, and only then creates tag `1.6.1` on the verified commit. A mismatched pre-existing tag must abort, not be rewritten.
+5. A tag push made with `GITHUB_TOKEN` does not start a second tag-push workflow. Promotion therefore dispatches `release.yml` with `tag=1.6.1`. The release workflow verifies tag ancestry in `main`, rebuilds, runs release checks and asset attestation, and creates the public GitHub Release with `main.js`, `manifest.json`, and `styles.css`.
+6. Verify the tag SHA, release-workflow CI, public GitHub Release, all three download assets, and manifest 1.6.1; report these separately from Test Vault status. At preparation time, **do not create the tag or publish the release**, since `main` intentionally still points at the published 1.6.0 baseline.
+
 ## 1.6.0 publication sequence and exact-tag verification
 
 The release candidate is based on `preview`. The user's explicit 1.6.0 approval authorizes a **non-squash history-preserving merge to `main`**. Verify the source head, review state and exact-head CI before merging; do not rewrite the published history or replace unrelated commits.
