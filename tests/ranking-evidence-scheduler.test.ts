@@ -5,11 +5,12 @@ import {
   certifyRankingOrder, legacyRankingEvidence, provesBefore, recordRankingEvidence,
 } from "../src/domain/ranking-evidence";
 import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-scheduler";
-import { certifiedAbsoluteRankingPositions } from "../src/domain/ranking-certification";
+import { certifiedAbsoluteRankingPositions, projectRankingPositions } from "../src/domain/ranking-certification";
 import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
-  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, rankingConfirmedPositions, moveRankedItem,
+  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, rankingConfirmedPositions,
+  rankingPositionProjection, moveRankedItem,
 } from "../src/domain/pairwise-ranking";
 
 const item = (name: string): MediaItem => ({
@@ -90,6 +91,56 @@ describe("ranking evidence and diverse comparison schedule", () => {
     answerRound(round, "better");
     assert.deepEqual(nextRoundPair(round), { candidate:"s1", reference:"s2" });
   });
+  it("shows the widest range without evidence, and narrows only through strict comparisons", () => {
+    const works = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = works.map(work => work.filePath);
+    const list = emptyRankingCollection();
+    const rangeMap = () => new Map(rankingPositionProjection(list, works).possible
+      .map(({ path, first, last }) => [path, [first, last]]));
+    assert.deepEqual([...rangeMap().values()], [[1,4],[1,4],[1,4],[1,4]]);
+    list.evidence = {};
+    recordRankingEvidence(list.evidence, a, b);
+    assert.deepEqual(rangeMap().get(a), [1,3]);
+    assert.deepEqual(rangeMap().get(b), [2,4]);
+    assert.deepEqual(rangeMap().get(c), [1,4]);
+    recordRankingEvidence(list.evidence, b, c);
+    assert.deepEqual(rangeMap().get(a), [1,2]);
+    assert.deepEqual(rangeMap().get(b), [2,3]);
+    assert.deepEqual(rangeMap().get(c), [3,4]);
+    assert.deepEqual(rangeMap().get(d), [1,4]);
+    recordRankingEvidence(list.evidence, a, d);
+    assert.deepEqual(rangeMap().get(a), [1,1]);
+    assert.deepEqual(rangeMap().get(d), [2,4]);
+  });
+  it("skipped, current and legacy pending votes behave as saved evidence, not guesses", () => {
+    const works = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = works.map(work => work.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b]; // old persisted user order
+    list.pending[c] = { path:c, comparisons:{ [a]:"worse", [b]:"skip" } };
+    list.active = { path:d, comparisons:{ [b]:"worse" } };
+    const initial = new Map(rankingPositionProjection(list, works).possible.map(v => [v.path, v]));
+    assert.deepEqual([initial.get(a)?.first, initial.get(a)?.last], [1,1]);
+    assert.deepEqual([initial.get(b)?.first, initial.get(b)?.last], [2,3]);
+    assert.deepEqual([initial.get(c)?.first, initial.get(c)?.last], [2,4]);
+    assert.deepEqual([initial.get(d)?.first, initial.get(d)?.last], [3,4]);
+    const saved = JSON.parse(JSON.stringify(list)) as typeof list;
+    assert.deepEqual(rankingPositionProjection(saved, works), rankingPositionProjection(list, works));
+    delete saved.active?.comparisons[b];
+    const removedVote = new Map(rankingPositionProjection(saved, works).possible.map(v => [v.path, v]));
+    assert.deepEqual([removedVote.get(d)?.first, removedVote.get(d)?.last], [1,4]);
+  });
+  it("refuses to narrow possibilities when stored strict comparisons contradict", () => {
+    const works = [item("A"), item("B"), item("C")];
+    const [a,b,c] = works.map(work => work.filePath);
+    const cyclic = projectRankingPositions([a,b,c], [a,b,c], { [a]:[b], [b]:[c], [c]:[a] });
+    assert.deepEqual(cyclic.confirmed, []);
+    assert.deepEqual(cyclic.possible.map(({ first,last }) => [first,last]), [[1,3],[1,3],[1,3]]);
+    const conflict = projectRankingPositions([a,b], [a,b,c],
+      legacyRankingEvidence([a,b]), [{ path:c, comparisons:{ [a]:"better", [b]:"worse" } }]);
+    assert.deepEqual(conflict.confirmed, []);
+    assert.deepEqual(conflict.possible.map(({ first,last }) => [first,last]), [[1,3],[1,3],[1,3]]);
+  });
   it("certifies an absolute position iff it is fixed in every consistent total order", () => {
     const paths = ["A", "B", "C", "D", "E"];
     const permutations = (remaining: string[]): string[][] => remaining.length
@@ -112,8 +163,15 @@ describe("ranking evidence and diverse comparison schedule", () => {
         const ranks = new Set(possible.map(order => order.indexOf(path) + 1));
         return ranks.size === 1 ? [{ path, position:[...ranks][0] }] : [];
       }).sort((a,b) => a.position - b.position);
-      assert.deepEqual(certifiedAbsoluteRankingPositions(paths, paths, evidence), expected,
+      const projection = projectRankingPositions(paths, paths, evidence);
+      assert.deepEqual(projection.confirmed, expected,
         "mismatched certified ranks under evidence pattern " + mask);
+      const expectedRanges = paths.map(path => {
+        const positions = possible.map(order => order.indexOf(path) + 1);
+        return { path, first:Math.min(...positions), last:Math.max(...positions) };
+      });
+      assert.deepEqual(projection.possible, expectedRanges,
+        "invalid possible rank range under evidence pattern " + mask);
     }
   });
   it("never presents a relative order as a certain absolute rank", () => {
