@@ -7,7 +7,7 @@ export { roundProgress } from "./ranking-rounds";
 import { diverseRankingOrder } from "./ranking-scheduler";
 import {
   type RankingEvidence, recordRankingEvidence, provesBefore, legacyRankingEvidence,
-  certifyRankingOrder, declareManualPosition, renameRankingEvidencePath,
+  certifyRankingOrder, declareManualPosition, renameRankingEvidencePath, removeRankingEvidencePaths,
 } from "./ranking-evidence";
 
 export type RankingChoice = "better" | "worse" | "skip";
@@ -189,6 +189,15 @@ export function settleUnambiguousPending(list: RankingCollection): number {
     for (const [path, attempt] of Object.entries(list.pending)) {
       const { first, last } = rankingBounds(list, attempt);
       if (first !== last) continue;
+      list.evidence ??= legacyRankingEvidence(list.ordered);
+      for (const [other, choice] of Object.entries(attempt.comparisons)) {
+        if (choice === "skip") continue;
+        recordRankingEvidence(list.evidence,
+          choice === "better" ? path : other, choice === "better" ? other : path);
+      }
+      const before = list.ordered[first - 1], after = list.ordered[first];
+      if ((before && !provesBefore(list.evidence, before, path))
+        || (after && !provesBefore(list.evidence, path, after))) continue;
       list.ordered.splice(first, 0, path);
       delete list.pending[path];
       resolved += 1;
@@ -262,6 +271,19 @@ export function prepareRankingRounds(
     }
   }
   const baseline = kind === "full" ? [] : [...list.ordered];
+  if (kind === "range") {
+    list.evidence ??= legacyRankingEvidence(list.ordered);
+    const left = baseline[first - 2], right = baseline[last];
+    const preserved = participants.map(path => ({
+      path, leftProven: Boolean(left && provesBefore(list.evidence!, left, path)),
+      rightProven: Boolean(right && provesBefore(list.evidence!, path, right)),
+    }));
+    removeRankingEvidencePaths(list.evidence, new Set(participants));
+    for (const entry of preserved) {
+      if (left && entry.leftProven) recordRankingEvidence(list.evidence, left, entry.path);
+      if (right && entry.rightProven) recordRankingEvidence(list.evidence, entry.path, right);
+    }
+  }
   const generation = list.roundGeneration ?? 0;
   list.roundGeneration = generation + 1;
   if (kind === "full") list.evidence = {};
@@ -436,6 +458,10 @@ export function placePendingItem(list: RankingCollection, path: string, position
 export function recompareRankedItem(list: RankingCollection, path: string): boolean {
   const index = list.ordered.indexOf(path);
   if (index < 0) return false;
+  if (list.evidence && index > 0 && index < list.ordered.length - 1) {
+    const before = list.ordered[index - 1], after = list.ordered[index + 1];
+    if (provesBefore(list.evidence, before, after)) recordRankingEvidence(list.evidence, before, after);
+  }
   list.ordered.splice(index, 1);
   if (list.evidence) {
     // Old path relationships no longer apply while it is being re-compared.
