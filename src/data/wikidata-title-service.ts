@@ -102,7 +102,7 @@ export class WikidataTitleService {
     const work = this.lookupExact(result, locale, property).then(evidence => {
       this.cache.set(key, evidence);
       if (this.cache.size > 256) {
-        const oldest: string | undefined = this.cache.keys().next().value;
+        const [oldest] = this.cache.keys();
         if (oldest !== undefined) this.cache.delete(oldest);
       }
       return evidence;
