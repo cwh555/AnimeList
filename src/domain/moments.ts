@@ -323,13 +323,9 @@ export function findMomentsBlocks(markdown: unknown): MomentsBlock[] {
   return blocks;
 }
 
-function sameMomentsSource(left: string, right: string): boolean {
-  return serializeMomentsSource(parseMomentsSource(left)) === serializeMomentsSource(parseMomentsSource(right));
-}
-
 export function locateMomentsBlock(markdown: string, locator: MomentsLocator): MomentsBlock {
   return locateUnchangedMarkdownBlock(
-    findMomentsBlocks(markdown), locator, sameMomentsSource, "moments",
+    findMomentsBlocks(markdown), locator, "moments",
   );
 }
 

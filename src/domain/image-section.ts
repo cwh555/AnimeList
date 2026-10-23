@@ -100,14 +100,9 @@ export function findImageSectionBlocks(markdown: unknown): ImageSectionBlock[] {
   return blocks;
 }
 
-function sameSectionSource(left: string, right: string): boolean {
-  return serializeImageSectionPaths(parseImageSectionSource(left))
-    === serializeImageSectionPaths(parseImageSectionSource(right));
-}
-
 export function locateImageSectionBlock(markdown: string, locator: ImageSectionLocator): ImageSectionBlock {
   return locateUnchangedMarkdownBlock(
-    findImageSectionBlocks(markdown), locator, sameSectionSource, "image section",
+    findImageSectionBlocks(markdown), locator, "image section",
   );
 }
 

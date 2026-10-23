@@ -1,25 +1,23 @@
 /**
- * Resolve an editable fenced block against the current Markdown.
+ * Resolve a writable fenced block using its unchanged raw content.
  *
- * A line hint is never sufficient evidence of identity: edits above a block
- * can move it or make that line point into a different section. Resolve by
- * the original normalized block content, using the hint only to disambiguate
- * multiple equal-content blocks. When ambiguous, preserve the user's file.
+ * Line hints are not identities. When two identical sections exist, another
+ * identical section could occupy the old line after a concurrent edit.
+ * Reject ambiguous targets even when a line hint happens to match.
+ *
+ * Compare raw contents rather than reserialized known fields so newly added
+ * YAML comments, extension metadata and manually authored lines are not
+ * silently discarded by a stale edit. Normalize line endings and outer
+ * padding for Obsidian code-block renderer compatibility.
  */
-export function locateUnchangedMarkdownBlock<
-  Block extends { readonly source: string; readonly lineStart: number; readonly lineEnd: number },
->(
+export function locateUnchangedMarkdownBlock<Block extends { readonly source: string }>(
   blocks: readonly Block[],
-  locator: { readonly source: string; readonly lineStart?: number },
-  sameSource: (left: string, right: string) => boolean,
+  locator: { readonly source: string },
   kind: string,
 ): Block {
-  const matches = blocks.filter((block) => sameSource(block.source, locator.source));
-  const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
-  if (hint !== null) {
-    const hinted = matches.filter((block) => hint >= block.lineStart && hint <= block.lineEnd);
-    if (hinted.length === 1) return hinted[0];
-  }
+  const normalize = (source: string): string => source.replace(/\r\n/g, "\n").trim();
+  const expected = normalize(locator.source);
+  const matches = blocks.filter((block) => normalize(block.source) === expected);
   if (matches.length === 1) return matches[0];
   throw new Error(`Could not safely locate the unchanged ${kind} block; reopen the note and retry.`);
 }
