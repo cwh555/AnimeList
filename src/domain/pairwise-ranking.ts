@@ -5,7 +5,10 @@ import {
 } from "./ranking-rounds";
 export { roundProgress } from "./ranking-rounds";
 import { diverseRankingOrder, rankingSeriesKey } from "./ranking-scheduler";
-import { certifiedAbsoluteRankingPositions, type AbsoluteRankingPosition } from "./ranking-certification";
+import {
+  projectRankingPositions, certifiedAbsoluteRankingPositions,
+  type RankingPositionProjection, type AbsoluteRankingPosition,
+} from "./ranking-certification";
 import {
   type RankingEvidence, recordRankingEvidence, provesBefore, legacyRankingEvidence,
   certifyRankingOrder, declareManualPosition, renameRankingEvidencePath, removeRankingEvidencePaths,
@@ -602,6 +605,20 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
     if (list.active) relabel(list.active);
   }
   return changed;
+}
+
+/** Shared read-only projection for both confirmed ranks and pending intervals.
+ * Uses the complete eligible collection; persisted data is never modified.
+ */
+export function rankingPositionProjection(
+  list: RankingCollection, eligible: readonly MediaItem[],
+): RankingPositionProjection {
+  return projectRankingPositions(
+    list.ordered,
+    eligible.map(item => item.filePath),
+    list.evidence,
+    [...Object.values(list.pending), ...(list.active ? [list.active] : [])],
+  );
 }
 
 /** Exact absolute ranks are proved against *all* eligible entries, not just
