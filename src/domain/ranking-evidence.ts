@@ -20,10 +20,11 @@ export function recordRankingEvidence(evidence: RankingEvidence, better: string,
   if (!better || !worse || better === worse || provesBefore(evidence, worse, better)) {
     throw new Error("Conflicting strict ranking evidence; recompare the affected works.");
   }
-  if (!provesBefore(evidence, better, worse)) {
-    const targets = evidence[better] ?? [];
-    if (!targets.includes(worse)) evidence[better] = [...targets, worse];
-  }
+  // Keep explicit (or deliberately materialized transitive) edges even when
+  // another path currently proves the same relation. Removing/recomparing an
+  // intermediate work must not erase evidence between unaffected works.
+  const targets = evidence[better] ?? [];
+  if (!targets.includes(worse)) evidence[better] = [...targets, worse];
 }
 
 /** Older files stored the user's already-established total order, but not
