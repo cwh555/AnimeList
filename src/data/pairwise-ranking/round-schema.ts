@@ -20,6 +20,11 @@ export function assertStoredRankingRound(value: unknown, type: string): asserts 
     if (typeof round[name] !== "number" || !Number.isSafeInteger(round[name]) || round[name] < 0) corrupted(name);
   }
   if (!paths(round.baseline)) corrupted("baseline");
+  if (round.seriesKeys !== undefined
+    && (!object(round.seriesKeys)
+      || Object.entries(round.seriesKeys).some(([key, value]) => !key || typeof value !== "string"))) {
+    corrupted("seriesKeys");
+  }
   const jobs: unknown[] = Array.isArray(round.jobs) ? round.jobs : corrupted("jobs");
   for (const item of jobs) {
     if (!object(item) || !paths(item.left) || !paths(item.right)
