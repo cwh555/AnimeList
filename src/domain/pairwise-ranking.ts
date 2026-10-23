@@ -4,7 +4,7 @@ import {
   type RankingRound,
 } from "./ranking-rounds";
 export { roundProgress } from "./ranking-rounds";
-import { diverseRankingOrder } from "./ranking-scheduler";
+import { diverseRankingOrder, rankingSeriesKey } from "./ranking-scheduler";
 import {
   type RankingEvidence, recordRankingEvidence, provesBefore, legacyRankingEvidence,
   certifyRankingOrder, declareManualPosition, renameRankingEvidencePath, removeRankingEvidencePaths,
@@ -297,7 +297,8 @@ export function prepareRankingRounds(
   const participantSet = new Set(participants);
   const scheduled = diverseRankingOrder(eligible.filter(item => participantSet.has(item.filePath)), generation);
   // Preserve baseline as one sorted run for incremental merge.
-  list.round = startRankingRound(scheduled, kind, baseline, first - 1, participants.length);
+  list.round = startRankingRound(scheduled, kind, baseline, first - 1, participants.length,
+    Object.fromEntries(eligible.map(item => [item.filePath, rankingSeriesKey(item)])));
   const finished = advanceRound(list.round);
   if (finished) finishRankingRound(list, finished);
   return Boolean(nextRankingPair(list)) || participants.length > 0;
