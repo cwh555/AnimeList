@@ -52,7 +52,7 @@ export interface RankingBounds {
 }
 
 export function emptyRankingCollection(): RankingCollection {
-  return { ordered: [], evidence: {}, roundGeneration: 0, pending: {}, active: null, round: null, pendingQueue: null };
+  return { ordered: [], roundGeneration: 0, pending: {}, active: null, round: null, pendingQueue: null };
 }
 
 export function emptyRankingState(): RankingState {
@@ -107,19 +107,26 @@ function settleActive(list: RankingCollection): void {
   if (!list.active) return;
   const { first, last } = rankingBounds(list, list.active);
   if (first === last) {
-    list.ordered.splice(first, 0, list.active.path);
-    if (list.evidence) {
-      const at = first;
-      const before = list.ordered[at - 1];
-      const after = list.ordered[at + 1];
-      // A unique binary-insertion slot is supported by strict answers.
-      if (before && !provesBefore(list.evidence, before, list.active.path)) {
-        throw new Error("Cannot confirm rank without a strict comparison proof.");
-      }
-      if (after && !provesBefore(list.evidence, list.active.path, after)) {
-        throw new Error("Cannot confirm rank without a strict comparison proof.");
-      }
+    list.evidence ??= legacyRankingEvidence(list.ordered);
+    // Saved individual answers are first-class evidence, including when the
+    // attempt was restored from a previously skipped pending review.
+    for (const [other, choice] of Object.entries(list.active.comparisons)) {
+      if (choice === "skip") continue;
+      recordRankingEvidence(list.evidence,
+        choice === "better" ? list.active.path : other,
+        choice === "better" ? other : list.active.path);
     }
+    const before = list.ordered[first - 1];
+    const after = list.ordered[first];
+    if ((before && !provesBefore(list.evidence, before, list.active.path))
+      || (after && !provesBefore(list.evidence, list.active.path, after))) {
+      // Do not claim a definite position unless both adjacent relations follow
+      // from saved answers (or the legacy user-confirmed order).
+      list.pending[list.active.path] = list.active;
+      list.active = null;
+      return;
+    }
+    list.ordered.splice(first, 0, list.active.path);
     delete list.pending[list.active.path];
     list.active = null;
   } else if (!nextRankingPair(list)) {
