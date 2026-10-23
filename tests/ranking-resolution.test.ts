@@ -79,8 +79,7 @@ describe("ranking never reasks strict-transitive comparisons", () => {
     list.evidence = legacyRankingEvidence(list.ordered);
     list.active = { path:"X", comparisons:{} };
     const displayed = nextRankingPair(list)!;
-    recordRankingEvidence(list.evidence, "A", "X");
-    recordRankingEvidence(list.evidence, "X", "C");
+    recordRankingEvidence(list.evidence, "B", "X");
     assert.notDeepEqual(nextRankingPair(list),displayed);
     assert.throws(() => decideRanking(list,eligible,"better",displayed), /question changed/);
     assert.deepEqual(list.active?.comparisons,{});
