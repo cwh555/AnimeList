@@ -296,4 +296,45 @@ describe("search pagination", () => {
     assert.equal(await appendNextSearchPage(host as never, modal as never, state, rows as never), 0);
     assert.equal(requests, 0);
   });
+  it("passes a session ID to Load more and rejects the result after an ID switch", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    let requestedId = "";
+    const host = {
+      async searchExternalPage(_type: string, _query: string, _page: number, sessionId?: string) {
+        requestedId = sessionId ?? "";
+        return new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const first = [result(1)];
+    const modal = {
+      mediaType: "anime" as const, query: "Title", sessionId: "original",
+      results: first, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 5 }, async search() {}, renderSearch() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: ["anime", "Title"].join(String.fromCharCode(0)), results: [...first],
+      warnings: [], loads: 0, hasMore: true, loading: false,
+      sourceResults: first, sessionId: "original",
+    };
+    const rows = { children: ["1"], appendChild(node: string) { this.children.push(node); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    assert.equal(requestedId, "original");
+    modal.sessionId = "replacement";
+    state.sessionId = "replacement";
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.equal(state.loads, 0);
+  });
+
+  it("keeps ID-less results distinct when both come from one provider", () => {
+    const one = { ...result(1), sourceId: "", title: "First unidentified work" };
+    const two = { ...result(2), sourceId: "", title: "Second unidentified work" };
+    assert.deepEqual(
+      mergeSearchPages([one], [[two]]).map(item => item.title),
+      ["First unidentified work", "Second unidentified work"],
+    );
+  });
+
 });
