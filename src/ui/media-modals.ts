@@ -17,7 +17,7 @@ import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } fro
 import { transitionSurface } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
 import { createMediaCoverPicker, type MediaCoverPicker } from "./media-cover-picker";
-import { createMediaEditorIdentity, createMediaEditorSectionHeading } from "./media-editor-layout";
+import { createMediaEditorIdentity, createMediaEditorSectionHeading, updateMediaEditorIdentityTitle } from "./media-editor-layout";
 import { createFilePickerControl, createUiAction } from "./ui-primitives";
 
 
@@ -418,14 +418,15 @@ export class AddMediaModal extends AnimeListModal {
     back.addEventListener("click", () => this.renderSearch());
     this.contentEl.appendChild(back);
 
-    this.contentEl.appendChild(createMediaEditorIdentity({
+    const identity = createMediaEditorIdentity({
       title: result.title,
       originalTitle: result.originalTitle || result.romajiTitle || "",
       provider: mediaProviderLabel(result.provider),
       coverUrl: result.coverUrl,
       coverAlt: uiText("library.coverAlt", { title: result.title }),
       missingCoverText: uiText("add.noCover"),
-    }));
+    });
+    this.contentEl.appendChild(identity);
 
     const metadataLoading = makeEl("p", "al-modal-hint", uiText("add.metadataLoading"));
     this.contentEl.appendChild(metadataLoading);
@@ -434,6 +435,7 @@ export class AddMediaModal extends AnimeListModal {
       this.plugin.enrichExternalMedia(result),
     ]);
     metadataLoading.remove();
+    updateMediaEditorIdentityTitle(identity, enrichedResult.title, uiText("library.coverAlt", { title: enrichedResult.title }));
     const metadataHost = createDiv();
     metadataHost.className = "al-edit-metadata-host";
     renderMediaClassificationFields(metadataHost, enrichedResult);

@@ -15,6 +15,14 @@ export function createMediaEditorSectionHeading(label: string): HTMLHeadingEleme
   return makeEl("h3", "al-form-section-heading al-edit-form-heading", label);
 }
 
+/** The same DOM nodes survive optional provider enrichment, preventing image reload/flicker. */
+export function updateMediaEditorIdentityTitle(hero: HTMLElement, title: string, coverAlt: string): void {
+  const heading = hero.querySelector<HTMLHeadingElement>(".al-media-editor-identity-title");
+  if (heading) heading.textContent = title;
+  const image = hero.querySelector<HTMLImageElement>(".al-media-editor-identity-cover img");
+  if (image) image.alt = coverAlt;
+}
+
 /** One identity header for external-result creation and stored-note editing. */
 export function createMediaEditorIdentity(identity: MediaEditorIdentity): HTMLElement {
   const hero = makeEl("section", "al-selected-preview al-media-editor-identity");

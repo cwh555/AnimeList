@@ -11,7 +11,7 @@ try {
   await build({
     absWorkingDir: root,
     stdin: {
-      contents: 'export { createMediaEditorIdentity } from "./src/ui/media-editor-layout"; export { createUiAction, createFilePickerControl } from "./src/ui/ui-primitives";',
+      contents: 'export { createMediaEditorIdentity, updateMediaEditorIdentityTitle } from "./src/ui/media-editor-layout"; export { createUiAction, createFilePickerControl } from "./src/ui/ui-primitives";',
       resolveDir: root,
       loader: "ts",
     },
@@ -59,6 +59,8 @@ try {
     'const a=add.querySelector(".al-media-editor-identity"),b=edit.querySelector(".al-media-editor-identity");',
     'const bounded=el=>el.scrollWidth<=el.clientWidth+1;',
     'checks.identitySharedStructure=a.outerHTML===b.outerHTML;',
+    'const heading=a.querySelector("h2");UiProtocol.updateMediaEditorIdentityTitle(a,"更新後譯名","更新後封面");',
+    'checks.enrichedTitleUpdatesInPlace=a.querySelector("h2")===heading&&heading.textContent==="更新後譯名";',
     'checks.identityNoOverflow=bounded(a)&&bounded(b)&&bounded(a.querySelector(".al-media-editor-identity-copy"));',
     'checks.compactOuterMatchesContent=confirm.getBoundingClientRect().width<=521&&content.getBoundingClientRect().width<=confirm.getBoundingClientRect().width+1;',
     'checks.confirmNoOverflow=bounded(confirm)&&bounded(content)&&bounded(desc);',
