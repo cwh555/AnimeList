@@ -4,7 +4,7 @@ import type { MediaItem } from "./media-types";
 export function rankingSeriesKey(item: Pick<MediaItem, "title" | "originalTitle">): string {
   const raw = (item.originalTitle || item.title).normalize("NFKC").toLowerCase().trim();
   const withoutEdition = raw
-    .replace(/[（(【\[]?\s*(?:第\s*[一二三四五六七八九十\d]+\s*(?:季|期|部|章)|(?:season|series|part)\s*\d+|s\d+|\d+(?:st|nd|rd|th)\s+season|(?:the\s+)?movie|film|劇場版|电影版|電影版|特別篇|特别篇|ova|oad)(?:\s*[)）】\]])?\s*$/giu, "")
+    .replace(/[（(【[]?\s*(?:第\s*[一二三四五六七八九十\d]+\s*(?:季|期|部|章)|(?:season|series|part)\s*\d+|s\d+|\d+(?:st|nd|rd|th)\s+season|(?:the\s+)?movie|film|劇場版|电影版|電影版|特別篇|特别篇|ova|oad)(?:\s*[)）】\]])?\s*$/giu, "")
     .replace(/[\s\p{P}\p{S}]+/gu, "");
   return withoutEdition.length >= 3 ? withoutEdition : raw.replace(/\s+/g, "");
 }
