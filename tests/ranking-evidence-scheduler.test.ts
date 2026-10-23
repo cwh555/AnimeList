@@ -5,7 +5,7 @@ import {
   certifyRankingOrder, legacyRankingEvidence, provesBefore, recordRankingEvidence,
 } from "../src/domain/ranking-evidence";
 import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-scheduler";
-import { certifiedAbsoluteRankingPositions, projectRankingPositions } from "../src/domain/ranking-certification";
+import { projectRankingPositions } from "../src/domain/ranking-certification";
 import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
