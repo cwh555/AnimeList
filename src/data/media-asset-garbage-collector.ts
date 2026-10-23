@@ -58,7 +58,8 @@ export class MediaAssetGarbageCollector {
       await this.app.fileManager.trashFile(file);
       removedManagedFiles += 1;
     }
-    const removedJournalFiles = await this.cleanupImageOrderJournals();
+    revision.assertUnchanged();
+    const removedJournalFiles = await this.cleanupImageOrderJournals(revision);
     return {
       result: { removedManagedFiles, removedJournalFiles, removedCacheFiles: 0 },
       references,
@@ -80,7 +81,7 @@ export class MediaAssetGarbageCollector {
     return [...unique.values()];
   }
 
-  private async cleanupImageOrderJournals(): Promise<number> {
+  private async cleanupImageOrderJournals(revision: VaultMarkdownRevisionGuard): Promise<number> {
     const root = normalizePath(`${this.app.vault.configDir}/plugins/${this.pluginId}/state/image-order`);
     const adapter = this.app.vault.adapter;
     if (!await adapter.exists(root)) return 0;
@@ -88,9 +89,12 @@ export class MediaAssetGarbageCollector {
     let removed = 0;
     const decoder = new TextDecoder();
     for (const path of listing.files.filter((value) => value.toLocaleLowerCase().endsWith(".json"))) {
+      revision.assertUnchanged();
       let sourcePath = "";
+      let originalBytes: ArrayBuffer;
       try {
-        const raw = JSON.parse(decoder.decode(await adapter.readBinary(path))) as unknown;
+        originalBytes = await adapter.readBinary(path);
+        const raw = JSON.parse(decoder.decode(originalBytes)) as unknown;
         if (raw && typeof raw === "object" && "sourcePath" in raw && typeof raw.sourcePath === "string") {
           sourcePath = normalizePath(raw.sourcePath).replace(/^\/+/, "");
         }
@@ -99,6 +103,15 @@ export class MediaAssetGarbageCollector {
       }
       const source = sourcePath ? this.app.vault.getAbstractFileByPath(sourcePath) : null;
       if (source instanceof TFile && source.extension === "md") continue;
+      revision.assertUnchanged();
+      // A journal can be rewritten by the ordering session while cleanup
+      // enumerates entries. Keep the newer version for recovery instead of
+      // moving a stale path out from under the session.
+      if (!(await adapter.exists(path))) continue;
+      const latest = new Uint8Array(await adapter.readBinary(path));
+      const original = new Uint8Array(originalBytes);
+      if (latest.length !== original.length || latest.some((byte, index) => byte !== original[index])) continue;
+      revision.assertUnchanged();
       if (await moveAdapterFileToVaultTrash(adapter, path, "image-order")) removed += 1;
     }
     return removed;
