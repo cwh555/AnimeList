@@ -252,7 +252,6 @@
 .al-delete-button:hover,
 .al-detail-delete:hover { color:#fff; background:color-mix(in srgb,var(--text-error,#d86a70) 75%,#321); }
 .al-confirm-actions { justify-content:flex-end; }
-.animelist-confirm-modal .modal-content { max-width:520px; }
 .animelist-confirm-modal p { color:var(--text-muted); line-height:1.65; }
 
 .al-detail-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0 20px; padding:10px 12px; border:1px solid var(--background-modifier-border); border-radius:12px; background:var(--background-secondary); }

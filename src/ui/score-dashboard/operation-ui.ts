@@ -1,5 +1,6 @@
 import { Modal, type App } from "obsidian";
 import { scoreDashboardText as text } from "../../features/score-dashboard/text";
+import { createUiAction } from "../ui-primitives";
 
 export interface ScoreDashboardClampSummary {
   lowCount: number;
@@ -16,16 +17,19 @@ class ScoreDashboardClampModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
+    this.modalEl.addClass("animelist-modal", "al-dialog-compact");
     contentEl.addClass("al-score-confirm-modal");
     contentEl.createEl("h2", { text: text.shiftClampTitle });
     contentEl.createEl("p", { text: text.shiftClampMessage(this.summary.lowCount, this.summary.highCount) });
     const details = contentEl.createDiv({ cls: "al-score-confirm-summary" });
     if (this.summary.highCount) details.createDiv({ text: text.shiftClampHigh(this.summary.highCount) });
     if (this.summary.lowCount) details.createDiv({ text: text.shiftClampLow(this.summary.lowCount) });
-    const actions = contentEl.createDiv({ cls: "modal-button-container" });
-    const cancel = actions.createEl("button", { text: text.cancel });
+    const actions = contentEl.createDiv({ cls: "modal-button-container al-modal-actions" });
+    const cancel = createUiAction(text.cancel);
+    actions.appendChild(cancel);
     cancel.addEventListener("click", () => this.finish(false));
-    const confirm = actions.createEl("button", { text: text.confirmClamp, cls: "mod-cta" });
+    const confirm = createUiAction(text.confirmClamp, "primary");
+    actions.appendChild(confirm);
     confirm.addEventListener("click", () => this.finish(true));
     confirm.focus();
   }

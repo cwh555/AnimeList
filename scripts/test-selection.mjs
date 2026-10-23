@@ -6,10 +6,13 @@ export function parseTestArguments(arguments_, suitesCatalog, featuresCatalog) {
   const suites = new Set();
   const features = new Set();
   let list = false;
+  let smoke = false;
+  let all = false;
 
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
-    if (argument === "--all") continue;
+    if (argument === "--all") { all = true; continue; }
+    if (argument === "--smoke") { smoke = true; continue; }
     if (argument === "--list") {
       list = true;
       continue;
@@ -37,14 +40,16 @@ export function parseTestArguments(arguments_, suitesCatalog, featuresCatalog) {
   for (const feature of features) {
     if (!featuresCatalog.includes(feature)) throw new Error(`Unknown test feature: ${feature}`);
   }
-  return { suites, features, list };
+  if (all && smoke) throw new Error("Choose --all or --smoke, not both");
+  return { suites, features, list, smoke, all };
 }
 
 export function selectTestTargets(targets, filters) {
   return targets.filter((target) => {
     const suiteMatch = filters.suites.size === 0 || filters.suites.has(target.suite);
+    const smokeMatch = !filters.smoke || target.smoke === true;
     const featureMatch = filters.features.size === 0
       || target.features.some((feature) => filters.features.has(feature));
-    return suiteMatch && featureMatch;
+    return suiteMatch && featureMatch && smokeMatch;
   });
 }

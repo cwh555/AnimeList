@@ -1,4 +1,5 @@
 import { AnimeListModal } from "./animelist-modal";
+import { createUiAction } from "./ui-primitives";
 import { App, Notice } from "obsidian";
 import type { UserTagLibraryService, UserTagUsage } from "../data/user-tag-library-service";
 import {
@@ -187,12 +188,9 @@ export class UserTagManagerModal extends AnimeListModal {
     renameInput.type = "text";
     renameInput.value = tag;
     renameInput.autocomplete = "off";
-    const renameButton = makeEl("button", "mod-cta", userTagText("manager.rename"));
-    renameButton.type = "button";
-    const deleteButton = makeEl("button", "mod-warning", userTagText("manager.delete"));
-    deleteButton.type = "button";
-    const cancelButton = makeEl("button", "", userTagText("manager.cancel"));
-    cancelButton.type = "button";
+    const renameButton = createUiAction(userTagText("manager.rename"), "primary");
+    const deleteButton = createUiAction(userTagText("manager.delete"), "danger");
+    const cancelButton = createUiAction(userTagText("manager.cancel"));
 
     const setBusy = (busy: boolean): void => {
       renameButton.disabled = busy;

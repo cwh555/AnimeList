@@ -32,6 +32,10 @@ describe("test catalog", () => {
 
     assert.deepEqual(registered, discovered);
     assert.equal(new Set(TEST_TARGETS.map((target) => target.path)).size, TEST_TARGETS.length);
+    assert.ok(TEST_TARGETS.some((target) => target.smoke === true && target.suite === "unit"));
+    assert.ok(TEST_TARGETS.some((target) => target.smoke === true && target.suite === "contract"));
+    assert.ok(TEST_TARGETS.every((target) => target.smoke !== true || target.suite !== "legacy"));
+    assert.ok(TEST_TARGETS.every((target) => target.smoke !== true || target.suite !== "legacy-update"));
     for (const target of TEST_TARGETS) {
       assert.ok(TEST_SUITES.includes(target.suite), `${target.path} has an unknown suite`);
       assert.ok(target.features.length > 0, `${target.path} must declare a feature`);
@@ -67,6 +71,17 @@ describe("test catalog", () => {
     assert.ok(integrationSearch.every((target) => target.suite === "integration" && target.features.includes("search")));
   });
 
+  it("keeps legacy tests available in full mode but excludes them from fast smoke tests", () => {
+    const fast = parseTestArguments(["--smoke"], TEST_SUITES, TEST_FEATURES);
+    const complete = parseTestArguments(["--all"], TEST_SUITES, TEST_FEATURES);
+    const fastPaths = selectTestTargets(TEST_TARGETS, fast);
+    const allPaths = selectTestTargets(TEST_TARGETS, complete);
+    assert.ok(fastPaths.length > 0 && fastPaths.length < allPaths.length);
+    assert.ok(fastPaths.every((target) => target.smoke === true));
+    assert.ok(allPaths.some((target) => target.suite === "legacy"));
+    assert.ok(allPaths.some((target) => target.suite === "legacy-update"));
+  });
+
   it("rejects unknown selectors instead of silently running the wrong tests", () => {
     assert.throws(
       () => parseTestArguments(["--suite", "unknown"], TEST_SUITES, TEST_FEATURES),
@@ -80,5 +95,6 @@ describe("test catalog", () => {
       () => parseTestArguments(["rating"], TEST_SUITES, TEST_FEATURES),
       /Unknown test argument/,
     );
+    assert.throws(() => parseTestArguments(["--all", "--smoke"], TEST_SUITES, TEST_FEATURES), /Choose --all or --smoke/);
   });
 });
