@@ -256,7 +256,7 @@ export class AnimeListApplicationServices {
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> { return this.externalMediaSearch().search(mediaType, query, onProgress); }
-  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page); }
+  async searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page, sessionId); }
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }

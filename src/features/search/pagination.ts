@@ -1,6 +1,7 @@
 import { Notice } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
 import { dedupeSearchResults } from "../../data/provider-normalizers";
+import { sameMediaIdentity } from "../../domain/search/entity-resolution";
 import type { SearchModalAdapter } from "../../ui/search-contracts";
 import { uiText } from "../../ui-text";
 import type { ExternalMediaResult, MediaType } from "../../types";
@@ -31,27 +32,15 @@ export interface PaginationState {
   loading: boolean;
   sourceResults: ExternalMediaResult[] | null;
   loadToken?: object;
-}
-
-function resultKey(result: ExternalMediaResult): string {
-  return `${result.provider}:${result.sourceId}`;
+  sessionId?: string | null;
 }
 
 export function mergeSearchPages(
   initial: ExternalMediaResult[],
   pages: ExternalMediaResult[][],
 ): ExternalMediaResult[] {
-  const deduped = dedupeSearchResults([initial, ...pages].flat());
-  const seen = new Set<string>();
-  const output: ExternalMediaResult[] = [];
-  for (const result of deduped) {
-    const key = resultKey(result);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    output.push(result);
-    if (output.length >= SEARCH_PAGINATION_LIMITS.maxResults) break;
-  }
-  return output;
+  return dedupeSearchResults([initial, ...pages].flat())
+    .slice(0, SEARCH_PAGINATION_LIMITS.maxResults);
 }
 
 export function appendSearchResultRows<Node>(
@@ -76,6 +65,7 @@ function freshState(): PaginationState {
     hasMore: false,
     loading: false,
     sourceResults: null,
+    sessionId: null,
   };
 }
 
@@ -88,6 +78,7 @@ function resetFromInitialSearch(modal: PaginatedSearchModal, state: PaginationSt
   state.loading = false;
   state.loadToken = undefined;
   state.sourceResults = modal.results;
+  state.sessionId = modal.sessionId ?? null;
 }
 
 export function synchronizePaginationState(
@@ -95,7 +86,8 @@ export function synchronizePaginationState(
   state: PaginationState,
 ): void {
   const currentSignature = searchSignature(modal.mediaType, modal.query);
-  if (state.sourceResults !== modal.results || state.signature !== currentSignature) {
+  if (state.sourceResults !== modal.results || state.signature !== currentSignature
+    || state.sessionId !== (modal.sessionId ?? null)) {
     resetFromInitialSearch(modal, state);
   }
 }
@@ -122,15 +114,19 @@ export async function appendNextSearchPage(
   const startingResults = state.sourceResults;
   const requestMediaType = modal.mediaType;
   const requestQuery = modal.query;
+  const sessionId = state.sessionId ?? undefined;
   try {
-    const response = await host.searchExternalPage(requestMediaType, requestQuery, page);
+    const response = await host.searchExternalPage(requestMediaType, requestQuery, page, sessionId);
     // A new search may have started while a provider request was pending.
     // Never insert stale rows into a different query's result container.
     if (state.signature !== signature || state.sourceResults !== startingResults
+      || (state.sessionId ?? null) !== (sessionId ?? null)
       || searchSignature(modal.mediaType, modal.query) !== signature) return 0;
-    const existingKeys = new Set(state.results.map(resultKey));
-    const merged = mergeSearchPages(state.results, [response.results]);
-    const appended = merged.filter((result) => !existingKeys.has(resultKey(result)));
+    const existingResults = state.results;
+    const merged = mergeSearchPages(existingResults, [response.results]);
+    const appended = merged.filter((result) => !existingResults.some(
+      (existing) => sameMediaIdentity(existing, result),
+    ));
     state.loads += 1;
     state.results = merged;
     state.warnings = [...new Set([...state.warnings, ...response.warnings])];

@@ -84,6 +84,8 @@ export interface ExternalMediaSearchPage {
   results: ExternalMediaResult[];
   warnings: string[];
   hasMore: boolean;
+  /** Opaque per-interaction cursor ownership; omitted by older host clients. */
+  sessionId?: string;
 }
 
 export interface WikidataTitleEvidence {

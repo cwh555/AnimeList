@@ -115,6 +115,26 @@ describe("plugin UI workflows", () => {
     assert.deepEqual(savedGenres, ["動作", "Custom tag"]);
   });
 
+  it("forwards progress and cursor ownership from the plugin search host", async () => {
+    const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin;
+    plugin.app = new App();
+    const progress: number[] = [];
+    (plugin as unknown as { application: unknown }).application = {
+      async searchExternal(
+        _mediaType: string, _query: string,
+        callback?: (results: []) => void,
+      ) {
+        callback?.([]);
+        return { results: [], warnings: [], hasMore: false, sessionId: "search-one" };
+      },
+    };
+    const response = await plugin.searchExternal("anime", "Example", results => {
+      progress.push(results.length);
+    });
+    assert.deepEqual(progress, [0]);
+    assert.equal(response.sessionId, "search-one");
+  });
+
   it("routes the timeline command into the shared AnimeList workspace", async () => {
     const plugin = Object.create(AnimeListPlugin.prototype) as AnimeListPlugin;
     plugin.app = new App();

@@ -315,4 +315,31 @@ describe("external media search service", () => {
     assert.equal(output.hasMore, true);
     assert.deepEqual(output.warnings, ["AniList: rate limited"]);
   });
+  it("isolates two identical query sessions by explicit cursor ID", async () => {
+    const calls: number[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, _query, page) => {
+          calls.push(page);
+          return page === 1 ? {
+            results: Array.from({ length: 25 }, (_, i) => result("bangumi", String(i), "Example")),
+            hasMore: true,
+          } : { results: [result("bangumi", "25", "Example")], hasMore: false };
+        }),
+      }),
+    );
+    const first = await service.search("anime", "Example");
+    const second = await service.search("anime", "Example");
+    assert.ok(first.sessionId);
+    assert.ok(second.sessionId);
+    assert.notEqual(first.sessionId, second.sessionId);
+    const firstNext = await service.searchPage("anime", "Example", 2, first.sessionId);
+    const secondNext = await service.searchPage("anime", "Example", 2, second.sessionId);
+    assert.deepEqual(firstNext.results.map(item => item.sourceId), ["24", "25"]);
+    assert.deepEqual(secondNext.results.map(item => item.sourceId), ["24", "25"]);
+    assert.deepEqual(calls, [1, 1, 2, 2]);
+    await assert.rejects(service.searchPage("anime", "Example", 3, "expired"), /session expired/);
+  });
+
 });
