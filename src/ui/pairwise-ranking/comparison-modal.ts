@@ -5,7 +5,7 @@ import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   decideRanking, nextRankingPair, reconcileRanking,
-  type RankingChoice, type RankingCollection,
+  type RankingCollection,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { rankingText as t } from "../../features/pairwise-ranking/text";
@@ -114,7 +114,7 @@ export class RankingComparisonModal extends AnimeListModal {
         makeEl("span", "al-ranking-choice-title", name),
       );
       card.addEventListener("click", () => {
-        void this.change((list) => { decideRanking(list, this.options.eligible, answer as RankingChoice); });
+        void this.change((list) => { decideRanking(list, this.options.eligible, answer); });
       });
       choices.appendChild(card);
     }

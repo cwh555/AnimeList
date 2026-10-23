@@ -78,7 +78,7 @@ export function recoverStoredRankingRound(value: unknown, type: string): Recover
     try {
       assertStoredRankingRound(restored, type);
       return {
-        round: restored as RankingRound,
+        round: restored,
         recovered: true, needsRecompare: false, pendingPaths: [],
       };
     } catch {

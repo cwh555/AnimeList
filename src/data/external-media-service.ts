@@ -108,7 +108,7 @@ export class ExternalMediaSearchService {
     this.sessions.set(sessionId, { signature: sessionKey, session });
     this.legacySessionByQuery.set(sessionKey, sessionId);
     while (this.sessions.size > MAX_CACHED_SESSIONS) {
-      const oldest = this.sessions.keys().next().value as string | undefined;
+      const oldest = this.sessions.keys().next().value;
       if (oldest === undefined) break;
       this.sessions.delete(oldest);
       for (const [key, id] of this.legacySessionByQuery) {

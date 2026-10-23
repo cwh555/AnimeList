@@ -381,7 +381,7 @@ export async function applyStoredTitleUpdates(
         if (Object.keys(item.localized).length) {
           fm.title_localizations = {
             ...((fm.title_localizations && typeof fm.title_localizations === "object" && !Array.isArray(fm.title_localizations))
-              ? fm.title_localizations as Record<string, unknown> : {}),
+              ? fm.title_localizations : {}),
             ...item.localized,
           };
         }
@@ -397,7 +397,7 @@ export async function applyStoredTitleUpdates(
         if (Object.keys(item.scriptConversions).length) {
           fm.title_script_conversions = {
             ...((fm.title_script_conversions && typeof fm.title_script_conversions === "object" && !Array.isArray(fm.title_script_conversions))
-              ? fm.title_script_conversions as Record<string, unknown> : {}),
+              ? fm.title_script_conversions : {}),
             ...item.scriptConversions,
           };
         }
