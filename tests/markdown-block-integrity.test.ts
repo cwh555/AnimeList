@@ -70,12 +70,20 @@ describe("fenced Markdown edit identity", () => {
     assert.throws(() => replaceMoments(current, locator, []), /Could not safely locate/);
     assert.equal(findMomentsBlocks(current)[0].moments[0].text, "edited");
   });
-  it("refuses multiple identical image sections even when a stale line hint appears valid", () => {
+  it("refuses ambiguous identical image sections when there is no reliable line hint", () => {
+    const original = ["# Note", "```animelist-images", "- a.png", "```"].join("\n");
+    const source = findImageSectionBlocks(original)[0].source;
+    const now = [original, "", "```animelist-images", "- a.png", "```"].join("\n");
+    assert.throws(() => replaceImageSectionPaths(now, { source }, ["new.png"]), /Could not safely locate/);
+    assert.deepEqual(findImageSectionBlocks(now).map(b => b.paths), [["a.png"], ["a.png"]]);
+  });
+
+  it("rejects a repeated block when the saved exact range no longer exists", () => {
     const original = ["# Note", "```animelist-images", "- a.png", "```"].join("\n");
     const locator = findImageSectionBlocks(original)[0];
-    const now = [original, "", "```animelist-images", "- a.png", "```"].join("\n");
+    const now = ["An inserted heading", "", original,
+      "", "```animelist-images", "- a.png", "```"].join("\n");
     assert.throws(() => replaceImageSectionPaths(now, locator, ["new.png"]), /Could not safely locate/);
-    assert.deepEqual(findImageSectionBlocks(now).map(b => b.paths), [["a.png"], ["a.png"]]);
   });
 
   it("does not overwrite a user comment added inside the target image section", () => {
