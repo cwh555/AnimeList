@@ -153,14 +153,14 @@ export class RankingComparisonModal extends AnimeListModal {
         makeEl("span", "al-ranking-choice-title", name),
       );
       card.addEventListener("click", () => {
-        void this.change((list) => { decideRanking(list, this.options.eligible, answer); });
+        void this.change((list) => { decideRanking(list, this.options.eligible, answer, pair ?? undefined); });
       });
       choices.appendChild(card);
     }
     const toolbar = makeEl("div", "al-ranking-dialog-toolbar");
     if (pair) {
       const skip = action(t("skip"), "skip-forward", () => {
-        void this.change((list) => { decideRanking(list, this.options.eligible, "skip"); });
+        void this.change((list) => { decideRanking(list, this.options.eligible, "skip", pair ?? undefined); });
       });
       skip.addClass("al-ranking-skip");
       toolbar.append(skip);
