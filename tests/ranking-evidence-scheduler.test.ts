@@ -5,6 +5,7 @@ import {
   certifyRankingOrder, legacyRankingEvidence, provesBefore, recordRankingEvidence,
 } from "../src/domain/ranking-evidence";
 import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-scheduler";
+import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
   prepareRankingRounds, rankingCounts, rankingUnresolvedPaths,
@@ -68,6 +69,13 @@ describe("ranking evidence and diverse comparison schedule", () => {
       }
       assert.ok(lastUnrelated < firstCollision, "collision scheduled before unrelated match");
     }
+  });
+  it("defers a same-series current pair when another merge job is available", () => {
+    const round = startRankingRound(["s1", "s2", "x", "y"], "full", [], 0, 0,
+      { s1:"franchise", s2:"franchise", x:"other-x", y:"other-y" });
+    assert.deepEqual(nextRoundPair(round), { candidate:"x", reference:"y" });
+    answerRound(round, "better");
+    assert.deepEqual(nextRoundPair(round), { candidate:"s1", reference:"s2" });
   });
   it("keeps full- and skip-round partitions exhaustive, with proof-backed confirmed ranks", () => {
     const items = Array.from({ length: 9 }, (_, index) => item("W" + index));
