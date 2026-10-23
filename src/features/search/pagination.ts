@@ -120,7 +120,7 @@ export async function appendNextSearchPage(
     // A new search may have started while a provider request was pending.
     // Never insert stale rows into a different query's result container.
     if (state.signature !== signature || state.sourceResults !== startingResults
-      || state.sessionId !== (sessionId ?? null)
+      || (state.sessionId ?? null) !== (sessionId ?? null)
       || searchSignature(modal.mediaType, modal.query) !== signature) return 0;
     const existingResults = state.results;
     const merged = mergeSearchPages(existingResults, [response.results]);
