@@ -10,6 +10,11 @@ export interface MediaEditorIdentity {
   missingCoverText: string;
 }
 
+/** Identical section titles across collection and saved-note editing. */
+export function createMediaEditorSectionHeading(label: string): HTMLHeadingElement {
+  return makeEl("h3", "al-form-section-heading al-edit-form-heading", label);
+}
+
 /** One identity header for external-result creation and stored-note editing. */
 export function createMediaEditorIdentity(identity: MediaEditorIdentity): HTMLElement {
   const hero = makeEl("section", "al-selected-preview al-media-editor-identity");

@@ -17,7 +17,7 @@ import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } fro
 import { transitionSurface } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
 import { createMediaCoverPicker, type MediaCoverPicker } from "./media-cover-picker";
-import { createMediaEditorIdentity } from "./media-editor-layout";
+import { createMediaEditorIdentity, createMediaEditorSectionHeading } from "./media-editor-layout";
 import { createFilePickerControl, createUiAction } from "./ui-primitives";
 
 
@@ -313,6 +313,7 @@ export class AddMediaModal extends AnimeListModal {
 
     const templates = await this.plugin.getTemplates(mediaType);
     if (!this.contentEl.isConnected) return;
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
     const values = state.values ?? {};
@@ -438,6 +439,7 @@ export class AddMediaModal extends AnimeListModal {
     renderMediaClassificationFields(metadataHost, enrichedResult);
     this.contentEl.appendChild(metadataHost);
 
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
     const templateOptions: Array<[string, string]> = templates.length
@@ -613,7 +615,7 @@ export class EditMediaModal extends AnimeListModal {
     this.contentEl.appendChild(createMediaEditorIdentity({
       title,
       originalTitle: typeof frontmatter.title_original === "string" ? frontmatter.title_original : "",
-      provider: typeof frontmatter.source_provider === "string" ? frontmatter.source_provider : "",
+      provider: typeof frontmatter.source_provider === "string" ? mediaProviderLabel(frontmatter.source_provider) : "",
       coverUrl: this.plugin.resolveMediaCoverPath(coverPath, this.file.path)
         || this.plugin.resolveMediaCoverPath(fallbackPath, this.file.path),
       coverAlt: uiText("library.coverAlt", { title }),
@@ -629,10 +631,7 @@ export class EditMediaModal extends AnimeListModal {
     this.coverPicker = createMediaCoverPicker(this.plugin, this.file, frontmatter);
     this.contentEl.appendChild(this.coverPicker.element);
 
-    const formHeading = createEl("h3");
-    formHeading.className = "al-form-section-heading al-edit-form-heading";
-    formHeading.textContent = uiText("edit.collectionData");
-    this.contentEl.appendChild(formHeading);
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
 
     const form = createDiv();
     form.className = "al-media-form al-edit-media-form";

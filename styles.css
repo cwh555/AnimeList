@@ -4359,10 +4359,6 @@ button.al-moment-stack-strip:focus-visible {
   margin: 18px 0 12px;
 }
 
-.al-edit-media-form {
-  gap: 18px 22px;
-}
-
 .al-form-field-tags {
   grid-column: 1 / -1;
 }
@@ -4521,9 +4517,6 @@ button.al-moment-stack-strip:focus-visible {
     gap: 10px;
   }
 
-  .al-edit-media-form {
-    gap: 12px;
-  }
 }
 
 /* Component polish: Material 3-inspired form state controls. */
