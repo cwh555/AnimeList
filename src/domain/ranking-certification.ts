@@ -13,18 +13,34 @@ export interface AbsoluteRankingPosition {
   position: number;
 }
 
+/** Exact possible absolute-rank interval under every total order consistent
+ * with the user's decisions. Endpoints are inclusive and one-based. */
+export interface PossibleRankingPosition {
+  path: string;
+  first: number;
+  last: number;
+}
+
+export interface RankingPositionProjection {
+  confirmed: AbsoluteRankingPosition[];
+  possible: PossibleRankingPosition[];
+}
+
 /**
- * A work has an exact position only if strict reachability determines its
- * relationship to every other eligible work. Knowing just the relative order
- * within a previously ranked subset is not sufficient when other works are
- * pending. This projection does not modify the persisted ranking.
+ * Construct the same strict preference graph used to certify confirmed ranks
+ * and bound pending ranks. For a DAG, the earliest possible position is one
+ * plus its forced predecessors, and the latest is N minus its forced
+ * successors. Both endpoints are attainable by a topological ordering.
+ *
+ * Skip is never evidence; an invalid or contradictory graph cannot justify
+ * narrowing any rank. This read-only projection never mutates stored ranking.
  */
-export function certifiedAbsoluteRankingPositions(
+export function projectRankingPositions(
   ordered: readonly string[],
   eligible: readonly string[],
   savedEvidence: RankingEvidence | undefined,
   attempts: readonly RankingComparisonEvidence[] = [],
-): AbsoluteRankingPosition[] {
+): RankingPositionProjection {
   const allowed = new Set(eligible);
   const proof: RankingEvidence = {};
   const source = savedEvidence ?? legacyRankingEvidence(ordered);
@@ -33,9 +49,7 @@ export function certifiedAbsoluteRankingPositions(
     proof[from] = targets.filter(path => allowed.has(path));
   }
 
-  // Old v1 pending attempts contain actual votes but no central proof graph.
-  // Only import consistent answers; conflicts must not create a definite rank.
-  const conflicting = new Set<string>();
+  let invalid = false;
   for (const attempt of attempts) {
     if (!allowed.has(attempt.path)) continue;
     for (const [reference, answer] of Object.entries(attempt.comparisons)) {
@@ -45,8 +59,7 @@ export function certifiedAbsoluteRankingPositions(
       try {
         recordRankingEvidence(proof, better, worse);
       } catch {
-        conflicting.add(attempt.path);
-        conflicting.add(reference);
+        invalid = true;
       }
     }
   }
@@ -61,22 +74,40 @@ export function certifiedAbsoluteRankingPositions(
       seen.add(current);
       queue.push(...(proof[current] ?? []));
     }
+    if (seen.has(root)) invalid = true; // A cycle has no consistent strict order.
     reachable.set(root, seen);
   }
-  const complete: AbsoluteRankingPosition[] = [];
-  for (const path of ordered) {
-    if (!allowed.has(path) || conflicting.has(path)) continue;
+
+  const possible: PossibleRankingPosition[] = [];
+  const confirmed: AbsoluteRankingPosition[] = [];
+  const orderedSet = new Set(ordered);
+  for (const path of allowed) {
     let before = 0;
-    let valid = true;
-    for (const other of allowed) {
-      if (other === path) continue;
-      if (conflicting.has(other)) { valid = false; break; }
-      const precedes = reachable.get(path)?.has(other) ?? false;
-      const follows = reachable.get(other)?.has(path) ?? false;
-      if (precedes === follows) { valid = false; break; }
-      if (follows) before += 1;
+    let after = 0;
+    if (!invalid) {
+      for (const other of allowed) {
+        if (path === other) continue;
+        if (reachable.get(other)?.has(path)) before += 1;
+        if (reachable.get(path)?.has(other)) after += 1;
+      }
     }
-    if (valid) complete.push({ path, position: before + 1 });
+    const first = invalid ? 1 : before + 1;
+    const last = invalid ? allowed.size : allowed.size - after;
+    possible.push({ path, first, last });
+    if (!invalid && first === last && orderedSet.has(path)) {
+      confirmed.push({ path, position: first });
+    }
   }
-  return complete.sort((a, b) => a.position - b.position);
+  confirmed.sort((a, b) => a.position - b.position);
+  return { confirmed, possible };
+}
+
+/** Compatibility wrapper for existing callers using only certain ranks. */
+export function certifiedAbsoluteRankingPositions(
+  ordered: readonly string[],
+  eligible: readonly string[],
+  savedEvidence: RankingEvidence | undefined,
+  attempts: readonly RankingComparisonEvidence[] = [],
+): AbsoluteRankingPosition[] {
+  return projectRankingPositions(ordered, eligible, savedEvidence, attempts).confirmed;
 }
