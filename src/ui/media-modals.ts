@@ -3,6 +3,7 @@ import { Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { manualMediaResult, type MediaCoverAssetInput } from "../domain/manual-media";
 import { manualMediaText } from "../features/manual-media/text";
+import { searchFeatureText } from "../features/search/text";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeGenre } from "../domain/media-metadata";
@@ -479,11 +480,12 @@ export class AddMediaModal extends AnimeListModal {
       const proposal = createDiv();
       proposal.className = "al-source-note";
       proposal.appendChild(makeEl("p", "al-modal-hint",
-        "Possible translated title from " + suggestion.provider
-        + " (name/year match; identity not verified): " + suggestion.title));
+        searchFeatureText("title.suggestion", {
+          provider: suggestion.provider, title: suggestion.title,
+        })));
       const use = createEl("button");
       use.type = "button";
-      use.textContent = "Use suggested title";
+      use.textContent = searchFeatureText("title.useSuggestion");
       use.addEventListener("click", () => {
         fields.title.value = suggestion.title;
         fields.title.dispatchEvent(new Event("input", { bubbles: true }));

@@ -11,5 +11,7 @@ export const SEARCH_MESSAGES = {
   "provider.noneEnabled": "未启用任何元数据提供商。",
   "duplicate.warning.title": "媒体库中已有相同作品",
   "duplicate.warning.description": "已找到「{title}」。仅在原文标题、别名、年份、格式与已知集数均一致时才会提示此警告。",
+  "title.suggestion": "可能的翻译标题：{provider}（名称与年份相符，但作品身份尚未验证）：{title}",
+  "title.useSuggestion": "使用建议标题",
   "duplicate.warning.open": "打开既有笔记",
 } as const;
