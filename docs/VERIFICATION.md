@@ -55,6 +55,16 @@ A successful older SHA is not sufficient after the branch changes. If a validati
 
 The Community preflight must stay free of suppressions and browser-feature workarounds that exceed the minimum supported Obsidian baseline. Release CSS should avoid unsupported or partially supported features when an equivalent baseline layout exists. The current preflight explicitly protects against reintroducing CSS multi-column layout and `scrollbar-width` / `scrollbar-color` into the generated release stylesheet.
 
+## Pre-release merge, tag and release sequence
+
+For 1.6.0, `release/1.6.0-preparation` is a review branch based on `preview`. Version metadata and documentation may be reviewed there without mutating the published `main`.
+
+1. Validate the exact release-candidate PR head and obtain explicit manual Test Vault approval.
+2. Synchronize with the current `preview`, re-run required checks, and squash merge the release-preparation PR to `preview` only after approval.
+3. Once the user explicitly authorizes publication, merge the verified `preview` state into `main` according to the project release procedure, then verify the resulting `main` commit and its CI.
+4. **Only after the published `main` commit is confirmed**, create and push the exact Git tag `1.6.0` on that commit (no `v` prefix). This tag triggers `.github/workflows/release.yml`, which creates a GitHub Release automatically. Do not push a pre-release tag from a feature or review branch.
+5. Confirm the tagged commit, successful tag workflow and exact published `main.js`, `manifest.json` and `styles.css` assets. Synchronize `preview` with `main` after release.
+
 ## Test Vault
 
 After automated checks pass, run:

@@ -407,3 +407,36 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] **Regressions:** Check Timeline, Score Dashboard, Moments, Image Section,
       tag manager and release-tracking dialogs for button/focus/overflow issues.
       Confirm no new modal causes unexpected sidebar swipes.
+
+## AnimeList 1.6.0 release-candidate acceptance
+
+These checks are specifically required before promotion of the 1.6.0 candidate from `preview` to `main`. Use a backed-up or disposable Test Vault and review the changed files as well as the UI.
+
+### Preference ranking and recovery
+
+- [ ] Compare completed works in each media category; pause midway, close Ranking, reload Obsidian, and resume exactly where you stopped with no repeated or lost pair.
+- [ ] Skip an undecidable comparison and later review it; verify a skipped title is not silently assigned an arbitrary position and scores remain unchanged.
+- [ ] Include `.obsidian/animelist-ranking.json` in vault backup/sync; verify old v1 state and an interrupted older round recover without losing unrelated category order. If a recovery backup appears, verify the original bytes were retained.
+- [ ] Simulate an external edit of the ranking JSON in the disposable vault; verify a conflict is reported rather than silently overwriting it. Check on desktop and, when available, mobile.
+
+### Markdown and managed assets
+
+- [ ] Put **two identical** Image Sections and two identical Moments blocks in one note; edit only the selected block and confirm the other block, frontmatter, comments and prose remain untouched.
+- [ ] Modify a target block from another editor while its dialog is open; saving must refuse the stale change rather than overwrite newly added image paths, YAML comments or Moment text.
+- [ ] Replace an existing work cover by uploading a valid image; Cancel does nothing, Save updates the expected note only, and the previous image is not deleted.
+- [ ] With a disposable vault, run managed-media cleanup while a file is referenced in multiple notes and while sync/content changes; referenced images and active image-order journals must survive, and cleanup may stop conservatively.
+
+### Search, localization and touch
+
+- [ ] Search short/incomplete, Traditional/Simplified Chinese, Japanese, Korean and English title variants; verify a title match is never used as proof of cross-provider identity, and source errors do not hide other results.
+- [ ] Run the **same search text twice**, paginate one interaction and switch to another; Load more must not leak pages/results between sessions. Switch to manual entry while requests are in flight; stale responses must not replace the editor.
+- [ ] Test Bangumi, AniList and Open Library with one slow/unreachable provider; timeout warnings remain visible, another source can return results, and no duplicate retry burst occurs.
+- [ ] Check 1.6 prompts in zh-TW, zh-CN, en, ja and ko. Changing the language must not rewrite already saved media names, tags or note bodies.
+- [ ] Validate smooth mobile Timeline vertical/horizontal gestures, Score Dashboard drag intent, image-modal swipes, and the desktop equivalents.
+
+### Release metadata and publishing gate
+
+- [ ] `package.json`, `package-lock.json`, `manifest.json` and `versions.json` all identify 1.6.0 with unchanged `minAppVersion`, and `CHANGELOG.md` contains the 1.6.0 release entry.
+- [ ] Exact release-candidate head passes CI: `npm ci`, `npm run check`, `npm run release:check`, the browser suite and production Test Vault preparation.
+- [ ] Verify the installed Test Vault plugin reports 1.6.0; **do not tag or publish yet**.
+- [ ] Approve main merge explicitly; only after main's own CI passes, create the exact `1.6.0` tag on the released main commit and verify the automatic GitHub Release artifacts.

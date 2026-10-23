@@ -26,6 +26,8 @@ Application wiring may compose services, but it must not implement provider norm
 - `value-normalization.ts`: safe scalar, array, path, and identifier helpers.
 - `image-section.ts`: `animelist-images` parsing, serialization, insertion, image-path normalization, and managed image-folder rules.
 - `moments.ts`: typed `animelist-moments` entries, stable IDs, optional metadata, parsing/serialization, and block replacement.
+- `markdown-block-identity.ts`: guards edits against changed, ambiguous fenced blocks and protects user-authored source lines.
+- `pairwise-ranking.ts` and `ranking-rounds.ts`: independent, typed preference order and resumable merge rounds; no numeric-score updates.
 - `media-image-references.ts`: shared image-reference accounting used before managed images are trashed.
 - `release-tracking.ts`: release-tracking states, persisted binding/snapshot parsing, manga chapter semantics, and novel publication-line matching.
 - `manga-release-sources.ts`: supported official manga-source identities and URL normalization.
@@ -49,7 +51,8 @@ Application wiring may compose services, but it must not implement provider norm
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
 - `provider-normalizers.ts`: pure provider payload normalization, plus a thin call to typed, identity-safe result deduplication; no fuzzy source-ID inference.
 - `media-classification-service.ts`: optional exact-AniList-ID classification enrichment after a work is selected. Title/year matching alone is not evidence of cross-provider identity; failure never blocks note creation.
-- `external-media-service.ts`: the single multi-provider orchestration boundary for enabled sources, warnings, direct lookup, and bounded search sessions. It owns clients and pagination cursors, but not title semantics, entity identity heuristics, or transport throttling.
+- `external-media-service.ts`: the single multi-provider orchestration boundary for enabled sources, warnings, direct lookup, and bounded per-interaction search sessions. Explicit pagination session IDs are passed through the typed host; legacy calls remain supported. It owns clients and cursors, but not title semantics or transport throttling.
+- `providers/request-deadline.ts`: bounded UI wait for non-AniList metadata requests. This cannot abort Obsidian `requestUrl`; no automatic retry bursts.
 - `search-session.ts`: per-query buffered results, verified-ID deduplication across pages and per-provider cursor state; it never writes Markdown.
 - `app/search/multilingual-search.ts`: provider-neutral staged search orchestration with incremental first-result callbacks and partial failure isolation; request budgets are defined in the domain query planner.
 - `domain/search/query-plan.ts`, `chinese-variants.ts`, `ranking.ts`: pure query-plan construction, bounded Chinese substring discovery, scoring and edition-aware ranking.
@@ -61,6 +64,8 @@ Application wiring may compose services, but it must not implement provider norm
 - `special-label-state-service.ts`: the single Favorite/Masterpiece metadata writer and compatibility cleanup path.
 - `image-section-service.ts`: Image Section asset import, exact/canonical-raster duplicate checks, thumbnail requests, Markdown updates, Set as cover, and reference-aware deletion.
 - `moments-service.ts`: Moment creation/edit/delete, managed image import, stable-ID preservation, and reference-aware image cleanup.
+- `pairwise-ranking/store.ts` and `atomic-write.ts`: separate version-1 preference JSON, backup-on-recovery and conflict-safe writes; modern atomic adapter methods have an older-Obsidian compatibility fallback.
+- `media-asset-reference-service.ts`, `media-asset-garbage-collector.ts`, and `vault-markdown-revision-guard.ts`: direct Markdown reference reads and conservative stop-on-change behavior before trashing managed files or abandoned order journals.
 - `release-tracking-service.ts`: provider orchestration, safe binding/refresh behavior, official-source evidence comparison, and refresh summaries.
 - `release-tracking-state-service.ts`: scoped release-tracking frontmatter reads/writes that preserve unrelated YAML and note bodies.
 - `version-cleanup-service.ts`: candidate scan, review, revalidation, and narrow cleanup application.
@@ -154,6 +159,14 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 - Test Vault validation covers real Obsidian lifecycle, external-provider flows, Markdown rendering, note-media interaction, Settings, and DOM behavior.
 
 All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.strict.json` in addition to repository-wide TypeScript, lint, architecture, compatibility, Community, and release checks.
+
+## 1.6 release compatibility invariants
+
+- Existing media note schema remains `schema_version: 6` and is never automatically migrated on opening a vault. Ranking JSON format version `1` is **not** the note schema version; it is an independent auxiliary file at `.obsidian/animelist-ranking.json`.
+- Two valid, identical-content Image/Moments sections can coexist. A saved editor can update only an unchanged, uniquely locatable block; stale or ambiguous targets must fail rather than rewrite another section. No persistent block ID is inserted in old notes.
+- Cleanup operation read snapshots and note revision checks are conservative. They reduce race risks but are not a global file lock across synced devices.
+- The plugin retains `minAppVersion: 1.5.0`. Availability of `DataAdapter.process()` must be checked at runtime, not assumed for all supported installations.
+- Search aliases and script conversions aid **discovery**; source IDs and provenance determine **identity**. Presentation code must not turn a title similarity into an identity claim.
 
 ## Provider-neutral localization boundary
 

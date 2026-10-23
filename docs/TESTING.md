@@ -29,3 +29,9 @@ Do not replace behavior assertions with source-line or selector-text matching.
 Feature-specific browser checks are separate because Chromium rendering is
 not equivalent to Node unit-test coverage. Actual desktop/mobile Obsidian
 interactions still require the manual checklist.
+
+## 1.6.0 release regression coverage
+
+The 1.6.0 candidate adds independent behavior checks for the pairwise ranking file and resumed comparison rounds, Markdown Image Section/Moments block revalidation, cover replacement, media-asset garbage collection, per-interaction search pagination, delayed Add Media navigation, provider logical deadlines, and five-locale search prompts. These tests remain registered in `tests/test-catalog.mjs` and must run as part of `npm run check`.
+
+For full desktop/mobile interactive review, use the `AnimeList 1.6.0 release-candidate acceptance` section in [the manual checklist](MANUAL_TEST_CHECKLIST.md). Browser tests do not substitute for on-device Obsidian/Sync testing; the managed-asset cleanup and ranking adapter fallback do not provide cross-device transactional locking.
