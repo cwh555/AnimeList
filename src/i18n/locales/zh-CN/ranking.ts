@@ -26,6 +26,8 @@ export const RANKING_MESSAGES = {
   "cancel": "取消",
   "hint": "点击更喜欢的作品封面",
   "skip": "跳过",
+  "back": "返回上一题",
+  "finish": "完成并离开",
   "pause": "暂停",
   "exit": "保存并离开",
   "noCompleted": "没有已完成的作品",
