@@ -275,8 +275,7 @@ export function renderScoreDashboardWithBatchDrag(
         const rect = poster.getBoundingClientRect();
         touchDragOffset = { x: point.x - rect.left, y: point.y - rect.top };
         dragPreview = createScoreDashboardDragPreview(container.ownerDocument, poster, touchDragPaths.length);
-        dragPreview.style.left = "0px";
-        dragPreview.style.top = "0px";
+        dragPreview.classList.add("is-touch-drag");
         positionTouchPreview(point);
         poster.classList.add("is-dragging");
         autoScroller = new ScoreDashboardDragAutoScroller(container);
