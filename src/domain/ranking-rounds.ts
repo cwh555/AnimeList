@@ -27,6 +27,8 @@ export interface RankingRound {
   baseline: string[];
   rangeStart: number;
   rangeLength: number;
+  /** Optional for old saved rounds. Only affects scheduling, not rank decisions. */
+  seriesKeys?: Record<string, string>;
 }
 export interface RoundPair { candidate: string; reference: string }
 
@@ -43,6 +45,7 @@ function makeJobs(runs: string[][]): MergeJob[] {
 export function startRankingRound(
   paths: readonly string[], kind: RankingRound["kind"],
   baseline: readonly string[] = [], rangeStart = 0, rangeLength = 0,
+  seriesKeys: Record<string, string> = {},
 ): RankingRound {
   const unique = [...new Set(paths)];
   const orderedRuns = kind === "append" && baseline.length
@@ -55,6 +58,7 @@ export function startRankingRound(
     // A sparse array serializes its holes as null. Always keep one dense
     // result slot per merge job, even when only a later job has completed.
     results: jobs.map((): string[] => []), baseline: [...baseline], rangeStart, rangeLength,
+    seriesKeys,
   };
   advanceRound(round);
   return round;
@@ -81,29 +85,31 @@ export function advanceRound(round: RankingRound): string[] | null {
     round.cursor = 0;
   }
 }
-export function nextRoundPair(round: RankingRound): RoundPair | null {
-  if (round.jobs.length === 0) return null;
-  for (let offset = 0; offset < round.jobs.length; offset++) {
+function nextJobIndex(round: RankingRound): number {
+  if (!round.jobs.length) return -1;
+  let fallback = -1;
+  for (let offset = 0; offset < round.jobs.length; offset += 1) {
     const index = (round.cursor + offset) % round.jobs.length;
-    const job = round.jobs[index];
-    if (!job.done && job.left.length && job.right.length) {
-      return { candidate: job.left[0], reference: job.right[0] };
-    }
+    const current = round.jobs[index];
+    if (current.done || !current.left.length || !current.right.length) continue;
+    if (fallback < 0) fallback = index;
+    const leftSeries = round.seriesKeys?.[current.left[0]];
+    const rightSeries = round.seriesKeys?.[current.right[0]];
+    // Only defer pairs when their confidently normalized franchise keys match.
+    if (!leftSeries || !rightSeries || leftSeries !== rightSeries) return index;
   }
-  return null;
+  return fallback;
+}
+export function nextRoundPair(round: RankingRound): RoundPair | null {
+  const index = nextJobIndex(round);
+  if (index < 0) return null;
+  const current = round.jobs[index];
+  return { candidate: current.left[0], reference: current.right[0] };
 }
 export function answerRound(
   round: RankingRound, choice: RoundChoice,
 ): { done: string[] | null; skipped: string | null; against: string | null; better: string | null; worse: string | null } {
-  let selectedIndex = -1;
-  for (let offset = 0; offset < round.jobs.length; offset++) {
-    const index = (round.cursor + offset) % round.jobs.length;
-    const candidate = round.jobs[index];
-    if (!candidate.done && candidate.left.length && candidate.right.length) {
-      selectedIndex = index;
-      break;
-    }
-  }
+  const selectedIndex = nextJobIndex(round);
   if (selectedIndex < 0) return { done: advanceRound(round), skipped: null, against: null, better: null, worse: null };
   const current = round.jobs[selectedIndex];
   let skipped: string | null = null;
@@ -135,6 +141,14 @@ export function roundProgress(round: RankingRound): { stage: number; position: n
 export function mapRankingRound(round: RankingRound, mapper: (path: string) => string | null): void {
   const remap = (paths: string[]): string[] => [...new Set(paths.map(mapper).filter((path): path is string => path !== null))];
   round.baseline = remap(round.baseline);
+  if (round.seriesKeys) {
+    const keys: Record<string, string> = {};
+    for (const [path, key] of Object.entries(round.seriesKeys)) {
+      const renamed = mapper(path);
+      if (renamed != null) keys[renamed] = key;
+    }
+    round.seriesKeys = keys;
+  }
   for (const current of round.jobs) {
     current.left = remap(current.left);
     current.right = remap(current.right);
