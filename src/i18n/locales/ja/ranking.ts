@@ -26,6 +26,8 @@ export const JA_RANKING_MESSAGES = {
   "cancel": "キャンセル",
   "hint": "好きな作品の表紙を選択",
   "skip": "スキップ",
+  "back": "前の比較に戻る",
+  "finish": "完了して閉じる",
   "pause": "中断",
   "exit": "保存して戻る",
   "noCompleted": "完了した作品はありません",
