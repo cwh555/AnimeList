@@ -352,4 +352,28 @@ describe("image section storage service", () => {
     assert.match(updated, /## One\n```animelist-images\n- a\.jpg\n- c\.jpg\n```/);
     assert.match(updated, /## Two\n```animelist-images\n- external\.jpg\n```/);
   });
+  it("rolls back newly imported assets when the Image Section was changed during upload", async () => {
+    const original = [
+      "# Note", "```animelist-images", "- original.jpg", "```", "Unrelated prose",
+    ].join("\n");
+    const h = harness(original);
+    const locator = findImageSectionBlocks(original)[0];
+    const latest = original.replace("- original.jpg", "- externally-added.jpg");
+    const store = h.service.storeAssets.bind(h.service);
+    h.service.storeAssets = async (...args) => {
+      const stored = await store(...args);
+      h.data.set(h.note.path, latest);
+      return stored;
+    };
+    await assert.rejects(
+      h.service.addAssets(h.note.path, locator, [
+        { name: "pending.png", contentType: "image/png", data: new Uint8Array([4, 3, 2, 1]).buffer },
+      ]),
+      /Could not safely locate/,
+    );
+    assert.equal(h.data.get(h.note.path), latest);
+    assert.equal(h.trashed.length, 1);
+    assert.match(h.trashed[0], /pending/);
+  });
+
 });

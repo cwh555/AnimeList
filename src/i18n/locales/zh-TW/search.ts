@@ -11,5 +11,7 @@ export const SEARCH_MESSAGES = {
   "provider.noneEnabled": "No metadata provider is enabled.",
   "duplicate.warning.title": "收藏庫中已有相同作品",
   "duplicate.warning.description": "已找到「{title}」。只有在原文標題、另一個完整別名、年份、格式與已知集數皆一致時才會顯示此警告。",
+  "title.suggestion": "可能的翻譯標題：{provider}（名稱與年份相符，但作品身分尚未驗證）：{title}",
+  "title.useSuggestion": "使用建議標題",
   "duplicate.warning.open": "開啟既有筆記",
 } as const;

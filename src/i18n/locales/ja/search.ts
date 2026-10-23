@@ -11,5 +11,7 @@ export const JA_SEARCH_MESSAGES = {
     "provider.noneEnabled": "有効なメタデータ提供元がありません。",
     "duplicate.warning.title": "同じ作品がライブラリにあります",
     "duplicate.warning.description": "「{title}」が見つかりました。この警告は原題、別の完全な別名、年、形式、既知の話数がすべて一致した場合のみ表示されます。",
-    "duplicate.warning.open": "既存ノートを開く",
+    "title.suggestion": "翻訳候補（{provider}、題名と年のみ一致・作品の同一性は未確認）：{title}",
+  "title.useSuggestion": "候補の題名を使用",
+  "duplicate.warning.open": "既存ノートを開く",
   } as const;

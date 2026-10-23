@@ -283,14 +283,12 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async deleteMediaFile(file: TFile): Promise<void> { await this.services().deleteMediaFile(file); this.refreshViews(); }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.services().getTemplates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.services().readTemplate(path); }
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-    const response = await this.services().searchExternal(mediaType, query);
-    return response;
+  async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<ExternalMediaSearchPage> {
+    return this.services().searchExternal(mediaType, query, onProgress);
   }
 
-  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
-    const response = await this.services().searchExternalPage(mediaType, query, page);
-    return response;
+  async searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> {
+    return this.services().searchExternalPage(mediaType, query, page, sessionId);
   }
 
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {

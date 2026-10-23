@@ -11,5 +11,7 @@ export const KO_SEARCH_MESSAGES = {
     "provider.noneEnabled": "활성화된 메타데이터 제공자가 없습니다.",
     "duplicate.warning.title": "같은 작품이 이미 라이브러리에 있습니다",
     "duplicate.warning.description": "“{title}”을 찾았습니다. 이 경고는 원제, 다른 전체 별칭, 연도, 형식과 알려진 화수가 모두 일치할 때만 표시됩니다.",
-    "duplicate.warning.open": "기존 노트 열기",
+    "title.suggestion": "번역 제목 후보: {provider} (제목과 연도 일치, 작품 동일성 미확인): {title}",
+  "title.useSuggestion": "추천 제목 사용",
+  "duplicate.warning.open": "기존 노트 열기",
   } as const;

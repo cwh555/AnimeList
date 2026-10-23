@@ -6,6 +6,7 @@ import {
   createMomentId,
   hasUniqueMomentIds,
   hasUniqueMomentIdsInMarkdown,
+  locateMomentsBlock,
   parseMomentsSource,
   replaceMoments,
   serializeMomentsSource,
@@ -124,23 +125,34 @@ export class MomentsService {
     }
 
     const note = this.noteFile(sourcePath);
+    let saved: MomentItem | null = null;
+    let savedSource = "";
     try {
-      const markdown = await this.host.app.vault.read(note);
-      if (!hasUniqueMomentIdsInMarkdown(markdown)) {
-        throw new Error("This note has missing or duplicate Moment IDs; fix the YAML before adding another moment");
-      }
-      const id = createMomentId(allMomentIds(markdown));
-      const stackGapsY = stackGapsForStoredImages(
-        input,
-        [],
-        stored.acceptedAssetIndexes,
-        0,
-        stored.paths.length,
-      );
-      const moment = buildMomentPayload(id, input, stored.paths, stackGapsY);
-      const next = [...current, moment];
-      await this.host.app.vault.process(note, (value) => replaceMoments(value, locator, next));
-      return { source: serializeMomentsSource(next), moment, duplicatesSkipped: stored.duplicatesSkipped };
+      // Validate block identity, global moment IDs and derive the next version
+      // inside the atomic note callback. Any concurrent edit is rejected instead
+      // of being silently replaced by the snapshot from the opened dialog.
+      await this.host.app.vault.process(note, (markdown) => {
+        const block = locateMomentsBlock(markdown, locator);
+        if (!hasUniqueMomentIdsInMarkdown(markdown)) {
+          throw new Error("This note has missing or duplicate Moment IDs; fix the YAML before adding another moment");
+        }
+        const fresh = parseMomentsSource(block.source);
+        this.assertUsableIds(fresh);
+        const id = createMomentId(allMomentIds(markdown));
+        const stackGapsY = stackGapsForStoredImages(
+          input, [], stored.acceptedAssetIndexes, 0, stored.paths.length,
+        );
+        const moment = buildMomentPayload(id, input, stored.paths, stackGapsY);
+        const next = [...fresh, moment];
+        const updated = replaceMoments(markdown, {
+          source: block.source, lineStart: block.lineStart, lineEnd: block.lineEnd,
+        }, next);
+        saved = moment;
+        savedSource = serializeMomentsSource(next);
+        return updated;
+      });
+      if (!saved) throw new Error("Moment update was not committed");
+      return { source: savedSource, moment: saved, duplicatesSkipped: stored.duplicatesSkipped };
     } catch (error) {
       await this.images.rollbackStoredPaths(stored.addedPaths);
       throw error;

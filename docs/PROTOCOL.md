@@ -139,6 +139,17 @@ No note or external ID is changed merely because a candidate ranked highly.
   per-provider cursors and search category across Load more requests. It does not
   restart pagination from only the user's original string. Provider failures are
   surfaced and must not block successful results from the others.
+- Each new UI search receives an **opaque interaction-specific `sessionId`**.
+  The Load more API accepts an optional fourth argument with that ID; two
+  searches of the same text must never share or replace cursor state. The
+  three-argument legacy host call remains supported via the latest query
+  session, but UI pagination must always provide the explicit ID. Expired or
+  mismatched explicit IDs fail closed rather than silently requesting page N
+  from unrelated query state or another user interaction.
+- Search first-result progress callbacks must be forwarded through
+  `main.ts` to the search service. UI updates from stale queries are ignored;
+  subsequent pages use the same verified provider identity deduplication rules,
+  including preserving distinct results with no stable provider ID.
 - Searches are read-only. In particular, changes to this search layer never
   migrate titles, alter source IDs in existing notes, rename Markdown files,
   or mutate user-owned metadata. Provider-neutral display title selection and
@@ -153,6 +164,13 @@ Obsidian Test Vault rather than assuming mocked coverage proves availability.
 
 Search latency must not scale linearly with the number of guessed aliases:
 
+- Bangumi and Open Library interactive requests have a 6-second logical
+  deadline, with timeout warnings isolated to the affected provider. AniList
+  retains its separately configured 5-second timeout and 2100 ms pacing.
+  `requestUrl` does not support cancellation, so the physical upstream request
+  can continue after the UI timeout. Never automatically retry a timed-out
+  request or bypass provider rate limits. A logical deadline bounds user-visible
+  waiting per request; it is not a physical network abort.
 - Query planning limits first-phase variants to two, Chinese discovery variants to
   two, and cross-language alias variants to three; a non-batching provider executes
   at most two queries per phase concurrently, while AniList can batch up to three

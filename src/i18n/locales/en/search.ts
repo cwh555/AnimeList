@@ -11,5 +11,7 @@ export const EN_SEARCH_MESSAGES = {
     "provider.noneEnabled": "No metadata provider is enabled.",
     "duplicate.warning.title": "This work is already in the library",
     "duplicate.warning.description": "Found “{title}”. This warning appears only when the original title, another full alias, year, format, and known episode count all match.",
-    "duplicate.warning.open": "Open existing note",
+    "title.suggestion": "Possible translated title from {provider} (name/year match; identity not verified): {title}",
+  "title.useSuggestion": "Use suggested title",
+  "duplicate.warning.open": "Open existing note",
   } as const;

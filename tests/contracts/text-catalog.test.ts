@@ -61,6 +61,24 @@ describe("user-visible text catalog compatibility", () => {
     assert.match(uiText("library.resultMeta", { shown: 1, total: 2 }), /\{genre}/);
   });
 
+  it("formats title-suggestion identity warnings across all supported languages", () => {
+    registerBundledLocales();
+    try {
+      for (const locale of ["zh-TW", "zh-CN", "en", "ja", "ko"] as const) {
+        setActiveLocale(locale);
+        const message = searchFeatureText("title.suggestion", {
+          provider: "Bangumi", title: "Localized title",
+        });
+        assert.ok(message.includes("Bangumi"), locale);
+        assert.ok(message.includes("Localized title"), locale);
+        assert.equal(message.includes("{provider}"), false, locale);
+        assert.ok(searchFeatureText("title.useSuggestion").trim(), locale);
+      }
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
   it("keeps feature text helpers stable for later locale replacement", () => {
     assert.equal(ratingFeatureText("adjusted", { original: 8.2, rounded: 8 }), "評分 8.2 不符合 0.5 分級距，已四捨五入為 8。");
     assert.equal(searchFeatureText("duplicate.warning.open"), "開啟既有筆記");

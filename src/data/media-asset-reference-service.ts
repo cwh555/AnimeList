@@ -19,7 +19,7 @@ export class MediaAssetReferenceService {
     private readonly settings: () => AnimeListSettings,
   ) {}
 
-  async collect(): Promise<MediaAssetReferenceSnapshot> {
+  async collect(options: { freshRead?: boolean } = {}): Promise<MediaAssetReferenceSnapshot> {
     const referencedPaths = new Set<string>();
     const notes = getAllMarkdownFiles(this.app);
     let cursor = 0;
@@ -27,7 +27,11 @@ export class MediaAssetReferenceService {
       while (cursor < notes.length) {
         const note = notes[cursor++];
         if (!note) continue;
-        const markdown = await this.app.vault.cachedRead(note);
+        // Destructive cleanup must observe disk content even when Obsidian's
+        // display cache has not yet noticed an external synchronization.
+        const markdown = options.freshRead
+          ? await this.app.vault.read(note)
+          : await this.app.vault.cachedRead(note);
         const frontmatter = this.app.metadataCache.getFileCache(note)?.frontmatter;
         const targets = new Set([
           ...extractMarkdownAssetTargets(markdown),

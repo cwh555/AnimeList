@@ -24,6 +24,7 @@ export interface AnimeListUiHost {
     results: ExternalMediaResult[];
     warnings: string[];
     hasMore?: boolean;
+    sessionId?: string;
   }>;
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;
