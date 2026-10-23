@@ -5,6 +5,7 @@ import {
   certifyRankingOrder, legacyRankingEvidence, provesBefore, recordRankingEvidence,
 } from "../src/domain/ranking-evidence";
 import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-scheduler";
+import { certifiedAbsoluteRankingPositions } from "../src/domain/ranking-certification";
 import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
@@ -86,6 +87,32 @@ describe("ranking evidence and diverse comparison schedule", () => {
     assert.deepEqual(nextRoundPair(round), { candidate:"x", reference:"y" });
     answerRound(round, "better");
     assert.deepEqual(nextRoundPair(round), { candidate:"s1", reference:"s2" });
+  });
+  it("certifies an absolute position iff it is fixed in every consistent total order", () => {
+    const paths = ["A", "B", "C", "D", "E"];
+    const permutations = (remaining: string[]): string[][] => remaining.length
+      ? remaining.flatMap((path, index) =>
+        permutations(remaining.filter((_, other) => other !== index)).map(tail => [path, ...tail]))
+      : [[]];
+    const allOrders = permutations(paths);
+    const possibleEdges: Array<[string,string]> = [
+      ["A","B"], ["B","C"], ["A","D"], ["C","D"], ["D","E"],
+      ["B","E"], ["A","E"], ["C","E"],
+    ];
+    for (let mask = 0; mask < 256; mask += 1) {
+      const evidence = {};
+      const edges = possibleEdges.filter((_, edge) => Boolean(mask & (1 << edge)));
+      for (const [before, after] of edges) recordRankingEvidence(evidence, before, after);
+      const possible = allOrders.filter(order =>
+        edges.every(([before, after]) => order.indexOf(before) < order.indexOf(after)));
+      assert.ok(possible.length > 0);
+      const expected = paths.flatMap(path => {
+        const ranks = new Set(possible.map(order => order.indexOf(path) + 1));
+        return ranks.size === 1 ? [{ path, position:[...ranks][0] }] : [];
+      }).sort((a,b) => a.position - b.position);
+      assert.deepEqual(certifiedAbsoluteRankingPositions(paths, paths, evidence), expected,
+        "mismatched certified ranks under evidence pattern " + mask);
+    }
   });
   it("never presents a relative order as a certain absolute rank", () => {
     const items = [item("A"), item("B"), item("C"), item("D")];
