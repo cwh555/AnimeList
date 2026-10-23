@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.1 - 2026-10-23
+
+### Improved
+
+- **Mobile Ranking:** Long Chinese, Japanese, English, manga, and novel titles wrap completely instead of being truncated in ranked rows, pending rows, or pairwise comparison modals. Comparison controls retain comfortable mobile touch targets and support internal scrolling.
+- **Mobile Score Dashboard:** Long-press a poster to begin dragging it to another score lane; ordinary touch scrolling, tap, cancel, desktop drag, and selected batch movement retain their distinct behaviors.
+- **Reversible ranking comparison:** Return to the previous pair during a session, including undoing Skip or a mistaken final choice before choosing Finish. Closing the modal preserves committed progress.
+- **More varied ranking rounds:** Consecutive full reranks rotate their initial pairings. Matching seasons and theatrical variants of a work are preferentially compared later when independent matchups are available; series detection changes question order only.
+- **Evidence-backed rank certainty:** A completed work has a confirmed absolute rank only when direct preference answers, an explicit manual ordering, or strict transitivity prove its position against every eligible completed work. All other works remain visible in Pending, including during interrupted or skipped rounds.
+- **Pending possible-rank intervals:** Each Pending work shows a provable inclusive range such as `1～20` or `4～15`. Bounds narrow only with strict comparison evidence; Skip never produces an invented rank or tie.
+
+### Compatibility and validation
+
+- Ranking data remains in `.obsidian/animelist-ranking.json`; previous version-1 data, confirmed orders, saved partial comparisons, and recovery behavior remain supported. No media-note/frontmatter migration, numeric-score rewrite, or Obsidian minimum-version increase.
+- Added behavior-driven strict-ranking and rank-range tests, plus mobile/desktop Chromium interaction and responsive-layout regression checks.
+- Release assets remain `main.js`, `manifest.json`, and `styles.css`. The `1.6.1` tag and public GitHub Release are deliberately deferred until the verified candidate is fast-forwarded to `main` and the exact `main` push CI succeeds.
+
 ## 1.6.0 - 2026-10-23
 
 ### Added

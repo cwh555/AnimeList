@@ -1,8 +1,7 @@
-name: Promote AnimeList 1.6.0 after verified main CI
+name: Promote verified AnimeList release from main CI
 
-# Single-version publication bridge: it is deliberately inert once 1.6.0
-# exists. GitHub Actions GITHUB_TOKEN tag pushes do not trigger push workflows,
-# so this workflow explicitly dispatches the normal release.yml.
+# Only a successful push CI on the current main head may mint a public tag.
+# GITHUB_TOKEN tag pushes do not initiate another workflow, so dispatch release.yml.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -12,6 +11,10 @@ on:
 permissions:
   contents: write
   actions: write
+
+concurrency:
+  group: animelist-main-release-promoter
+  cancel-in-progress: false
 
 jobs:
   promote:
@@ -28,7 +31,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Verify main head and 1.6.0 metadata before publishing
+      - name: Validate verified main head and consistent release metadata
         shell: bash
         env:
           VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -38,47 +41,51 @@ jobs:
           test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
           current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
           if [ "$current_main" != "$VERIFIED_SHA" ]; then
-            echo "::error::main moved after the successful CI; refusing to publish a stale commit."
+            echo "::error::main moved since successful CI; refusing stale release."
             exit 1
           fi
-          node --input-type=module -e '
+          release_version="$(node --input-type=module -e '
             import { readFileSync } from "node:fs";
-            const read = (path) => JSON.parse(readFileSync(path, "utf8"));
+            const read = (file) => JSON.parse(readFileSync(file, "utf8"));
             const pkg = read("package.json"), lock = read("package-lock.json");
             const manifest = read("manifest.json"), versions = read("versions.json");
-            if (pkg.version !== "1.6.0" || lock.version !== "1.6.0"
-              || lock.packages[""].version !== "1.6.0"
-              || manifest.version !== "1.6.0"
+            const version = pkg.version;
+            if (!/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(version)
+              || lock.version !== version || lock.packages?.[""]?.version !== version
+              || manifest.version !== version || manifest.id !== "animelist"
               || manifest.minAppVersion !== "1.5.0"
-              || versions["1.6.0"] !== manifest.minAppVersion) {
-              throw new Error("Refusing tag: 1.6.0 version metadata does not agree.");
+              || versions[version] !== manifest.minAppVersion) {
+              throw new Error("Refusing tag: release version metadata is inconsistent.");
             }
-          '
-          existing_tag="$(git ls-remote origin refs/tags/1.6.0 | cut -f1)"
+            process.stdout.write(version);
+          ')"
+          existing_tag="$(git ls-remote origin "refs/tags/$release_version" | cut -f1)"
           if [ -n "$existing_tag" ] && [ "$existing_tag" != "$VERIFIED_SHA" ]; then
-            echo "::error::An existing 1.6.0 tag points elsewhere. Never overwrite release tags."
+            echo "::error::An existing release tag points elsewhere; never rewrite it."
             exit 1
           fi
-          if gh release view 1.6.0 >/dev/null 2>&1; then
-            echo "GitHub Release 1.6.0 already exists; no further action."
+          echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
+          if gh release view "$release_version" >/dev/null 2>&1; then
+            echo "Release already exists; leaving immutable tag and assets untouched."
             echo "PROMOTE=false" >> "$GITHUB_ENV"
             exit 0
           fi
+          echo "PROMOTE=true" >> "$GITHUB_ENV"
           if [ -n "$existing_tag" ]; then
             echo "CREATE_TAG=false" >> "$GITHUB_ENV"
           else
             echo "CREATE_TAG=true" >> "$GITHUB_ENV"
           fi
-          echo "PROMOTE=true" >> "$GITHUB_ENV"
-      - name: Tag the exactly verified main commit
+      - name: Tag exact commit that passed main push CI
         if: env.PROMOTE == 'true' && env.CREATE_TAG == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          git tag 1.6.0
-          git push origin refs/tags/1.6.0
-      - name: Dispatch release workflow for exact 1.6.0 tag
+          git tag "$RELEASE_VERSION"
+          git push origin "refs/tags/$RELEASE_VERSION"
+      - name: Dispatch verified release build and asset attestation
         if: env.PROMOTE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run release.yml --ref main --field tag=1.6.0
+        run: gh workflow run release.yml --ref main --field "tag=$RELEASE_VERSION"
+

@@ -5,7 +5,7 @@ on:
     tags:
       - "*.*.*"
   # A tag pushed using GITHUB_TOKEN does not itself trigger push workflows.
-  # The vetted 1.6.0 promoter therefore dispatches this same release workflow.
+  # The verified-main promoter therefore dispatches this same release workflow.
   workflow_dispatch:
     inputs:
       tag:

@@ -139,7 +139,7 @@ This document preserves the product-level decisions introduced by each major dev
 
 ## 1.6.0 — Personal ranking, cover control, and multilingual discovery
 
-**Release state:** Approved for publication to `main` (2026-10-23); tag and GitHub Release are verified separately after publication.
+**Release state:** Published as `1.6.0` (2026-10-23). The `1.6.1` mobile/ranking patch is prepared separately on `preview` pending Test Vault approval.
 
 ### Main outcomes
 
