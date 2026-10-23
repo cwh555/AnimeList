@@ -94,7 +94,7 @@ export function nextRoundPair(round: RankingRound): RoundPair | null {
 }
 export function answerRound(
   round: RankingRound, choice: RoundChoice,
-): { done: string[] | null; skipped: string | null; against: string | null } {
+): { done: string[] | null; skipped: string | null; against: string | null; better: string | null; worse: string | null } {
   let selectedIndex = -1;
   for (let offset = 0; offset < round.jobs.length; offset++) {
     const index = (round.cursor + offset) % round.jobs.length;
@@ -104,10 +104,12 @@ export function answerRound(
       break;
     }
   }
-  if (selectedIndex < 0) return { done: advanceRound(round), skipped: null, against: null };
+  if (selectedIndex < 0) return { done: advanceRound(round), skipped: null, against: null, better: null, worse: null };
   const current = round.jobs[selectedIndex];
   let skipped: string | null = null;
   let against: string | null = null;
+  const before = current.left[0];
+  const after = current.right[0];
   if (choice === "better") current.winners.push(current.left.shift());
   else if (choice === "worse") current.winners.push(current.right.shift());
   else {
@@ -119,7 +121,9 @@ export function answerRound(
   }
   round.comparisons += 1;
   round.cursor = (selectedIndex + 1) % round.jobs.length;
-  return { done: advanceRound(round), skipped, against };
+  return { done: advanceRound(round), skipped, against,
+    better: choice === "better" ? before : choice === "worse" ? after : null,
+    worse: choice === "better" ? after : choice === "worse" ? before : null };
 }
 export function roundProgress(round: RankingRound): { stage: number; position: number; total: number } {
   const unfinished = round.jobs.filter((entry) => !entry.done);
