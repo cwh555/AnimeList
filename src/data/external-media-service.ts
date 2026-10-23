@@ -38,7 +38,10 @@ function providerTask(provider: string, task: Promise<MetadataProviderPage>): Pr
 }
 
 export class ExternalMediaSearchService {
-  private readonly sessions = new Map<string, SearchSession>();
+  private readonly sessions = new Map<string, { signature: string; session: SearchSession }>();
+  /** Legacy callers without an ID still use the most recent matching query. */
+  private readonly legacySessionByQuery = new Map<string, string>();
+  private nextSessionId = 0;
 
   constructor(
     private readonly providers: () => ProviderSettings,
@@ -58,11 +61,7 @@ export class ExternalMediaSearchService {
     return JSON.stringify([mediaType, query.normalize("NFKC").trim(), this.providers(), this.languages()]);
   }
 
-  async search(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{
-    results: ExternalMediaResult[];
-    warnings: string[];
-    hasMore: boolean;
-  }> {
+  async search(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<ExternalMediaSearchPage> {
     const sessionKey = this.sessionKey(mediaType, query);
     const cursors = new Map<string, SearchCursor>();
     const rememberPage = (provider: MetadataProviderId, candidate: string, page: MetadataProviderPage): void => {
@@ -92,7 +91,7 @@ export class ExternalMediaSearchService {
       return adapter;
     });
     if (!providers.length) {
-      this.sessions.delete(sessionKey);
+      this.legacySessionByQuery.delete(sessionKey);
       return { results: [], warnings: [searchFeatureText("provider.noneEnabled")], hasMore: false };
     }
 
@@ -105,27 +104,39 @@ export class ExternalMediaSearchService {
       onProgress,
     });
     const session = new SearchSession(mediaType, query, response.expandedQueries, response.results, [...cursors.values()]);
-    this.sessions.delete(sessionKey);
-    this.sessions.set(sessionKey, session);
+    const sessionId = String(++this.nextSessionId);
+    this.sessions.set(sessionId, { signature: sessionKey, session });
+    this.legacySessionByQuery.set(sessionKey, sessionId);
     while (this.sessions.size > MAX_CACHED_SESSIONS) {
       const oldest = this.sessions.keys().next().value as string | undefined;
       if (oldest === undefined) break;
       this.sessions.delete(oldest);
+      for (const [key, id] of this.legacySessionByQuery) {
+        if (id === oldest) this.legacySessionByQuery.delete(key);
+      }
     }
     const results = session.takePage();
-    return { results, warnings: response.warnings, hasMore: session.hasMore };
+    return { results, warnings: response.warnings, hasMore: session.hasMore, sessionId };
   }
 
   /**
    * Use the original multilingual query plan for further pages. A standalone
    * page request (without a search session) preserves the legacy host API.
    */
-  async searchPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
+  async searchPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> {
     const providers = this.enabledProviders(mediaType);
     if (!providers.length) {
       return { results: [], warnings: [searchFeatureText("provider.noneEnabled")], hasMore: false };
     }
-    const session = this.sessions.get(this.sessionKey(mediaType, query));
+    const signature = this.sessionKey(mediaType, query);
+    const id = sessionId ?? this.legacySessionByQuery.get(signature);
+    const entry = id ? this.sessions.get(id) : undefined;
+    // An explicit cursor may never fall back to another search's provider
+    // pages, even when the query strings happen to be identical.
+    if (sessionId && (!entry || entry.signature !== signature || page !== entry.session.nextPage)) {
+      throw new Error("Search session expired or replaced; search again before loading more results.");
+    }
+    const session = entry?.signature === signature ? entry.session : undefined;
     if (session && page === session.nextPage) {
       const warnings: string[] = [];
       let attempts = 0;
