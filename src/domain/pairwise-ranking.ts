@@ -368,12 +368,19 @@ export function decideRanking(
   list: RankingCollection,
   eligible: readonly MediaItem[],
   choice: RankingChoice,
+  expectedPair?: RankingPair,
 ): boolean {
   // A saved round may contain old, already-proven pairs. Drain them before
   // accepting a new user choice rather than asking for contradictory evidence.
   if (list.round) settleProvenRound(list);
   const pair = nextRankingPair(list);
   if (!pair) return false;
+  // Reject a stale modal choice rather than applying it to a different pair
+  // that became current after another mutation or automatic proof resolution.
+  if (expectedPair && (pair.candidate !== expectedPair.candidate
+    || pair.reference !== expectedPair.reference)) {
+    throw new Error("Ranking question changed; reopen the comparison.");
+  }
   if (list.round) {
     const result = answerRound(list.round, choice);
     if (result.better && result.worse) {
