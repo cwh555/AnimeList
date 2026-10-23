@@ -2,7 +2,7 @@ import { Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
-  prepareRanking, rankingBounds, rankingCounts,
+  prepareRanking, rankingBounds, rankingCounts, rankingConfirmedPositions,
   reconcileRanking, emptyRankingState, rankingUnresolvedPaths,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
@@ -75,8 +75,10 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (!container.isConnected) return;
   const list = state[options.type];
   const byPath = new Map(eligible.map((item) => [item.filePath, item]));
+  const confirmed = rankingConfirmedPositions(list, eligible);
   const counts = rankingCounts(list, eligible);
   const unresolved = rankingUnresolvedPaths(list, eligible);
+  const allPositionsKnown = counts.pending === 0;
   const hasNew = eligible.some(item => !list.ordered.includes(item.filePath)
     && !Object.hasOwn(list.pending, item.filePath) && list.active?.path !== item.filePath);
   const pair = nextRankingPair(list);
@@ -161,27 +163,30 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (counts.pending) panel.appendChild(makeEl("p", "al-ranking-warning", t("warning")));
   const result = makeEl("ol", "al-ranking-list");
   const rows: HTMLElement[] = [];
-  for (const [index, path] of list.ordered.entries()) {
+  for (const [index, rank] of confirmed.entries()) {
+    const path = rank.path;
     const item = byPath.get(path);
     if (!item) continue;
     const row = makeEl("li", "al-ranking-row");
-    row.append(makeEl("span", "al-ranking-position", String(index + 1)));
+    row.append(makeEl("span", "al-ranking-position", String(rank.position)));
     const content = button("", () => { void options.openNote(path); }, undefined, "al-ranking-open");
     content.title = item.title;
     content.append(rankingCover(item, "al-ranking-row-cover"), makeEl("span", "al-ranking-row-title", item.title));
     row.appendChild(content);
-    const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
-    handle.setAttribute("aria-label", t("drag", { title: item.title }));
-    handle.title = t("drag", { title: item.title });
-    row.appendChild(handle);
-    rows.push(row);
+    if (allPositionsKnown) {
+      const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
+      handle.setAttribute("aria-label", t("drag", { title: item.title }));
+      handle.title = t("drag", { title: item.title });
+      row.appendChild(handle);
+      rows.push(row);
+      installRankingDrag(handle, row, rows, index + 1, (nextPosition) => {
+        void mutate((draft) => { moveRankedItem(draft, path, nextPosition); });
+      });
+    }
     result.appendChild(row);
-    installRankingDrag(handle, row, rows, index + 1, (rank) => {
-      void mutate((draft) => { moveRankedItem(draft, path, rank); });
-    });
   }
   panel.appendChild(result);
-  if (!list.ordered.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
+  if (!confirmed.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
   if (unresolved.length) {
     const pendingSection = makeEl("section", "al-ranking-pending");
     pendingSection.append(makeEl("h3", "", t("pendingTitle")));
@@ -193,7 +198,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const label = makeEl("div", "al-ranking-pending-label");
       label.append(rankingCover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
       const bounds = attempt ? rankingBounds(list, attempt) : null;
-      const info = makeEl("span", "al-ranking-pending-bounds", !bounds
+      const info = makeEl("span", "al-ranking-pending-bounds", !bounds || counts.pending > 1
         ? (list.round ? t("progress") : t("pendingHint"))
         : bounds.first === bounds.last
           ? t("onePosition", { first: bounds.first + 1 })
