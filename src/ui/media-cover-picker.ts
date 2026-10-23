@@ -3,6 +3,7 @@ import type { MediaCoverAssetInput } from "../domain/manual-media";
 import type { AnimeListUiHost } from "./plugin-host";
 import { bindImageFallback } from "./image-fallback";
 import { makeEl } from "./ui-helpers";
+import { createFilePickerControl, createUiAction } from "./ui-primitives";
 import { uiText } from "../ui-text";
 
 export interface MediaCoverPicker {
@@ -21,7 +22,18 @@ export function createMediaCoverPicker(
   host.appendChild(makeEl("h3", "al-form-section-heading", uiText("edit.coverHeading")));
   host.appendChild(makeEl("p", "al-edit-cover-hint", uiText("edit.coverHint")));
 
+  const picker = createFilePickerControl(uiText("edit.coverChoose"), "image/jpeg,image/png,image/webp,image/avif");
+  picker.input.classList.add("al-edit-cover-file");
+  const clear = createUiAction(uiText("edit.coverClear"));
+  clear.classList.add("al-edit-cover-clear");
+  clear.hidden = true;
+  const controls = makeEl("div", "al-edit-cover-controls");
+  controls.append(picker.element, clear);
+  host.appendChild(controls);
+
+  // The identity header already shows the current cover; expand comparisons only on selection.
   const previews = makeEl("div", "al-edit-cover-previews");
+  previews.hidden = true;
   const current = makeEl("div", "al-edit-cover-preview");
   current.appendChild(makeEl("span", "al-edit-cover-caption", uiText("edit.coverCurrent")));
   const currentPath = typeof frontmatter.cover === "string" ? frontmatter.cover : "";
@@ -47,18 +59,12 @@ export function createMediaCoverPicker(
 
   let selected: File | null = null;
   let previewUrl: string | null = null;
-  const input = makeEl("input", "al-edit-cover-file");
-  input.type = "file";
-  input.accept = "image/jpeg,image/png,image/webp,image/avif";
-  input.setAttribute("aria-label", uiText("edit.coverChoose"));
-  const clear = makeEl("button", "al-secondary-button al-edit-cover-clear", uiText("edit.coverClear"));
-  clear.type = "button";
-  clear.hidden = true;
   const renderSelection = (): void => {
     replacementBody.replaceChildren();
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     clear.hidden = !selected;
+    previews.hidden = !selected;
     if (!selected) {
       replacementBody.appendChild(makeEl("span", "al-edit-cover-empty", uiText("edit.coverUnchanged")));
       return;
@@ -70,21 +76,16 @@ export function createMediaCoverPicker(
     replacementBody.append(image, makeEl("span", "al-edit-cover-filename", selected.name));
     image.src = previewUrl;
   };
-  input.addEventListener("change", () => {
-    selected = input.files?.[0] ?? null;
+  picker.input.addEventListener("change", () => {
+    selected = picker.input.files?.[0] ?? null;
     renderSelection();
   });
   clear.addEventListener("click", () => {
     selected = null;
-    input.value = "";
+    picker.input.value = "";
     renderSelection();
   });
   renderSelection();
-  const controls = makeEl("div", "al-edit-cover-controls");
-  const inputLabel = makeEl("label", "al-edit-cover-file-label", uiText("edit.coverChoose"));
-  inputLabel.appendChild(input);
-  controls.append(inputLabel, clear);
-  host.appendChild(controls);
 
   return {
     element: host,
