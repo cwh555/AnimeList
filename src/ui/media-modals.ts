@@ -1,4 +1,5 @@
 import { AnimeListModal } from "./animelist-modal";
+import { MediaModalNavigation } from "./media-modal-navigation";
 import { Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { manualMediaResult, type MediaCoverAssetInput } from "../domain/manual-media";
@@ -47,7 +48,7 @@ export class AddMediaModal extends AnimeListModal {
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
   hasMore = false;
-  private searchGeneration = 0;
+  private readonly navigation = new MediaModalNavigation();
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
@@ -64,7 +65,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   onClose(): void {
-    this.searchGeneration += 1;
+    this.navigation.enter();
     this.disposeActiveForm();
     if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
     this.manualCoverPreviewUrl = null;
@@ -82,6 +83,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   renderSearch(): void {
+    this.navigation.enter();
     this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
@@ -104,7 +106,6 @@ export class AddMediaModal extends AnimeListModal {
       button.className = `al-modal-type${this.mediaType === value ? " is-active" : ""}`;
       button.textContent = text;
       button.addEventListener("click", () => {
-        this.searchGeneration += 1;
         this.mediaType = value;
         this.results = [];
         this.warnings = [];
@@ -162,11 +163,11 @@ export class AddMediaModal extends AnimeListModal {
     this.results.forEach((result) => resultsEl.appendChild(this.createResultRow(result)));
     this.contentEl.appendChild(resultsEl);
     this.plugin.afterSearchRender(this);
-    window.setTimeout(() => input.focus(), 0);
+    window.setTimeout(() => { if (this.contentEl.contains(input)) input.focus(); }, 0);
   }
 
   async search(button: HTMLButtonElement): Promise<void> {
-    const generation = ++this.searchGeneration;
+    const generation = this.navigation.enter();
     const mediaType = this.mediaType;
     const query = this.query;
     button.disabled = true;
@@ -182,20 +183,20 @@ export class AddMediaModal extends AnimeListModal {
     // aliases or a rate-limited second metadata service. Do not replace the
     // search form: this preserves keyboard focus and current input text.
     const onProgress = (results: ExternalMediaResult[]): void => {
-      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
       this.results = results;
       const panel = this.contentEl.querySelector<HTMLElement>(".al-search-results");
       if (panel) panel.replaceChildren(...results.map(result => this.createResultRow(result)));
     };
     try {
       const response = await this.plugin.searchExternal(mediaType, query, onProgress);
-      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
       this.results = response.results;
       this.warnings = response.warnings;
       this.hasMore = response.hasMore ?? this.results.length > 0;
       if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
-      if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
       console.error("AnimeList external search failed", error);
       this.results = [];
       this.hasMore = false;
@@ -237,6 +238,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   private async renderManualDetails(mediaType: MediaType, state: ManualMediaFormState = {}): Promise<void> {
+    const generation = this.navigation.enter();
     this.disposeActiveForm();
     this.mediaType = mediaType;
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
@@ -311,8 +313,14 @@ export class AddMediaModal extends AnimeListModal {
     typeFieldHost.appendChild(coverPreview);
     this.contentEl.appendChild(typeFieldHost);
 
-    const templates = await this.plugin.getTemplates(mediaType);
-    if (!this.contentEl.isConnected) return;
+    const templates = await this.plugin.getTemplates(mediaType).catch((error: unknown) => {
+      if (this.navigation.isCurrent(generation)) {
+        console.error("AnimeList manual template loading failed", error);
+        new Notice(uiText("notice.searchUnavailable"));
+      }
+      return null;
+    });
+    if (!templates || !this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
     this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
@@ -408,7 +416,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {
-    this.searchGeneration += 1;
+    const generation = this.navigation.enter();
     this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
@@ -430,10 +438,22 @@ export class AddMediaModal extends AnimeListModal {
 
     const metadataLoading = makeEl("p", "al-modal-hint", uiText("add.metadataLoading"));
     this.contentEl.appendChild(metadataLoading);
-    const [templates, enrichedResult] = await Promise.all([
-      this.plugin.getTemplates(result.mediaType),
-      this.plugin.enrichExternalMedia(result),
-    ]);
+    let details: Awaited<ReturnType<AnimeListUiHost["enrichExternalMedia"]>>;
+    let templates: Awaited<ReturnType<AnimeListUiHost["getTemplates"]>>;
+    try {
+      [templates, details] = await Promise.all([
+        this.plugin.getTemplates(result.mediaType),
+        this.plugin.enrichExternalMedia(result),
+      ]);
+    } catch (error) {
+      if (this.navigation.isCurrent(generation)) {
+        console.error("AnimeList selected media metadata failed", error);
+        metadataLoading.textContent = uiText("notice.searchUnavailable");
+      }
+      return;
+    }
+    if (!this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
+    const enrichedResult = details;
     metadataLoading.remove();
     updateMediaEditorIdentityTitle(identity, enrichedResult.title, uiText("library.coverAlt", { title: enrichedResult.title }));
     const metadataHost = createDiv();
