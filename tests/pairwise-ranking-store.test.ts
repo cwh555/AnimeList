@@ -98,6 +98,30 @@ describe("ranking vault storage", () => {
     );
   });
 
+  it("supports older Obsidian adapters without process() and preserves the v1 schema", async () => {
+    const { app, adapter } = setup();
+    const legacy = {
+      exists: adapter.exists.bind(adapter),
+      mkdir: adapter.mkdir.bind(adapter),
+      readBinary: adapter.readBinary.bind(adapter),
+      writeBinary: adapter.writeBinary.bind(adapter),
+    };
+    const oldApp = { vault: { adapter: legacy, configDir: ".obsidian" } } as unknown as App;
+    const store = new PairwiseRankingStore(oldApp);
+    await store.mutate(state => { state.anime.ordered = ["A.md"]; });
+    await store.mutate(state => { state.anime.ordered.push("B.md"); });
+    assert.equal(adapter.writeBinaryCalls, 2, "legacy saves use the existing binary API");
+    assert.equal(adapter.processCalls, 0);
+    const loaded = await new PairwiseRankingStore(oldApp).load();
+    assert.deepEqual(loaded.anime.ordered, ["A.md", "B.md"]);
+    assert.equal(loaded.version, 1);
+    adapter.put(".obsidian/animelist-ranking.json", '{"version":1,"elsewhere":true}');
+    await assert.rejects(
+      store.mutate(state => { state.anime.ordered.push("C.md"); }),
+      /changed on another device/,
+    );
+  });
+
   it("retains last saved state when a write fails", async () => {
     const { app, adapter } = setup();
     const service = new PairwiseRankingStore(app);
