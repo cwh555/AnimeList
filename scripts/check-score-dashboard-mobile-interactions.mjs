@@ -58,6 +58,19 @@ const html = `<!doctype html>
     window.createEl = (tag) => document.createElement(tag);
     window.createDiv = () => document.createElement("div");
     window.createSpan = () => document.createElement("span");
+    HTMLElement.prototype.createDiv = function(options = {}) {
+      const el = document.createElement("div");
+      if (options.cls) el.className = options.cls;
+      this.appendChild(el); return el;
+    };
+    HTMLElement.prototype.createEl = function(tag, options = {}) {
+      const el = document.createElement(tag);
+      if (options.cls) el.className = options.cls;
+      if (options.text) el.textContent = options.text;
+      this.appendChild(el); return el;
+    };
+    window.__touchErrors = [];
+    window.addEventListener("error", event => window.__touchErrors.push(event.message));
     window.__coverObservers = [];
     window.IntersectionObserver = class {
       constructor(callback, options) {
@@ -156,7 +169,7 @@ const html = `<!doctype html>
         lane90.dispatchEvent(new DragEvent("drop", { bubbles:true, cancelable:true, dataTransfer:transfer }));
         await delay(150);
         details.desktopDragChangesScore = applied.length===1 && applied[0].length===1 && applied[0][0].filePath==="Alpha.md" && applied[0][0].nextScore===9;
-        document.body.dataset.details = JSON.stringify(details);
+        document.body.dataset.details = JSON.stringify({ ...details, touchErrors:window.__touchErrors });
         document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
         return;
       }
@@ -298,7 +311,7 @@ const html = `<!doctype html>
         && alphaCoverAfterChange?.getAttribute("src") === cover2
         && !alphaCoverBeforeFilters?.isConnected;
 
-      document.body.dataset.details = JSON.stringify(details);
+      document.body.dataset.details = JSON.stringify({ ...details, touchErrors:window.__touchErrors });
       document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
     })().catch((error) => {
       document.body.dataset.details = String(error?.stack || error);
