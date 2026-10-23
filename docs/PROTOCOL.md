@@ -153,6 +153,13 @@ Obsidian Test Vault rather than assuming mocked coverage proves availability.
 
 Search latency must not scale linearly with the number of guessed aliases:
 
+- Bangumi and Open Library interactive requests have a 6-second logical
+  deadline, with timeout warnings isolated to the affected provider. AniList
+  retains its separately configured 5-second timeout and 2100 ms pacing.
+  `requestUrl` does not support cancellation, so the physical upstream request
+  can continue after the UI timeout. Never automatically retry a timed-out
+  request or bypass provider rate limits. A logical deadline bounds user-visible
+  waiting per request; it is not a physical network abort.
 - Query planning limits first-phase variants to two, Chinese discovery variants to
   two, and cross-language alias variants to three; a non-batching provider executes
   at most two queries per phase concurrently, while AniList can batch up to three
