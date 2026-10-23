@@ -8,7 +8,7 @@ import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-sch
 import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
-  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, moveRankedItem,
+  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, rankingConfirmedPositions, moveRankedItem,
 } from "../src/domain/pairwise-ranking";
 
 const item = (name: string): MediaItem => ({
@@ -86,6 +86,48 @@ describe("ranking evidence and diverse comparison schedule", () => {
     assert.deepEqual(nextRoundPair(round), { candidate:"x", reference:"y" });
     answerRound(round, "better");
     assert.deepEqual(nextRoundPair(round), { candidate:"s1", reference:"s2" });
+  });
+  it("never presents a relative order as a certain absolute rank", () => {
+    const items = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = items.map(x => x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b,c]; // Incomplete old v1 user ordering.
+    assert.deepEqual(rankingConfirmedPositions(list, items), [],
+      "an unseen completed work could occupy any position");
+    assert.deepEqual(rankingCounts(list, items), { ranked:0, pending:4, unranked:0 });
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([a,b,c,d]));
+    list.evidence = legacyRankingEvidence(list.ordered);
+    recordRankingEvidence(list.evidence, a, d);
+    recordRankingEvidence(list.evidence, b, d);
+    assert.deepEqual(rankingConfirmedPositions(list, items), [
+      { path:a, position:1 }, { path:b, position:2 },
+    ]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([c,d]));
+  });
+  it("shows the true global rank number even when earlier works are pending", () => {
+    const items = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = items.map(x => x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b,c];
+    list.evidence = legacyRankingEvidence(list.ordered);
+    recordRankingEvidence(list.evidence, d, c);
+    assert.deepEqual(rankingConfirmedPositions(list, items), [{ path:c, position:4 }]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([a,b,d]));
+  });
+  it("recovers comparisons saved on a legacy pending attempt without inventing skip answers", () => {
+    const items = [item("A"), item("B"), item("C")];
+    const [a,b,c] = items.map(x=>x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b];
+    list.pending[c] = { path:c, comparisons:{ [a]:"worse", [b]:"skip" } };
+    assert.deepEqual(rankingConfirmedPositions(list, items), [{ path:a, position:1 }]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([b,c]));
+    list.pending[c].comparisons[b] = "worse";
+    assert.deepEqual(rankingConfirmedPositions(list, items), [
+      { path:a, position:1 }, { path:b, position:2 },
+    ]);
+    // c is fully comparable, but stays pending until the saved insertion
+    // attempt is committed into the persistent ordered sequence.
   });
   it("keeps full- and skip-round partitions exhaustive, with proof-backed confirmed ranks", () => {
     const items = Array.from({ length: 9 }, (_, index) => item("W" + index));
