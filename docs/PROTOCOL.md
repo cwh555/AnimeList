@@ -186,3 +186,50 @@ Regression tests must verify worst-case request counts, the first-result callbac
 while a second provider is pending, Korean-origin + Chinese-infobox-alias
 selection (Bangumi subject 399671), seasons and subtitles, pagination loading
 state, and preservation of the original note metadata.
+
+## UI presentation and interaction protocol
+
+This section is authoritative for AnimeList UI consistency. Metadata, provider identity,
+frontmatter and note content remain governed by the preceding storage/API contracts.
+
+- **Shared component ownership:** Common modal actions use `src/ui/ui-primitives.ts`.
+  A primary action uses `mod-cta`, a destructive confirmation uses `mod-warning`,
+  and other actions remain secondary. Feature-specific icon tools and workspace
+  gestures may differ, but must preserve the same focus, disabled and touch states.
+- **Media editing:** Search-result collection and editing a saved work use
+  `createMediaEditorIdentity` in `src/ui/media-editor-layout.ts` and the existing
+  `createMediaEditorFields` in `src/ui/media-form-controls.ts`. The source
+  controls only initial values and whether collection or saving is offered.
+  Provider classification uses `src/ui/media-classification-fields.ts`.
+  Do not introduce another set of parallel fields or validation rules.
+- **Covers:** The displayed cover in the editor's identity header is read-only.
+  Both manual collection and saved-cover replacement use the accessible
+  `createFilePickerControl` button instead of exposing the native file-input
+  chrome. Replacement previews stay collapsed until a file is selected;
+  opening or canceling an editor must never write images to the vault.
+  Reset, cleanup and size/type validation retain their existing data-service contracts.
+- **Dialog dimensions:** Confirmation dialogs use a compact, centered modal,
+  not a wide outer dialog with a narrow content column. Standard editing dialogs
+  can remain wider, while Timeline and image workspaces retain task-dependent
+  geometry. The CSS contract is scoped under `.animelist-modal` rather than
+  modifying Obsidian's global `.modal` or other plugins.
+- **Text layout:** Long CJK titles, arbitrary aliases, file names and paths
+  must not overflow any dialog. Use `min-width: 0` in flex/grid children;
+  prefer natural line breaks and `overflow-wrap: anywhere` only for unbroken
+  strings. Do not globally apply `word-break: break-all` or force a narrow
+  description container inside a wide modal.
+- **Accessibility and input:** Functional buttons are real `button` elements,
+  including file-picker triggers. Focus-visible indication, disabled semantics,
+  keyboard activation and a touch target of at least 44 px on narrow layouts
+  are required. Modals retain Obsidian's native focus and Escape lifecycle.
+- **Styling:** `styles/ui-primitives.css` and `styles/media-editor-layout.css`
+  are bundled through `scripts/style-bundle.mjs`. Consume Obsidian CSS variables
+  instead of introducing fixed theme colors. `styles.css` is generated and may
+  only be changed with `npm run styles:build`.
+- **Evidence:** Layout changes require a Chromium check at 320/390/768/1200 px,
+  real DOM interaction checks for covered workflows, and manual Test Vault
+  verification of Obsidian theme/locale/modal lifecycle on desktop and mobile.
+  A passing isolated browser fixture does not establish parity with the live app.
+
+See `docs/TESTING.md` for fast/full test tiers. Full tests must run for a
+release or merge gate; targeted/smoke tests are for routine iteration.

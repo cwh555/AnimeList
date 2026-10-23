@@ -383,3 +383,27 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] If a note changes or is renamed, incremental mode should scan it again. A failed API lookup, unconfirmed candidate or failed write must not become a completed checkpoint.
 - [ ] Run filename scans with two works competing for the same filename; a partial scan must preserve global collision-safe naming.
 - [ ] Close and reopen Settings and restart Obsidian; successful scan checkpoints persist outside Markdown frontmatter.
+
+## UI Protocol unification — additional manual validation
+
+- [ ] **Search → select → collect:** Verify a Bangumi/AniList work displays
+      the same cover/title/metadata layout as Edit; confirm Create opens the
+      note and leaves correct provider/source fields. Try anime, manga and novel.
+- [ ] **Edit from library:** Verify the identity header shows the current
+      title, original name and cover; make and save a status/score/date/tag edit.
+      Reopen to verify persisted values and unrelated Markdown unchanged.
+- [ ] **Manual collection:** File chooser has the same styled button as
+      replacement; test choose, change, cancel and successful collect.
+- [ ] **Replace cover:** Before choosing, comparison panels are hidden.
+      After choosing, current and replacement images appear. Clear restores
+      unchanged state. Cancel leaves cover and files untouched; Save updates
+      the cover exactly once; existing source metadata and note body survive.
+- [ ] **Delete confirmation:** Compact dialog uses its own width, not a wide
+      shell with a narrow inner paragraph. Verify cancel, Escape and confirm;
+      test long Chinese/Japanese/Korean/mixed-language titles and paths.
+- [ ] **Mobile 320–390 px:** No horizontal scroll or clipped footer buttons;
+      controls are reachable by touch and the file chooser opens on mobile.
+      Try dark/light Obsidian themes and a larger system text size.
+- [ ] **Regressions:** Check Timeline, Score Dashboard, Moments, Image Section,
+      tag manager and release-tracking dialogs for button/focus/overflow issues.
+      Confirm no new modal causes unexpected sidebar swipes.

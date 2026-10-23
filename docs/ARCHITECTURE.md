@@ -128,7 +128,7 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 
 ## Compatibility boundary
 
-`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module should add new behavior to the compatibility barrel. Add and edit modals share `createMediaEditorFields` so common fields, ordering, validation bindings, and date controls have one implementation.
+`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module should add new behavior to the compatibility barrel. Add and edit modals share `createMediaEditorFields` so common fields, ordering, validation bindings, and date controls have one implementation. Media identity and modal actions live in `src/ui/media-editor-layout.ts` and `src/ui/ui-primitives.ts`, not independent copies in each modal. The UI presentation contract is in `docs/PROTOCOL.md`.
 
 - do not add implementations or domain rules to `legacy.ts`;
 - do not copy typed services back into `main.ts` or feature modules;
@@ -180,3 +180,11 @@ All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.str
 - Provider responses are external hints. Newly imported note defaults may use verified provenance rules; already-owned Markdown titles/frontmatter remain authoritative. Any existing-note migration stays a separate opt-in, review-first workflow.
 
 The public API/identity/alias, request-budget and fallback rules are defined in `docs/PROTOCOL.md`; avoid duplicating them in UI components or release-tracking services.
+
+### UI verification tiers
+
+Routine development uses the fast smoke suite and feature-targeted tests;
+`npm run check` and CI run the complete suite, including retained legacy
+characterization and migration checks. Browser interaction tests run explicitly
+by feature and in CI. For commands and responsibility boundaries, see
+`docs/TESTING.md`.
