@@ -1,6 +1,7 @@
 import { normalizePath, type App } from "obsidian";
 import { emptyRankingState, type RankingState } from "../../domain/pairwise-ranking";
 import { recoverStoredRankingRound } from "./round-schema";
+import { saveRankingRevision } from "./atomic-write";
 
 interface LoadedRanking {
   state: RankingState;
@@ -137,30 +138,10 @@ export class PairwiseRankingStore {
       const newValue = JSON.stringify(next);
       if (oldValue === newValue) { answer = current; return; }
       const adapter = this.app.vault.adapter;
-      const found = await adapter.exists(this.path);
       const folder = this.path.slice(0, this.path.lastIndexOf("/"));
       if (!(await adapter.exists(folder))) await adapter.mkdir(folder);
       const serialized = newValue + "\n";
-      if (found) {
-        // Ranking is UTF-8 JSON. Obsidian's DataAdapter.process() atomically
-        // reads, validates and writes the current text, so a second device
-        // cannot modify the file between our conflict check and our write.
-        // Never update this.loaded/original if this atomic operation fails.
-        const expected = this.original;
-        await adapter.process(this.path, (onDisk) => {
-          if (onDisk !== expected) {
-            throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
-          }
-          return serialized;
-        });
-      } else {
-        if (this.original !== null) {
-          throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
-        }
-        // First-time initialization: process() requires an existing file.
-        const bytes = new TextEncoder().encode(serialized);
-        await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-      }
+      await saveRankingRevision(adapter, this.path, this.original, serialized);
       this.original = serialized;
       this.loaded = next;
       answer = next;
