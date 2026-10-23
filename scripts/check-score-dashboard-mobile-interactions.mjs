@@ -102,6 +102,13 @@ const html = `<!doctype html>
       bubbles:true, cancelable:true, composed:true, pointerId, pointerType:"touch", isPrimary:true,
       clientX:x, clientY:y, buttons:type === "pointerup" ? 0 : 1,
     }));
+    const finger = (target, type, x, y, identifier = 7) => {
+      const point = new Touch({ identifier, target, clientX:x, clientY:y, pageX:x, pageY:y, screenX:x, screenY:y });
+      const touches = type === "touchend" || type === "touchcancel" ? [] : [point];
+      return target.dispatchEvent(new TouchEvent(type, {
+        bubbles:true, cancelable:true, composed:true, touches, targetTouches:touches, changedTouches:[point],
+      }));
+    };
     const center = (element) => {
       const rect = element.getBoundingClientRect();
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -174,11 +181,10 @@ const html = `<!doctype html>
       lane90.scrollIntoView({ block:"center" });
       await delay(30);
       const start = center(alpha);
-      const laneTarget = center(lane90);
-      const target = { x: start.x, y: laneTarget.y };
-      touch(alpha, "pointerdown", start.x, start.y, 11);
-      touch(alpha, "pointermove", target.x, target.y, 11);
-      touch(alpha, "pointerup", target.x, target.y, 11);
+      const target = center(lane90);
+      finger(alpha, "touchstart", start.x, start.y, 11);
+      finger(alpha, "touchmove", target.x, target.y, 11);
+      finger(alpha, "touchend", target.x, target.y, 11);
       alpha.click();
       await delay(80);
 
@@ -189,55 +195,71 @@ const html = `<!doctype html>
       details.mobilePosterPansNatively = getComputedStyle(alpha).touchAction === "auto";
       details.mobileNativeDragDisabled = alpha.draggable === false;
 
-      const alphaAfterDrag = poster("Alpha.md");
-      alphaAfterDrag.scrollIntoView({ block:"center" });
+      const alphaAfterSwipe = poster("Alpha.md");
+      alphaAfterSwipe.scrollIntoView({ block:"center" });
       await delay(30);
-      const longPressPoint = center(alphaAfterDrag);
-      touch(alphaAfterDrag, "pointerdown", longPressPoint.x, longPressPoint.y, 21);
-      await delay(500);
-      details.longPressEntersBatch = shell().classList.contains("is-batch-mode") && alphaAfterDrag.classList.contains("is-selected");
-      touch(alphaAfterDrag, "pointerup", longPressPoint.x, longPressPoint.y, 21);
-      alphaAfterDrag.click();
-      await delay(20);
-      details.generatedClickAfterLongPressSuppressed = shell().classList.contains("is-batch-mode")
-        && alphaAfterDrag.classList.contains("is-selected")
-        && selectedCount() === 1;
+      const longPressPoint = center(alphaAfterSwipe);
+      const dropPoint = center(lane("9.0"));
+      finger(alphaAfterSwipe, "touchstart", longPressPoint.x, longPressPoint.y, 21);
+      await delay(520);
+      details.longPressArmsMove = !!document.querySelector(".al-score-drag-preview")
+        && alphaAfterSwipe.classList.contains("is-dragging");
+      finger(alphaAfterSwipe, "touchmove", dropPoint.x, dropPoint.y, 21);
+      details.longPressHighlightsDropLane = lane("9.0").classList.contains("is-drop-target");
+      finger(alphaAfterSwipe, "touchend", dropPoint.x, dropPoint.y, 21);
+      alphaAfterSwipe.click();
+      await delay(150);
+      details.longPressDropChangesScore = applied.length === 1 && applied[0].length === 1
+        && applied[0][0].filePath === "Alpha.md" && applied[0][0].nextScore === 9
+        && poster("Alpha.md")?.dataset.score === "9.0";
+      details.longPressDragCleansUp = !document.querySelector(".al-score-drag-preview,.al-score-lane.is-drop-target,.al-score-poster.is-dragging");
+      details.longPressDoesNotEnterBatch = !shell().classList.contains("is-batch-mode");
+      details.generatedClickAfterLongPressSuppressed = opened.length === 0;
 
       const beta = poster("Beta.md");
+      const betaPoint = center(beta);
+      finger(beta, "touchstart", betaPoint.x, betaPoint.y, 22);
+      await delay(520);
+      finger(beta, "touchcancel", betaPoint.x, betaPoint.y, 22);
+      await delay(30);
+      details.cancelledLongPressDoesNotEdit = applied.length === 1
+        && !document.querySelector(".al-score-drag-preview,.al-score-poster.is-dragging");
+
+      const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
+      batchButton.click();
+      poster("Alpha.md").click();
       beta.click();
       await delay(20);
-      details.tapAddsSecondSelection = shell().classList.contains("is-batch-mode")
-        && selectedCount() === 2
-        && beta.classList.contains("is-selected");
+      details.explicitBatchSelectsTwo = shell().classList.contains("is-batch-mode")
+        && selectedCount() === 2 && beta.classList.contains("is-selected");
 
-      alphaAfterDrag.click();
+      poster("Alpha.md").click();
       await delay(20);
       details.deselectOneKeepsBatch = shell().classList.contains("is-batch-mode")
-        && selectedCount() === 1
-        && beta.classList.contains("is-selected");
+        && selectedCount() === 1 && beta.classList.contains("is-selected");
 
       beta.click();
       await delay(30);
       details.lastDeselectionExitsBatch = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
 
-      const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
       const batchPoint = center(batchButton);
       touch(batchButton, "pointerdown", batchPoint.x, batchPoint.y, 31);
       touch(batchButton, "pointerup", batchPoint.x, batchPoint.y, 31);
       batchButton.click();
       await delay(30);
       details.emptyTouchBatchCannotPersist = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
+
       batchButton.click();
       poster("Alpha.md").click();
       const moveTo = dashboard.querySelector(".al-score-batch-target");
-      moveTo.value = "9.0";
+      moveTo.value = "8.5";
       moveTo.dispatchEvent(new Event("change", { bubbles:true }));
       await delay(100);
-      details.explicitTargetSelectionChangesScore = applied.length === 1
-        && applied[0].length === 1
-        && applied[0][0].filePath === "Alpha.md"
-        && applied[0][0].nextScore === 9
-        && poster("Alpha.md")?.dataset.score === "9.0";
+      details.explicitTargetSelectionChangesScore = applied.length === 2
+        && applied[1].length === 1
+        && applied[1][0].filePath === "Alpha.md"
+        && applied[1][0].nextScore === 8.5
+        && poster("Alpha.md")?.dataset.score === "8.5";
 
       const alphaBeforeFilters = poster("Alpha.md");
       const alphaCoverBeforeFilters = alphaBeforeFilters?.querySelector("img");
