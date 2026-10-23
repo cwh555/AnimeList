@@ -275,8 +275,8 @@ export function prepareRankingRounds(
     list.evidence ??= legacyRankingEvidence(list.ordered);
     const left = baseline[first - 2], right = baseline[last];
     const preserved = participants.map(path => ({
-      path, leftProven: Boolean(left && provesBefore(list.evidence!, left, path)),
-      rightProven: Boolean(right && provesBefore(list.evidence!, path, right)),
+      path, leftProven: Boolean(left && provesBefore(list.evidence, left, path)),
+      rightProven: Boolean(right && provesBefore(list.evidence, path, right)),
     }));
     removeRankingEvidencePaths(list.evidence, new Set(participants));
     for (const entry of preserved) {
