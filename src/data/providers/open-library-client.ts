@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { withProviderRequestDeadline } from "./request-deadline";
 import { USER_AGENT } from "../../app-metadata";
 import type { MediaType } from "../../domain/media-types";
 import { asArray } from "../../domain/value-normalization";
@@ -39,11 +40,11 @@ export class OpenLibraryClient implements MetadataProviderClient {
     const normalizedPage = Math.max(1, Math.floor(page));
     const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
     const language = openLibrarySearchLanguage(locale);
-    const response = await requestUrl({
+    const response = await withProviderRequestDeadline("Open Library", () => requestUrl({
       url: `${OPEN_LIBRARY_SEARCH_ENDPOINT}?title=${encodeURIComponent(query)}&fields=${encodeURIComponent(OPEN_LIBRARY_FIELDS)}&limit=${OPEN_LIBRARY_PAGE_SIZE}&page=${normalizedPage}&lang=${language}`,
       method: "GET",
       headers: { Accept: "application/json", "User-Agent": USER_AGENT },
-    });
+    }));
     const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
     const payload = record(parsed);
     const docs = asArray(payload.docs);
