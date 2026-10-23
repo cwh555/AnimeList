@@ -9,7 +9,7 @@
     "build": "npm run styles:check && tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
-    "test": "node scripts/run-tests.mjs --smoke",
+    "test": "node scripts/run-tests.mjs",
     "test:all": "node scripts/run-tests.mjs --all",
     "test:smoke": "node scripts/run-tests.mjs --smoke",
     "test:ui": "node scripts/run-tests.mjs --feature ui",
