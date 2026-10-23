@@ -108,6 +108,7 @@ export const TEST_TARGETS = [
   { path: "tests/search-entity-resolution.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/multilingual-search.test.ts", kind: "test", suite: "unit", features: ["search"] },
   { path: "tests/search-pagination.test.ts", kind: "test", suite: "unit", features: ["search"] },
+  { path: "tests/provider-request-deadline.test.ts", kind: "test", suite: "unit", features: ["search"], smoke: true },
   { path: "tests/search-settings.test.ts", kind: "test", suite: "integration", features: ["search", "settings"] },
 
   { path: "tests/serial-entry-cover.test.ts", kind: "test", suite: "unit", features: ["serial-covers"] },
