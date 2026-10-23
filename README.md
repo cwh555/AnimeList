@@ -45,7 +45,9 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new in 1.6.0 — release candidate**
+> **What's new**
+>
+> **AnimeList 1.6.0**
 >
 > - **Rank completed works by preference:** Compare two covers at a time to build a personal, independent ranking for anime, manga, and novels. Pause and resume later, revisit unranked works, and keep rankings separate from numeric scores.
 > - **Make your library look the way you want:** Replace an existing work's cover with your own local image without losing its metadata or previous artwork.
