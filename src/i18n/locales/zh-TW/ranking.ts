@@ -34,7 +34,7 @@ export const RANKING_MESSAGES = {
   "empty": "尚無排名",
   "pendingTitle": "待定",
   "pendingHint": "待確認名次",
-  "possible": "可能名次 {first}–{last}",
+  "possible": "可能名次 {first}～{last}",
   "onePosition": "可能名次 {first}",
   "retry": "比較",
   "openNote": "開啟筆記",
