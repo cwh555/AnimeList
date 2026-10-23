@@ -202,7 +202,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
       const label = makeEl("div", "al-ranking-pending-label");
       label.append(rankingCover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
       const bounds = boundsByPath.get(path);
-      const info = makeEl("span", "al-ranking-pending-bounds", bounds?.first === bounds?.last
+      const info = makeEl("span", "al-ranking-pending-bounds", bounds != null && bounds.first === bounds.last
         ? t("onePosition", { first: bounds.first })
         : t("possible", { first: bounds?.first ?? 1, last: bounds?.last ?? eligible.length }));
       row.append(label, info);
