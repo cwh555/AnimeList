@@ -3845,6 +3845,7 @@ button.al-moment-stack-strip:focus-visible {
 .al-score-poster-missing svg { width:42%; height:42%; fill:none; stroke:currentColor; }
 .al-score-lane-empty { align-self:center; color:var(--text-faint); font-size:.68rem; line-height:1.2; }
 .al-score-drag-preview { position:fixed; z-index:10000; top:-10000px; left:-10000px; overflow:visible; pointer-events:none; }
+.al-score-drag-preview.is-touch-drag { top:0; left:0; }
 .al-score-drag-preview::before,.al-score-drag-preview::after { content:""; position:absolute; inset:0; border:1px solid color-mix(in srgb,var(--text-normal) 22%,transparent); border-radius:5px; background:var(--background-secondary); box-shadow:0 4px 12px rgba(0,0,0,.24); }
 .al-score-drag-preview::before,.al-score-drag-preview::after { display:none; }
 .al-score-drag-preview[data-stack-depth="1"]::before { display:block; transform:translate(7px,7px) rotate(2deg); }
