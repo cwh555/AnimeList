@@ -1,6 +1,7 @@
 import { normalizePath, type App } from "obsidian";
 import { emptyRankingState, type RankingState } from "../../domain/pairwise-ranking";
 import { recoverStoredRankingRound } from "./round-schema";
+import { saveRankingRevision } from "./atomic-write";
 
 interface LoadedRanking {
   state: RankingState;
@@ -137,14 +138,11 @@ export class PairwiseRankingStore {
       const newValue = JSON.stringify(next);
       if (oldValue === newValue) { answer = current; return; }
       const adapter = this.app.vault.adapter;
-      const found = await adapter.exists(this.path);
-      const onDisk = found ? new TextDecoder().decode(await adapter.readBinary(this.path)) : null;
-      if (onDisk !== this.original) throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
       const folder = this.path.slice(0, this.path.lastIndexOf("/"));
       if (!(await adapter.exists(folder))) await adapter.mkdir(folder);
-      const bytes = new TextEncoder().encode(newValue + "\n");
-      await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-      this.original = newValue + "\n";
+      const serialized = newValue + "\n";
+      await saveRankingRevision(adapter, this.path, this.original, serialized);
+      this.original = serialized;
       this.loaded = next;
       answer = next;
     });
