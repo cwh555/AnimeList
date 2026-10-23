@@ -313,14 +313,17 @@ export class AddMediaModal extends AnimeListModal {
     typeFieldHost.appendChild(coverPreview);
     this.contentEl.appendChild(typeFieldHost);
 
-    const templates = await this.plugin.getTemplates(mediaType).catch((error: unknown) => {
+    let templates: Array<{ path: string; name: string }>;
+    try {
+      templates = await this.plugin.getTemplates(mediaType);
+    } catch (error) {
       if (this.navigation.isCurrent(generation)) {
         console.error("AnimeList manual template loading failed", error);
         new Notice(uiText("notice.searchUnavailable"));
       }
-      return null;
-    });
-    if (!templates || !this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
+      return;
+    }
+    if (!this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
     this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
