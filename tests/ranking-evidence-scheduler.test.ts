@@ -46,6 +46,8 @@ describe("ranking evidence and diverse comparison schedule", () => {
       rankingSeriesKey(item("輝夜大小姐想讓我告白 劇場版")));
     assert.equal(rankingSeriesKey(item("Attack on Titan Season 2")),
       rankingSeriesKey(item("Attack on Titan The Movie")));
+    assert.equal(rankingSeriesKey(item("劇場版 輝夜大小姐想讓我告白")),
+      rankingSeriesKey(item("輝夜大小姐想讓我告白 第三季")));
     assert.notEqual(rankingSeriesKey(item("Love Is War")), rankingSeriesKey(item("Love Is Magic")));
   });
   it("does not repeat first-stage matchings before the round-robin cycle repeats", () => {
