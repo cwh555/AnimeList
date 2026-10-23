@@ -29,13 +29,15 @@ jobs:
       - name: Run full checks in UTC
         run: TZ=UTC npm run check
       - name: Run full tests in Asia/Taipei
-        run: TZ=Asia/Taipei npm test
+        run: TZ=Asia/Taipei npm run test:all
       - name: Run segmented-date keyboard flow in Chromium
         run: npm run test:browser:date
       - name: Validate English-only title migration dialog in desktop and mobile Chromium
         run: npm run test:browser:title-localization
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run shared modal UI protocol in Chromium
+        run: npm run test:browser:ui
       - name: Run media cover replacement picker in Chromium
         run: npm run test:browser:cover-upload
       - name: Run Lightbox layout and interaction regressions in Chromium

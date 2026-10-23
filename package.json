@@ -9,8 +9,12 @@
     "build": "npm run styles:check && tsc --noEmit --pretty false && node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src types --max-warnings 0",
-    "test": "node scripts/run-tests.mjs",
-    "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm run architecture:check && npm test && npm run community:check && npm run build",
+    "test": "node scripts/run-tests.mjs --smoke",
+    "test:all": "node scripts/run-tests.mjs --all",
+    "test:smoke": "node scripts/run-tests.mjs --smoke",
+    "test:ui": "node scripts/run-tests.mjs --feature ui",
+    "check": "npm run typecheck && npm run typecheck:strict && npm run lint && npm run architecture:check && npm run test:all && npm run community:check && npm run build",
+    "check:quick": "npm run typecheck && npm run typecheck:strict && npm run lint && npm run architecture:check && npm test && npm run build",
     "test-vault": "npm run check && npm run release:check && node scripts/test-vault.mjs production",
     "test-vault:dev": "node scripts/test-vault.mjs development",
     "test-vault:fixtures": "node scripts/release-tracking-test-fixtures.mjs --reset",
@@ -53,6 +57,7 @@
     "test:browser:image-empty-target": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-empty-drop-target.mjs",
     "test:browser:image-final-slot": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-image-section-final-slot.mjs",
     "test:browser:cover-upload": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-media-cover-picker.mjs",
+    "test:browser:ui": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-modal-ui-protocol.mjs && npm run test:browser:cover-upload",
     "test:browser:title-localization": "node scripts/check-title-localization-modal.mjs"
   },
   "keywords": [
