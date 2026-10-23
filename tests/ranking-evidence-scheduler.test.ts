@@ -8,7 +8,7 @@ import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-sch
 import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
 import {
   completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
-  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths,
+  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, moveRankedItem,
 } from "../src/domain/pairwise-ranking";
 
 const item = (name: string): MediaItem => ({
@@ -29,6 +29,16 @@ describe("ranking evidence and diverse comparison schedule", () => {
     assert.deepEqual(certifyRankingOrder(["A", "unknown", "B", "C"], evidence),
       { ordered: ["A", "B", "C"], pending: ["unknown"] });
     assert.equal(Object.keys(legacyRankingEvidence(["A", "B", "C"])).length, 2);
+  });
+  it("preserves transitive order when manual drag moves an intermediate work", () => {
+    const list = emptyRankingCollection();
+    list.ordered = ["A", "B", "C", "D"];
+    list.evidence = legacyRankingEvidence(list.ordered);
+    assert.ok(moveRankedItem(list, "B", 4));
+    assert.deepEqual(list.ordered, ["A", "C", "D", "B"]);
+    for (let index = 1; index < list.ordered.length; index += 1) {
+      assert.ok(provesBefore(list.evidence ?? {}, list.ordered[index - 1], list.ordered[index]));
+    }
   });
   it("detects explicit season and film variants without matching unrelated works", () => {
     assert.equal(rankingSeriesKey(item("輝夜大小姐想讓我告白 第二季")),
