@@ -2,7 +2,7 @@ import { Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
-  prepareRanking, rankingBounds, rankingConfirmedPositions,
+  prepareRanking, rankingPositionProjection,
   reconcileRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
@@ -77,7 +77,9 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const byPath = new Map(eligible.map((item) => [item.filePath, item]));
   // Compute reachability only once per render; the same certificate drives
   // the displayed ranks and the exhaustive pending partition.
-  const confirmed = rankingConfirmedPositions(list, eligible);
+  const projection = rankingPositionProjection(list, eligible);
+  const confirmed = projection.confirmed;
+  const boundsByPath = new Map(projection.possible.map(range => [range.path, range]));
   const confirmedPaths = new Set(confirmed.map(entry => entry.path));
   const unresolved = eligible.map(item => item.filePath).filter(path => !confirmedPaths.has(path));
   const counts = { ranked: confirmed.length, pending: unresolved.length };
@@ -196,16 +198,13 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     for (const path of unresolved) {
       const item = byPath.get(path);
       if (!item) continue;
-      const attempt = list.pending[path] ?? (list.active?.path === path ? list.active : null);
       const row = makeEl("div", "al-ranking-pending-row");
       const label = makeEl("div", "al-ranking-pending-label");
       label.append(rankingCover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
-      const bounds = attempt ? rankingBounds(list, attempt) : null;
-      const info = makeEl("span", "al-ranking-pending-bounds", !bounds || counts.pending > 1
-        ? (list.round ? t("progress") : t("pendingHint"))
-        : bounds.first === bounds.last
-          ? t("onePosition", { first: bounds.first + 1 })
-          : t("possible", { first: bounds.first + 1, last: bounds.last + 1 }));
+      const bounds = boundsByPath.get(path);
+      const info = makeEl("span", "al-ranking-pending-bounds", bounds?.first === bounds?.last
+        ? t("onePosition", { first: bounds.first })
+        : t("possible", { first: bounds?.first ?? 1, last: bounds?.last ?? eligible.length }));
       row.append(label, info);
       pendingSection.appendChild(row);
     }
