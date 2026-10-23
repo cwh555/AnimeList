@@ -124,7 +124,6 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const stats = makeEl("div", "al-ranking-stats");
   stats.append(
     makeEl("span", "", t("ranked", { count: counts.ranked })),
-    makeEl("span", "", t("unranked", { count: counts.unranked })),
     makeEl("span", counts.pending ? "has-pending" : "", t("pending", { count: counts.pending })),
   );
   header.append(typeTabs, stats);
