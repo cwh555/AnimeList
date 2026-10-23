@@ -4,6 +4,11 @@ import {
   type RankingRound,
 } from "./ranking-rounds";
 export { roundProgress } from "./ranking-rounds";
+import { diverseRankingOrder } from "./ranking-scheduler";
+import {
+  type RankingEvidence, recordRankingEvidence, provesBefore, legacyRankingEvidence,
+  certifyRankingOrder, declareManualPosition, renameRankingEvidencePath,
+} from "./ranking-evidence";
 
 export type RankingChoice = "better" | "worse" | "skip";
 export type RankingMode = "new" | "pending" | "reset";
@@ -16,6 +21,10 @@ export interface RankingAttempt {
 
 export interface RankingCollection {
   ordered: string[];
+  /** Strict user-answer graph; absent only in legacy v1 ranking files. */
+  evidence?: RankingEvidence;
+  /** Persisted round-robin generation ensures distinct early pairings on rerank. */
+  roundGeneration?: number;
   pending: Record<string, RankingAttempt>;
   active: RankingAttempt | null;
   round?: RankingRound | null;
@@ -43,7 +52,7 @@ export interface RankingBounds {
 }
 
 export function emptyRankingCollection(): RankingCollection {
-  return { ordered: [], pending: {}, active: null, round: null, pendingQueue: null };
+  return { ordered: [], evidence: {}, roundGeneration: 0, pending: {}, active: null, round: null, pendingQueue: null };
 }
 
 export function emptyRankingState(): RankingState {
@@ -99,6 +108,18 @@ function settleActive(list: RankingCollection): void {
   const { first, last } = rankingBounds(list, list.active);
   if (first === last) {
     list.ordered.splice(first, 0, list.active.path);
+    if (list.evidence) {
+      const at = first;
+      const before = list.ordered[at - 1];
+      const after = list.ordered[at + 1];
+      // A unique binary-insertion slot is supported by strict answers.
+      if (before && !provesBefore(list.evidence, before, list.active.path)) {
+        throw new Error("Cannot confirm rank without a strict comparison proof.");
+      }
+      if (after && !provesBefore(list.evidence, list.active.path, after)) {
+        throw new Error("Cannot confirm rank without a strict comparison proof.");
+      }
+    }
     delete list.pending[list.active.path];
     list.active = null;
   } else if (!nextRankingPair(list)) {
@@ -128,6 +149,10 @@ function advancePendingQueue(list: RankingCollection): void {
 
 export function reconcileRanking(list: RankingCollection, eligible: readonly MediaItem[]): void {
   const allowed = new Set(eligible.map((item) => item.filePath));
+  // Existing ranks represent comparisons already committed by the user.
+  // Only legacy files lack a stored proof graph; preserve their established
+  // order, without inventing relationships to unknown or pending entries.
+  if (!list.evidence) list.evidence = legacyRankingEvidence(list.ordered);
   if (list.round) {
     mapRankingRound(list.round, (path) => allowed.has(path) ? path : null);
     const finished = advanceRound(list.round);
@@ -194,6 +219,12 @@ function finishRankingRound(list: RankingCollection, sequence: string[]): void {
     list.ordered = sequence;
   }
   list.round = null;
+  const certified = certifyRankingOrder(list.ordered, list.evidence ?? {});
+  list.ordered = certified.ordered;
+  for (const path of certified.pending) {
+    list.pending[path] ??= { path, comparisons: {} };
+  }
+  for (const path of list.ordered) delete list.pending[path];
   settleUnambiguousPending(list);
 }
 
@@ -231,7 +262,13 @@ export function prepareRankingRounds(
     }
   }
   const baseline = kind === "full" ? [] : [...list.ordered];
-  list.round = startRankingRound(participants, kind, baseline, first - 1, participants.length);
+  const generation = list.roundGeneration ?? 0;
+  list.roundGeneration = generation + 1;
+  if (kind === "full") list.evidence = {};
+  const participantSet = new Set(participants);
+  const scheduled = diverseRankingOrder(eligible.filter(item => participantSet.has(item.filePath)), generation);
+  // Preserve baseline as one sorted run for incremental merge.
+  list.round = startRankingRound(scheduled, kind, baseline, first - 1, participants.length);
   const finished = advanceRound(list.round);
   if (finished) finishRankingRound(list, finished);
   return Boolean(nextRankingPair(list)) || participants.length > 0;
@@ -244,6 +281,7 @@ export function prepareRanking(list: RankingCollection, eligible: readonly Media
     list.pending = {};
     list.active = null;
     list.pendingQueue = null;
+    list.evidence = {};
   }
   if (mode === "pending") {
     // Snapshot the entire batch once. A skipped item may remain pending, but
@@ -295,6 +333,10 @@ export function decideRanking(
   if (!pair) return false;
   if (list.round) {
     const result = answerRound(list.round, choice);
+    if (result.better && result.worse) {
+      list.evidence ??= {};
+      recordRankingEvidence(list.evidence, result.better, result.worse);
+    }
     if (result.skipped) {
       list.pending[result.skipped] = {
         path: result.skipped,
@@ -306,6 +348,12 @@ export function decideRanking(
   }
   if (!list.active) return false;
   list.active.comparisons[pair.reference] = choice;
+  if (choice !== "skip") {
+    list.evidence ??= {};
+    recordRankingEvidence(list.evidence,
+      choice === "better" ? pair.candidate : pair.reference,
+      choice === "better" ? pair.reference : pair.candidate);
+  }
   settleActive(list);
   settleUnambiguousPending(list);
   if (!list.active) {
@@ -362,6 +410,8 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   list.round = null;
   list.ordered.splice(oldIndex, 1);
   list.ordered.splice(newIndex, 0, path);
+  list.evidence ??= legacyRankingEvidence(list.ordered.filter(item => item !== path));
+  declareManualPosition(list.evidence, list.ordered, path);
   // Every unaffected ranked pair keeps its relative order. Only comparisons to
   // the moved work can contradict the latest explicit manual order.
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
@@ -375,6 +425,8 @@ export function placePendingItem(list: RankingCollection, path: string, position
     || position < 1 || position > list.ordered.length + 1) return false;
   list.round = null;
   list.ordered.splice(position - 1, 0, path);
+  list.evidence ??= legacyRankingEvidence(list.ordered.filter(item => item !== path));
+  declareManualPosition(list.evidence, list.ordered, path);
   delete list.pending[path];
   for (const candidate of Object.values(list.pending)) delete candidate.comparisons[path];
   if (list.active) delete list.active.comparisons[path];
@@ -385,6 +437,14 @@ export function recompareRankedItem(list: RankingCollection, path: string): bool
   const index = list.ordered.indexOf(path);
   if (index < 0) return false;
   list.ordered.splice(index, 1);
+  if (list.evidence) {
+    // Old path relationships no longer apply while it is being re-compared.
+    delete list.evidence[path];
+    for (const targets of Object.values(list.evidence)) {
+      const offset = targets.indexOf(path);
+      if (offset >= 0) targets.splice(offset, 1);
+    }
+  }
   list.pending[path] = { path, comparisons: {} };
   if (list.active?.path === path) list.active = null;
   for (const attempt of Object.values(list.pending)) delete attempt.comparisons[path];
@@ -412,7 +472,22 @@ export function removeRankingPath(state: RankingState, path: string): boolean {
       }
     }
     const previous = list.ordered.length;
+    if (list.evidence && list.ordered.includes(path)) {
+      const oldIndex = list.ordered.indexOf(path);
+      const before = list.ordered[oldIndex - 1];
+      const after = list.ordered[oldIndex + 1];
+      if (before && after && provesBefore(list.evidence, before, after)) {
+        recordRankingEvidence(list.evidence, before, after);
+      }
+    }
     list.ordered = list.ordered.filter((item) => item !== path);
+    if (list.evidence) {
+      delete list.evidence[path];
+      for (const targets of Object.values(list.evidence)) {
+        const index = targets.indexOf(path);
+        if (index >= 0) targets.splice(index, 1);
+      }
+    }
     if (previous !== list.ordered.length) changedHere = true;
     if (Object.hasOwn(list.pending, path)) {
       delete list.pending[path];
@@ -454,6 +529,7 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
       mapRankingRound(list.round, (item) => item === from ? to : item);
       if (oldRound !== JSON.stringify(list.round)) { changed = true;  }
     }
+    if (list.evidence) renameRankingEvidencePath(list.evidence, from, to);
     const replace = (value: string): string => value === from ? to : value;
     if (list.ordered.includes(from)) {
       list.ordered = [...new Set(list.ordered.map(replace))];
@@ -481,14 +557,16 @@ export function renameRankingPath(state: RankingState, from: string, to: string)
   return changed;
 }
 
+/** Complete, disjoint view partition: all eligible work is either proven
+ * against the ranked chain or explicitly visible as unresolved.
+ */
+export function rankingUnresolvedPaths(list: RankingCollection, eligible: readonly MediaItem[]): string[] {
+  const ranked = new Set(list.ordered);
+  return [...new Set(eligible.map(item => item.filePath).filter(path => !ranked.has(path)))];
+}
+
 export function rankingCounts(list: RankingCollection, eligible: readonly MediaItem[]): {
   ranked: number; pending: number; unranked: number;
 } {
-  const excluded = new Set([...list.ordered, ...Object.keys(list.pending)]);
-  if (list.active) excluded.add(list.active.path);
-  return {
-    ranked: list.ordered.length,
-    pending: Object.keys(list.pending).length,
-    unranked: eligible.filter((item) => !excluded.has(item.filePath)).length + (list.active ? 1 : 0),
-  };
+  return { ranked: list.ordered.length, pending: rankingUnresolvedPaths(list, eligible).length, unranked: 0 };
 }
