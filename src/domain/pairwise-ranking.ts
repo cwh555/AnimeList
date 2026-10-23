@@ -442,6 +442,14 @@ export function moveRankedItem(list: RankingCollection, path: string, position: 
   if (oldIndex < 0 || !Number.isFinite(position) || oldIndex === newIndex) return false;
   // Explicit manual movement takes priority over an unfinished automatic round.
   list.round = null;
+  list.evidence ??= legacyRankingEvidence(list.ordered);
+  // A former intermediate entry may be the only transitive path between its
+  // neighbors. Materialize that already-proven shortcut before invalidating
+  // comparisons involving the moved entry.
+  const oldBefore = list.ordered[oldIndex - 1], oldAfter = list.ordered[oldIndex + 1];
+  if (oldBefore && oldAfter && provesBefore(list.evidence, oldBefore, oldAfter)) {
+    recordRankingEvidence(list.evidence, oldBefore, oldAfter);
+  }
   list.ordered.splice(oldIndex, 1);
   list.ordered.splice(newIndex, 0, path);
   list.evidence ??= legacyRankingEvidence(list.ordered.filter(item => item !== path));
