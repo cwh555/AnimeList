@@ -47,6 +47,7 @@ export class AddMediaModal extends AnimeListModal {
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
   hasMore = false;
+  sessionId: string | null = null;
   private searchGeneration = 0;
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
@@ -174,6 +175,7 @@ export class AddMediaModal extends AnimeListModal {
     this.results = [];
     this.warnings = [];
     this.hasMore = false;
+    this.sessionId = null;
     this.contentEl.querySelector(".al-search-pagination")?.remove();
     const current = this.contentEl.querySelector<HTMLElement>(".al-search-results");
     if (current) current.replaceChildren(makeEl("p", "al-modal-hint", uiText("add.searching")));
@@ -193,12 +195,14 @@ export class AddMediaModal extends AnimeListModal {
       this.results = response.results;
       this.warnings = response.warnings;
       this.hasMore = response.hasMore ?? this.results.length > 0;
+      this.sessionId = response.sessionId ?? null;
       if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
       if (generation !== this.searchGeneration || mediaType !== this.mediaType || query !== this.query) return;
       console.error("AnimeList external search failed", error);
       this.results = [];
       this.hasMore = false;
+      this.sessionId = null;
       this.warnings = [errorMessage(error)];
       new Notice(uiText("notice.searchUnavailable"));
     }
