@@ -58,6 +58,19 @@ const html = `<!doctype html>
     window.createEl = (tag) => document.createElement(tag);
     window.createDiv = () => document.createElement("div");
     window.createSpan = () => document.createElement("span");
+    HTMLElement.prototype.createDiv = function(options = {}) {
+      const el = document.createElement("div");
+      if (options.cls) el.className = options.cls;
+      this.appendChild(el); return el;
+    };
+    HTMLElement.prototype.createEl = function(tag, options = {}) {
+      const el = document.createElement(tag);
+      if (options.cls) el.className = options.cls;
+      if (options.text) el.textContent = options.text;
+      this.appendChild(el); return el;
+    };
+    window.__touchErrors = [];
+    window.addEventListener("error", event => window.__touchErrors.push(event.message));
     window.__coverObservers = [];
     window.IntersectionObserver = class {
       constructor(callback, options) {
@@ -102,6 +115,13 @@ const html = `<!doctype html>
       bubbles:true, cancelable:true, composed:true, pointerId, pointerType:"touch", isPrimary:true,
       clientX:x, clientY:y, buttons:type === "pointerup" ? 0 : 1,
     }));
+    const finger = (target, type, x, y, identifier = 7) => {
+      const point = new Touch({ identifier, target, clientX:x, clientY:y, pageX:x, pageY:y, screenX:x, screenY:y });
+      const touches = type === "touchend" || type === "touchcancel" ? [] : [point];
+      return target.dispatchEvent(new TouchEvent(type, {
+        bubbles:true, cancelable:true, composed:true, touches, targetTouches:touches, changedTouches:[point],
+      }));
+    };
     const center = (element) => {
       const rect = element.getBoundingClientRect();
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -109,6 +129,7 @@ const html = `<!doctype html>
     const poster = (path) => dashboard.querySelector('.al-score-poster[data-file-path="' + path + '"]');
     const lane = (score) => dashboard.querySelector('.al-score-lane[data-score="' + score + '"]');
     const shell = () => dashboard.querySelector('.al-score-dashboard');
+    window.__scoreTouchHarness = { dashboard, poster, lane, applied, opened };
     const selectedCount = () => dashboard.querySelectorAll('.al-score-poster.is-selected').length;
 
     (async () => {
@@ -148,7 +169,7 @@ const html = `<!doctype html>
         lane90.dispatchEvent(new DragEvent("drop", { bubbles:true, cancelable:true, dataTransfer:transfer }));
         await delay(150);
         details.desktopDragChangesScore = applied.length===1 && applied[0].length===1 && applied[0][0].filePath==="Alpha.md" && applied[0][0].nextScore===9;
-        document.body.dataset.details = JSON.stringify(details);
+        document.body.dataset.details = JSON.stringify({ ...details, touchErrors:window.__touchErrors });
         document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
         return;
       }
@@ -174,11 +195,10 @@ const html = `<!doctype html>
       lane90.scrollIntoView({ block:"center" });
       await delay(30);
       const start = center(alpha);
-      const laneTarget = center(lane90);
-      const target = { x: start.x, y: laneTarget.y };
-      touch(alpha, "pointerdown", start.x, start.y, 11);
-      touch(alpha, "pointermove", target.x, target.y, 11);
-      touch(alpha, "pointerup", target.x, target.y, 11);
+      const target = center(lane90);
+      finger(alpha, "touchstart", start.x, start.y, 11);
+      finger(alpha, "touchmove", target.x, target.y, 11);
+      finger(alpha, "touchend", target.x, target.y, 11);
       alpha.click();
       await delay(80);
 
@@ -189,55 +209,71 @@ const html = `<!doctype html>
       details.mobilePosterPansNatively = getComputedStyle(alpha).touchAction === "auto";
       details.mobileNativeDragDisabled = alpha.draggable === false;
 
-      const alphaAfterDrag = poster("Alpha.md");
-      alphaAfterDrag.scrollIntoView({ block:"center" });
+      const alphaAfterSwipe = poster("Alpha.md");
+      alphaAfterSwipe.scrollIntoView({ block:"center" });
       await delay(30);
-      const longPressPoint = center(alphaAfterDrag);
-      touch(alphaAfterDrag, "pointerdown", longPressPoint.x, longPressPoint.y, 21);
-      await delay(500);
-      details.longPressEntersBatch = shell().classList.contains("is-batch-mode") && alphaAfterDrag.classList.contains("is-selected");
-      touch(alphaAfterDrag, "pointerup", longPressPoint.x, longPressPoint.y, 21);
-      alphaAfterDrag.click();
-      await delay(20);
-      details.generatedClickAfterLongPressSuppressed = shell().classList.contains("is-batch-mode")
-        && alphaAfterDrag.classList.contains("is-selected")
-        && selectedCount() === 1;
+      const longPressPoint = center(alphaAfterSwipe);
+      const dropPoint = center(lane("9.0"));
+      finger(alphaAfterSwipe, "touchstart", longPressPoint.x, longPressPoint.y, 21);
+      await delay(520);
+      details.longPressArmsMove = !!document.querySelector(".al-score-drag-preview")
+        && alphaAfterSwipe.classList.contains("is-dragging");
+      finger(alphaAfterSwipe, "touchmove", dropPoint.x, dropPoint.y, 21);
+      details.longPressHighlightsDropLane = lane("9.0").classList.contains("is-drop-target");
+      finger(alphaAfterSwipe, "touchend", dropPoint.x, dropPoint.y, 21);
+      alphaAfterSwipe.click();
+      await delay(150);
+      details.longPressDropChangesScore = applied.length === 1 && applied[0].length === 1
+        && applied[0][0].filePath === "Alpha.md" && applied[0][0].nextScore === 9
+        && poster("Alpha.md")?.dataset.score === "9.0";
+      details.longPressDragCleansUp = !document.querySelector(".al-score-drag-preview,.al-score-lane.is-drop-target,.al-score-poster.is-dragging");
+      details.longPressDoesNotEnterBatch = !shell().classList.contains("is-batch-mode");
+      details.generatedClickAfterLongPressSuppressed = opened.length === 0;
 
       const beta = poster("Beta.md");
+      const betaPoint = center(beta);
+      finger(beta, "touchstart", betaPoint.x, betaPoint.y, 22);
+      await delay(520);
+      finger(beta, "touchcancel", betaPoint.x, betaPoint.y, 22);
+      await delay(30);
+      details.cancelledLongPressDoesNotEdit = applied.length === 1
+        && !document.querySelector(".al-score-drag-preview,.al-score-poster.is-dragging");
+
+      const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
+      batchButton.click();
+      poster("Alpha.md").click();
       beta.click();
       await delay(20);
-      details.tapAddsSecondSelection = shell().classList.contains("is-batch-mode")
-        && selectedCount() === 2
-        && beta.classList.contains("is-selected");
+      details.explicitBatchSelectsTwo = shell().classList.contains("is-batch-mode")
+        && selectedCount() === 2 && beta.classList.contains("is-selected");
 
-      alphaAfterDrag.click();
+      poster("Alpha.md").click();
       await delay(20);
       details.deselectOneKeepsBatch = shell().classList.contains("is-batch-mode")
-        && selectedCount() === 1
-        && beta.classList.contains("is-selected");
+        && selectedCount() === 1 && beta.classList.contains("is-selected");
 
       beta.click();
       await delay(30);
       details.lastDeselectionExitsBatch = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
 
-      const batchButton = dashboard.querySelector('.al-score-dashboard-action-group .al-score-tool-button:last-child');
       const batchPoint = center(batchButton);
       touch(batchButton, "pointerdown", batchPoint.x, batchPoint.y, 31);
       touch(batchButton, "pointerup", batchPoint.x, batchPoint.y, 31);
       batchButton.click();
       await delay(30);
       details.emptyTouchBatchCannotPersist = !shell().classList.contains("is-batch-mode") && selectedCount() === 0;
+
       batchButton.click();
       poster("Alpha.md").click();
       const moveTo = dashboard.querySelector(".al-score-batch-target");
-      moveTo.value = "9.0";
+      moveTo.value = "8.5";
       moveTo.dispatchEvent(new Event("change", { bubbles:true }));
       await delay(100);
-      details.explicitTargetSelectionChangesScore = applied.length === 1
-        && applied[0].length === 1
-        && applied[0][0].filePath === "Alpha.md"
-        && applied[0][0].nextScore === 9
-        && poster("Alpha.md")?.dataset.score === "9.0";
+      details.explicitTargetSelectionChangesScore = applied.length === 2
+        && applied[1].length === 1
+        && applied[1][0].filePath === "Alpha.md"
+        && applied[1][0].nextScore === 8.5
+        && poster("Alpha.md")?.dataset.score === "8.5";
 
       const alphaBeforeFilters = poster("Alpha.md");
       const alphaCoverBeforeFilters = alphaBeforeFilters?.querySelector("img");
@@ -275,7 +311,7 @@ const html = `<!doctype html>
         && alphaCoverAfterChange?.getAttribute("src") === cover2
         && !alphaCoverBeforeFilters?.isConnected;
 
-      document.body.dataset.details = JSON.stringify(details);
+      document.body.dataset.details = JSON.stringify({ ...details, touchErrors:window.__touchErrors });
       document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
     })().catch((error) => {
       document.body.dataset.details = String(error?.stack || error);
@@ -292,6 +328,42 @@ try {
     testName: "Score Dashboard mobile touch interaction test",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    interact: async ({ send, sleep }) => {
+      const evaluate = async (expression) => {
+        const output = await send("Runtime.evaluate", { expression, returnByValue: true });
+        if (output.exceptionDetails) throw new Error(output.exceptionDetails.text);
+        return output.result.value;
+      };
+      for (let attempt = 0; attempt < 160; attempt++) {
+        if (await evaluate("document.body.dataset.result") !== "pending") break;
+        await sleep(30);
+      }
+      if (await evaluate("document.body.dataset.result") !== "pass") return;
+      const points = JSON.parse(await evaluate(`JSON.stringify((() => {
+        const { poster, lane } = window.__scoreTouchHarness;
+        const source = poster("Alpha.md"), target = lane("9.0");
+        source.scrollIntoView({ block:"center" });
+        const middle = el => { const r=el.getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 }; };
+        return { source:middle(source), target:middle(target) };
+      })())`));
+      await send("Emulation.setTouchEmulationEnabled", { enabled:true, maxTouchPoints:1 });
+      await send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[points.source] });
+      await sleep(520);
+      const armed = await evaluate('Boolean(document.querySelector(".al-score-drag-preview.is-touch-drag"))');
+      await send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[points.target] });
+      await sleep(50);
+      await send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] });
+      await sleep(220);
+      const after = JSON.parse(await evaluate(`JSON.stringify((() => {
+        const { applied, poster } = window.__scoreTouchHarness;
+        return { count:applied.length, score:poster("Alpha.md")?.dataset.score,
+          overlays:document.querySelectorAll(".al-score-drag-preview,.al-score-lane.is-drop-target").length };
+      })())`));
+      const passed = armed && after.count === 3 && after.score === "9.0" && after.overlays === 0;
+      await evaluate("document.body.dataset.realTouch=" + JSON.stringify(JSON.stringify({ armed, ...after }))
+        + ";document.body.dataset.result=" + JSON.stringify(passed ? "pass" : "fail")
+        + ";document.body.dataset.details=" + JSON.stringify(JSON.stringify({ realTouchArmed:armed, realTouchAfter:after })));
+    },
   });
   await runChromiumDatasetTest({
     html,

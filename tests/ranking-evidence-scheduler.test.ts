@@ -1,0 +1,264 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import type { MediaItem } from "../src/domain/media-types";
+import {
+  certifyRankingOrder, legacyRankingEvidence, provesBefore, recordRankingEvidence,
+} from "../src/domain/ranking-evidence";
+import { diverseRankingOrder, rankingSeriesKey } from "../src/domain/ranking-scheduler";
+import { projectRankingPositions } from "../src/domain/ranking-certification";
+import { startRankingRound, nextRoundPair, answerRound } from "../src/domain/ranking-rounds";
+import {
+  completedRankingItems, decideRanking, emptyRankingCollection, nextRankingPair,
+  prepareRankingRounds, rankingCounts, rankingUnresolvedPaths, rankingConfirmedPositions,
+  rankingPositionProjection, moveRankedItem,
+} from "../src/domain/pairwise-ranking";
+
+const item = (name: string): MediaItem => ({
+  title: name, originalTitle: "", mediaType: "anime", status: "completed",
+  filePath: "anime/" + name + ".md",
+} as MediaItem);
+
+describe("ranking evidence and diverse comparison schedule", () => {
+  it("requires reachable strict comparisons, not guessed similarity or scores", () => {
+    const evidence = {};
+    recordRankingEvidence(evidence, "A", "B");
+    recordRankingEvidence(evidence, "B", "C");
+    assert.equal(provesBefore(evidence, "A", "C"), true);
+    assert.equal(provesBefore(evidence, "C", "A"), false);
+    assert.throws(() => recordRankingEvidence(evidence, "C", "A"), /Conflicting/);
+    assert.deepEqual(certifyRankingOrder(["A", "B", "C"], evidence),
+      { ordered: ["A", "B", "C"], pending: [] });
+    assert.deepEqual(certifyRankingOrder(["A", "unknown", "B", "C"], evidence),
+      { ordered: ["A", "B", "C"], pending: ["unknown"] });
+    assert.equal(Object.keys(legacyRankingEvidence(["A", "B", "C"])).length, 2);
+  });
+  it("preserves transitive order when manual drag moves an intermediate work", () => {
+    const list = emptyRankingCollection();
+    list.ordered = ["A", "B", "C", "D"];
+    list.evidence = legacyRankingEvidence(list.ordered);
+    assert.ok(moveRankedItem(list, "B", 4));
+    assert.deepEqual(list.ordered, ["A", "C", "D", "B"]);
+    for (let index = 1; index < list.ordered.length; index += 1) {
+      assert.ok(provesBefore(list.evidence ?? {}, list.ordered[index - 1], list.ordered[index]));
+    }
+  });
+  it("detects explicit season and film variants without matching unrelated works", () => {
+    assert.equal(rankingSeriesKey(item("輝夜大小姐想讓我告白 第二季")),
+      rankingSeriesKey(item("輝夜大小姐想讓我告白 劇場版")));
+    assert.equal(rankingSeriesKey(item("Attack on Titan Season 2")),
+      rankingSeriesKey(item("Attack on Titan The Movie")));
+    assert.equal(rankingSeriesKey(item("劇場版 輝夜大小姐想讓我告白")),
+      rankingSeriesKey(item("輝夜大小姐想讓我告白 第三季")));
+    assert.notEqual(rankingSeriesKey(item("Love Is War")), rankingSeriesKey(item("Love Is Magic")));
+  });
+  it("does not repeat first-stage matchings before the round-robin cycle repeats", () => {
+    const items = Array.from({ length: 8 }, (_, index) => item("Work-" + index));
+    const seen = new Set<string>();
+    for (let generation = 0; generation < 7; generation += 1) {
+      const order = diverseRankingOrder(items, generation);
+      assert.equal(new Set(order).size, items.length);
+      for (let index = 0; index < order.length; index += 2) {
+        const pair = [order[index], order[index + 1]].sort().join("|");
+        assert.equal(seen.has(pair), false, "repeated initial pairing: " + pair);
+        seen.add(pair);
+      }
+    }
+    assert.equal(seen.size, 28);
+  });
+  it("pushes same-series collisions behind unrelated first-stage pairs", () => {
+    const items = [
+      item("Magic Season 1"), item("Magic Season 2"), item("Magic The Movie"),
+      item("Drama Season 1"), item("Drama Season 2"),
+      item("Standalone X"), item("Standalone Y"), item("Standalone Z"),
+    ];
+    for (let generation = 0; generation < 7; generation += 1) {
+      const arranged = diverseRankingOrder(items, generation);
+      let firstCollision = Number.POSITIVE_INFINITY;
+      let lastUnrelated = -1;
+      for (let index = 0; index < arranged.length; index += 2) {
+        const a = items.find(value => value.filePath === arranged[index])!;
+        const b = items.find(value => value.filePath === arranged[index + 1])!;
+        if (rankingSeriesKey(a) === rankingSeriesKey(b)) firstCollision = Math.min(firstCollision, index);
+        else lastUnrelated = Math.max(lastUnrelated, index);
+      }
+      assert.ok(lastUnrelated < firstCollision, "collision scheduled before unrelated match");
+    }
+  });
+  it("defers a same-series current pair when another merge job is available", () => {
+    const round = startRankingRound(["s1", "s2", "x", "y"], "full", [], 0, 0,
+      { s1:"franchise", s2:"franchise", x:"other-x", y:"other-y" });
+    assert.deepEqual(nextRoundPair(round), { candidate:"x", reference:"y" });
+    answerRound(round, "better");
+    assert.deepEqual(nextRoundPair(round), { candidate:"s1", reference:"s2" });
+  });
+  it("shows the widest range without evidence, and narrows only through strict comparisons", () => {
+    const works = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = works.map(work => work.filePath);
+    const list = emptyRankingCollection();
+    const rangeMap = () => new Map(rankingPositionProjection(list, works).possible
+      .map(({ path, first, last }) => [path, [first, last]]));
+    assert.deepEqual([...rangeMap().values()], [[1,4],[1,4],[1,4],[1,4]]);
+    list.evidence = {};
+    recordRankingEvidence(list.evidence, a, b);
+    assert.deepEqual(rangeMap().get(a), [1,3]);
+    assert.deepEqual(rangeMap().get(b), [2,4]);
+    assert.deepEqual(rangeMap().get(c), [1,4]);
+    recordRankingEvidence(list.evidence, b, c);
+    assert.deepEqual(rangeMap().get(a), [1,2]);
+    assert.deepEqual(rangeMap().get(b), [2,3]);
+    assert.deepEqual(rangeMap().get(c), [3,4]);
+    assert.deepEqual(rangeMap().get(d), [1,4]);
+    recordRankingEvidence(list.evidence, a, d);
+    assert.deepEqual(rangeMap().get(a), [1,1]);
+    assert.deepEqual(rangeMap().get(d), [2,4]);
+  });
+  it("skipped, current and legacy pending votes behave as saved evidence, not guesses", () => {
+    const works = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = works.map(work => work.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b]; // old persisted user order
+    list.pending[c] = { path:c, comparisons:{ [a]:"worse", [b]:"skip" } };
+    list.active = { path:d, comparisons:{ [b]:"worse" } };
+    const initial = new Map(rankingPositionProjection(list, works).possible.map(v => [v.path, v]));
+    assert.deepEqual([initial.get(a)?.first, initial.get(a)?.last], [1,1]);
+    assert.deepEqual([initial.get(b)?.first, initial.get(b)?.last], [2,3]);
+    assert.deepEqual([initial.get(c)?.first, initial.get(c)?.last], [2,4]);
+    assert.deepEqual([initial.get(d)?.first, initial.get(d)?.last], [3,4]);
+    const saved = JSON.parse(JSON.stringify(list)) as typeof list;
+    assert.deepEqual(rankingPositionProjection(saved, works), rankingPositionProjection(list, works));
+    delete saved.active?.comparisons[b];
+    const removedVote = new Map(rankingPositionProjection(saved, works).possible.map(v => [v.path, v]));
+    assert.deepEqual([removedVote.get(d)?.first, removedVote.get(d)?.last], [1,4]);
+  });
+  it("refuses to narrow possibilities when stored strict comparisons contradict", () => {
+    const works = [item("A"), item("B"), item("C")];
+    const [a,b,c] = works.map(work => work.filePath);
+    const cyclic = projectRankingPositions([a,b,c], [a,b,c], { [a]:[b], [b]:[c], [c]:[a] });
+    assert.deepEqual(cyclic.confirmed, []);
+    assert.deepEqual(cyclic.possible.map(({ first,last }) => [first,last]), [[1,3],[1,3],[1,3]]);
+    const conflict = projectRankingPositions([a,b], [a,b,c],
+      legacyRankingEvidence([a,b]), [{ path:c, comparisons:{ [a]:"better", [b]:"worse" } }]);
+    assert.deepEqual(conflict.confirmed, []);
+    assert.deepEqual(conflict.possible.map(({ first,last }) => [first,last]), [[1,3],[1,3],[1,3]]);
+  });
+  it("certifies an absolute position iff it is fixed in every consistent total order", () => {
+    const paths = ["A", "B", "C", "D", "E"];
+    const permutations = (remaining: string[]): string[][] => remaining.length
+      ? remaining.flatMap((path, index) =>
+        permutations(remaining.filter((_, other) => other !== index)).map(tail => [path, ...tail]))
+      : [[]];
+    const allOrders = permutations(paths);
+    const possibleEdges: Array<[string,string]> = [
+      ["A","B"], ["B","C"], ["A","D"], ["C","D"], ["D","E"],
+      ["B","E"], ["A","E"], ["C","E"],
+    ];
+    for (let mask = 0; mask < 256; mask += 1) {
+      const evidence = {};
+      const edges = possibleEdges.filter((_, edge) => Boolean(mask & (1 << edge)));
+      for (const [before, after] of edges) recordRankingEvidence(evidence, before, after);
+      const possible = allOrders.filter(order =>
+        edges.every(([before, after]) => order.indexOf(before) < order.indexOf(after)));
+      assert.ok(possible.length > 0);
+      const expected = paths.flatMap(path => {
+        const ranks = new Set(possible.map(order => order.indexOf(path) + 1));
+        return ranks.size === 1 ? [{ path, position:[...ranks][0] }] : [];
+      }).sort((a,b) => a.position - b.position);
+      const projection = projectRankingPositions(paths, paths, evidence);
+      assert.deepEqual(projection.confirmed, expected,
+        "mismatched certified ranks under evidence pattern " + mask);
+      const expectedRanges = paths.map(path => {
+        const positions = possible.map(order => order.indexOf(path) + 1);
+        return { path, first:Math.min(...positions), last:Math.max(...positions) };
+      });
+      assert.deepEqual(projection.possible, expectedRanges,
+        "invalid possible rank range under evidence pattern " + mask);
+    }
+  });
+  it("never presents a relative order as a certain absolute rank", () => {
+    const items = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = items.map(x => x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b,c]; // Incomplete old v1 user ordering.
+    assert.deepEqual(rankingConfirmedPositions(list, items), [],
+      "an unseen completed work could occupy any position");
+    assert.deepEqual(rankingCounts(list, items), { ranked:0, pending:4, unranked:0 });
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([a,b,c,d]));
+    list.evidence = legacyRankingEvidence(list.ordered);
+    recordRankingEvidence(list.evidence, a, d);
+    recordRankingEvidence(list.evidence, b, d);
+    assert.deepEqual(rankingConfirmedPositions(list, items), [
+      { path:a, position:1 }, { path:b, position:2 },
+    ]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([c,d]));
+  });
+  it("shows the true global rank number even when earlier works are pending", () => {
+    const items = [item("A"), item("B"), item("C"), item("D")];
+    const [a,b,c,d] = items.map(x => x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b,c];
+    list.evidence = legacyRankingEvidence(list.ordered);
+    recordRankingEvidence(list.evidence, d, c);
+    assert.deepEqual(rankingConfirmedPositions(list, items), [{ path:c, position:4 }]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([a,b,d]));
+  });
+  it("recovers comparisons saved on a legacy pending attempt without inventing skip answers", () => {
+    const items = [item("A"), item("B"), item("C")];
+    const [a,b,c] = items.map(x=>x.filePath);
+    const list = emptyRankingCollection();
+    list.ordered = [a,b];
+    list.pending[c] = { path:c, comparisons:{ [a]:"worse", [b]:"skip" } };
+    assert.deepEqual(rankingConfirmedPositions(list, items), [{ path:a, position:1 }]);
+    assert.deepEqual(new Set(rankingUnresolvedPaths(list, items)), new Set([b,c]));
+    list.pending[c].comparisons[b] = "worse";
+    assert.deepEqual(rankingConfirmedPositions(list, items), [
+      { path:a, position:1 }, { path:b, position:2 },
+    ]);
+    // c is fully comparable, but stays pending until the saved insertion
+    // attempt is committed into the persistent ordered sequence.
+  });
+  it("keeps full- and skip-round partitions exhaustive, with proof-backed confirmed ranks", () => {
+    const items = Array.from({ length: 9 }, (_, index) => item("W" + index));
+    const list = emptyRankingCollection();
+    assert.deepEqual(rankingCounts(list, items), { ranked: 0, pending: 9, unranked: 0 });
+    assert.ok(prepareRankingRounds(list, items, "full"));
+    assert.deepEqual(rankingUnresolvedPaths(list, items).length, 9);
+    let steps = 0;
+    while (nextRankingPair(list)) {
+      const pair = nextRankingPair(list)!;
+      const choice = steps === 0 ? "skip" : pair.candidate < pair.reference ? "better" : "worse";
+      decideRanking(list, items, choice);
+      assert.equal(new Set([...list.ordered, ...rankingUnresolvedPaths(list, items)]).size, items.length);
+      if (++steps > 100) throw Error("ranking did not terminate");
+    }
+    assert.equal(list.round, null);
+    assert.equal(rankingCounts(list, items).ranked + rankingCounts(list, items).pending, items.length);
+    assert.ok(rankingCounts(list, items).pending >= 1);
+    for (let index = 1; index < list.ordered.length; index += 1) {
+      assert.equal(provesBefore(list.evidence ?? {}, list.ordered[index - 1], list.ordered[index]), true);
+    }
+  });
+  it("rerank uses new first-round pairings while still proving every confirmed relation", () => {
+    const items = completedRankingItems(Array.from({ length: 8 }, (_, index) => item("Work " + index)), "anime");
+    const list = emptyRankingCollection();
+    const seen = new Set<string>();
+    for (let round = 0; round < 3; round += 1) {
+      assert.equal(prepareRankingRounds(list, items, "full"), true);
+      const first: string[] = [];
+      for (let step = 0; step < 4; step += 1) {
+        const pair = nextRankingPair(list)!;
+        const key = [pair.candidate, pair.reference].sort().join("|");
+        assert.equal(seen.has(key), false);
+        first.push(key); seen.add(key);
+        assert.ok(decideRanking(list, items, pair.candidate < pair.reference ? "better" : "worse"));
+      }
+      while (nextRankingPair(list)) {
+        const pair = nextRankingPair(list)!;
+        decideRanking(list, items, pair.candidate < pair.reference ? "better" : "worse");
+      }
+      assert.equal(list.ordered.length, items.length);
+      for (let index = 1; index < list.ordered.length; index += 1) {
+        assert.ok(provesBefore(list.evidence ?? {}, list.ordered[index - 1], list.ordered[index]));
+      }
+    }
+  });
+});

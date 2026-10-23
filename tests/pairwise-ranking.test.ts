@@ -88,7 +88,7 @@ describe("pairwise ranking: strict ordered list", () => {
     assert.equal(Object.keys(list.pending).length, 1);
     const remaining = Object.values(list.pending)[0];
     assert.deepEqual(rankingBounds(list, remaining), { first: 0, last: 1 });
-    assert.deepEqual(rankingCounts(list, [a, b]), { ranked: 1, pending: 1, unranked: 0 });
+    assert.deepEqual(rankingCounts(list, [a, b]), { ranked: 0, pending: 2, unranked: 0 });
   });
 
   it("automatically resolves a pending entry when strict evidence leaves a unique slot", () => {

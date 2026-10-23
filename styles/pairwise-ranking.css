@@ -186,5 +186,23 @@
   .al-ranking-choice { padding: 5px; gap: 6px; }
   .al-ranking-choice-cover { max-height: min(41dvh, 300px); }
   .al-ranking-dialog-toolbar { gap: 4px; margin-top: 12px; }
-  .al-ranking-dialog-action { padding: 6px 8px; }
+  .al-ranking-dialog-action { min-height: 44px; padding: 8px; }
+  /* Show the entire title on phones instead of silently losing the end of it. */
+  .al-ranking-row-title,
+  .al-ranking-pending-label strong,
+  .al-ranking-choice-title {
+    display: block;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .al-ranking-comparison-modal .modal-content {
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .al-ranking-choice-cover { max-height: min(32dvh, 240px); }
 }

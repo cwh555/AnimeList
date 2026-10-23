@@ -21,6 +21,20 @@ function validateRankData(input: unknown): LoadedRanking {
     if (!Array.isArray(collection.ordered) || !collection.ordered.every((x) => typeof x === "string")
         || !collection.pending || typeof collection.pending !== "object" || Array.isArray(collection.pending)
         ) throw new Error("Corrupted ranking collection: " + type);
+    if (collection.roundGeneration !== undefined
+      && (!Number.isSafeInteger(collection.roundGeneration)
+        || typeof collection.roundGeneration !== "number" || collection.roundGeneration < 0)) {
+      throw new Error("Invalid ranking generation: " + type);
+    }
+    if (collection.evidence !== undefined) {
+      if (!collection.evidence || typeof collection.evidence !== "object"
+        || Array.isArray(collection.evidence)
+        || Object.entries(collection.evidence as Record<string, unknown>)
+          .some(([path, targets]) => !path || !Array.isArray(targets)
+            || targets.some((other: unknown) => typeof other !== "string" || !other || other === path))) {
+        throw new Error("Corrupted strict ranking evidence: " + type);
+      }
+    }
     if (collection.pendingQueue != null && (!Array.isArray(collection.pendingQueue)
       || collection.pendingQueue.some((path: unknown) => typeof path !== "string"))) {
       throw new Error("Invalid pending review queue: " + type);

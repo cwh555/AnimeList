@@ -107,7 +107,7 @@ describe("round-robin complete ranking", () => {
     assert.equal(list.ordered.length, 3);
     assert.equal(list.pending[first.candidate].path, first.candidate);
     assert.equal(new Set(list.ordered).size, 3);
-    assert.deepEqual(rankingCounts(list, items), { ranked: 3, pending: 1, unranked: 0 });
+    assert.deepEqual(rankingCounts(list, items), { ranked: 0, pending: 4, unranked: 0 });
   });
 
   it("retains the current round after a choice without storing snapshots", () => {

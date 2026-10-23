@@ -34,6 +34,8 @@ export class RankingComparisonModal extends AnimeListModal {
   private list: RankingCollection | null = null;
   private busy = false;
   private closed = false;
+  /** Session-only reversible choices; never save an undo-history structure. */
+  private readonly previous: Array<{ before: RankingCollection; after: RankingCollection }> = [];
 
   constructor(app: App, private readonly options: RankingComparisonOptions) {
     super(app);
@@ -74,6 +76,7 @@ export class RankingComparisonModal extends AnimeListModal {
   private async change(edit: (list: RankingCollection) => void): Promise<void> {
     if (this.busy || this.closed) return;
     this.busy = true;
+    const before = structuredClone(this.list);
     this.contentEl.querySelectorAll<HTMLButtonElement>("button").forEach((button) => { button.disabled = true; });
     try {
       const next = await this.options.store.mutate((state) => {
@@ -81,6 +84,36 @@ export class RankingComparisonModal extends AnimeListModal {
         edit(state[this.options.type]);
       });
       this.list = next[this.options.type];
+      if (before && JSON.stringify(before) !== JSON.stringify(this.list)) {
+        this.previous.push({ before, after: structuredClone(this.list) });
+      }
+      if (!this.closed) this.render();
+    } catch (error) {
+      this.fail(error);
+    } finally {
+      this.busy = false;
+      if (this.closed) this.options.onClose();
+    }
+  }
+
+  /** Undo exactly one persisted choice if no other writer has changed the state.
+   * The commit is reversed atomically through the existing serialized store.
+   */
+  private async back(): Promise<void> {
+    if (this.busy || this.closed) return;
+    const step = this.previous.at(-1);
+    if (!step) return;
+    this.busy = true;
+    this.contentEl.querySelectorAll<HTMLButtonElement>("button").forEach(button => { button.disabled = true; });
+    try {
+      const state = await this.options.store.mutate(draft => {
+        if (JSON.stringify(draft[this.options.type]) !== JSON.stringify(step.after)) {
+          throw new Error("Ranking changed after this comparison; cannot undo stale data.");
+        }
+        draft[this.options.type] = structuredClone(step.before);
+      });
+      this.previous.pop();
+      this.list = structuredClone(state[this.options.type]);
       if (!this.closed) this.render();
     } catch (error) {
       this.fail(error);
@@ -93,7 +126,7 @@ export class RankingComparisonModal extends AnimeListModal {
   private render(): void {
     if (!this.list || this.closed) return;
     const pair = nextRankingPair(this.list);
-    if (!pair) { this.close(); return; }
+    if (!pair && !this.previous.length) { this.close(); return; }
     const { contentEl } = this;
     contentEl.replaceChildren();
     const round = this.list.round;
@@ -102,7 +135,9 @@ export class RankingComparisonModal extends AnimeListModal {
     const progress = round ? makeEl("p", "al-ranking-dialog-progress",
       t("roundProgress", { done: round.comparisons, count: round.total })) : null;
     const choices = makeEl("div", "al-ranking-choices");
-    for (const [path, answer] of [[pair.candidate, "better"], [pair.reference, "worse"]] as const) {
+    for (const [path, answer] of pair
+      ? [[pair.candidate, "better"], [pair.reference, "worse"]] as const
+      : []) {
       const item = this.items.get(path);
       const name = item?.title ?? path;
       const card = makeEl("button", "al-ranking-choice");
@@ -119,15 +154,23 @@ export class RankingComparisonModal extends AnimeListModal {
       choices.appendChild(card);
     }
     const toolbar = makeEl("div", "al-ranking-dialog-toolbar");
-    const skip = action(t("skip"), "skip-forward", () => {
-      void this.change((list) => { decideRanking(list, this.options.eligible, "skip"); });
-    });
-    skip.addClass("al-ranking-skip");
-    const pause = action(t("pause"), "pause", () => this.close());
-    toolbar.append(skip, pause);
+    if (pair) {
+      const skip = action(t("skip"), "skip-forward", () => {
+        void this.change((list) => { decideRanking(list, this.options.eligible, "skip"); });
+      });
+      skip.addClass("al-ranking-skip");
+      toolbar.append(skip);
+    }
+    const back = action(t("back"), "arrow-left", () => { void this.back(); });
+    back.addClass("al-ranking-back");
+    back.disabled = this.previous.length === 0;
+    toolbar.append(back);
+    const pause = action(pair ? t("pause") : t("finish"), pair ? "pause" : "check", () => this.close());
+    toolbar.append(pause);
     contentEl.append(heading);
     if (progress) contentEl.append(progress);
-    contentEl.append(choices, toolbar);
+    if (pair) contentEl.append(choices);
+    contentEl.append(toolbar);
     const first = choices.querySelector<HTMLButtonElement>("button");
     first?.focus();
   }

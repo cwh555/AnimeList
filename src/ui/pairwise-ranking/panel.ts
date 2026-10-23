@@ -2,7 +2,7 @@ import { Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
-  prepareRanking, rankingBounds, rankingCounts,
+  prepareRanking, rankingPositionProjection,
   reconcileRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
@@ -75,7 +75,17 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (!container.isConnected) return;
   const list = state[options.type];
   const byPath = new Map(eligible.map((item) => [item.filePath, item]));
-  const counts = rankingCounts(list, eligible);
+  // Compute reachability only once per render; the same certificate drives
+  // the displayed ranks and the exhaustive pending partition.
+  const projection = rankingPositionProjection(list, eligible);
+  const confirmed = projection.confirmed;
+  const boundsByPath = new Map(projection.possible.map(range => [range.path, range]));
+  const confirmedPaths = new Set(confirmed.map(entry => entry.path));
+  const unresolved = eligible.map(item => item.filePath).filter(path => !confirmedPaths.has(path));
+  const counts = { ranked: confirmed.length, pending: unresolved.length };
+  const allPositionsKnown = counts.pending === 0;
+  const hasNew = eligible.some(item => !list.ordered.includes(item.filePath)
+    && !Object.hasOwn(list.pending, item.filePath) && list.active?.path !== item.filePath);
   const pair = nextRankingPair(list);
   const panel = makeEl("section", "al-ranking-panel");
   container.replaceChildren(panel);
@@ -121,7 +131,6 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   const stats = makeEl("div", "al-ranking-stats");
   stats.append(
     makeEl("span", "", t("ranked", { count: counts.ranked })),
-    makeEl("span", "", t("unranked", { count: counts.unranked })),
     makeEl("span", counts.pending ? "has-pending" : "", t("pending", { count: counts.pending })),
   );
   header.append(typeTabs, stats);
@@ -134,16 +143,16 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
 
   const actions = makeEl("div", "al-ranking-actions");
   if (pair) actions.appendChild(button(t("continue"), compare, "play", "mod-cta"));
-  else if (counts.unranked) {
+  else if (hasNew) {
     actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => {
-      if (list.ordered.length === 0 || counts.unranked > 1) {
+      if (list.ordered.length === 0 || unresolved.length > 1) {
         void mutate((draft) => {
           prepareRankingRounds(draft, eligible, list.ordered.length ? "append" : "full");
         }, true);
       } else start("new");
     }, "play", "mod-cta"));
   }
-  if (counts.pending) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
+  if (Object.keys(list.pending).length) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
   if (list.ordered.length || list.round) {
     actions.appendChild(button(t("reset"), () => {
       new RankingConfirmModal(options.app, () => {
@@ -159,41 +168,43 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (counts.pending) panel.appendChild(makeEl("p", "al-ranking-warning", t("warning")));
   const result = makeEl("ol", "al-ranking-list");
   const rows: HTMLElement[] = [];
-  for (const [index, path] of list.ordered.entries()) {
+  for (const [index, rank] of confirmed.entries()) {
+    const path = rank.path;
     const item = byPath.get(path);
     if (!item) continue;
     const row = makeEl("li", "al-ranking-row");
-    row.append(makeEl("span", "al-ranking-position", String(index + 1)));
+    row.append(makeEl("span", "al-ranking-position", String(rank.position)));
     const content = button("", () => { void options.openNote(path); }, undefined, "al-ranking-open");
     content.title = item.title;
     content.append(rankingCover(item, "al-ranking-row-cover"), makeEl("span", "al-ranking-row-title", item.title));
     row.appendChild(content);
-    const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
-    handle.setAttribute("aria-label", t("drag", { title: item.title }));
-    handle.title = t("drag", { title: item.title });
-    row.appendChild(handle);
-    rows.push(row);
+    if (allPositionsKnown) {
+      const handle = button("", () => undefined, "grip-vertical", "al-ranking-handle");
+      handle.setAttribute("aria-label", t("drag", { title: item.title }));
+      handle.title = t("drag", { title: item.title });
+      row.appendChild(handle);
+      rows.push(row);
+      installRankingDrag(handle, row, rows, index + 1, (nextPosition) => {
+        void mutate((draft) => { moveRankedItem(draft, path, nextPosition); });
+      });
+    }
     result.appendChild(row);
-    installRankingDrag(handle, row, rows, index + 1, (rank) => {
-      void mutate((draft) => { moveRankedItem(draft, path, rank); });
-    });
   }
   panel.appendChild(result);
-  if (!list.ordered.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
-  if (counts.pending) {
+  if (!confirmed.length) panel.appendChild(makeEl("p", "al-ranking-empty", t("empty")));
+  if (unresolved.length) {
     const pendingSection = makeEl("section", "al-ranking-pending");
     pendingSection.append(makeEl("h3", "", t("pendingTitle")));
-    for (const [path, attempt] of Object.entries(list.pending)) {
+    for (const path of unresolved) {
       const item = byPath.get(path);
       if (!item) continue;
-      const bounds = rankingBounds(list, attempt);
       const row = makeEl("div", "al-ranking-pending-row");
       const label = makeEl("div", "al-ranking-pending-label");
       label.append(rankingCover(item, "al-ranking-row-cover"), makeEl("strong", "", item.title));
-      const possible = bounds.first === bounds.last
-        ? t("onePosition", { first: bounds.first + 1 })
-        : t("possible", { first: bounds.first + 1, last: bounds.last + 1 });
-      const info = makeEl("span", "al-ranking-pending-bounds", possible);
+      const bounds = boundsByPath.get(path);
+      const info = makeEl("span", "al-ranking-pending-bounds", bounds != null && bounds.first === bounds.last
+        ? t("onePosition", { first: bounds.first })
+        : t("possible", { first: bounds?.first ?? 1, last: bounds?.last ?? eligible.length }));
       row.append(label, info);
       pendingSection.appendChild(row);
     }
