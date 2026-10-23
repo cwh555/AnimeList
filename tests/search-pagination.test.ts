@@ -42,6 +42,21 @@ describe("search pagination", () => {
     assert.deepEqual(SEARCH_PAGINATION_LIMITS, { pageSize: 24, maxLoads: 2, maxResults: 72 });
   });
 
+  it("keeps Load more available after an empty initial page when the provider has a cursor", () => {
+    const modal = {
+      mediaType: "novel", query: "different title", results: [], warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 }, renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "", results: [result(100)], warnings: [],
+      loads: 0, hasMore: false, loading: false, sourceResults: null,
+    };
+    synchronizePaginationState(modal as never, state);
+    assert.equal(state.hasMore, true);
+    assert.deepEqual(state.results, []);
+  });
+
   it("appends unique pages without moving existing results", () => {
     const merged = mergeSearchPages([result(1), result(2)], [[result(2), result(3)], [result(4)]]);
     assert.deepEqual(merged.map((item) => item.sourceId), ["1", "2", "3", "4"]);
@@ -111,6 +126,34 @@ describe("search pagination", () => {
     assert.deepEqual(rows.children, ["1", "2"]);
     assert.deepEqual(modal.results.map((item) => item.sourceId), ["1", "2"]);
     assert.equal(state.sourceResults, modal.results);
+    assert.equal(state.loading, false);
+  });
+
+  it("permits a second Load more after the first one succeeds", async () => {
+    const pages: number[] = [];
+    const host = {
+      async searchExternalPage(_type: string, _query: string, pageNumber: number) {
+        pages.push(pageNumber);
+        return page([result(pageNumber)], pageNumber < 3);
+      },
+    };
+    const first = [result(1)];
+    const modal = {
+      mediaType: "anime", query: "Title", results: first, warnings: [],
+      contentEl: { scrollTop: 0 }, renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title", results: [...first], warnings: [],
+      loads: 0, hasMore: true, loading: false, sourceResults: first,
+    };
+    const rows = { children: ["1"], appendChild(value: string) { this.children.push(value); } };
+    assert.equal(await appendNextSearchPage(host as never, modal as never, state, rows as never), 1);
+    assert.equal(state.loading, false);
+    assert.equal(await appendNextSearchPage(host as never, modal as never, state, rows as never), 1);
+    assert.equal(state.loading, false);
+    assert.deepEqual(pages, [2, 3]);
+    assert.deepEqual(rows.children, ["1", "2", "3"]);
   });
 
   it("resets loaded pages when the same query is searched again", async () => {
@@ -159,6 +202,67 @@ describe("search pagination", () => {
     assert.deepEqual(rows.children, ["1", "3"]);
   });
 
+  it("ignores an old Load more response after a new search replaces the result list", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    const host = {
+      async searchExternalPage() {
+        return await new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const original = [result(1)];
+    const modal = {
+      mediaType: "anime", query: "First",
+      results: original, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 },
+      renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000First", results: [...original], warnings: [],
+      loads: 0, hasMore: true, loading: false, sourceResults: original,
+    };
+    const rows = { children: ["1"], appendChild(value: string) { this.children.push(value); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    const replacement = [result(20)];
+    modal.results = replacement;
+    modal.query = "Second";
+    synchronizePaginationState(modal as never, state);
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.deepEqual(modal.results.map(item => item.sourceId), ["20"]);
+    assert.equal(state.signature, "anime\u0000Second");
+  });
+
+  it("rejects prior Load more results even when the same query is searched again", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    const host = {
+      async searchExternalPage() {
+        return await new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const first = [result(1)];
+    const modal = {
+      mediaType: "anime", query: "Title",
+      results: first, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 0 },
+      renderSearch() {}, async search() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: "anime\u0000Title", results: [...first], warnings: [],
+      loads: 0, hasMore: true, loading: false, sourceResults: first,
+    };
+    const rows = { children: ["1"], appendChild(value: string) { this.children.push(value); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    modal.results = [result(10)];
+    synchronizePaginationState(modal as never, state);
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.deepEqual(modal.results.map(item => item.sourceId), ["10"]);
+  });
+
   it("stops requesting after two additional pages", async () => {
     let requests = 0;
     const host = {
@@ -192,4 +296,45 @@ describe("search pagination", () => {
     assert.equal(await appendNextSearchPage(host as never, modal as never, state, rows as never), 0);
     assert.equal(requests, 0);
   });
+  it("passes a session ID to Load more and rejects the result after an ID switch", async () => {
+    let finish!: (value: ExternalMediaSearchPage) => void;
+    let requestedId = "";
+    const host = {
+      async searchExternalPage(_type: string, _query: string, _page: number, sessionId?: string) {
+        requestedId = sessionId ?? "";
+        return new Promise<ExternalMediaSearchPage>(resolve => { finish = resolve; });
+      },
+    };
+    const first = [result(1)];
+    const modal = {
+      mediaType: "anime" as const, query: "Title", sessionId: "original",
+      results: first, warnings: [], hasMore: true,
+      contentEl: { scrollTop: 5 }, async search() {}, renderSearch() {},
+      createResultRow(item: ExternalMediaResult) { return item.sourceId; },
+    };
+    const state = {
+      signature: ["anime", "Title"].join(String.fromCharCode(0)), results: [...first],
+      warnings: [], loads: 0, hasMore: true, loading: false,
+      sourceResults: first, sessionId: "original",
+    };
+    const rows = { children: ["1"], appendChild(node: string) { this.children.push(node); } };
+    const pending = appendNextSearchPage(host as never, modal as never, state, rows as never);
+    assert.equal(requestedId, "original");
+    modal.sessionId = "replacement";
+    state.sessionId = "replacement";
+    finish(page([result(2)], false));
+    assert.equal(await pending, 0);
+    assert.deepEqual(rows.children, ["1"]);
+    assert.equal(state.loads, 0);
+  });
+
+  it("keeps ID-less results distinct when both come from one provider", () => {
+    const one = { ...result(1), sourceId: "", title: "First unidentified work" };
+    const two = { ...result(2), sourceId: "", title: "Second unidentified work" };
+    assert.deepEqual(
+      mergeSearchPages([one], [[two]]).map(item => item.title),
+      ["First unidentified work", "Second unidentified work"],
+    );
+  });
+
 });

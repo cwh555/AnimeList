@@ -1,5 +1,8 @@
 import type { MediaStatus } from "./media-status";
 import type { MediaType } from "./media-primitives";
+import type { MediaTitleVariants } from "./media-title-localization";
+
+import type { SupportedLocale } from "../i18n/locale";
 import type { MediaClassification } from "./media-classification";
 
 export type { MediaType } from "./media-primitives";
@@ -81,6 +84,24 @@ export interface ExternalMediaSearchPage {
   results: ExternalMediaResult[];
   warnings: string[];
   hasMore: boolean;
+  /** Opaque per-interaction cursor ownership; omitted by older host clients. */
+  sessionId?: string;
+}
+
+export interface WikidataTitleEvidence {
+  readonly title: string;
+  readonly locale: SupportedLocale;
+  readonly itemId: string;
+  readonly kind: "wikidata-label" | "wikipedia-title" | "script-conversion";
+  readonly identityProperty: string;
+}
+
+export interface TitleSuggestion {
+  readonly title: string;
+  readonly locale: SupportedLocale;
+  readonly provider: string;
+  readonly sourceId: string;
+  readonly sourceUrl: string;
 }
 
 export interface ExternalMediaResult {
@@ -105,6 +126,15 @@ export interface ExternalMediaResult {
   externalScore: number | null;
   releaseStatus: ReleaseStatus;
   searchTitles?: string[];
+  titleVariants?: MediaTitleVariants;
+  /** Cross-provider title suggestion only: never official without identity proof. */
+  titleSuggestion?: TitleSuggestion;
+  /** External-ID matched Wikidata name; distinct from provider-verified titles. */
+  wikidataTitleEvidence?: WikidataTitleEvidence;
+  /** Prevent duplicate cross-provider lookups during create-note submission. */
+  titleEvidenceChecked?: SupportedLocale;
+  /** Auto script conversion is not a provider-verified official title. */
+  titleScriptConversions?: Partial<Record<SupportedLocale, string>>;
   sources?: ExternalMediaSourceRef[];
   classification?: MediaClassification;
 }

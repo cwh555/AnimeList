@@ -1,6 +1,9 @@
+import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
+import { readCleanupScanHistory, saveCleanupScanHistory } from "../data/cleanup-scan-history";
+import { getScopedMarkdownFiles } from "../data/vault-scope";
 import {
   applyMediaNoteFilenameCleanup,
   planMediaNoteFilenameCleanup,
@@ -34,9 +37,12 @@ export class MediaNoteFilenameCleanupModal extends AnimeListModal {
     appendRule(rules, "Note content and frontmatter are not rewritten. Obsidian's file rename API is used so link updates follow your Obsidian settings.");
     appendRule(rules, "Every reviewed item is rechecked immediately before rename; changed or conflicting items are skipped.");
 
-    const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: "Scanning media notes…" });
+    const scope = createScanModeControl(this.contentEl);
+    const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: "Select scan scope and start." });
     const list = this.contentEl.createDiv({ cls: "al-version-cleanup-list" });
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
+    const scan = footer.createEl("button", { text: "Scan" });
+    scan.type = "button";
     const cancel = footer.createEl("button", { text: "Cancel" });
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
@@ -45,13 +51,30 @@ export class MediaNoteFilenameCleanupModal extends AnimeListModal {
     confirm.disabled = true;
 
     let plan: MediaNoteFilenameCleanupPlan | null = null;
-    try {
-      plan = planMediaNoteFilenameCleanup(this.host.app, this.host.getScanFolders());
-      status.setText(`Scanned ${plan.scanned} AnimeList media notes. ${plan.items.length} note(s) can be renamed.`);
-      if (!plan.items.length) {
+    scan.addEventListener("click", () => {
+      scan.disabled = true;
+      scope.disabled = true;
+      plan = null;
+      confirm.disabled = true;
+      list.empty();
+      status.setText("Scanning note filenames…");
+      void readCleanupScanHistory(this.host.app).then(async history => {
+        const roots = this.host.getScanFolders();
+        const scopeMode = scope.value === "all" ? "all" : "pending";
+        plan = planMediaNoteFilenameCleanup(this.host.app, roots,
+          file => history.needsScan("filenames", file, scopeMode));
+        const pending = new Set(plan.items.map(item => item.path));
+        await saveCleanupScanHistory(this.host.app, "filenames",
+          getScopedMarkdownFiles(this.host.app, roots).filter(file =>
+            history.needsScan("filenames", file, scopeMode) && !pending.has(file.path)));
+        return plan;
+      }).then(value => {
+        if (!value) return;
+        status.setText(`Scanned ${value.scanned} AnimeList media notes. ${value.items.length} note(s) can be renamed.`);
+      if (!value.items.length) {
         list.createDiv({ cls: "al-search-empty", text: "All scanned note filenames already match their titles or safe collision names." });
       } else {
-        for (const item of plan.items) {
+        for (const item of value.items) {
           const row = list.createDiv({ cls: "al-version-cleanup-item" });
           row.createEl("strong", { text: item.title });
           row.createDiv({ cls: "al-result-meta", text: item.path });
@@ -59,17 +82,21 @@ export class MediaNoteFilenameCleanupModal extends AnimeListModal {
         }
         confirm.disabled = false;
       }
-    } catch (error) {
-      console.error("AnimeList note filename scan failed", error);
-      status.setText(`Scan failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+      }).catch((error) => {
+        console.error("AnimeList note filename scan failed", error);
+        status.setText(`Scan failed: ${error instanceof Error ? error.message : String(error)}`);
+      }).finally(() => { scan.disabled = false; scope.disabled = false; });
+    });
 
     confirm.addEventListener("click", () => {
       if (!plan || !plan.items.length) return;
       confirm.disabled = true;
       cancel.disabled = true;
       status.setText("Applying reviewed note renames…");
-      void applyMediaNoteFilenameCleanup(this.host.app, plan).then((result) => {
+      void applyMediaNoteFilenameCleanup(this.host.app, plan).then(async (result) => {
+        const renamed = new Set(result.details.filter(detail => detail.status === "renamed").map(detail => detail.targetPath));
+        await saveCleanupScanHistory(this.host.app, "filenames",
+          getScopedMarkdownFiles(this.host.app, this.host.getScanFolders()).filter(file => renamed.has(file.path)));
         status.setText(`Renamed ${result.renamed}; skipped ${result.skipped}; failed ${result.failed}.`);
         list.empty();
         for (const detail of result.details) {

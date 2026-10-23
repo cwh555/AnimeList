@@ -147,7 +147,7 @@ describe("search language settings", () => {
       "Settings for title search languages and the metadata providers used to enrich your library.",
       "Settings for optional AnimeList features and their feature-specific behavior.",
       "Library setup and maintenance actions for folders, templates, and routine upkeep.",
-      "Tools for update-related migrations and cleaning up legacy or obsolete AnimeList data.",
+      "Review version-specific fixes or update older library data.",
     ]);
     assert.equal(
       getSettingsPageDefinition("features").description,

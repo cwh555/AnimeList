@@ -123,6 +123,8 @@ declare module "obsidian" {
     mkdir(path: string): Promise<void>;
     list(path: string): Promise<{ files: string[]; folders: string[] }>;
     stat(path: string): Promise<DataAdapterStat | null>;
+    read(path: string): Promise<string>;
+    write(path: string, data: string): Promise<void>;
     readBinary(path: string): Promise<ArrayBuffer>;
     writeBinary(path: string, data: ArrayBuffer): Promise<void>;
     remove(path: string): Promise<void>;

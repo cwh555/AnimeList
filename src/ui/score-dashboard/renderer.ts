@@ -116,6 +116,8 @@ export function renderScoreDashboard(
   let anchorElement: HTMLElement | null = null;
   let anchorTop = 0;
   let saveTimer = 0;
+  const isTouchFirst = (): boolean => container.ownerDocument.body.classList.contains("is-mobile")
+    || container.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")?.matches === true;
 
   container.replaceChildren();
   const shell = create("section", "al-score-dashboard");
@@ -260,7 +262,7 @@ export function renderScoreDashboard(
 
   const updateSummary = (): void => {
     const data = buildScoreDashboardData(items, state.type);
-    summary.textContent = `${text.ratedSummary(data.rated, data.total)} · ${batchMode ? text.selectionHint : text.dragHint}`;
+    summary.textContent = `${text.ratedSummary(data.rated, data.total)} · ${batchMode ? text.selectionHint : (isTouchFirst() ? text.mobileHint : text.dragHint)}`;
     updateUnratedControl(data.unrated.length);
   };
 
@@ -462,7 +464,7 @@ export function renderScoreDashboard(
     continuousScale = state.scale;
     applyScale();
     updateScaleControls();
-    summary.textContent = `${text.ratedSummary(data.rated, data.total)} · ${batchMode ? text.selectionHint : text.dragHint}`;
+    summary.textContent = `${text.ratedSummary(data.rated, data.total)} · ${batchMode ? text.selectionHint : (isTouchFirst() ? text.mobileHint : text.dragHint)}`;
     typeTabs.replaceChildren();
     TYPE_OPTIONS.forEach(([value, label]) => {
       const button = create("button", `al-score-dashboard-tab${state.type === value ? " is-active" : ""}`);

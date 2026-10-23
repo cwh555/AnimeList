@@ -36,7 +36,10 @@ function run(command, arguments_, label) {
   if (result.status !== 0) throw new Error(`${label} failed with status ${result.status ?? "unknown"}`);
 }
 
-const filters = parseTestArguments(process.argv.slice(2), TEST_SUITES, TEST_FEATURES);
+const arguments_ = process.argv.slice(2);
+const filters = parseTestArguments(arguments_, TEST_SUITES, TEST_FEATURES);
+// No arguments means a fast everyday smoke run. Explicit feature/suite filters keep full coverage.
+if (arguments_.length === 0) filters.smoke = true;
 const targets = selectTestTargets(TEST_TARGETS, filters);
 if (!targets.length) throw new Error("No tests matched the requested filters");
 if (filters.list) {

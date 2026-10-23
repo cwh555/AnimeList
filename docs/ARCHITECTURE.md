@@ -26,6 +26,8 @@ Application wiring may compose services, but it must not implement provider norm
 - `value-normalization.ts`: safe scalar, array, path, and identifier helpers.
 - `image-section.ts`: `animelist-images` parsing, serialization, insertion, image-path normalization, and managed image-folder rules.
 - `moments.ts`: typed `animelist-moments` entries, stable IDs, optional metadata, parsing/serialization, and block replacement.
+- `markdown-block-identity.ts`: guards edits against changed, ambiguous fenced blocks and protects user-authored source lines.
+- `pairwise-ranking.ts` and `ranking-rounds.ts`: independent, typed preference order and resumable merge rounds; no numeric-score updates.
 - `media-image-references.ts`: shared image-reference accounting used before managed images are trashed.
 - `release-tracking.ts`: release-tracking states, persisted binding/snapshot parsing, manga chapter semantics, and novel publication-line matching.
 - `manga-release-sources.ts`: supported official manga-source identities and URL normalization.
@@ -47,14 +49,23 @@ Application wiring may compose services, but it must not implement provider norm
 - `providers/ndl-release-client.ts`: NDL/JPRO publication discovery for novels.
 - `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
-- `provider-normalizers.ts`: pure provider payload normalization and cross-provider result deduplication.
-- `media-classification-service.ts`: optional classification enrichment after a work is selected; failure never blocks note creation.
-- `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
+- `provider-normalizers.ts`: pure provider payload normalization, plus a thin call to typed, identity-safe result deduplication; no fuzzy source-ID inference.
+- `media-classification-service.ts`: optional exact-AniList-ID classification enrichment after a work is selected. Title/year matching alone is not evidence of cross-provider identity; failure never blocks note creation.
+- `external-media-service.ts`: the single multi-provider orchestration boundary for enabled sources, warnings, direct lookup, and bounded per-interaction search sessions. Explicit pagination session IDs are passed through the typed host; legacy calls remain supported. It owns clients and cursors, but not title semantics or transport throttling.
+- `providers/request-deadline.ts`: bounded UI wait for non-AniList metadata requests. This cannot abort Obsidian `requestUrl`; no automatic retry bursts.
+- `search-session.ts`: per-query buffered results, verified-ID deduplication across pages and per-provider cursor state; it never writes Markdown.
+- `app/search/multilingual-search.ts`: provider-neutral staged search orchestration with incremental first-result callbacks and partial failure isolation; request budgets are defined in the domain query planner.
+- `domain/search/query-plan.ts`, `chinese-variants.ts`, `ranking.ts`: pure query-plan construction, bounded Chinese substring discovery, scoring and edition-aware ranking.
+- `domain/search/entity-resolution.ts`: single source-identity policy used by search deduplication; overlapping nonconflicting provider IDs, not title/year/format similarity, are required to merge works.
+- `domain/bangumi-book-type.ts`: explicit Book-type evidence shared by Bangumi metadata search and serial-cover candidate discovery; novel and manga are never inferred from a title alone.
 - `media-note-service.ts`: note creation and series-cover download workflow.
+- `title-localization-service.ts`: preview-first per-work title migration with bounded provider I/O and selective frontmatter writes; see docs/PROTOCOL.md for the language contract.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
 - `special-label-state-service.ts`: the single Favorite/Masterpiece metadata writer and compatibility cleanup path.
 - `image-section-service.ts`: Image Section asset import, exact/canonical-raster duplicate checks, thumbnail requests, Markdown updates, Set as cover, and reference-aware deletion.
 - `moments-service.ts`: Moment creation/edit/delete, managed image import, stable-ID preservation, and reference-aware image cleanup.
+- `pairwise-ranking/store.ts` and `atomic-write.ts`: separate version-1 preference JSON, backup-on-recovery and conflict-safe writes; modern atomic adapter methods have an older-Obsidian compatibility fallback.
+- `media-asset-reference-service.ts`, `media-asset-garbage-collector.ts`, and `vault-markdown-revision-guard.ts`: direct Markdown reference reads and conservative stop-on-change behavior before trashing managed files or abandoned order journals.
 - `release-tracking-service.ts`: provider orchestration, safe binding/refresh behavior, official-source evidence comparison, and refresh summaries.
 - `release-tracking-state-service.ts`: scoped release-tracking frontmatter reads/writes that preserve unrelated YAML and note bodies.
 - `version-cleanup-service.ts`: candidate scan, review, revalidation, and narrow cleanup application.
@@ -122,7 +133,7 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 
 ## Compatibility boundary
 
-`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module should add new behavior to the compatibility barrel. Add and edit modals share `createMediaEditorFields` so common fields, ordering, validation bindings, and date controls have one implementation.
+`src/legacy.ts` is a thin compatibility barrel. Active Library, Timeline, Markdown renderer, form-control, and modal implementations live under `src/ui/`; no production module should add new behavior to the compatibility barrel. Add and edit modals share `createMediaEditorFields` so common fields, ordering, validation bindings, and date controls have one implementation. Media identity and modal actions live in `src/ui/media-editor-layout.ts` and `src/ui/ui-primitives.ts`, not independent copies in each modal. The UI presentation contract is in `docs/PROTOCOL.md`.
 
 - do not add implementations or domain rules to `legacy.ts`;
 - do not copy typed services back into `main.ts` or feature modules;
@@ -148,3 +159,45 @@ Release CSS must respect the declared minimum Obsidian browser baseline. Prefer 
 - Test Vault validation covers real Obsidian lifecycle, external-provider flows, Markdown rendering, note-media interaction, Settings, and DOM behavior.
 
 All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.strict.json` in addition to repository-wide TypeScript, lint, architecture, compatibility, Community, and release checks.
+
+## 1.6 release compatibility invariants
+
+- Existing media note schema remains `schema_version: 6` and is never automatically migrated on opening a vault. Ranking JSON format version `1` is **not** the note schema version; it is an independent auxiliary file at `.obsidian/animelist-ranking.json`.
+- Two valid, identical-content Image/Moments sections can coexist. A saved editor can update only an unchanged, uniquely locatable block; stale or ambiguous targets must fail rather than rewrite another section. No persistent block ID is inserted in old notes.
+- Cleanup operation read snapshots and note revision checks are conservative. They reduce race risks but are not a global file lock across synced devices.
+- The plugin retains `minAppVersion: 1.5.0`. Availability of `DataAdapter.process()` must be checked at runtime, not assumed for all supported installations.
+- Search aliases and script conversions aid **discovery**; source IDs and provenance determine **identity**. Presentation code must not turn a title similarity into an identity claim.
+
+## Provider-neutral localization boundary
+
+- `domain/media-title-localization.ts`: single typed rule for verified variants, Chinese script conversion, source-ID-backed nonofficial `displayAliases`, and fallback; the conversion candidate is reused by existing-note migration.
+- `data/media-title-service.ts`: immutable `ExternalMediaResult` adapter, including provenance-aware title selection and searchable aliases; reads the active locale only in a thin integration helper.
+- `data/provider-normalizers.ts`: Bangumi, AniList and Open Library extract provider-specific language evidence, but do not implement their own selection policies; Bangumi infobox aliases may carry a distinct nonofficial `displayAliases` provenance and are never promoted to verified `localized` variants.
+- `data/providers/open-library-client.ts`: interface-locale edition preference, not an assertion of an official localized name.
+- `app/anime-list-application.ts`: reapplies the common selector after metadata enrichment before displaying the create-note form; manually edited form titles remain authoritative.
+- The existing-title migration remains opt-in. Provenance-verified translations and script conversions are stored separately for compatibility.
+
+## Unified name lookup and scan checkpoints
+
+- `data/wikidata-title-service.ts`: exact external-ID to QID mapping, locale labels/sitelinks, bounded per-session cached lookup; no heuristic title-to-ID guessing.
+- `data/media-title-service.ts`: applies ordered language evidence without mutating source names, authors, provider IDs or original variants.
+- `domain/media-title-suggestion.ts`: last-resort cross-provider heuristic suggestions for human review only.
+- `data/cleanup-scan-history.ts`: versioned, task/locale-specific checkpoint persistence independent from Markdown; `ui/cleanup-scan-controls.ts` owns the shared Settings selector. Each migration service accepts an optional file-selection predicate and avoids rewriting unrelated content.
+
+## Search UI and provider latency boundary
+
+- `ui/media-modals.ts` renders current candidates and rejects stale asynchronous generations. It cannot implement translation, fuzzy identity reconciliation or API transport. Search updates are incremental and must not steal keyboard focus.
+- `features/search/pagination.ts` owns the Load more control and DOM row append, consumes `SearchSession`-backed service pages and protects against stale pages. Loading state always releases after success/error for the current request.
+- `data/providers/anilist-client.ts` owns its one physical GraphQL queue, batching/cache and 403/429 cooldown; provider-neutral search must **not** create a second rate limiter or bypass it.
+- `data/providers/bangumi-client.ts` handles Bangumi search/fetch boundaries, validates explicit Book subtype evidence and preserves the subject ID; infobox detail enrichment is an exact-ID request only after user selection.
+- Provider responses are external hints. Newly imported note defaults may use verified provenance rules; already-owned Markdown titles/frontmatter remain authoritative. Any existing-note migration stays a separate opt-in, review-first workflow.
+
+The public API/identity/alias, request-budget and fallback rules are defined in `docs/PROTOCOL.md`; avoid duplicating them in UI components or release-tracking services.
+
+### UI verification tiers
+
+Routine development uses the fast smoke suite and feature-targeted tests;
+`npm run check` and CI run the complete suite, including retained legacy
+characterization and migration checks. Browser interaction tests run explicitly
+by feature and in CI. For commands and responsibility boundaries, see
+`docs/TESTING.md`.

@@ -215,6 +215,84 @@ describe("external media search service", () => {
     assert.equal(response.results.some((item) => item.sourceId === "425211"), true);
   });
 
+  it("continues from expanded Chinese search queries instead of restarting with the input title", async () => {
+    const calls: string[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, query, page) => {
+          calls.push(`${query}:${page}`);
+          if (query !== "成为影之") return { results: [], hasMore: false };
+          if (page === 1) return {
+            results: [result("bangumi", "novel-1", "想成為影之實力者", "novel")],
+            hasMore: true,
+          };
+          return {
+            results: [result("bangumi", "novel-2", "想成為影之實力者 後篇", "novel")],
+            hasMore: false,
+          };
+        }, true),
+      }),
+    );
+    const first = await service.search("novel", "我想成為影之強者");
+    assert.deepEqual(first.results.map(x => x.sourceId), ["novel-1"]);
+    const next = await service.searchPage("novel", "我想成為影之強者", 2);
+    assert.deepEqual(next.results.map(x => x.sourceId), ["novel-2"]);
+    assert.ok(calls.includes("成为影之:2"));
+    assert.equal(calls.includes("我想成為影之強者:2"), false);
+    assert.equal(next.hasMore, false);
+  });
+
+  it("serves first-page overflow before sending further provider requests", async () => {
+    let calls = 0;
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async () => {
+          calls += 1;
+          return {
+            results: Array.from({ length: 30 }, (_, i) => result("bangumi", String(i), "Title " + i)),
+            hasMore: false,
+          };
+        }, true),
+      }),
+    );
+    const first = await service.search("anime", "Title");
+    const callsAfterFirst = calls;
+    const second = await service.searchPage("anime", "Title", 2);
+    assert.equal(first.results.length, 24);
+    assert.equal(second.results.length, 6);
+    assert.equal(calls, callsAfterFirst);
+    assert.equal(second.hasMore, false);
+  });
+
+  it("fills a partially buffered page from the original provider cursor", async () => {
+    const calls: number[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, query, page) => {
+          calls.push(page);
+          if (page === 1) return {
+            results: Array.from({ length: 25 }, (_, index) => result("bangumi", String(index), query)),
+            hasMore: true,
+          };
+          return {
+            results: Array.from({ length: 23 }, (_, index) => result("bangumi", String(index + 25), query)),
+            hasMore: false,
+          };
+        }),
+      }),
+    );
+    const first = await service.search("anime", "Example");
+    const second = await service.searchPage("anime", "Example", 2);
+    assert.equal(first.results.length, 24);
+    assert.equal(second.results.length, 24);
+    assert.equal(new Set([...first.results, ...second.results].map(value => value.sourceId)).size, 48);
+    assert.deepEqual(calls, [1, 2]);
+    assert.equal(second.hasMore, false);
+  });
+
   it("uses the same provider clients for pagination and keeps partial provider success", async () => {
     const calls: string[] = [];
     const service = new ExternalMediaSearchService(
@@ -237,4 +315,31 @@ describe("external media search service", () => {
     assert.equal(output.hasMore, true);
     assert.deepEqual(output.warnings, ["AniList: rate limited"]);
   });
+  it("isolates two identical query sessions by explicit cursor ID", async () => {
+    const calls: number[] = [];
+    const service = new ExternalMediaSearchService(
+      () => ({ bangumi: true, anilist: false, openlibrary: false }),
+      clients({
+        bangumi: client("bangumi", "Bangumi", () => true, async (_type, _query, page) => {
+          calls.push(page);
+          return page === 1 ? {
+            results: Array.from({ length: 25 }, (_, i) => result("bangumi", String(i), "Example")),
+            hasMore: true,
+          } : { results: [result("bangumi", "25", "Example")], hasMore: false };
+        }),
+      }),
+    );
+    const first = await service.search("anime", "Example");
+    const second = await service.search("anime", "Example");
+    assert.ok(first.sessionId);
+    assert.ok(second.sessionId);
+    assert.notEqual(first.sessionId, second.sessionId);
+    const firstNext = await service.searchPage("anime", "Example", 2, first.sessionId);
+    const secondNext = await service.searchPage("anime", "Example", 2, second.sessionId);
+    assert.deepEqual(firstNext.results.map(item => item.sourceId), ["24", "25"]);
+    assert.deepEqual(secondNext.results.map(item => item.sourceId), ["24", "25"]);
+    assert.deepEqual(calls, [1, 1, 2, 2]);
+    await assert.rejects(service.searchPage("anime", "Example", 3, "expired"), /session expired/);
+  });
+
 });

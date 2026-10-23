@@ -37,10 +37,12 @@ export function renderScoreDashboardWithBatchDrag(
   items: readonly MediaItem[],
   initialState: ScoreDashboardUiState,
   adapters: ScoreDashboardUiAdapters,
+  persistentChrome?: HTMLElement,
 ): void {
   controllers.get(container)?.abort();
   let currentState = { ...initialState };
   let touchInputSeen = false;
+  let lastPointerInput: "touch" | "mouse" | null = null;
 
   const render = (scrollTop: number, restoreBatchMode = false): void => {
     controllers.get(container)?.abort();
@@ -57,6 +59,8 @@ export function renderScoreDashboardWithBatchDrag(
       },
     });
 
+    // Internal score-board rerenders must not erase the shared rating/ranking switch.
+    if (persistentChrome) container.prepend(persistentChrome);
     const controller = new AbortController();
     controllers.set(container, controller);
     const options = { signal: controller.signal };
@@ -86,7 +90,7 @@ export function renderScoreDashboardWithBatchDrag(
     );
     let batchInvariantQueued = false;
     scheduleTouchBatchInvariant = (): void => {
-      if (!touchInputSeen || batchInvariantQueued) return;
+      if (!touchInputSeen || lastPointerInput !== "touch" || batchInvariantQueued) return;
       batchInvariantQueued = true;
       queueMicrotask(() => {
         batchInvariantQueued = false;
@@ -98,11 +102,16 @@ export function renderScoreDashboardWithBatchDrag(
         batchButton.click();
       });
     };
+    const isTouchDevice = (): boolean => lastPointerInput === "touch"
+      || (lastPointerInput !== "mouse" && (
+        container.ownerDocument.body.classList.contains("is-mobile")
+        || container.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")?.matches === true
+      ));
     const syncDraggablePosters = (): void => {
       const batchMode = shell.classList.contains("is-batch-mode");
       container.querySelectorAll<HTMLButtonElement>(".al-score-poster").forEach((poster) => {
-        poster.draggable = !batchMode || poster.classList.contains("is-selected");
-        poster.setAttribute("aria-grabbed", String(batchMode && poster.classList.contains("is-selected")));
+        poster.draggable = !isTouchDevice() && (!batchMode || poster.classList.contains("is-selected"));
+        poster.setAttribute("aria-grabbed", String(!isTouchDevice() && batchMode && poster.classList.contains("is-selected")));
       });
     };
     const clearDropTargets = (): void => {
@@ -177,6 +186,11 @@ export function renderScoreDashboardWithBatchDrag(
     }, options);
 
     container.addEventListener("dragstart", (event) => {
+      if (isTouchDevice()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (!shell.classList.contains("is-batch-mode")) return;
       const target = event.target;
       const poster = target instanceof Element ? target.closest<HTMLButtonElement>(".al-score-poster") : null;
@@ -235,17 +249,19 @@ export function renderScoreDashboardWithBatchDrag(
     }, { ...options, capture: true });
 
     installScoreDashboardTouchInteractions(container, shell, batchButton, controller.signal, {
-      selectedPosters,
-      onTouchInput: () => { touchInputSeen = true; },
-      finishDrag,
-      onDragStart: (clientY) => {
-        autoScroller = new ScoreDashboardDragAutoScroller(container);
-        autoScroller.start();
-        autoScroller.update(clientY);
+      onTouchInput: () => {
+        touchInputSeen = true;
+        lastPointerInput = "touch";
+        syncDraggablePosters();
       },
-      onDragMove: (clientY) => autoScroller?.update(clientY),
-      onDrop: (paths, lane) => applyPathDrop(paths, lane, false),
     });
+    // A hybrid device must not lose desktop drag-and-drop for the rest of the
+    // session merely because its touchscreen was used once.
+    container.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || lastPointerInput === "mouse") return;
+      lastPointerInput = "mouse";
+      syncDraggablePosters();
+    }, { ...options, capture: true });
 
     container.addEventListener("dragend", finishDrag, { ...options, capture: true });
     container.ownerDocument.defaultView?.addEventListener("blur", finishDrag, options);
@@ -255,4 +271,9 @@ export function renderScoreDashboardWithBatchDrag(
   };
 
   render(container.scrollTop);
+}
+
+export function disposeScoreDashboardInteractions(container: HTMLElement): void {
+  controllers.get(container)?.abort();
+  controllers.delete(container);
 }

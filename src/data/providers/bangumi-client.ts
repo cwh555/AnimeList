@@ -1,7 +1,9 @@
 import { requestUrl } from "obsidian";
+import { withProviderRequestDeadline } from "./request-deadline";
 import { USER_AGENT } from "../../app-metadata";
 import type { MediaType } from "../../domain/media-types";
-import { asArray } from "../../domain/value-normalization";
+import { asArray, stringValue } from "../../domain/value-normalization";
+import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
 import { normalizeBangumiAnimationStudiosFromPersons, normalizeBangumiSubject } from "../provider-normalizers";
 
@@ -23,6 +25,15 @@ function optionalNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** An unknown Book subtype remains a candidate; a known opposite subtype does not. */
+function matchesBookMediaType(subject: Record<string, unknown>, requested: MediaType): boolean {
+  if (requested === "anime") return true;
+  const tags = asArray(subject.meta_tags).map(value => stringValue(value));
+  const keys = asArray(subject.infobox).map(value => stringValue(record(value).key));
+  const inferred = bangumiBookMediaType(stringValue(subject.platform), tags, keys);
+  return inferred === null || inferred === requested;
+}
+
 export class BangumiClient implements MetadataProviderClient {
   readonly id = "bangumi" as const;
   readonly label = "Bangumi";
@@ -31,27 +42,43 @@ export class BangumiClient implements MetadataProviderClient {
   supports(_mediaType: MediaType): boolean { return true; }
 
 
+
+  /** Only the subject detail endpoint is needed for title normalization. */
+  async fetchTitleById(mediaType: MediaType, sourceId: string): Promise<ReturnType<typeof normalizeBangumiSubject> | null> {
+    const id = sourceId.trim();
+    if (!/^\d+$/.test(id)) return null;
+    const response = await withProviderRequestDeadline("Bangumi", () => requestUrl({
+      url: BANGUMI_SUBJECT_ENDPOINT + "/" + encodeURIComponent(id),
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    }));
+    const subject = record(response.json ?? JSON.parse(response.text || "{}"));
+    return Object.keys(subject).length && matchesBookMediaType(subject, mediaType)
+      ? normalizeBangumiSubject(subject, mediaType) : null;
+  }
+
   async fetchById(mediaType: MediaType, sourceId: string): Promise<ReturnType<typeof normalizeBangumiSubject> | null> {
     const id = sourceId.trim();
     if (!id) return null;
-    const response = await requestUrl({
+    const response = await withProviderRequestDeadline("Bangumi", () => requestUrl({
       url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(id)}`,
       method: "GET",
       headers: { Accept: "application/json", "User-Agent": USER_AGENT },
-    });
+    }));
     const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
     const subject = record(parsed);
     if (!Object.keys(subject).length) return null;
 
+    if (!matchesBookMediaType(subject, mediaType)) return null;
     const normalized = normalizeBangumiSubject(subject, mediaType);
     if (mediaType !== "anime" || normalized.people.length) return normalized;
 
     try {
-      const personsResponse = await requestUrl({
+      const personsResponse = await withProviderRequestDeadline("Bangumi", () => requestUrl({
         url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(id)}${BANGUMI_SUBJECT_PERSONS_SUFFIX}`,
         method: "GET",
         headers: { Accept: "application/json", "User-Agent": USER_AGENT },
-      });
+      }));
       const persons: unknown = personsResponse.json ?? JSON.parse(personsResponse.text || "[]");
       const studios = normalizeBangumiAnimationStudiosFromPersons(persons);
       return studios.length ? { ...normalized, people: studios } : normalized;
@@ -66,7 +93,7 @@ export class BangumiClient implements MetadataProviderClient {
   async searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
     const normalizedPage = Math.max(1, Math.floor(page));
     const offset = (normalizedPage - 1) * BANGUMI_PAGE_SIZE;
-    const response = await requestUrl({
+    const response = await withProviderRequestDeadline("Bangumi", () => requestUrl({
       url: `${BANGUMI_SEARCH_ENDPOINT}?limit=${BANGUMI_PAGE_SIZE}&offset=${offset}`,
       method: "POST",
       headers: {
@@ -79,13 +106,14 @@ export class BangumiClient implements MetadataProviderClient {
         sort: "match",
         filter: { type: [mediaType === "anime" ? 2 : 1], nsfw: false },
       }),
-    });
+    }));
     const parsed: unknown = response.json ?? JSON.parse(response.text || "{}");
     const payload = record(parsed);
     const subjects = asArray(payload.data);
     const total = optionalNumber(payload.total);
     return {
-      results: subjects.map((subject) => normalizeBangumiSubject(subject, mediaType)),
+      results: subjects.filter(subject => matchesBookMediaType(record(subject), mediaType))
+        .map((subject) => normalizeBangumiSubject(subject, mediaType)),
       hasMore: total === null
         ? subjects.length === BANGUMI_PAGE_SIZE
         : offset + subjects.length < total,

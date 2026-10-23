@@ -295,7 +295,7 @@ test("manual cover discovery includes broad Chinese queries without replacing th
   assert.deepEqual(manualSerialCoverQueries("關於我被隔壁天使變成廢材這件事", "1").slice(0, 3), [
     "關於我被隔壁天使變成廢材這件事 1",
     "隔壁天使 1",
-    "變成废材 1",
+    "变成废材 1",
   ]);
   assert.ok(manualSerialCoverQueries("不時以俄語遮羞的艾利同學", "1").includes("俄语遮羞 1"));
   assert.deepEqual(manualSerialCoverQueries("冰菓", "1"), ["冰菓 1"]);

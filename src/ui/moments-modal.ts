@@ -1,4 +1,5 @@
 import { AnimeListModal } from "./animelist-modal";
+import { createUiAction } from "./ui-primitives";
 import { Notice } from "obsidian";
 import type { ImageSectionAssetInput, ImageSectionService } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
@@ -539,15 +540,13 @@ export class DeleteMomentModal extends AnimeListModal {
   ) { super(app); }
 
   onOpen(): void {
-    this.modalEl.addClass("animelist-moment-delete-modal");
+    this.modalEl.addClass("animelist-modal", "al-dialog-compact", "animelist-moment-delete-modal");
     this.setTitle(momentsText("deleteTitle"));
     this.contentEl.appendChild(makeEl("p", "al-moment-delete-copy", momentsText("deleteMessage")));
-    const actions = makeEl("div", "al-moment-editor-actions");
-    const cancel = makeEl("button", "", momentsText("cancel"));
-    cancel.type = "button";
+    const actions = makeEl("div", "al-moment-editor-actions al-modal-actions");
+    const cancel = createUiAction(momentsText("cancel"));
     cancel.addEventListener("click", () => this.close());
-    const confirm = makeEl("button", "mod-warning", momentsText("deleteConfirm"));
-    confirm.type = "button";
+    const confirm = createUiAction(momentsText("deleteConfirm"), "danger");
     confirm.addEventListener("click", () => {
       confirm.disabled = true;
       void this.onDelete().then(() => this.close()).catch((error) => {

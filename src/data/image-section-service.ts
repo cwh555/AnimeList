@@ -1,4 +1,5 @@
 import { Notice, TFile, requestUrl, type App } from "obsidian";
+import { uiText } from "../ui-text";
 import type { CoverSources } from "../types";
 import type { AnimeListSettings } from "../domain/settings-types";
 import {
@@ -334,7 +335,7 @@ export class ImageSectionService {
       frontmatter.cover = path;
     });
     this.host.refreshViews();
-    new Notice("Media cover updated");
+    new Notice(uiText("notice.saved"));
   }
 
   private async fileFingerprints(file: TFile): Promise<{ binary: string; visual?: string }> {

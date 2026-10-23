@@ -1,3 +1,5 @@
+import { JA_TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
+import { JA_RANKING_MESSAGES } from "./ranking";
 import type { LocaleCatalogs } from "../zh-TW";
 import { JA_CORE_MESSAGES } from "./core";
 import { JA_SEARCH_MESSAGES } from "./search";
@@ -27,6 +29,7 @@ export const JA_CATALOGS = {
   "progress-unit": JA_PROGRESS_UNIT_MESSAGES,
   masterpiece: JA_MASTERPIECE_MESSAGES,
   "score-dashboard": JA_SCORE_DASHBOARD_MESSAGES,
+  ranking: JA_RANKING_MESSAGES,
   "legacy-metadata": JA_LEGACY_METADATA_MESSAGES,
   "user-tag": JA_USER_TAG_MESSAGES,
   "image-section": JA_IMAGE_SECTION_MESSAGES,
@@ -36,4 +39,5 @@ export const JA_CATALOGS = {
   "library-export": JA_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": JA_TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": JA_MANUAL_MEDIA_MESSAGES,
+  "title-localization": JA_TITLE_LOCALIZATION_MESSAGES,
 } as const satisfies LocaleCatalogs;

@@ -29,17 +29,36 @@ jobs:
       - name: Run full checks in UTC
         run: TZ=UTC npm run check
       - name: Run full tests in Asia/Taipei
-        run: TZ=Asia/Taipei npm test
+        run: TZ=Asia/Taipei npm run test:all
       - name: Run segmented-date keyboard flow in Chromium
         run: npm run test:browser:date
+      - name: Validate English-only title migration dialog in desktop and mobile Chromium
+        run: npm run test:browser:title-localization
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Run shared modal UI protocol in Chromium
+        run: npm run test:browser:ui
       - name: Run Lightbox layout and interaction regressions in Chromium
         run: npm run test:browser:image-session-regressions
       - name: Run Score Dashboard mobile interactions in Chromium
         run: npm run test:browser:score-mobile
+      - name: Run ranking interactions across mobile and desktop viewports
+        run: npm run test:browser:ranking
+      - name: Upload simulated ranking layouts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranking-layouts-${{ github.sha }}
+          path: .tmp/ranking-ui-screenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Run ranking pointer drag preview in Chromium
+        run: npm run test:browser:ranking-drag
+      - name: Verify Scores and Ranking share one workspace without scroll regressions
+        run: npm run test:browser:score-ranking
       - name: Run tag chip interactions in Chromium
         run: npm run test:browser:tags
       - name: Run tag manager interactions in Chromium
         run: npm run test:browser:tag-manager
       - run: npm run release:check
+      - name: Assemble production Test Vault without opening the desktop app
+        run: ANIMELIST_TEST_VAULT="$RUNNER_TEMP/animelist-test-vault" node scripts/test-vault.mjs production --no-open

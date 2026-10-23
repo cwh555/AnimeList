@@ -65,3 +65,7 @@ Within one work, the same image path referenced by multiple Image Sections appea
 - No global drag ordering: a mixed-work gallery has no unambiguous Markdown order to write back.
 - No cross-note image mutation from the Images page.
 - No duplicate Timeline/Score/Images entry buttons in the Library header.
+
+## Existing work cover replacement in 1.6
+
+Replacing a work cover is an explicit operation in that work's **Edit** dialog, not an image-library reorganization. Saving a chosen local image changes the note's `cover` reference while retaining older cover files and any Image Section/Moments references; Cancel does not write new media. The Images workspace continues to derive its content from saved Image Sections rather than a second image database. Cleanup of unreferenced managed assets stays opt-in and reference-aware.

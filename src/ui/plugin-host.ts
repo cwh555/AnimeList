@@ -20,15 +20,17 @@ export interface AnimeListUiHost {
   collectMediaItems(source?: string): MediaItem[];
   getScanFolders(): string[];
   resolveMediaCoverPath(value: unknown, sourcePath: string): string;
-  searchExternal(mediaType: MediaType, query: string): Promise<{
+  searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{
     results: ExternalMediaResult[];
     warnings: string[];
+    hasMore?: boolean;
+    sessionId?: string;
   }>;
   enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult>;
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;
   getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>>;
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
-  updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void>;
+  updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void>;
   deleteMediaFile(file: TFile): Promise<void>;
   setFavorite(path: string, next: boolean): Promise<void>;
   openLibrary(): Promise<void>;

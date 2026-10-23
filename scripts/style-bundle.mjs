@@ -20,6 +20,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/version-cleanup.css",
   "styles/masterpiece.css",
   "styles/score-dashboard.css",
+  "styles/pairwise-ranking.css",
   "styles/serial-cover.css",
   "styles/library-list.css",
   "styles/media-metadata.css",
@@ -33,6 +34,11 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/workspace-responsive-library.css",
   "styles/workspace-responsive-pages.css",
   "styles/plugin-mobile-gestures.css",
+  "styles/media-cover-replacement.css",
+  "styles/mobile-touch-refinements.css",
+  "styles/updates-cleanup.css",
+  "styles/ui-primitives.css",
+  "styles/media-editor-layout.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {

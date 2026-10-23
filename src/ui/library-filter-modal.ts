@@ -1,4 +1,5 @@
 import { AnimeListModal } from "./animelist-modal";
+import { createUiAction } from "./ui-primitives";
 import { App } from "obsidian";
 import type { LibraryFilterOptions, LibraryFilters, LibraryQuarterOption } from "../domain/library-filters";
 import { normalizeLibraryFilters, toggleLibraryFilterValue, toggleLibraryQuarter } from "../domain/library-filters";
@@ -69,11 +70,9 @@ export class LibraryFilterModal extends AnimeListModal {
       this.close();
     });
     const spacer = makeEl("span", "al-filter-action-spacer");
-    const cancel = makeEl("button", "", uiText("action.cancel"));
-    cancel.type = "button";
+    const cancel = createUiAction(uiText("action.cancel"));
     cancel.addEventListener("click", () => this.close());
-    const apply = makeEl("button", "mod-cta", uiText("library.filterApply"));
-    apply.type = "button";
+    const apply = createUiAction(uiText("library.filterApply"), "primary");
     apply.addEventListener("click", () => {
       this.onApply(normalizeLibraryFilters(this.draft));
       this.close();

@@ -26,6 +26,8 @@ export interface LegacyMetadataCleanupOptions {
   onProgress?: (progress: LegacyMetadataCleanupProgress) => void;
   apiIntervalMs?: number;
   sleep?: (milliseconds: number) => Promise<void>;
+  shouldScan?: (file: TFile) => boolean;
+  onChecked?: (file: TFile, success: boolean) => void;
 }
 
 const LEGACY_GENRE_NOISE = [
@@ -326,7 +328,8 @@ export async function cleanupLegacyMetadataNotes(
 ): Promise<LegacyMetadataCleanupResult> {
   const mediaFiles = getScopedMarkdownFiles(app, roots).filter((file) => {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
-    return Boolean(frontmatter && isMediaType(frontmatter.media_type));
+    return Boolean(frontmatter && isMediaType(frontmatter.media_type)
+      && (options.shouldScan?.(file) ?? true));
   });
   const result: LegacyMetadataCleanupResult = {
     scanned: mediaFiles.length,
@@ -396,6 +399,7 @@ export async function cleanupLegacyMetadataNotes(
     }
 
     if (!metadataUpgrade && !localChange.changed) {
+      options.onChecked?.(file, true);
       progress(options.onProgress, "completed", index + 1, mediaFiles.length, title, `Already current: ${title}`);
       continue;
     }
@@ -438,6 +442,8 @@ export async function cleanupLegacyMetadataNotes(
         ...(enrichmentError ? { error: enrichmentError } : {}),
       });
     }
+    // Failed/unavailable remote enrichment must stay eligible for incremental retries.
+    options.onChecked?.(file, !metadataUpgrade || enriched !== null || !options.enrich);
     progress(options.onProgress, "completed", index + 1, mediaFiles.length, title, changed ? `Updated ${title}` : `No changes for ${title}`);
   }
 

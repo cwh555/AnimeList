@@ -34,6 +34,7 @@ export const SCORE_DASHBOARD_MESSAGES = {
   moveNoChange: "作品已在目標分數，沒有需要更新的項目。",
   moveFailed: "分數更新失敗：{message}",
   dragHint: "拖曳封面可直接變更分數",
+  mobileHint: "長按封面選取作品，再用「移動至」調整分數；滑動只會瀏覽。",
   selectionHint: "點選封面勾選作品，再使用批次工具列移動。",
   ratedSummary: "已評分 {rated}／{total}",
   coverAlt: "{title} 的封面",

@@ -21,3 +21,4 @@
 > Performance and usability improvements that preserve existing functionality and behavior.
 
 - Continue profiling very large libraries and image collections while keeping indexing, thumbnails, and workspace rendering incremental.
+- Evaluate additional title-discovery coverage and latency using measured live provider results, without assuming fuzzy aliases prove source identity.

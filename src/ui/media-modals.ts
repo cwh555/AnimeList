@@ -1,8 +1,10 @@
 import { AnimeListModal } from "./animelist-modal";
+import { MediaModalNavigation } from "./media-modal-navigation";
 import { Notice, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm, MediaType } from "../types";
 import { manualMediaResult, type MediaCoverAssetInput } from "../domain/manual-media";
 import { manualMediaText } from "../features/manual-media/text";
+import { searchFeatureText } from "../features/search/text";
 import { normalizeUserTags } from "../domain/user-tags";
 import { persistedMediaTags } from "../domain/media-classification";
 import { normalizeGenre } from "../domain/media-metadata";
@@ -16,6 +18,9 @@ import { createLabeledField, createMediaEditorFields, createMediaFormContext, cr
 import { MEDIA_UI_LABELS, appendIconLabel, errorMessage, formValue, makeEl } from "./ui-helpers";
 import { transitionSurface } from "./layout-motion";
 import { bindImageFallback } from "./image-fallback";
+import { createMediaCoverPicker, type MediaCoverPicker } from "./media-cover-picker";
+import { createMediaEditorIdentity, createMediaEditorSectionHeading, updateMediaEditorIdentityTitle } from "./media-editor-layout";
+import { createFilePickerControl, createUiAction } from "./ui-primitives";
 
 
 function libraryTagOptions(plugin: AnimeListUiHost, extra: unknown = []): string[] {
@@ -43,6 +48,9 @@ export class AddMediaModal extends AnimeListModal {
   query = "";
   results: ExternalMediaResult[] = [];
   warnings: string[] = [];
+  hasMore = false;
+  sessionId: string | null = null;
+  private readonly navigation = new MediaModalNavigation();
   private manualCoverFile: File | null = null;
   private manualCoverPreviewUrl: string | null = null;
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
@@ -59,6 +67,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   onClose(): void {
+    this.navigation.enter();
     this.disposeActiveForm();
     if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
     this.manualCoverPreviewUrl = null;
@@ -76,6 +85,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   renderSearch(): void {
+    this.navigation.enter();
     this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const heading = createDiv();
@@ -101,6 +111,7 @@ export class AddMediaModal extends AnimeListModal {
         this.mediaType = value;
         this.results = [];
         this.warnings = [];
+        this.hasMore = false;
         this.renderSearch();
       });
       typeTabs.appendChild(button);
@@ -145,7 +156,7 @@ export class AddMediaModal extends AnimeListModal {
 
     const resultsEl = createDiv();
     resultsEl.className = "al-search-results";
-    if (!this.results.length && this.query) {
+    if (!this.results.length && this.query && !this.hasMore) {
       const empty = createDiv();
       empty.className = "al-search-empty";
       empty.textContent = uiText("add.emptyResult");
@@ -154,20 +165,46 @@ export class AddMediaModal extends AnimeListModal {
     this.results.forEach((result) => resultsEl.appendChild(this.createResultRow(result)));
     this.contentEl.appendChild(resultsEl);
     this.plugin.afterSearchRender(this);
-    window.setTimeout(() => input.focus(), 0);
+    window.setTimeout(() => { if (this.contentEl.contains(input)) input.focus(); }, 0);
   }
 
   async search(button: HTMLButtonElement): Promise<void> {
+    const generation = this.navigation.enter();
+    const mediaType = this.mediaType;
+    const query = this.query;
     button.disabled = true;
     button.textContent = uiText("add.searching");
+    this.results = [];
+    this.warnings = [];
+    this.hasMore = false;
+    this.sessionId = null;
+    this.contentEl.querySelector(".al-search-pagination")?.remove();
+    const current = this.contentEl.querySelector<HTMLElement>(".al-search-results");
+    if (current) current.replaceChildren(makeEl("p", "al-modal-hint", uiText("add.searching")));
+
+    // Show first matching provider immediately, without waiting for fallback
+    // aliases or a rate-limited second metadata service. Do not replace the
+    // search form: this preserves keyboard focus and current input text.
+    const onProgress = (results: ExternalMediaResult[]): void => {
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
+      this.results = results;
+      const panel = this.contentEl.querySelector<HTMLElement>(".al-search-results");
+      if (panel) panel.replaceChildren(...results.map(result => this.createResultRow(result)));
+    };
     try {
-      const response = await this.plugin.searchExternal(this.mediaType, this.query);
+      const response = await this.plugin.searchExternal(mediaType, query, onProgress);
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
       this.results = response.results;
       this.warnings = response.warnings;
+      this.hasMore = response.hasMore ?? this.results.length > 0;
+      this.sessionId = response.sessionId ?? null;
       if (!this.results.length) new Notice(uiText("notice.searchNoResults"));
     } catch (error) {
+      if (!this.navigation.isCurrent(generation) || mediaType !== this.mediaType || query !== this.query) return;
       console.error("AnimeList external search failed", error);
       this.results = [];
+      this.hasMore = false;
+      this.sessionId = null;
       this.warnings = [errorMessage(error)];
       new Notice(uiText("notice.searchUnavailable"));
     }
@@ -206,6 +243,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   private async renderManualDetails(mediaType: MediaType, state: ManualMediaFormState = {}): Promise<void> {
+    const generation = this.navigation.enter();
     this.disposeActiveForm();
     this.mediaType = mediaType;
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
@@ -247,19 +285,24 @@ export class AddMediaModal extends AnimeListModal {
       manualMediaText("year"),
       createTextInput("text", state.year ?? ""),
     );
-    const coverInput = createEl("input");
-    coverInput.type = "file";
-    coverInput.accept = "image/*";
-    const coverField = createLabeledField(typeFieldHost, manualMediaText("cover"), coverInput, manualMediaText("coverHint"));
-    coverField.classList.add("al-manual-cover-input");
+    const coverPicker = createFilePickerControl(uiText("edit.coverChoose"), "image/jpeg,image/png,image/webp,image/avif");
+    const coverInput = coverPicker.input;
+    const coverField = makeEl("div", "al-form-field al-manual-cover-input");
+    coverField.append(
+      makeEl("span", "al-form-label", manualMediaText("cover")),
+      coverPicker.element,
+      makeEl("small", "al-form-hint", manualMediaText("coverHint")),
+    );
+    typeFieldHost.appendChild(coverField);
     const coverPreview = makeEl("div", "al-manual-cover-preview");
     const renderCoverPreview = (): void => {
       coverPreview.replaceChildren();
+      if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
+      this.manualCoverPreviewUrl = null;
       if (!this.manualCoverFile) {
         coverPreview.appendChild(makeEl("span", "", manualMediaText("noCover")));
         return;
       }
-      if (this.manualCoverPreviewUrl) URL.revokeObjectURL(this.manualCoverPreviewUrl);
       this.manualCoverPreviewUrl = URL.createObjectURL(this.manualCoverFile);
       const image = makeEl("img");
       image.alt = "";
@@ -275,8 +318,18 @@ export class AddMediaModal extends AnimeListModal {
     typeFieldHost.appendChild(coverPreview);
     this.contentEl.appendChild(typeFieldHost);
 
-    const templates = await this.plugin.getTemplates(mediaType);
-    if (!this.contentEl.isConnected) return;
+    let templates: Array<{ path: string; name: string }>;
+    try {
+      templates = await this.plugin.getTemplates(mediaType);
+    } catch (error) {
+      if (this.navigation.isCurrent(generation)) {
+        console.error("AnimeList manual template loading failed", error);
+        new Notice(uiText("notice.searchUnavailable"));
+      }
+      return;
+    }
+    if (!this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
     const values = state.values ?? {};
@@ -335,10 +388,7 @@ export class AddMediaModal extends AnimeListModal {
 
     const actions = createDiv();
     actions.className = "al-modal-actions";
-    const createButton = createEl("button");
-    createButton.type = "button";
-    createButton.className = "mod-cta";
-    createButton.textContent = uiText("action.collect");
+    const createButton = createUiAction(uiText("action.collect"), "primary");
     createButton.addEventListener("click", () => {
       void (async () => {
         createButton.disabled = true;
@@ -374,6 +424,7 @@ export class AddMediaModal extends AnimeListModal {
   }
 
   async renderDetails(result: ExternalMediaResult): Promise<void> {
+    const generation = this.navigation.enter();
     this.disposeActiveForm();
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
     const back = createEl("button");
@@ -383,36 +434,42 @@ export class AddMediaModal extends AnimeListModal {
     back.addEventListener("click", () => this.renderSearch());
     this.contentEl.appendChild(back);
 
-    const preview = createDiv();
-    preview.className = "al-selected-preview";
-    if (result.coverUrl) {
-      const image = createEl("img");
-      image.alt = uiText("library.coverAlt", { title: result.title });
-      bindImageFallback(image, () => makeEl("div", "al-search-result-placeholder", uiText("add.noCover")));
-      preview.appendChild(image);
-      image.src = result.coverUrl;
-    }
-    const copy = createDiv();
-    copy.append(
-      makeEl("div", "al-kicker", mediaProviderLabel(result.provider)),
-      makeEl("h2", "", result.title),
-      makeEl("p", "", result.originalTitle || result.romajiTitle || ""),
-    );
-    preview.appendChild(copy);
-    this.contentEl.appendChild(preview);
+    const identity = createMediaEditorIdentity({
+      title: result.title,
+      originalTitle: result.originalTitle || result.romajiTitle || "",
+      provider: mediaProviderLabel(result.provider),
+      coverUrl: result.coverUrl,
+      coverAlt: uiText("library.coverAlt", { title: result.title }),
+      missingCoverText: uiText("add.noCover"),
+    });
+    this.contentEl.appendChild(identity);
 
     const metadataLoading = makeEl("p", "al-modal-hint", uiText("add.metadataLoading"));
     this.contentEl.appendChild(metadataLoading);
-    const [templates, enrichedResult] = await Promise.all([
-      this.plugin.getTemplates(result.mediaType),
-      this.plugin.enrichExternalMedia(result),
-    ]);
+    let details: Awaited<ReturnType<AnimeListUiHost["enrichExternalMedia"]>>;
+    let templates: Awaited<ReturnType<AnimeListUiHost["getTemplates"]>>;
+    try {
+      [templates, details] = await Promise.all([
+        this.plugin.getTemplates(result.mediaType),
+        this.plugin.enrichExternalMedia(result),
+      ]);
+    } catch (error) {
+      if (this.navigation.isCurrent(generation)) {
+        console.error("AnimeList selected media metadata failed", error);
+        metadataLoading.textContent = uiText("notice.searchUnavailable");
+      }
+      return;
+    }
+    if (!this.navigation.isCurrent(generation) || !this.contentEl.isConnected) return;
+    const enrichedResult = details;
     metadataLoading.remove();
+    updateMediaEditorIdentityTitle(identity, enrichedResult.title, uiText("library.coverAlt", { title: enrichedResult.title }));
     const metadataHost = createDiv();
     metadataHost.className = "al-edit-metadata-host";
     renderMediaClassificationFields(metadataHost, enrichedResult);
     this.contentEl.appendChild(metadataHost);
 
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
     const form = createDiv();
     form.className = "al-media-form";
     const templateOptions: Array<[string, string]> = templates.length
@@ -445,6 +502,25 @@ export class AddMediaModal extends AnimeListModal {
     });
     this.contentEl.appendChild(form);
 
+    if (enrichedResult.titleSuggestion) {
+      const suggestion = enrichedResult.titleSuggestion;
+      const proposal = createDiv();
+      proposal.className = "al-source-note";
+      proposal.appendChild(makeEl("p", "al-modal-hint",
+        searchFeatureText("title.suggestion", {
+          provider: suggestion.provider, title: suggestion.title,
+        })));
+      const use = createEl("button");
+      use.type = "button";
+      use.textContent = searchFeatureText("title.useSuggestion");
+      use.addEventListener("click", () => {
+        fields.title.value = suggestion.title;
+        fields.title.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      proposal.appendChild(use);
+      this.contentEl.appendChild(proposal);
+    }
+
     const context = createMediaFormContext({
       mode: "create",
       plugin: this.plugin,
@@ -467,10 +543,7 @@ export class AddMediaModal extends AnimeListModal {
 
     const actions = createDiv();
     actions.className = "al-modal-actions";
-    const createButton = createEl("button");
-    createButton.type = "button";
-    createButton.className = "mod-cta";
-    createButton.textContent = uiText("action.collect");
+    const createButton = createUiAction(uiText("action.collect"), "primary");
     createButton.addEventListener("click", () => {
       void (async () => {
       createButton.disabled = true;
@@ -505,17 +578,15 @@ export class ConfirmDeleteModal extends AnimeListModal {
   }
 
   onOpen(): void {
-    this.modalEl.classList.add("animelist-modal", "animelist-confirm-modal");
+    this.modalEl.classList.add("animelist-modal", "animelist-confirm-modal", "al-dialog-compact");
     const fm = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     this.contentEl.replaceChildren();
     const title = makeEl("h2", "", uiText("delete.title"));
     const description = makeEl("p", "", uiText("delete.description", { title: formValue(fm.title, this.file.basename) }));
     const actions = makeEl("div", "al-modal-actions al-confirm-actions");
-    const cancel = makeEl("button", "", uiText("action.cancel"));
-    cancel.type = "button";
+    const cancel = createUiAction(uiText("action.cancel"));
     cancel.addEventListener("click", () => this.close());
-    const remove = makeEl("button", "mod-warning", uiText("action.delete"));
-    remove.type = "button";
+    const remove = createUiAction(uiText("action.delete"), "danger");
     remove.addEventListener("click", () => {
       void (async () => {
       remove.disabled = true;
@@ -538,6 +609,7 @@ export class ConfirmDeleteModal extends AnimeListModal {
 
 export class EditMediaModal extends AnimeListModal {
   private activeFormContext: MediaFormContext<AnimeListUiHost> | null = null;
+  private coverPicker: MediaCoverPicker | null = null;
 
   constructor(
     private readonly plugin: AnimeListUiHost,
@@ -554,35 +626,43 @@ export class EditMediaModal extends AnimeListModal {
   onClose(): void {
     this.activeFormContext?.dispose();
     this.activeFormContext = null;
+    this.coverPicker?.dispose();
+    this.coverPicker = null;
   }
 
   private render(): void {
     this.activeFormContext?.dispose();
     this.activeFormContext = null;
+    this.coverPicker?.dispose();
+    this.coverPicker = null;
     const frontmatter = this.plugin.app.metadataCache.getFileCache(this.file)?.frontmatter || {};
     transitionSurface(this.contentEl, () => this.contentEl.replaceChildren());
-    const heading = createDiv();
-    heading.className = "al-modal-heading";
-    const titleHeading = createEl("h2");
-    titleHeading.textContent = uiText("edit.title", { title: formValue(frontmatter.title, this.file.basename) });
-    const description = createEl("p");
-    description.textContent = uiText("edit.description");
-    heading.append(titleHeading, description);
-    this.contentEl.appendChild(heading);
-
     const mediaType: MediaType = frontmatter.media_type === "manga" || frontmatter.media_type === "novel"
       ? frontmatter.media_type
       : "anime";
+    const title = String(formValue(frontmatter.title, this.file.basename));
+    const coverPath = typeof frontmatter.cover === "string" ? frontmatter.cover : "";
+    const fallbackPath = typeof frontmatter.cover_remote === "string" ? frontmatter.cover_remote : "";
+    this.contentEl.appendChild(createMediaEditorIdentity({
+      title,
+      originalTitle: typeof frontmatter.title_original === "string" ? frontmatter.title_original : "",
+      provider: typeof frontmatter.source_provider === "string" ? mediaProviderLabel(frontmatter.source_provider) : "",
+      coverUrl: this.plugin.resolveMediaCoverPath(coverPath, this.file.path)
+        || this.plugin.resolveMediaCoverPath(fallbackPath, this.file.path),
+      coverAlt: uiText("library.coverAlt", { title }),
+      missingCoverText: uiText("add.noCover"),
+    }));
+    this.contentEl.appendChild(makeEl("p", "al-modal-hint al-editor-description", uiText("edit.description")));
 
     const metadataHost = createDiv();
     metadataHost.className = "al-edit-metadata-host";
     renderStoredMediaClassificationFields(metadataHost, frontmatter, mediaType, true);
     this.contentEl.appendChild(metadataHost);
 
-    const formHeading = createEl("h3");
-    formHeading.className = "al-form-section-heading al-edit-form-heading";
-    formHeading.textContent = uiText("edit.collectionData");
-    this.contentEl.appendChild(formHeading);
+    this.coverPicker = createMediaCoverPicker(this.plugin, this.file, frontmatter);
+    this.contentEl.appendChild(this.coverPicker.element);
+
+    this.contentEl.appendChild(createMediaEditorSectionHeading(uiText("edit.collectionData")));
 
     const form = createDiv();
     form.className = "al-media-form al-edit-media-form";
@@ -633,22 +713,19 @@ export class EditMediaModal extends AnimeListModal {
 
     const actions = createDiv();
     actions.className = "al-modal-actions al-edit-actions";
-    const deleteButton = createEl("button");
-    deleteButton.type = "button";
-    deleteButton.className = "al-delete-button";
+    const deleteButton = createUiAction("", "secondary");
+    deleteButton.classList.add("al-delete-button");
     appendIconLabel(deleteButton, "trash", uiText("action.delete"));
     deleteButton.addEventListener("click", () => new ConfirmDeleteModal(this.plugin, this.file, () => this.close()).open());
-    const save = createEl("button");
-    save.type = "button";
-    save.className = "mod-cta";
-    save.textContent = uiText("action.save");
+    const save = createUiAction(uiText("action.save"), "primary");
     save.addEventListener("click", () => {
       void (async () => {
         save.disabled = true;
         try {
           const submitContext = { ...context, form: mediaFormValues(context) };
           await this.plugin.prepareMediaSubmit(submitContext);
-          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form);
+          const coverAsset = await this.coverPicker?.readSelectedAsset();
+          await this.plugin.updateMediaNote(this.file, mediaType, submitContext.form, coverAsset);
           this.close();
           new Notice(uiText("notice.saved"));
         } catch (error) {

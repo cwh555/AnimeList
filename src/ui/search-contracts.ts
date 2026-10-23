@@ -4,6 +4,8 @@ export interface SearchModalAdapter {
   readonly contentEl: HTMLElement;
   results: ExternalMediaResult[];
   warnings: string[];
+  hasMore?: boolean;
+  sessionId?: string | null;
   query: string;
   mediaType: MediaType;
   renderSearch(): void;

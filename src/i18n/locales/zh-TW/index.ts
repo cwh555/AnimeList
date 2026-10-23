@@ -1,3 +1,5 @@
+import { TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
+import { RANKING_MESSAGES } from "./ranking";
 import { CORE_MESSAGES } from "./core";
 import { LEGACY_METADATA_MESSAGES } from "./legacy-metadata";
 import { MASTERPIECE_MESSAGES } from "./masterpiece";
@@ -45,6 +47,7 @@ export const ZH_TW_CATALOGS = {
   "progress-unit": PROGRESS_UNIT_MESSAGES,
   masterpiece: MASTERPIECE_MESSAGES,
   "score-dashboard": SCORE_DASHBOARD_MESSAGES,
+  ranking: RANKING_MESSAGES,
   "legacy-metadata": LEGACY_METADATA_MESSAGES,
   "user-tag": USER_TAG_MESSAGES,
   "image-section": IMAGE_SECTION_MESSAGES,
@@ -54,6 +57,7 @@ export const ZH_TW_CATALOGS = {
   "library-export": LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": MANUAL_MEDIA_MESSAGES,
+  "title-localization": TITLE_LOCALIZATION_MESSAGES,
 } as const;
 
 export type ZhTwCatalogNamespace = keyof typeof ZH_TW_CATALOGS;

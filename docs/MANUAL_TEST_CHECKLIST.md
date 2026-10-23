@@ -183,6 +183,16 @@ Enable **Settings → Features → Latest release tracking** for these checks.
 - [ ] Edit, reorder, add, or remove an original Image Section reference, then return to/refresh Images and confirm the aggregate updates without a Vault-wide Markdown scan or duplicated asset. Rename/delete a media note and confirm stale work entries disappear.
 - [ ] A work with an empty Image Section does not create an empty board; an entirely empty aggregate shows the safe empty state. Large galleries progressively append image DOM instead of rendering every image eagerly.
 
+## Work cover replacement
+
+- [ ] Open an existing anime, manga, and novel in **Edit**: the current cover is displayed, and a local image can be chosen as a replacement.
+- [ ] Choose JPEG, PNG, WebP, and AVIF files on desktop and mobile; preview appears without changing the vault before **Save**.
+- [ ] **Cancel replacement** (and closing the editor without saving) preserves the original frontmatter and cover; file preview resources do not leak across repeated selections.
+- [ ] **Save** writes a uniquely named new file to the configured cover folder and updates `cover`; original image and `cover_remote` remain present; note prose and unrelated frontmatter are unchanged.
+- [ ] Reopen Library, Timeline, Images and the note detail: the new cover is rendered without stale thumbnails, while the old file remains untouched even if another note shares it.
+- [ ] Saving other edits with no replacement leaves the original cover unchanged.
+- [ ] Empty/unsupported/mismatched files and files over 20 MB are rejected without touching the note or vault images; a failed note write rolls back only the new uncommitted cover.
+
 ## Image Sections
 
 Use the editor context menu **AnimeList → Add image section**.
@@ -292,6 +302,29 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Out-of-range batch moves require confirmation and clamp to 0–10.
 - [ ] Opening the dashboard does not eagerly generate thumbnails for every library poster.
 
+## Ranking (Scores → Ranking)
+
+- [ ] Only completed Anime / Manga / Novel notes participate; each original media note is ranked independently.
+- [ ] Opening a comparison launches an Obsidian modal; clicking a cover selects the preferred work, Skip never creates a tie.
+- [ ] The modal closes on Pause / Escape, then Continue restores the pending comparison without losing answers.
+- [ ] Long Chinese/Japanese/English titles fit within two lines inside modal cards at 320px/390px/desktop widths.
+- [ ] The main ranking page remains visible behind the modal; modal controls and native Obsidian close behavior work.
+- [ ] Ranking page has no work-search field; all completed ranked works remain visible after edits and category switching.
+- [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
+- [ ] New entries are inserted without reshuffling the existing ranked order.
+- [ ] Tournament-like merge rounds interleave comparisons; full rankings remain strict and skip never fabricates placement.
+- [ ] Manual rank changes only use the drag handle; comparison modal has Skip and Pause but no Undo. Confirmed complete reset works, numeric scores stay unchanged.
+- [ ] Each ranked work has one full-width compact row at every viewport (320, 390, 768, 1200px), with rank, cover, left-aligned two-line title and one trailing drag handle. No oversized gray inner card.
+- [ ] While dragging, a pointer-following visual clone and source placeholder stay visible, with a clear drop highlight.
+- [ ] No redundant move-to-rank, range-rerank, or per-item more buttons remain; drag handle ArrowUp/ArrowDown provides keyboard sorting.
+- [ ] Manual movement takes precedence over earlier comparison evidence.
+- [ ] Closing/restarting Obsidian preserves an active comparison and saved ranking.
+- [ ] Rebuilding test vault / updating plugin files preserves .obsidian/animelist-ranking.json.
+- [ ] Rename and completion-status changes do not leave ghost ranks.
+- [ ] Verify language labels in Traditional Chinese, English, Japanese and Korean.
+- [ ] Confirm the old Scores dashboard still behaves identically after switching modes.
+- [ ] Test touch scrolling, handle dragging and 320px mobile layout, plus desktop/keyboard interactions.
+
 ## Mobile / narrow layouts
 
 - [ ] On iOS/Android, swipe horizontally from the **center** of Library, Timeline, Score Dashboard, and Images. AnimeList controls respond normally without opening an Obsidian sidebar.
@@ -317,3 +350,93 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Each operation changes only its owned fields/block and preserves unrelated frontmatter/body content.
 - [ ] No optional feature introduced by the current release performs a vault-wide automatic rewrite on startup.
 - [ ] Disabling optional features leaves stored Markdown readable and does not delete user data.
+
+## Language and title migration
+
+- [ ] Every Obsidian Settings section and Settings-launched dialog (buttons, status, failure and completion) remains English regardless of AnimeList UI locale.
+- [ ] Settings → Updates & cleanup → Preview title updates reports each work live while scanning; after scanning, review contains **only proposed changes**. Unchanged, missing and failed entries contribute only to the summary counters, not individual review rows.
+- [ ] An AniList-only work with a verified Bangumi candidate is offered as manual review, unchecked by default; ambiguous/mismatched-year candidates are not automatically selected.
+- [ ] A Bangumi result with Simplified Chinese but no verified Traditional title visibly explains the missing translation.
+- [ ] A Bangumi ID found in an AniList record's source_urls is usable for a direct lookup.
+- [ ] Custom titles, unavailable translations, HTTP 429 failures and cancelled scans never silently modify notes.
+- [ ] Applying a checked result leaves note path, body, unrelated frontmatter, tags, scores, progress and ranking unchanged. The previous name remains searchable in title_aliases, with title_original retained.
+- [ ] A 50+ work test vault scans progressively without blocking the settings dialog or flooding API requests; closing a scan cancels its remaining queued work.
+- [ ] Changing the interface language does not rewrite existing titles.
+
+- [ ] Accept a review-only OpenCC suggestion, explicitly switch to another verified language, then switch back. The accepted conversion must remain available but must **not** appear inside the official `title_localizations` map.
+
+## Multisource title resolution, new imports
+
+- [ ] On all Settings interface languages, create a Bangumi anime, manga and novel with a verified translated name. The verified name takes precedence; original titles and all non-title metadata remain unchanged.
+- [ ] With zh-TW selected, create a Bangumi item containing only `name_cn`; the initial form and saved note should show Traditional script without pressing the Legacy data button, and frontmatter must identify this as a script conversion rather than an official translation.
+- [ ] Add AniList Japanese and Korean works with locale ja/ko/en; verify correct provider native/English title only where language attribution exists. With zh-TW/zh-CN and no verified Chinese title, ensure the original source name remains usable and unknown synonyms do not become made-up translations.
+- [ ] Search and add an Open Library novel under zh, en, ja or ko; verify the edition preference follows the UI language, and missing translations do not overwrite the original book title or author.
+- [ ] Edit the proposed title in the new-note form; verify the custom name is preserved and no automatic conversion is falsely claimed. Repeat the search with an existing duplicate to verify source identity checking remains unchanged.
+- [ ] Change locale between searching and opening note details; ensure the create-note form resolves the chosen locale consistently, without losing original aliases or switching metadata sources.
+
+## Wikidata / incremental-cleanup final review
+
+- [ ] Add AniList-only anime with a **known Wikidata external-ID mapping** and a different target-language label; ensure the initial form prefers the matched QID name and frontmatter stores `title_external_evidence`, **not** an invented `title_localizations` entry.
+- [ ] Test an ID with no QID mapping and another with missing language data; preserve source title, avoid unsafe guesses. An API outage must leave other provider searches available.
+- [ ] Confirm user-edited names override the proposal, with original/romanized names retained and no incorrect `title_external_evidence` field.
+- [ ] In Settings → Updates & cleanup, open each of the **four** scanners and verify default 'Only new or unfinished items' versus 'Rescan all items'. After successful checks, repeat pending mode: those unchanged notes should be skipped; full scan should still inspect them.
+- [ ] If a note changes or is renamed, incremental mode should scan it again. A failed API lookup, unconfirmed candidate or failed write must not become a completed checkpoint.
+- [ ] Run filename scans with two works competing for the same filename; a partial scan must preserve global collision-safe naming.
+- [ ] Close and reopen Settings and restart Obsidian; successful scan checkpoints persist outside Markdown frontmatter.
+
+## UI Protocol unification — additional manual validation
+
+- [ ] **Search → select → collect:** Verify a Bangumi/AniList work displays
+      the same cover/title/metadata layout as Edit; confirm Create opens the
+      note and leaves correct provider/source fields. Try anime, manga and novel.
+- [ ] **Edit from library:** Verify the identity header shows the current
+      title, original name and cover; make and save a status/score/date/tag edit.
+      Reopen to verify persisted values and unrelated Markdown unchanged.
+- [ ] **Manual collection:** File chooser has the same styled button as
+      replacement; test choose, change, cancel and successful collect.
+- [ ] **Replace cover:** Before choosing, comparison panels are hidden.
+      After choosing, current and replacement images appear. Clear restores
+      unchanged state. Cancel leaves cover and files untouched; Save updates
+      the cover exactly once; existing source metadata and note body survive.
+- [ ] **Delete confirmation:** Compact dialog uses its own width, not a wide
+      shell with a narrow inner paragraph. Verify cancel, Escape and confirm;
+      test long Chinese/Japanese/Korean/mixed-language titles and paths.
+- [ ] **Mobile 320–390 px:** No horizontal scroll or clipped footer buttons;
+      controls are reachable by touch and the file chooser opens on mobile.
+      Try dark/light Obsidian themes and a larger system text size.
+- [ ] **Regressions:** Check Timeline, Score Dashboard, Moments, Image Section,
+      tag manager and release-tracking dialogs for button/focus/overflow issues.
+      Confirm no new modal causes unexpected sidebar swipes.
+
+## AnimeList 1.6.0 release-candidate acceptance
+
+These checks are specifically required before promotion of the 1.6.0 candidate from `preview` to `main`. Use a backed-up or disposable Test Vault and review the changed files as well as the UI.
+
+### Preference ranking and recovery
+
+- [ ] Compare completed works in each media category; pause midway, close Ranking, reload Obsidian, and resume exactly where you stopped with no repeated or lost pair.
+- [ ] Skip an undecidable comparison and later review it; verify a skipped title is not silently assigned an arbitrary position and scores remain unchanged.
+- [ ] Include `.obsidian/animelist-ranking.json` in vault backup/sync; verify old v1 state and an interrupted older round recover without losing unrelated category order. If a recovery backup appears, verify the original bytes were retained.
+- [ ] Simulate an external edit of the ranking JSON in the disposable vault; verify a conflict is reported rather than silently overwriting it. Check on desktop and, when available, mobile.
+
+### Markdown and managed assets
+
+- [ ] Put **two identical** Image Sections and two identical Moments blocks in one note; edit only the selected block and confirm the other block, frontmatter, comments and prose remain untouched.
+- [ ] Modify a target block from another editor while its dialog is open; saving must refuse the stale change rather than overwrite newly added image paths, YAML comments or Moment text.
+- [ ] Replace an existing work cover by uploading a valid image; Cancel does nothing, Save updates the expected note only, and the previous image is not deleted.
+- [ ] With a disposable vault, run managed-media cleanup while a file is referenced in multiple notes and while sync/content changes; referenced images and active image-order journals must survive, and cleanup may stop conservatively.
+
+### Search, localization and touch
+
+- [ ] Search short/incomplete, Traditional/Simplified Chinese, Japanese, Korean and English title variants; verify a title match is never used as proof of cross-provider identity, and source errors do not hide other results.
+- [ ] Run the **same search text twice**, paginate one interaction and switch to another; Load more must not leak pages/results between sessions. Switch to manual entry while requests are in flight; stale responses must not replace the editor.
+- [ ] Test Bangumi, AniList and Open Library with one slow/unreachable provider; timeout warnings remain visible, another source can return results, and no duplicate retry burst occurs.
+- [ ] Check 1.6 prompts in zh-TW, zh-CN, en, ja and ko. Changing the language must not rewrite already saved media names, tags or note bodies.
+- [ ] Validate smooth mobile Timeline vertical/horizontal gestures, Score Dashboard drag intent, image-modal swipes, and the desktop equivalents.
+
+### Release metadata and publishing gate
+
+- [ ] `package.json`, `package-lock.json`, `manifest.json` and `versions.json` all identify 1.6.0 with unchanged `minAppVersion`, and `CHANGELOG.md` contains the 1.6.0 release entry.
+- [ ] Exact release-candidate head passes CI: `npm ci`, `npm run check`, `npm run release:check`, the browser suite and production Test Vault preparation.
+- [ ] Verify the installed Test Vault plugin reports 1.6.0; **do not tag or publish yet**.
+- [ ] Approve main merge explicitly; only after main's own CI passes, create the exact `1.6.0` tag on the released main commit and verify the automatic GitHub Release artifacts.

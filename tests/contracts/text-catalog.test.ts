@@ -61,6 +61,24 @@ describe("user-visible text catalog compatibility", () => {
     assert.match(uiText("library.resultMeta", { shown: 1, total: 2 }), /\{genre}/);
   });
 
+  it("formats title-suggestion identity warnings across all supported languages", () => {
+    registerBundledLocales();
+    try {
+      for (const locale of ["zh-TW", "zh-CN", "en", "ja", "ko"] as const) {
+        setActiveLocale(locale);
+        const message = searchFeatureText("title.suggestion", {
+          provider: "Bangumi", title: "Localized title",
+        });
+        assert.ok(message.includes("Bangumi"), locale);
+        assert.ok(message.includes("Localized title"), locale);
+        assert.equal(message.includes("{provider}"), false, locale);
+        assert.ok(searchFeatureText("title.useSuggestion").trim(), locale);
+      }
+    } finally {
+      resetLocaleForTests();
+    }
+  });
+
   it("keeps feature text helpers stable for later locale replacement", () => {
     assert.equal(ratingFeatureText("adjusted", { original: 8.2, rounded: 8 }), "評分 8.2 不符合 0.5 分級距，已四捨五入為 8。");
     assert.equal(searchFeatureText("duplicate.warning.open"), "開啟既有筆記");
@@ -94,6 +112,7 @@ describe("user-visible text catalog compatibility", () => {
     registerBundledLocales();
     const cases = [
       ["zh-TW", "收藏庫", "儲存", "Tags"],
+      ["zh-CN", "媒体库", "保存", "作品标签"],
       ["en", "Library", "Save", "Tags"],
       ["ja", "ライブラリ", "保存", "タグ"],
       ["ko", "라이브러리", "저장", "태그"],
@@ -115,6 +134,10 @@ describe("user-visible text catalog compatibility", () => {
 
   it("normalizes explicit and system locale preferences deterministically", () => {
     assert.equal(normalizeSupportedLocale("zh-Hant-TW"), "zh-TW");
+    assert.equal(normalizeSupportedLocale("zh-Hans-CN"), "zh-CN");
+    assert.equal(normalizeSupportedLocale("zh_CN"), "zh-CN");
+    assert.equal(normalizeSupportedLocale("zh-SG"), "zh-CN");
+    assert.equal(resolveInterfaceLocale("system", "zh-Hans"), "zh-CN");
     assert.equal(normalizeSupportedLocale("en-US"), "en");
     assert.equal(normalizeSupportedLocale("ja_JP"), "ja");
     assert.equal(normalizeSupportedLocale("ko-KR"), "ko");
@@ -165,6 +188,7 @@ describe("user-visible text catalog compatibility", () => {
   });
 
   it("keeps unknown provider values unchanged instead of guessing a translation", () => {
+    assert.equal(localizeProviderTag("Action", "zh-CN"), "动作");
     assert.equal(localizeProviderTag("Unknown provider tag", "zh-TW"), "Unknown provider tag");
     assert.equal(localizeProviderTag("Unknown provider tag", "ja"), "Unknown provider tag");
   });

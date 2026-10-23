@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../../app-metadata";
+import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import {
   confidentSerialCover,
   manualSerialCoverQueries,
@@ -46,13 +47,6 @@ function comparable(value: unknown): string {
   return text(value).normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
 }
 
-function mediaTypeFromPlatform(value: unknown): SerialMediaType | undefined {
-  const platform = text(value).normalize("NFKC").toLocaleLowerCase();
-  if (/漫画|manga|comic|コミック/.test(platform)) return "manga";
-  if (/小说|小説|轻小说|輕小說|light\s*novel|novel|文庫|文库/.test(platform)) return "novel";
-  return undefined;
-}
-
 function infoboxValues(value: unknown, keys: string[]): string[] {
   const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
   const output: string[] = [];
@@ -82,11 +76,7 @@ function bangumiCandidate(value: unknown): SerialCoverCandidate | null {
   if (!item || !sourceId || !title || !coverUrl) return null;
   const platform = text(item.platform);
   const metaTags = asArray(item.meta_tags).map(text).filter(Boolean);
-  const formatMetadata = [
-    platform,
-    ...metaTags,
-    ...infoboxValues(item.infobox, ["书系", "書系", "文库", "文庫", "连载杂志", "連載雑誌"]),
-  ].filter(Boolean).join(" ");
+  const infoboxKeys = asArray(item.infobox).map(row => text(record(row)?.key));
   return {
     provider: "Bangumi",
     sourceId,
@@ -96,7 +86,7 @@ function bangumiCandidate(value: unknown): SerialCoverCandidate | null {
     categories: [platform, ...metaTags].filter(Boolean),
     authors: infoboxValues(item.infobox, ["作者", "原作", "作画", "插图", "插畫"]),
     publisher: infoboxValues(item.infobox, ["出版社"])[0] ?? "",
-    mediaTypeHint: mediaTypeFromPlatform(formatMetadata),
+    mediaTypeHint: bangumiBookMediaType(platform, metaTags, infoboxKeys) ?? undefined,
   };
 }
 

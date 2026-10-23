@@ -1,5 +1,6 @@
 import { normalizeImageSectionPath } from "./image-section";
 import { stringValue } from "./value-normalization";
+import { locateUnchangedMarkdownBlock } from "./markdown-block-identity";
 import {
   momentImageLayoutState,
   normalizeMomentStackGapsY,
@@ -322,25 +323,10 @@ export function findMomentsBlocks(markdown: unknown): MomentsBlock[] {
   return blocks;
 }
 
-function sameMomentsSource(left: string, right: string): boolean {
-  return serializeMomentsSource(parseMomentsSource(left)) === serializeMomentsSource(parseMomentsSource(right));
-}
-
-function locateMomentsBlock(markdown: string, locator: MomentsLocator): MomentsBlock {
-  const blocks = findMomentsBlocks(markdown);
-  const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
-  if (hint !== null) {
-    const containing = blocks.find((block) => hint >= block.lineStart && hint <= block.lineEnd);
-    if (containing) return containing;
-  }
-  const matches = blocks.filter((block) => sameMomentsSource(block.source, locator.source));
-  if (matches.length === 1) return matches[0];
-  if (hint !== null && matches.length > 1) {
-    return [...matches].sort((left, right) => (
-      Math.abs(left.lineStart - hint) - Math.abs(right.lineStart - hint)
-    ))[0];
-  }
-  throw new Error("Could not safely locate this moments section in the note");
+export function locateMomentsBlock(markdown: string, locator: MomentsLocator): MomentsBlock {
+  return locateUnchangedMarkdownBlock(
+    findMomentsBlocks(markdown), locator, "moments",
+  );
 }
 
 export function replaceMoments(

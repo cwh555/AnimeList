@@ -1,3 +1,5 @@
+import { KO_TITLE_LOCALIZATION_MESSAGES } from "./title-localization";
+import { KO_RANKING_MESSAGES } from "./ranking";
 import type { LocaleCatalogs } from "../zh-TW";
 import { KO_CORE_MESSAGES } from "./core";
 import { KO_SEARCH_MESSAGES } from "./search";
@@ -27,6 +29,7 @@ export const KO_CATALOGS = {
   "progress-unit": KO_PROGRESS_UNIT_MESSAGES,
   masterpiece: KO_MASTERPIECE_MESSAGES,
   "score-dashboard": KO_SCORE_DASHBOARD_MESSAGES,
+  ranking: KO_RANKING_MESSAGES,
   "legacy-metadata": KO_LEGACY_METADATA_MESSAGES,
   "user-tag": KO_USER_TAG_MESSAGES,
   "image-section": KO_IMAGE_SECTION_MESSAGES,
@@ -36,4 +39,5 @@ export const KO_CATALOGS = {
   "library-export": KO_LIBRARY_EXPORT_MESSAGES,
   "timeline-workspace": KO_TIMELINE_WORKSPACE_MESSAGES,
   "manual-media": KO_MANUAL_MEDIA_MESSAGES,
+  "title-localization": KO_TITLE_LOCALIZATION_MESSAGES,
 } as const satisfies LocaleCatalogs;

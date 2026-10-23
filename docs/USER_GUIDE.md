@@ -8,7 +8,7 @@ Open AnimeList from the ribbon or run **AnimeList: Open library** from the comma
 
 AnimeList supports a managed library with separate Anime, Manga, Novel, Covers, and Templates folders, or a flat-folder layout. Additional scan folders can include existing notes without moving them.
 
-The AnimeList interface can use Traditional Chinese, English, Japanese, or Korean, or follow Obsidian's interface language. The Settings page intentionally remains English.
+The AnimeList interface can use Traditional Chinese, Simplified Chinese, English, Japanese, or Korean, or follow Obsidian's interface language. The Settings page intentionally remains English.
 
 The native AnimeList view is one shared workspace with four peer destinations: **Library**, **Timeline**, **Score Dashboard**, and **Images**. Switching destinations reuses the same Obsidian ItemView; page-local filters remain inside their own page instead of becoming global navigation.
 
@@ -51,6 +51,10 @@ Click an entry's cover area or retry action to open manual cover search. Manual 
 
 Clear an entry cover to return that entry to the series-cover fallback. Existing notes can use **Settings → Maintenance → Serial cover recovery** to scan dated entries in a floating progress window. The migration reports loaded, not found, failed, and skipped records, supports cancellation, and never overwrites an existing entry cover.
 
+### Replace an existing work cover
+
+Open a work's **Edit** dialog to view its current cover. Under **Work cover**, choose a local JPEG, PNG, WebP, or AVIF file (maximum 20 MB). The replacement preview does not change the vault until **Save**. **Cancel replacement** or closing the editor retains the current cover. A successful save copies the new original image to the configured cover folder and updates only the note's existing `cover` frontmatter value alongside the normal editable fields; metadata source, `cover_remote`, unrelated YAML, and Markdown body are preserved. Previous cover files are not automatically deleted because other notes may still refer to them.
+
 ## Search and duplicate warnings
 
 AnimeList searches enabled providers:
@@ -58,7 +62,11 @@ AnimeList searches enabled providers:
 - Bangumi and AniList for anime, manga, and light novels.
 - Open Library for general novels and books.
 
-Search settings can expand queries with Chinese, English, and original-language titles. Chinese discovery includes Traditional and Simplified aliases; original-language discovery may include native and romanized titles.
+Search settings can expand queries with Chinese, English, and original-language titles. Chinese discovery includes Traditional and Simplified aliases; original-language discovery may include native and romanized titles. The provider-neutral search uses stored source identity rather than similar titles alone to decide whether two results represent one work.
+
+Partial-title and cross-script discovery is best-effort: not every source exposes all aliases, and OpenCC conversion is a script fallback, not a verified translation. Bangumi and Open Library interactive requests have a six-second logical waiting limit (AniList uses its own pacing and timeout), but a timed-out underlying request may still finish later. Successful results from one source can appear before other providers finish. Use **Load more** to continue the current search rather than repeating a query.
+
+The Add Media dialog ignores results from an earlier search if you move to manual entry or open another work. A suggested translated name is shown with its source/provenance so you can accept or edit it; existing library titles are never silently renamed by a search.
 
 Results are ranked with title relevance and season, part, movie, special, or edition information. Use **Load more** when a provider has additional results.
 
@@ -137,7 +145,7 @@ The **Images** page is a derived view over the `animelist-images` blocks already
 - Reusing the same image path across multiple Image Sections in one work does not duplicate it in the work-level aggregate, while the original session references remain intact.
 - Editing, reordering, adding, or removing an Image Section updates the derived Images page on refresh without introducing a separate image database.
 
-See [`IMAGES_WORKSPACE.md`](IMAGES_WORKSPACE.md) for the detailed workspace/data contract.
+See [`IMAGES_WORKSPACE.md`](IMAGES_WORKSPACE.md) for the workspace/Images layout contract.
 
 ## Image Sections
 
@@ -262,6 +270,14 @@ The dashboard supports:
 
 A batch containing unrated titles cannot use ±0.5 adjustment until those titles receive a score. Changes that would exceed 0–10 require confirmation and are clamped to the valid range.
 
+### Pairwise Ranking (Scores → Ranking)
+
+Open the **Ranking** view from Scores to arrange **completed** anime, manga, or novel works by personal preference. Ranking is not the same as the 0–10 numeric score: it stores a separate order for each media type, and comparisons do not modify scores or media Markdown.
+
+Select two covers at a time and choose which work you prefer, or **Skip** an undecidable comparison. A skipped work remains eligible for later review instead of receiving an invented position. You can stop mid-round, reopen the view, and resume from the saved comparison state. The same saved ordering can be reviewed and adjusted later; only works with **Completed** status participate.
+
+Ranking data is stored at `.obsidian/animelist-ranking.json` (inside the vault configuration directory). Include this file in vault backup/sync. If an older interrupted ranking round is recoverable, the plugin can preserve the original bytes in a separate recovery backup; never manually delete the saved ranking or recovery files to resolve a warning. If the file changes on another device while the editor is open, reopen Obsidian and verify synchronization before continuing. On older supported Obsidian versions, the fallback write path is not fully atomic across simultaneous devices.
+
 ## Timeline
 
 Timeline is a full workspace page for completion records and dated serial entries. Use **Actual time / History** to switch between the spatial timeline and newest-first grouped history, and use the media-type filters to show all records, anime, manga, or novels.
@@ -357,6 +373,7 @@ Older supported Obsidian versions keep the compatibility five-page tabbed render
 
 - Follow Obsidian
 - Traditional Chinese
+- Simplified Chinese
 - English
 - Japanese
 - Korean
@@ -366,6 +383,16 @@ The Settings page always stays in English. Interface language is independent fro
 ## Updates & cleanup
 
 Cleanup actions are deliberately explicit and review-first. Back up or fully sync the vault before confirming a rewrite.
+
+### Update scan scope and title review
+
+Maintenance scanners for legacy metadata, note filenames, duplicate cover embeds, and existing media titles can distinguish **Only new or unfinished items** from **Rescan all items**. The first mode skips unchanged notes that were successfully checked previously; failed requests, unconfirmed candidates, renamed notes, and newly edited notes remain eligible for later checks. Use full rescan to deliberately revisit the whole selected scope.
+
+**Existing media titles** shows candidates for manual review. Language changes and search suggestions never rewrite existing titles, and a possible title/year match across sources is not proof of identical work identity. Applying an accepted title keeps the note path, other frontmatter, body, personal progress, score, and existing metadata provenance. OpenCC Chinese conversion is identified as such, not presented as an official translated title.
+
+### Managed-media cleanup safety
+
+Explicit managed image cleanup scans references in vault Markdown and protects files used by other notes or sections. It checks that notes have not changed while scanning; stop editing and let sync finish before running a large cleanup. If content changes mid-cleanup, the operation may stop with an error rather than risk deleting a newly referenced asset. Deleted candidates follow the Obsidian trash setting; do not treat this as an undo or cross-device transaction guarantee.
 
 ### Remove duplicate note covers
 

@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - "*.*.*"
+  # A tag pushed using GITHUB_TOKEN does not itself trigger push workflows.
+  # The vetted 1.6.0 promoter therefore dispatches this same release workflow.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing exact x.y.z tag to publish (no v prefix)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -14,8 +22,26 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Verify tag, main ancestry and exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag must be an exact x.y.z version (no v prefix)."
+            exit 1
+          fi
+          git fetch origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          git fetch origin main:refs/remotes/origin/main
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test "$(git rev-parse HEAD)" = "$tag_commit"
+          git merge-base --is-ancestor "$tag_commit" refs/remotes/origin/main
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -23,10 +49,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npm run release:check
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_REF_TYPE: ${{ github.ref_type }}
+      - name: Verify exact tag release metadata and artifacts
+        run: npm run release:check -- "$RELEASE_TAG"
       - name: Attest release assets
         uses: actions/attest@v4
         with:
@@ -38,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "${GITHUB_REF_NAME}"
+          gh release create "$RELEASE_TAG"
           manifest.json main.js styles.css
-          --title "AnimeList ${GITHUB_REF_NAME}"
+          --title "AnimeList $RELEASE_TAG"
           --generate-notes

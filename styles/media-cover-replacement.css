@@ -1,0 +1,17 @@
+/* Editable cover replacement; native file picker also works on Obsidian mobile. */
+.al-edit-cover-picker { display: grid; gap: 10px; padding: 12px 0; }
+.al-edit-cover-picker .al-form-section-heading { margin: 0; }
+.al-edit-cover-hint { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-edit-cover-previews { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.al-edit-cover-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--background-secondary); }
+.al-edit-cover-caption { font-weight: 600; color: var(--text-normal); }
+.al-edit-cover-preview img { width: 100%; max-height: 180px; object-fit: contain; border-radius: 7px; }
+.al-edit-cover-replacement-body { display: flex; min-width: 0; min-height: 110px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.al-edit-cover-empty { display: block; color: var(--text-muted); text-align: center; font-size: var(--font-ui-small); }
+.al-edit-cover-filename { max-width: 100%; overflow-wrap: anywhere; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.al-edit-cover-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.al-edit-cover-clear[hidden] { display: none; }
+@media (max-width: 420px) {
+  .al-edit-cover-previews { gap: 8px; }
+  .al-edit-cover-preview { padding: 8px; }
+}

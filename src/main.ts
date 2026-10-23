@@ -283,14 +283,12 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async deleteMediaFile(file: TFile): Promise<void> { await this.services().deleteMediaFile(file); this.refreshViews(); }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.services().getTemplates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.services().readTemplate(path); }
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> {
-    const response = await this.services().searchExternal(mediaType, query);
-    return response;
+  async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<ExternalMediaSearchPage> {
+    return this.services().searchExternal(mediaType, query, onProgress);
   }
 
-  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
-    const response = await this.services().searchExternalPage(mediaType, query, page);
-    return response;
+  async searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> {
+    return this.services().searchExternalPage(mediaType, query, page, sessionId);
   }
 
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> {
@@ -305,8 +303,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.services().searchOpenLibrary(query);
   }
 
-  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
-    return this.services().enrichExternalMedia(result);
+  async enrichExternalMedia(result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media"): Promise<ExternalMediaResult> {
+    return this.services().enrichExternalMedia(result, purpose);
   }
 
   async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
@@ -322,8 +320,8 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.services().createMediaNote(result, form, coverAsset);
   }
 
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
-    await this.services().updateMediaNote(file, mediaType, form);
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void> {
+    await this.services().updateMediaNote(file, mediaType, form, coverAsset);
   }
 
   getFeatureSettingsSections(): ReturnType<AnimeListFeatureRegistry<AnimeListFeatureHost>["settingsSections"]> { return this.features.settingsSections(this); }

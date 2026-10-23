@@ -67,3 +67,10 @@ The seeded Frieren two-image quote and Oregairu three-image quote are controlled
 - Compare the Moment's referenced image files before and after stacked editing; the file set/count must remain unchanged unless you explicitly add or remove an image.
 - Delete one image until only one remains. A single-image Moment must fall back to the existing featured-image presentation; stacked metadata must not force a one-image stack.
 - OCR / automatic subtitle detection and persistent PNG export are intentionally **not part of this version**. Manual positioning is the source of truth for stacked layout metadata; clipboard rasterization is temporary only.
+
+## 1.6 stale-content and duplicate-block regression
+
+- Create two identical Moments code blocks in the same note, edit only one and confirm the other is byte-for-byte unchanged.
+- While an editor is open, change its source Markdown or add an unrelated YAML comment within the target block from another pane; saving the stale editor must report a conflict rather than rewrite the new data.
+- Edit a Moment with multiple images, close and reopen the note, and confirm ID uniqueness and original image references across other sections.
+- Run this in both desktop and mobile Test Vault alongside the [1.6 acceptance checklist](MANUAL_TEST_CHECKLIST.md). Do not test destructive conflicts in a live library without backups.

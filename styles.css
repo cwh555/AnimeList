@@ -252,7 +252,6 @@
 .al-delete-button:hover,
 .al-detail-delete:hover { color:#fff; background:color-mix(in srgb,var(--text-error,#d86a70) 75%,#321); }
 .al-confirm-actions { justify-content:flex-end; }
-.animelist-confirm-modal .modal-content { max-width:520px; }
 .animelist-confirm-modal p { color:var(--text-muted); line-height:1.65; }
 
 .al-detail-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0 20px; padding:10px 12px; border:1px solid var(--background-modifier-border); border-radius:12px; background:var(--background-secondary); }
@@ -651,11 +650,30 @@
 }
 
 .animelist-settings-section-header {
+  padding: var(--size-4-5) clamp(var(--size-4-4), 3vw, var(--size-4-6));
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary-alt);
 }
 
-.animelist-settings-section-header > .setting-item,
+/* Normalize Obsidian's heading-item margins inside a card; preserve Setting API. */
+.animelist-settings-section-header > .setting-item {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-height: 0;
+  background: transparent;
+}
+.animelist-settings-section-header > .setting-item .setting-item-name {
+  margin: 0;
+  padding: 0;
+  line-height: 1.35;
+}
+.animelist-settings-section-header > .setting-item .setting-item-description {
+  margin: var(--size-4-2) 0 0;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .animelist-settings-section-body > .setting-item {
   margin: 0;
   padding: var(--size-4-4) clamp(var(--size-4-3), 3vw, var(--size-4-5));
@@ -663,11 +681,6 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.animelist-settings-section-header > .setting-item .setting-item-description {
-  margin-top: var(--size-4-1);
-  color: var(--text-muted);
 }
 
 .animelist-settings-section-body > .setting-item + .setting-item {
@@ -3870,6 +3883,197 @@ button.al-moment-stack-strip:focus-visible {
   .al-score-lane { grid-template-columns:44px minmax(0,1fr); }
 }
 
+.al-ranking-mode-tabs {
+  display: flex; gap: 4px; margin: 0 0 14px; padding: 4px;
+  border: 1px solid var(--background-modifier-border); border-radius: 11px;
+  background: var(--background-secondary);
+}
+.al-ranking-mode-tabs button {
+  flex: 1; min-width: 0; min-height: 36px; padding: 6px 12px;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--text-muted); font-weight: 600; box-shadow: none;
+}
+.al-ranking-mode-tabs button.is-active {
+  background: var(--interactive-accent); color: var(--text-on-accent);
+}
+.animelist-ranking-view { padding: 0 24px 48px; }
+.al-ranking-panel { width: 100%; min-width: 0; max-width: none; margin: 0; padding: 6px 0 36px; }
+.al-ranking-header { display: grid; gap: 10px; margin-bottom: 12px; }
+.al-ranking-type-tabs {
+  display: flex; width: fit-content; max-width: 100%; gap: 4px;
+  padding: 4px; border: 1px solid var(--background-modifier-border);
+  border-radius: 11px; background: var(--background-secondary);
+}
+.al-ranking-type-tabs button {
+  min-width: 0; min-height: 34px; padding: 0 12px; border: 0;
+  border-radius: 8px; color: var(--text-muted); background: transparent;
+  box-shadow: none; font-size: var(--font-ui-small);
+}
+.al-ranking-type-tabs button.is-active {
+  background: var(--interactive-accent); color: var(--text-on-accent);
+}
+.al-ranking-stats { display: flex; flex-wrap: wrap; gap: 12px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-stats .has-pending { color: var(--text-warning); }
+.al-ranking-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.al-ranking-actions button, .al-ranking-pending-row button {
+  display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+  min-height: 36px; padding: 6px 12px; font-size: var(--font-ui-small);
+}
+.al-ranking-warning { margin: 8px 0; color: var(--text-warning); font-size: var(--font-ui-small); }
+.al-ranking-list {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: 0; min-width: 0; margin: 0; padding: 0; list-style: none;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.al-ranking-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0;
+  min-height: 86px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0; background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.al-ranking-row:hover { background: var(--background-modifier-hover); }
+.al-ranking-row[hidden] { display: none; }
+.al-ranking-position {
+  flex: 0 0 42px; text-align: center; font-size: var(--font-ui-medium);
+  font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.al-ranking-row:nth-child(-n + 3) .al-ranking-position { color: var(--text-accent); }
+.al-ranking-row > .al-ranking-open {
+  display: flex; align-items: center; justify-content: flex-start;
+  gap: 14px; flex: 1 1 auto; min-width: 0; width: 0; height: auto;
+  padding: 0; margin: 0; background: transparent; border: 0; box-shadow: none;
+  text-align: left; color: var(--text-normal); overflow: hidden;
+}
+.al-ranking-row > .al-ranking-open:hover,
+.al-ranking-row > .al-ranking-open:active {
+  background: transparent; border: 0; box-shadow: none; color: var(--text-accent);
+}
+.al-ranking-open:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.al-ranking-row-cover {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 46px; width: 46px; height: 68px; overflow: hidden;
+  border-radius: 5px; background: var(--background-secondary);
+}
+.al-ranking-row-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.al-ranking-row-title, .al-ranking-pending-label strong {
+  display: -webkit-box; min-width: 0; overflow: hidden;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere; word-break: break-word;
+  line-height: 1.45; max-height: 2.9em; font-size: var(--font-ui-medium);
+  font-weight: 550;
+}
+.al-ranking-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0;
+  border: 0; border-radius: var(--radius-s);
+  background: transparent; box-shadow: none; color: var(--text-muted);
+}
+.al-ranking-handle:hover, .al-ranking-handle:focus-visible {
+  background: var(--background-modifier-hover); color: var(--text-normal);
+}
+.al-ranking-handle { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.al-ranking-handle:active { cursor: grabbing; }
+.al-ranking-handle:disabled { opacity: .35; cursor: default; }
+.al-ranking-row.is-rank-moving {
+  opacity: .35; background: var(--background-secondary);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.al-ranking-row.is-rank-target {
+  box-shadow: inset 0 -3px 0 var(--interactive-accent);
+}
+.al-ranking-drag-preview {
+  position: fixed; top: 0; left: 0; z-index: 10000; pointer-events: none;
+  margin: 0; opacity: .97;
+  border: 1px solid var(--interactive-accent); border-radius: 8px;
+  background: var(--background-primary);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .35);
+  will-change: transform;
+}
+.al-ranking-reset { margin-left: auto; }
+.al-ranking-dialog-progress {
+  color: var(--text-muted); text-align: center; font-size: var(--font-ui-smaller);
+  margin: -10px 0 16px;
+}
+.al-ranking-pending { min-width: 0; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--background-modifier-border); }
+.al-ranking-pending h3 { margin: 0 0 10px; font-size: var(--font-ui-medium); }
+.al-ranking-pending-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0;
+  margin: 6px 0; padding: 8px; border-radius: 8px; background: var(--background-secondary);
+}
+.al-ranking-pending-label { display: flex; flex: 1 1 180px; align-items: center; gap: 10px; min-width: 0; }
+.al-ranking-pending-bounds { color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-ranking-empty, .al-ranking-loading { padding: 28px 12px; color: var(--text-muted); text-align: center; }
+.al-ranking-error { color: var(--text-error); }
+.al-ranking-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* Focused comparison uses the same Obsidian modal and button primitives. */
+.modal.al-ranking-comparison-modal { width: min(680px, calc(100vw - 24px)); max-width: 680px; }
+.al-ranking-comparison-modal .modal-content { max-width: 100%; min-width: 0; }
+.al-ranking-dialog-title {
+  margin: 0 0 18px; font-size: 1.15rem; font-weight: 700; text-align: center;
+  letter-spacing: normal;
+}
+.al-ranking-choices {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 2vw, 16px); min-width: 0; width: 100%;
+}
+.al-ranking-choice {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  width: 100%; min-width: 0; max-width: 100%; height: auto;
+  padding: 8px; border: 1px solid var(--background-modifier-border);
+  border-radius: 9px; background: var(--background-primary-alt);
+  color: var(--text-normal); box-shadow: none; cursor: pointer;
+  overflow: hidden;
+}
+.al-ranking-choice:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
+.al-ranking-choice:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.al-ranking-choice-cover {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 1 auto; width: 100%; min-width: 0; aspect-ratio: 2 / 3;
+  max-height: min(44dvh, 380px); overflow: hidden;
+  border-radius: 5px; background: var(--background-secondary);
+}
+.al-ranking-choice-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.al-ranking-choice-title {
+  display: -webkit-box; width: 100%; min-width: 0; height: 2.8em;
+  max-height: 2.8em; overflow: hidden;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere; word-break: break-word;
+  font-size: var(--font-ui-small); font-weight: 600; line-height: 1.4;
+  text-align: center;
+}
+.al-ranking-dialog-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px; margin-top: 16px;
+}
+.al-ranking-dialog-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; gap: 6px; padding: 6px 12px; font-size: var(--font-ui-small);
+}
+.al-ranking-dialog-action.al-ranking-skip { min-width: 90px; }
+.al-ranking-dialog-action:disabled { opacity: .45; }
+
+@media (max-width: 600px) {
+  .animelist-ranking-view { padding: 0 12px 32px; }
+  .al-ranking-panel { padding: 4px 0 24px; }
+  .al-ranking-row { min-height: 74px; gap: 8px; padding: 5px 4px; }
+  .al-ranking-position { flex-basis: 30px; font-size: var(--font-ui-small); }
+  .al-ranking-row-cover { flex-basis: 40px; width: 40px; height: 60px; }
+  .al-ranking-row > .al-ranking-open { gap: 10px; }
+  .al-ranking-handle { flex-basis: 44px; }
+  .al-ranking-row-title { font-size: var(--font-ui-small); }
+  .al-ranking-type-tabs { width: 100%; }
+  .al-ranking-type-tabs button { flex: 1; padding: 0 5px; }
+  .modal.al-ranking-comparison-modal { width: calc(100vw - 16px); max-width: calc(100vw - 16px); }
+  .al-ranking-comparison-modal .modal-content { padding: 14px 10px; }
+  .al-ranking-dialog-title { margin-bottom: 12px; }
+  .al-ranking-choice { padding: 5px; gap: 6px; }
+  .al-ranking-choice-cover { max-height: min(41dvh, 300px); }
+  .al-ranking-dialog-toolbar { gap: 4px; margin-top: 12px; }
+  .al-ranking-dialog-action { padding: 6px 8px; }
+}
+
 /* Per-entry cover UI. Kept isolated from shared styles. */
 .animelist-modal .al-volume-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -4155,10 +4359,6 @@ button.al-moment-stack-strip:focus-visible {
   margin: 18px 0 12px;
 }
 
-.al-edit-media-form {
-  gap: 18px 22px;
-}
-
 .al-form-field-tags {
   grid-column: 1 / -1;
 }
@@ -4317,9 +4517,6 @@ button.al-moment-stack-strip:focus-visible {
     gap: 10px;
   }
 
-  .al-edit-media-form {
-    gap: 12px;
-  }
 }
 
 /* Component polish: Material 3-inspired form state controls. */
@@ -6059,4 +6256,243 @@ button.al-moment-stack-strip:focus-visible {
 .is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-left { float: left; margin-right: -24px; }
 .is-mobile .animelist-native-view > .al-native-swipe-edge.is-right,
 .is-mobile .animelist-score-dashboard-view > .al-native-swipe-edge.is-right { float: right; margin-left: -24px; }
+
+/* Editable cover replacement; native file picker also works on Obsidian mobile. */
+.al-edit-cover-picker { display: grid; gap: 10px; padding: 12px 0; }
+.al-edit-cover-picker .al-form-section-heading { margin: 0; }
+.al-edit-cover-hint { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); }
+.al-edit-cover-previews { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.al-edit-cover-preview { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--background-secondary); }
+.al-edit-cover-caption { font-weight: 600; color: var(--text-normal); }
+.al-edit-cover-preview img { width: 100%; max-height: 180px; object-fit: contain; border-radius: 7px; }
+.al-edit-cover-replacement-body { display: flex; min-width: 0; min-height: 110px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.al-edit-cover-empty { display: block; color: var(--text-muted); text-align: center; font-size: var(--font-ui-small); }
+.al-edit-cover-filename { max-width: 100%; overflow-wrap: anywhere; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.al-edit-cover-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.al-edit-cover-clear[hidden] { display: none; }
+@media (max-width: 420px) {
+  .al-edit-cover-previews { gap: 8px; }
+  .al-edit-cover-preview { padding: 8px; }
+}
+
+/* Mobile browsing gestures must not look or behave like edit gestures. */
+@media (hover: none) and (pointer: coarse) {
+  .al-score-dashboard .al-score-poster,
+  .al-score-dashboard .al-score-poster:active { cursor: pointer; touch-action: auto; }
+  .al-score-dashboard .al-score-poster:hover { transform: none; }
+  .al-score-lane-posters { scroll-snap-type: none; }
+  .al-timeline-viewport .al-timeline-card,
+  .al-timeline-viewport .al-timeline-card img {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+  }
+}
+
+/* Unknown-date cards are deliberately miniature. The timeline's full-size
+ * card selector otherwise overrides their 72x108 geometry. */
+.animelist-native-view .al-timeline-workspace .al-timeline-card.al-timeline-undated-card {
+  width: 72px;
+  height: 108px;
+}
+
+/* Phone controls and undated media must not squeeze the pan canvas below its
+ * posters. Scroll inside the Timeline body, never the parent Obsidian leaf.
+ * Narrow desktop panes keep their existing resizable layout. */
+.is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-workspace-body {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-scale-wrap {
+  flex: 0 0 auto;
+  height: 440px;
+  min-height: 440px;
+}
+
+/* In landscape, the leaf can be wider than the compact breakpoint but too
+ * short for a fixed Timeline. Use the same scrollable canvas contract. */
+@media (max-height: 600px) {
+  .is-mobile .animelist-native-view .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-workspace-body {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .is-mobile .animelist-native-view .al-timeline-workspace[data-timeline-mode="scale"] .al-timeline-scale-wrap {
+    flex: 0 0 auto;
+    height: 440px;
+    min-height: 440px;
+  }
+}
+
+/* Landscape phones need the controls to wrap horizontally; the portrait
+ * column layout otherwise consumes nearly the entire short screen. */
+@media (max-height: 600px) and (orientation: landscape) {
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-workspace-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+  }
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-view-modes,
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-workspace-page.is-timeline .al-timeline-type-filters {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-scale-actions {
+    width: auto;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .is-mobile .animelist-native-view .al-workspace-shell[data-window-size="compact"] .al-timeline-control-group {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .is-mobile .animelist-native-view .al-timeline-overview {
+    grid-template-columns: max-content minmax(0, 1fr);
+    min-height: 40px;
+    gap: 8px;
+    margin-top: 3px;
+    padding: 3px 8px;
+  }
+  .is-mobile .animelist-native-view .al-timeline-overview-chart,
+  .is-mobile .animelist-native-view .al-timeline-density-svg {
+    height: 28px;
+  }
+}
+
+/* Updates & cleanup only: shorter, clearer rows without changing other Settings pages. */
+#animelist-settings-panel-updates-cleanup .animelist-settings-section {
+  margin-bottom: var(--size-4-5);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-header {
+  padding-block: var(--size-4-5);
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+  gap: var(--size-4-3);
+  align-items: center;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-description {
+  max-width: 66ch;
+  line-height: 1.55;
+}
+#animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+  flex: 0 0 auto;
+}
+@media (max-width: 680px) {
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--size-4-2);
+  }
+  #animelist-settings-panel-updates-cleanup .animelist-settings-section-body > .setting-item .setting-item-control {
+    align-self: flex-start;
+  }
+}
+
+/* Shared modal primitives. Scoped to AnimeList dialogs to avoid changing Obsidian or other plugins. */
+.animelist-modal .al-ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--button-radius, 8px);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.animelist-modal .al-ui-button:focus-visible,
+.animelist-modal .al-file-picker-trigger:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.animelist-modal .al-ui-button:disabled { cursor: not-allowed; opacity: .55; }
+.animelist-modal .al-modal-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.animelist-modal .al-modal-actions > * { min-width: 0; }
+.animelist-modal .al-file-picker-control { display: flex; min-width: 0; align-items: center; }
+.animelist-modal .al-file-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.modal.animelist-confirm-modal,
+.modal.al-dialog-compact { width: min(520px, calc(100vw - 24px)); max-width: 520px; }
+.animelist-confirm-modal .modal-content,
+.al-dialog-compact .modal-content { width: 100%; max-width: none; min-width: 0; }
+.animelist-confirm-modal p,
+.al-dialog-compact p { white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .animelist-modal .al-ui-button { min-height: 44px; }
+  .animelist-modal .al-modal-actions > .al-ui-button { flex: 1 1 auto; }
+}
+
+/* Shared identity layout for external search selection and stored media editing. */
+.animelist-modal .al-media-editor-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+}
+.animelist-modal .al-media-editor-identity-cover {
+  flex: 0 0 92px;
+  width: 92px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+.animelist-modal .al-media-editor-identity-cover img,
+.animelist-modal .al-media-editor-identity-cover .al-search-result-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.animelist-modal .al-media-editor-identity-cover .al-search-result-placeholder {
+  display: grid;
+  place-items: center;
+}
+.animelist-modal .al-media-editor-identity-copy { flex: 1; min-width: 0; }
+.animelist-modal .al-media-editor-identity-title {
+  margin: 4px 0 5px;
+  font-size: 1.35rem;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.animelist-modal .al-media-editor-identity-original { overflow-wrap: anywhere; }
+.animelist-modal .al-edit-cover-picker { min-width: 0; }
+.animelist-modal .al-edit-cover-previews[hidden] { display: none; }
+.animelist-modal .al-edit-cover-controls { flex-wrap: wrap; }
+.animelist-modal .al-edit-cover-control-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.animelist-modal .al-edit-cover-picker .al-form-section-heading { font-size: 1rem; }
+@media (max-width: 620px) {
+  .animelist-modal .al-media-editor-identity { gap: 12px; align-items: center; }
+  .animelist-modal .al-media-editor-identity-cover { width: 72px; flex-basis: 72px; }
+  .animelist-modal .al-media-editor-identity-title { font-size: 1.12rem; }
+}
 /* END GENERATED FEATURE STYLES */

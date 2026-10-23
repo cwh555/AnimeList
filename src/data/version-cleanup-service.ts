@@ -35,8 +35,9 @@ export interface VersionCleanupApplyResult {
 export async function planDuplicateDefaultCoverCleanup(
   app: App,
   roots: readonly string[],
+  shouldScan: (file: TFile) => boolean = () => true,
 ): Promise<VersionCleanupPlan> {
-  const files = getScopedMarkdownFiles(app, [...roots]);
+  const files = getScopedMarkdownFiles(app, [...roots]).filter(shouldScan);
   const items: VersionCleanupPlanItem[] = [];
   for (const file of files) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;

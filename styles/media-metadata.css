@@ -40,10 +40,6 @@
   margin: 18px 0 12px;
 }
 
-.al-edit-media-form {
-  gap: 18px 22px;
-}
-
 .al-form-field-tags {
   grid-column: 1 / -1;
 }
@@ -202,7 +198,4 @@
     gap: 10px;
   }
 
-  .al-edit-media-form {
-    gap: 12px;
-  }
 }

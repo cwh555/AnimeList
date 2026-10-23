@@ -137,6 +137,27 @@ This document preserves the product-level decisions introduced by each major dev
 - Workspace/Timeline navigation and zoom state remain presentation state rather than Markdown schema.
 - Existing 1.4.0 notes, settings, Image Sections, Moments, release-tracking data, and unknown frontmatter/body content remain compatible.
 
+## 1.6.0 — Personal ranking, cover control, and multilingual discovery
+
+**Release state:** Approved for publication to `main` (2026-10-23); tag and GitHub Release are verified separately after publication.
+
+### Main outcomes
+
+- Introduced a pairwise preference-ranking workflow for completed works, independent for anime, manga, and novels, with resumable comparison rounds and unresolved items for later review. Ratings and existing media notes are not rewritten by ranking.
+- Added user-supplied local replacement covers for existing works with explicit Save/Cancel behavior; previous artwork remains available until separately reviewed for cleanup.
+- Expanded multilingual search and title evidence handling, including Chinese-script conversion as a separately identified fallback, source-ID-verified candidates, and opt-in existing-title review rather than automatic translation.
+- Added incremental versus full rescan controls for update/cleanup operations, improving everyday maintenance without risking unrelated content.
+- Improved mobile touch gestures and unified media forms; isolated delayed searches and navigation so stale responses cannot replace an active editor.
+- Reinforced data safety for Image Sections, Moments, ranking recovery, and managed-media cleanup across interrupted actions.
+
+### Data model and compatibility
+
+- Media Markdown/frontmatter remains `schema_version: 6`. Title provenance fields are optional, and existing titles, unrelated YAML keys and note bodies remain authoritative.
+- Preference rankings live in `.obsidian/animelist-ranking.json` using ranking-format version `1`, separate from personal numeric scores and source Markdown. A recovery backup may be created if damaged round state is detected.
+- Imported covers remain local files; replacing a cover updates the chosen note's `cover` only on Save and does not delete older artwork.
+- Scan history is auxiliary local state; explicit cleanup workflows remain opt-in and do not rewrite old notes on startup.
+- The minimum Obsidian version remains `1.5.0`; newer adapter features are capability-checked.
+
 ## Future session template
 
 ```markdown

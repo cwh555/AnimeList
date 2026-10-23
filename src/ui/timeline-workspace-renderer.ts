@@ -29,6 +29,7 @@ import { timelineWorkspaceText } from "../features/timeline/text";
 import { uiText } from "../ui-text";
 import { makeEl, parseDateValue, setAnimeListIcon } from "./ui-helpers";
 import { isolateHorizontalSwipeSurface } from "./mobile-swipe-isolation";
+import { installTimelinePointerPan } from "./timeline-pan-gesture";
 
 interface TimedTimelineEntry extends TimelineMediaEntry { completedTime: number; }
 
@@ -292,6 +293,22 @@ export function renderTimelineWorkspace(
     updateOverviewWindow?.();
   }
 
+  function initialAxisScreenY(): number {
+    if (!viewport) return 0;
+    // Compact mobile Timeline puts every stack lane above the axis. Centering
+    // that axis clips the posters even in an otherwise adequate canvas.
+    const shortMobileViewport = (root.ownerDocument.defaultView?.innerHeight ?? Infinity) <= 600;
+    if (!root.ownerDocument.body.classList.contains("is-mobile")
+      || (windowSize(root) !== "compact" && !shortMobileViewport)) {
+      return viewport.clientHeight / 2;
+    }
+    // The canvas itself may extend below a short phone screen. Keep the first
+    // full-sized poster above the visible fold, without changing its scale.
+    const visibleBelowTop = (root.ownerDocument.defaultView?.innerHeight ?? viewport.clientHeight)
+      - viewport.getBoundingClientRect().top;
+    return Math.max(212, Math.min(viewport.clientHeight - 40, visibleBelowTop - 40));
+  }
+
   function centerFocus(centerAxis = false): void {
     if (!viewport || !scene || !currentItems.length) return;
     const focusX = timelineXForTime(state.focusTime, minimumTime, state.daySpacing, SIDE_PADDING);
@@ -304,7 +321,7 @@ export function renderTimelineWorkspace(
         state.viewScale,
       );
       state.panX = pan.x;
-      state.panY = pan.y;
+      state.panY = initialAxisScreenY() - axisY * state.viewScale;
     } else {
       state.panX = viewport.clientWidth / 2 - focusX * state.viewScale;
     }
@@ -522,32 +539,14 @@ export function renderTimelineWorkspace(
     state.focusTime = maximumTime;
     centerFocus(true);
 
-    let drag: { id: number; x: number; y: number; startPanX: number; startPanY: number } | null = null;
-    viewport.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || (event.target instanceof Element && event.target.closest(".al-timeline-card"))) return;
-      drag = {
-        id: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        startPanX: state.panX,
-        startPanY: state.panY,
-      };
-      viewport?.classList.add("is-dragging");
-      viewport.setPointerCapture(event.pointerId);
+    installTimelinePointerPan(viewport, {
+      position: () => ({ x: state.panX, y: state.panY }),
+      panTo: (x, y) => {
+        state.panX = x;
+        state.panY = y;
+        applyPan();
+      },
     });
-    viewport.addEventListener("pointermove", (event) => {
-      if (!drag || drag.id !== event.pointerId) return;
-      state.panX = drag.startPanX + event.clientX - drag.x;
-      state.panY = drag.startPanY + event.clientY - drag.y;
-      applyPan();
-    });
-    const endDrag = (event: PointerEvent) => {
-      if (!drag || drag.id !== event.pointerId) return;
-      drag = null;
-      viewport?.classList.remove("is-dragging");
-    };
-    viewport.addEventListener("pointerup", endDrag);
-    viewport.addEventListener("pointercancel", endDrag);
     viewport.addEventListener("wheel", (event) => {
       event.preventDefault();
       if (event.ctrlKey || event.metaKey) {
@@ -627,7 +626,7 @@ export function renderTimelineWorkspace(
         state.viewScale,
       );
       state.panX = pan.x;
-      state.panY = pan.y;
+      state.panY = initialAxisScreenY() - axisY * state.viewScale;
       applyPan();
     } else {
       centerFocus(true);

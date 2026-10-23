@@ -9,10 +9,17 @@ import { MediaLibraryIndex } from "../data/media-library-index";
 import { MediaNoteService } from "../data/media-note-service";
 import { MediaRepository } from "../data/media-repository";
 import { MediaUpdateService } from "../data/media-update-service";
+import { MediaCoverStorage } from "../data/media-cover-storage";
 import { MediaAssetGarbageCollector } from "../data/media-asset-garbage-collector";
 import type { MediaAssetCleanupResult } from "../domain/media-asset-cleanup";
 import { SpecialLabelStateService } from "../data/special-label-state-service";
 import { storedMediaExternalResult } from "../data/stored-media-result";
+import { localizeActiveMediaResult } from "../data/media-title-service";
+import { suggestCrossProviderTitle } from "../domain/media-title-suggestion";
+import { WikidataTitleService } from "../data/wikidata-title-service";
+import { chineseScriptCandidate } from "../domain/media-title-localization";
+import { normalizeSupportedLocale } from "../i18n/locale";
+import { getActiveLocale } from "../i18n/catalog";
 import type { AnimeListSettings, CoverSources, ExternalMediaResult, ExternalMediaSearchPage, MediaItem, MediaNoteForm, MediaType } from "../types";
 import { MANUAL_MEDIA_PROVIDER, type MediaCoverAssetInput } from "../domain/manual-media";
 import { getScopedMarkdownFiles } from "../data/vault-scope";
@@ -28,6 +35,7 @@ export class AnimeListApplicationServices {
   private mediaRepository?: MediaRepository;
   private mediaIndex?: MediaLibraryIndex;
   private classificationService?: MediaClassificationService;
+  private wikidataTitles?: WikidataTitleService;
   private storage?: LibraryStorage;
   private providerClients?: HttpMetadataProviderClients;
   private searchService?: ExternalMediaSearchService;
@@ -106,7 +114,16 @@ export class AnimeListApplicationServices {
   }
 
   private mediaUpdates(): MediaUpdateService {
-    this.updateService ??= new MediaUpdateService(this.app, { refreshViews: () => this.callbacks.refreshViews() });
+    this.updateService ??= new MediaUpdateService(
+      this.app,
+      { refreshViews: () => this.callbacks.refreshViews() },
+      new MediaCoverStorage(
+        this.app,
+        this.settings,
+        this.libraryStorage(),
+        { optimizeFile: (file) => this.coverCache?.optimizeFile(file) ?? Promise.resolve() },
+      ),
+    );
     return this.updateService;
   }
 
@@ -238,23 +255,70 @@ export class AnimeListApplicationServices {
   }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.externalMediaSearch().search(mediaType, query); }
-  async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page); }
+  async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> { return this.externalMediaSearch().search(mediaType, query, onProgress); }
+  async searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page, sessionId); }
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
   async searchOpenLibrary(query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("openlibrary", "novel", query); }
-  async enrichExternalMedia(result: ExternalMediaResult): Promise<ExternalMediaResult> {
+  async enrichExternalMedia(
+    result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media",
+  ): Promise<ExternalMediaResult> {
     let base = result;
-    if (result.provider === "bangumi" && result.sourceId && (!result.people.length || !result.rawGenres.length)) {
+    const requestedLocale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    const needsChineseAlias = purpose === "new-media"
+      && (requestedLocale === "zh-TW" || requestedLocale === "zh-CN")
+      && !result.titleVariants?.localized?.[requestedLocale]
+      && !result.titleVariants?.displayAliases?.[requestedLocale]
+      && /[\\p{Script=Hangul}\\p{Script=Hiragana}\\p{Script=Katakana}]/u.test(result.originalTitle);
+    if (result.provider === "bangumi" && result.sourceId
+      && (!result.people.length || !result.rawGenres.length || needsChineseAlias)) {
       try {
         base = await this.metadataProviders().bangumi.fetchById(result.mediaType, result.sourceId) ?? result;
       } catch (error) {
         console.warn("AnimeList Bangumi metadata refresh failed; continuing with stored metadata", error);
       }
     }
-    return this.mediaClassification().enrichOrOriginal(base, (error) => {
+    const enriched = await this.mediaClassification().enrichOrOriginal(base, (error) => {
       console.warn("AnimeList metadata enrichment failed; continuing without classification metadata", error);
     });
+    const locale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    let localized = localizeActiveMediaResult(enriched);
+    // Legacy metadata repair needs classification only, not an additional
+    // Wikidata + Bangumi title lookup for every note in a bulk scan.
+    if (purpose === "metadata-only") return localized;
+    if (localized.provider !== MANUAL_MEDIA_PROVIDER
+      && !localized.titleVariants?.localized?.[locale]
+      && !localized.titleVariants?.displayAliases?.[locale]
+      && localized.wikidataTitleEvidence?.locale !== locale) {
+      try {
+        this.wikidataTitles ??= new WikidataTitleService();
+        const evidence = await this.wikidataTitles.lookup(localized, locale);
+        if (evidence) localized = localizeActiveMediaResult({
+          ...localized, wikidataTitleEvidence: evidence,
+        });
+      } catch (error) {
+        console.warn("AnimeList Wikidata title lookup unavailable; keeping source title", error);
+      }
+    }
+    if ((locale !== "zh-TW" && locale !== "zh-CN")
+      || !this.settings().providers.bangumi || localized.provider === "bangumi"
+      || localized.provider === MANUAL_MEDIA_PROVIDER
+      || localized.titleEvidenceChecked === locale
+      || localized.wikidataTitleEvidence?.locale === locale) return localized;
+    // The other source provides *candidate evidence*, not an authoritative ID
+    // mapping. Do not silently change the media title or original source.
+    try {
+      const query = localized.originalTitle.trim();
+      if (!query || !Number(localized.year)
+        || localized.titleVariants?.localized?.[locale]
+        || (localized.titleVariants && chineseScriptCandidate(localized.titleVariants, locale))) return localized;
+      const matches = (await this.metadataProviders().bangumi.searchPage(localized.mediaType, query, 1)).results;
+      const titleSuggestion = suggestCrossProviderTitle(localized, matches, locale);
+      return { ...localized, titleEvidenceChecked: locale, titleSuggestion: titleSuggestion ?? undefined };
+    } catch (error) {
+      console.warn("AnimeList cross-provider title suggestion unavailable; keeping original title", error);
+      return localized;
+    }
   }
   async enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult> {
     return this.enrichExternalMedia(storedMediaExternalResult(frontmatter, mediaType));
@@ -282,7 +346,7 @@ export class AnimeListApplicationServices {
       : form;
     return this.mediaNotes().create(enriched, preparedForm, coverAsset);
   }
-  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm): Promise<void> {
-    await this.mediaUpdates().update(file, mediaType, form);
+  async updateMediaNote(file: TFile, mediaType: MediaType, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<void> {
+    await this.mediaUpdates().update(file, mediaType, form, coverAsset);
   }
 }

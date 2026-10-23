@@ -47,6 +47,7 @@ describe("media asset garbage collector", () => {
           return files.get(path) ?? null;
         },
         async cachedRead() { return `![[${shared.path}]]`; },
+        async read() { return `![[${shared.path}]]`; },
         adapter: {
           async exists(path: string) {
             return path === ".obsidian/plugins/animelist/state/image-order"
@@ -121,4 +122,159 @@ describe("media asset garbage collector", () => {
     assert.equal(maxInFlight <= 8, true);
     assert.equal(references.referencedPaths.has(shared.path), true);
   });
+  it("reads disk Markdown instead of a stale display cache before deleting assets", async () => {
+    const note = file("Notes/synced.md");
+    const protectedImage = file("AnimeList/Images/anime/work-id/protected.png");
+    const orphan = file("AnimeList/Images/anime/work-id/orphan.png");
+    const files = new Map([note, protectedImage, orphan].map(item => [item.path, item]));
+    let freshReads = 0;
+    let cachedReads = 0;
+    const deleted: string[] = [];
+    const app: any = {
+      metadataCache: {
+        getFileCache() { return null; },
+        getFirstLinkpathDest(target: string) { return files.get(target) ?? null; },
+      },
+      vault: {
+        configDir: ".obsidian",
+        getRoot() { return { children: [note] }; },
+        getAbstractFileByPath(path: string) {
+          if (path === "AnimeList/Images") {
+            return { children: [protectedImage, orphan] };
+          }
+          return files.get(path) ?? null;
+        },
+        async cachedRead() { cachedReads += 1; return ""; },
+        async read() { freshReads += 1; return `![[${protectedImage.path}]]`; },
+        adapter: { async exists() { return false; } },
+      },
+      fileManager: {
+        async trashFile(item: TFile) { deleted.push(item.path); files.delete(item.path); },
+      },
+    };
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    const collector = new MediaAssetGarbageCollector(app, "animelist", () => settings);
+    const result = await collector.cleanup();
+    assert.deepEqual(deleted, [orphan.path]);
+    assert.equal(result.result.removedManagedFiles, 1);
+    assert.equal(freshReads, 1);
+    assert.equal(cachedReads, 0);
+    assert.ok(files.has(protectedImage.path));
+  });
+
+  it("aborts remaining trash operations when a note gains a reference during cleanup", async () => {
+    const note = file("Notes/changes-during-cleanup.md");
+    const orphanA = file("AnimeList/Images/anime/work-id/a.png");
+    const orphanB = file("AnimeList/Images/anime/work-id/b.png");
+    const files = new Map([note, orphanA, orphanB].map(item => [item.path, item]));
+    let markdown = "";
+    const deleted: string[] = [];
+    const app: any = {
+      metadataCache: {
+        getFileCache() { return null; },
+        getFirstLinkpathDest(target: string) { return files.get(target) ?? null; },
+      },
+      vault: {
+        configDir: ".obsidian",
+        getRoot() { return { children: [note] }; },
+        getAbstractFileByPath(path: string) {
+          if (path === "AnimeList/Images") {
+            return { children: [orphanA, orphanB] };
+          }
+          return files.get(path) ?? null;
+        },
+        async read() { return markdown; },
+        adapter: { async exists() { return false; } },
+      },
+      fileManager: {
+        async trashFile(item: TFile) {
+          deleted.push(item.path);
+          files.delete(item.path);
+          if (item.path === orphanA.path) {
+            markdown = `![[${orphanB.path}]]`;
+            note.stat.mtime += 10;
+            note.stat.size = markdown.length;
+          }
+        },
+      },
+    };
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    const collector = new MediaAssetGarbageCollector(app, "animelist", () => settings);
+    await assert.rejects(collector.cleanup(), /Markdown changed during media cleanup/);
+    assert.deepEqual(deleted, [orphanA.path]);
+    assert.ok(files.has(orphanB.path), "an asset newly referenced by a note must survive");
+  });
+
+  it("stops before any deletion when a new Markdown note appears during the reference scan", async () => {
+    const note = file("Notes/existing.md");
+    const created = file("Notes/new.md");
+    const orphan = file("AnimeList/Images/anime/work-id/orphan.png");
+    const entries = [note];
+    const files = new Map([note, orphan].map(item => [item.path, item]));
+    const deleted: string[] = [];
+    const app: any = {
+      metadataCache: {
+        getFileCache() { return null; },
+        getFirstLinkpathDest(target: string) { return files.get(target) ?? null; },
+      },
+      vault: {
+        configDir: ".obsidian",
+        getRoot() { return { children: entries }; },
+        getAbstractFileByPath(path: string) {
+          if (path === "AnimeList/Images") return { children: [orphan] };
+          return files.get(path) ?? null;
+        },
+        async read() { entries.push(created); files.set(created.path, created); return ""; },
+        adapter: { async exists() { return false; } },
+      },
+      fileManager: {
+        async trashFile(item: TFile) { deleted.push(item.path); },
+      },
+    };
+    const settings = createDefaultSettings();
+    settings.coverFolder = "AnimeList/Covers";
+    await assert.rejects(new MediaAssetGarbageCollector(app, "animelist", () => settings).cleanup(),
+      /Markdown changed during media cleanup/);
+    assert.deepEqual(deleted, []);
+  });
+
+  it("preserves a journal rewritten after cleanup's initial read", async () => {
+    const note = file("Notes/active-order.md");
+    const journal = ".obsidian/plugins/animelist/state/image-order/pending.json";
+    const initial = new TextEncoder().encode(JSON.stringify({ sourcePath: "Deleted.md" })).buffer;
+    const updated = new TextEncoder().encode(JSON.stringify({ sourcePath: note.path })).buffer;
+    let reads = 0;
+    const moved: string[] = [];
+    const app: any = {
+      metadataCache: { getFileCache() { return null; } },
+      vault: {
+        configDir: ".obsidian",
+        getRoot() { return { children: [note] }; },
+        getAbstractFileByPath(path: string) { return path === note.path ? note : null; },
+        async read() { return ""; },
+        adapter: {
+          async exists(path: string) {
+            return path === ".obsidian/plugins/animelist/state/image-order"
+              || path === journal;
+          },
+          async list() { return { files: [journal], folders: [] }; },
+          async readBinary() {
+            reads += 1;
+            return reads === 1 ? initial : updated;
+          },
+          async rename(source: string) { moved.push(source); },
+        },
+      },
+      fileManager: { async trashFile() { throw new Error("no assets should be removed"); } },
+    };
+    const settings = createDefaultSettings();
+    const collector = new MediaAssetGarbageCollector(app, "animelist", () => settings);
+    const result = await collector.cleanup();
+    assert.equal(reads, 2);
+    assert.deepEqual(moved, []);
+    assert.equal(result.result.removedJournalFiles, 0);
+  });
+
 });
