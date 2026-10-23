@@ -91,7 +91,7 @@ export class MediaAssetGarbageCollector {
     for (const path of listing.files.filter((value) => value.toLocaleLowerCase().endsWith(".json"))) {
       revision.assertUnchanged();
       let sourcePath = "";
-      let originalBytes: ArrayBuffer;
+      let originalBytes: ArrayBuffer | null = null;
       try {
         originalBytes = await adapter.readBinary(path);
         const raw = JSON.parse(decoder.decode(originalBytes)) as unknown;
@@ -107,7 +107,7 @@ export class MediaAssetGarbageCollector {
       // A journal can be rewritten by the ordering session while cleanup
       // enumerates entries. Keep the newer version for recovery instead of
       // moving a stale path out from under the session.
-      if (!(await adapter.exists(path))) continue;
+      if (!originalBytes || !(await adapter.exists(path))) continue;
       const latest = new Uint8Array(await adapter.readBinary(path));
       const original = new Uint8Array(originalBytes);
       if (latest.length !== original.length || latest.some((byte, index) => byte !== original[index])) continue;
