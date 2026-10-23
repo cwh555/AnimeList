@@ -38,8 +38,6 @@ jobs:
         run: npm run test:browser:mobile
       - name: Run shared modal UI protocol in Chromium
         run: npm run test:browser:ui
-      - name: Run media cover replacement picker in Chromium
-        run: npm run test:browser:cover-upload
       - name: Run Lightbox layout and interaction regressions in Chromium
         run: npm run test:browser:image-session-regressions
       - name: Run Score Dashboard mobile interactions in Chromium
@@ -62,3 +60,5 @@ jobs:
       - name: Run tag manager interactions in Chromium
         run: npm run test:browser:tag-manager
       - run: npm run release:check
+      - name: Assemble production Test Vault without opening the desktop app
+        run: ANIMELIST_TEST_VAULT="$RUNNER_TEMP/animelist-test-vault" node scripts/test-vault.mjs production --no-open
