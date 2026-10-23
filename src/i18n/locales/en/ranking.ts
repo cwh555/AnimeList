@@ -26,6 +26,8 @@ export const EN_RANKING_MESSAGES = {
   "cancel": "Cancel",
   "hint": "Tap the cover of the work you prefer",
   "skip": "Skip",
+  "back": "Back to previous pair",
+  "finish": "Finish and close",
   "pause": "Pause",
   "exit": "Save and exit",
   "noCompleted": "No completed works",
