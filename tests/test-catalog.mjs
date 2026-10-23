@@ -37,6 +37,7 @@ export const TEST_TARGETS = [
   { path: "tests/media-form-lifecycle.test.ts", kind: "test", suite: "unit", features: ["serial-covers", "settings", "ui"], smoke: true },
   { path: "tests/image-gallery.test.ts", kind: "test", suite: "unit", features: ["image-gallery", "image-sections", "markdown"] },
   { path: "tests/contracts/image-gallery-service.test.ts", kind: "test", suite: "contract", features: ["image-gallery", "image-sections", "markdown", "library"] },
+  { path: "tests/markdown-block-integrity.test.ts", kind: "test", suite: "unit", features: ["image-sections", "moments", "markdown"], smoke: true },
   { path: "tests/image-section.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-layout.test.ts", kind: "test", suite: "unit", features: ["image-sections", "markdown"] },
   { path: "tests/image-section-drag-hit-testing.test.ts", kind: "test", suite: "unit", features: ["image-sections"] },

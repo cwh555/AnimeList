@@ -199,4 +199,33 @@ describe("moments storage service", () => {
     }), /duplicate Moment IDs/);
   });
 
+  it("rolls back a moment's imported images when its source changes before commit", async () => {
+    const original = [
+      "# Note", "```animelist-moments", "moments: []", "```", "Unrelated prose",
+    ].join("\n");
+    const h = harness(original);
+    const locator = findMomentsBlocks(original)[0];
+    const latest = original.replace("moments: []", [
+      "moments:", '  - id: "m_external123"', "    text: external",
+      "    images:", '      - "preserved.jpg"',
+    ].join("\n"));
+    const store = h.imageService.storeAssets.bind(h.imageService);
+    h.imageService.storeAssets = async (...args) => {
+      const assets = await store(...args);
+      h.data.set(h.note.path, latest);
+      return assets;
+    };
+    await assert.rejects(
+      h.service.addMoment(h.note.path, locator, {
+        text: "stale", retainedImages: [], newAssets: [
+          { name: "pending.png", contentType: "image/png", data: new Uint8Array([4, 3, 2, 1]).buffer },
+        ],
+      }),
+      /Could not safely locate/,
+    );
+    assert.equal(h.data.get(h.note.path), latest);
+    assert.equal(h.trashed.length, 1);
+    assert.match(h.trashed[0], /pending/);
+  });
+
 });
