@@ -1,5 +1,6 @@
 import { normalizePath } from "obsidian";
 import { sha256Hex } from "./content-hash";
+import { locateUnchangedMarkdownBlock } from "./markdown-block-identity";
 import { sanitizePathPart, slugify, stringValue } from "./value-normalization";
 import type { MediaType } from "./media-types";
 
@@ -105,20 +106,9 @@ function sameSectionSource(left: string, right: string): boolean {
 }
 
 export function locateImageSectionBlock(markdown: string, locator: ImageSectionLocator): ImageSectionBlock {
-  const blocks = findImageSectionBlocks(markdown);
-  const hint = typeof locator.lineStart === "number" ? locator.lineStart : null;
-  if (hint !== null) {
-    const containing = blocks.find((block) => hint >= block.lineStart && hint <= block.lineEnd);
-    if (containing) return containing;
-  }
-  const matches = blocks.filter((block) => sameSectionSource(block.source, locator.source));
-  if (matches.length === 1) return matches[0];
-  if (hint !== null && matches.length > 1) {
-    return [...matches].sort((left, right) => (
-      Math.abs(left.lineStart - hint) - Math.abs(right.lineStart - hint)
-    ))[0];
-  }
-  throw new Error("Could not safely locate this image section in the note");
+  return locateUnchangedMarkdownBlock(
+    findImageSectionBlocks(markdown), locator, sameSectionSource, "image section",
+  );
 }
 
 export function replaceImageSectionPaths(
