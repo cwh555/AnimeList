@@ -2,8 +2,8 @@ import { Modal, setIcon, type App } from "obsidian";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
   completedRankingItems, moveRankedItem, nextRankingPair, prepareRankingRounds,
-  prepareRanking, rankingBounds, rankingCounts, rankingConfirmedPositions,
-  reconcileRanking, emptyRankingState, rankingUnresolvedPaths,
+  prepareRanking, rankingBounds, rankingConfirmedPositions,
+  reconcileRanking, emptyRankingState,
   type RankingCollection, type RankingState,
 } from "../../domain/pairwise-ranking";
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
@@ -75,9 +75,12 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   if (!container.isConnected) return;
   const list = state[options.type];
   const byPath = new Map(eligible.map((item) => [item.filePath, item]));
+  // Compute reachability only once per render; the same certificate drives
+  // the displayed ranks and the exhaustive pending partition.
   const confirmed = rankingConfirmedPositions(list, eligible);
-  const counts = rankingCounts(list, eligible);
-  const unresolved = rankingUnresolvedPaths(list, eligible);
+  const confirmedPaths = new Set(confirmed.map(entry => entry.path));
+  const unresolved = eligible.map(item => item.filePath).filter(path => !confirmedPaths.has(path));
+  const counts = { ranked: confirmed.length, pending: unresolved.length };
   const allPositionsKnown = counts.pending === 0;
   const hasNew = eligible.some(item => !list.ordered.includes(item.filePath)
     && !Object.hasOwn(list.pending, item.filePath) && list.active?.path !== item.filePath);
