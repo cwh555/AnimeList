@@ -25,7 +25,7 @@ Legacy tag limitation: historical genres mixes provider terms and manually enter
 - title_romaji: romanized spelling when available.
 - title_aliases: historical names and search aliases.
 - title_localizations: optional locale-to-verified-title dictionary from the provider.
-- title_script_conversions: optional locale-to-OpenCC-converted-name dictionary, written **only after the user explicitly accepts a suggestion**. It never claims the conversion is official, and allows round-trip selection without mistaking the previously accepted result for an unknown custom title.
+- title_script_conversions: optional locale-to-OpenCC-converted-name dictionary. For a **new import**, the initial create form may adopt an offline-converted name and persist its provenance if the user saves the form without replacing that title. For **existing notes**, any title update or conversion requires the user's explicit review and acceptance. A conversion never claims to be an official provider localization; manual title edits never acquire spurious conversion provenance.
 
 Bangumi name_cn is Simplified Chinese, not necessarily an official Taiwanese Traditional title. A verified Traditional title must have explicit provenance from Bangumi infobox. AniList provides English/native/romaji, with JP/KR native attribution only if origin information supports it. Never invent an official translation from unlabelled synonyms. OpenCC (opencc-js 1.4.2) is available **only** as an offline Chinese-script-conversion fallback. It is **not** a provider-verified localized title or general machine translation.
 
@@ -68,10 +68,11 @@ For **new** imports, in order:
 1. Prefer an explicit, provider-labelled title for the interface locale.
 2. Use a localized Wikidata/Wikipedia name **only when a unique QID is linked by the work's exact AniList/Bangumi external ID**. Record QID, locale and source separately in `title_external_evidence`—not in the provider-verified `title_localizations` map.
 3. If the locale is Chinese and the source has an explicitly labeled name in the other Chinese script, use offline OpenCC as a fallback. Record the conversion in `title_script_conversions`, **never** `title_localizations`.
-4. Otherwise keep a safe source title. Unlabelled synonyms are searchable aliases, not verified translations; do not infer a work's identity from its title.
+4. If the same **verified source work ID** (not a title/year heuristic) supplies a suitable nonofficial Han-only infobox alias for a Korean/Japanese original, use the scoped `displayAliases` candidate; convert its Chinese script if required and retain conversion provenance. `displayAliases` is a transient typed source-evidence field, **not** a verified `title_localizations` value or a newly introduced YAML schema field. Persist the chosen title and already-supported aliases/provenance using the existing note codec.
+5. Otherwise keep a safe source title. Other unlabelled synonyms are searchable aliases, not verified translations; do not infer a work's identity from its title.
 
 Provider-specific evidence:
-- **Bangumi:** `name_cn` is Simplified Chinese, an explicitly labelled infobox title can be Traditional Chinese. Both can be converted when the other script is requested.
+- **Bangumi:** `name_cn` is Simplified Chinese, an explicitly labelled infobox title can be Traditional Chinese. Both can be converted when the other script is requested. When the compact search result contains only a Korean/Japanese original title, the user may select it and fetch that same subject ID's full infobox. Only a matching subject's nonofficial Chinese alias is eligible for `displayAliases` (for example Bangumi subject 399671); it must never be promoted to an official localization.
 - **AniList:** `english` is official English; `native` is attributed to its native-script locale when `countryOfOrigin` identifies JP, KR, CN, TW or HK. Chinese-origin native titles can use script conversion, with conversion provenance recorded separately. Country-of-origin attribution is not evidence of a separate licensed translation. Neither `romaji` nor `synonyms` provides trustworthy Chinese language attribution for Japanese/Korean-origin works, so do not invent Chinese translations.
 - **Open Library:** Work `title` is a fallback, not presumed to be an official Chinese translation. Search's `lang` now follows the interface's language preference (zh-TW/zh-CN → zh, en → en, ja → ja, ko → ko), which influences edition preference but **does not certify the title language**.
 - **Manually entered media:** User-entered title is authoritative; the adapter skips manual items entirely.
@@ -153,10 +154,12 @@ Obsidian Test Vault rather than assuming mocked coverage proves availability.
 Search latency must not scale linearly with the number of guessed aliases:
 
 - Query planning limits first-phase variants to two, Chinese discovery variants to
-  two, and cross-language alias variants to three. Sources run independently,
-  with up to two simultaneous requests within each provider. AniList continues
-  using a single batched GraphQL operation where supported and retains its
-  published 30/min limiter; never bypass upstream 403/429 protections.
+  two, and cross-language alias variants to three; a non-batching provider executes
+  at most two queries per phase concurrently, while AniList can batch up to three
+  aliases in one GraphQL operation. Each provider is independent. The same
+  AniList client still serializes *physical* requests at least 2100 ms apart;
+  never bypass upstream 403/429 protections. The limit is on speculative
+  variants, not a guarantee of end-to-end latency.
 - Stop discovery after the first sufficiently relevant source candidate. Avoid
   further alias requests to a source that already returned that work.
   When a different source remains unresolved, its supplemental lookup is
