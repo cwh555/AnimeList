@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.6.0 - Unreleased (release candidate)
+
+### Added
+
+- **Pairwise Ranking:** Compare completed anime, manga, and novels two at a time to build separate preference orderings. Supports resuming interrupted comparisons, reviewing unresolved works, and preserving order without changing personal scores or media-note files. Ranking state is stored separately in the vault's Obsidian configuration.
+- **Custom work covers:** Upload a replacement image directly from an existing work's Edit dialog with preview, confirmation, and rollback on failed writes; original artwork and unrelated note content are retained.
+- **Broader multilingual title handling:** Improved Chinese-script support, provider-neutral display-name selection, exact-source title evidence, and explicit review of proposed names for existing library entries.
+- **Incremental update scans:** Settings cleanup workflows distinguish only new/unfinished items from a full rescan, without reprocessing every unchanged note by default.
+
+### Improved
+
+- More responsive multilingual provider search, source-identity-aware pagination, and guarded Add Media screens so late network responses do not replace what the user is editing.
+- Unified metadata and search UI presentation, with localized prompts in Traditional/Simplified Chinese, English, Japanese, and Korean.
+- Refined mobile Timeline, rating/drag interactions, and touch gesture ownership while retaining desktop navigation and native edge swipes.
+
+### Data integrity and compatibility
+
+- Hardened Image Section and Moments edits against stale or ambiguous Markdown blocks; preserved unrelated frontmatter and manually authored content.
+- Strengthened ranking JSON recovery and conflict-safe writes; protected user-referenced media and image-order journals during explicit storage cleanup.
+- Existing `schema_version: 6` notes and settings remain readable. No automatic startup migration; optional title and metadata updates remain review-first. The new ranking file uses a separate JSON v1 format.
+- Maintains the declared Obsidian minimum version `1.5.0`; newer atomic adapter capabilities are used when available with backward-compatible fallback.
+
 ## 1.5.3 - 2026-10-18
 
 ### Improved

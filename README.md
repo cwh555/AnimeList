@@ -8,6 +8,8 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > **Existing libraries and update cleanup**
 >
 > Existing 1.4.0 and older libraries remain readable without an automatic startup migration. Older notes may still be missing classification metadata introduced in 1.3, and older generated note bodies may contain a redundant standalone cover below `animelist-detail`. Back up or sync the vault before using **Settings → Updates & cleanup**. The available cleanup tools are explicit, review-first operations and preserve unrelated frontmatter and Markdown body content.
+>
+> **For 1.6.0:** Back up or fully sync the vault before running any cleanup that removes files or applies title/metadata changes. Review proposed changes before confirming; choose **Only new or unfinished items** for normal scans and **Rescan all items** only when needed. If an Image Section or Moment was edited elsewhere while its editor was open, close and reopen the note before retrying rather than overwriting the newer content. The independent Ranking data file (`.obsidian/animelist-ranking.json`) should be included in vault backups and sync. Ranking conflicts may require reopening Obsidian; do not manually delete that file or its recovery backups.
 
 <table>
   <tr>
@@ -43,16 +45,13 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 </table>
 
 > [!NOTE]
-> **What's new**
+> **What's new in 1.6.0 — release candidate**
 >
-> - Unified Library, Timeline, Score Dashboard, and Images inside one Material 3-inspired AnimeList workspace with consistent desktop/mobile navigation.
-> - Rebuilt Timeline as a graph-view-style workspace with proportional time spacing, independent time-spacing and whole-scene zoom, horizontal pan, axis-stable scaling, History mode, and a smooth KDE density overview below the canvas.
-> - Added **Images** as a derived workspace over existing Image Sections, with All images / By work browsing, media/search filters, exact 1–6 columns, scoped lightbox navigation, and no copied gallery assets.
-> - Added versioned **Library Export** in JSON and readable Text formats, including safe text templates, Copy, and save-to-file output without rewriting media notes.
-> - Added exact Card and Thumbnail items-per-row controls with persisted 1–6 column choices.
-> - Upgraded Image Sections to natural-height masonry with persisted per-section columns and drag ordering within or between sections in the same note.
-> - Added optional **Stacked** Moment image layout using whole-image gap geometry. Copying a stack creates a transient flattened PNG only for the clipboard; editing or copying does not persist composite files.
-> - Restored the tabbed Settings shell on Obsidian 1.13+ and strengthened architecture/release metadata checks while keeping the Markdown/frontmatter schema compatible.
+> - **Rank completed works by preference:** Compare two covers at a time to build a personal, independent ranking for anime, manga, and novels. Pause and resume later, revisit unranked works, and keep rankings separate from numeric scores.
+> - **Make your library look the way you want:** Replace an existing work's cover with your own local image without losing its metadata or previous artwork.
+> - **Find works across more languages:** Improved search for alternate Chinese, Japanese, Korean, and English titles, with clearer source identity and title provenance. Review suggested names for existing works instead of automatically rewriting them.
+> - **Maintain older libraries with more control:** Incremental or full rescan choices, review-first updates, and stronger protection for existing notes, images, and ranking data.
+> - **Smoother day-to-day use:** More consistent Add/Edit dialogs, faster first-result presentation, and refined touch navigation on phones while preserving desktop behavior.
 
 ## Features
 
@@ -65,11 +64,13 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 - A shared AnimeList workspace for Library, Timeline, Score Dashboard, and Images.
 - An Images browser derived from existing Image Sections without copying source assets.
 - A Score Dashboard for direct and batch rating changes.
+- Pairwise preference **Ranking** for completed works, stored independently of scores and media-note Markdown.
 - Favorite mode or reusable Masterpiece categories.
 - A pannable, independently scalable completion timeline with History mode and a density overview.
 - Versioned JSON and readable Text Library export with safe templates.
 - Local series, serial-entry, Image Section, and Moment images with safe reference-aware cleanup.
-- Traditional Chinese, English, Japanese, and Korean interface support.
+- Replace an existing series cover with a local image from its Edit dialog; original media files are preserved.
+- Traditional Chinese, Simplified Chinese, English, Japanese, and Korean interface support.
 - Desktop and mobile support without a Dataview dependency.
 
 ## Installation
@@ -91,11 +92,11 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 1. Open AnimeList from the ribbon or run **AnimeList: Open library** from the command palette.
 2. Select **收錄**, choose anime, manga, or novel, and search for a title.
 3. Review the imported metadata and save the note.
-4. Update its status, progress, dates, rating, or special label from the library.
+4. Update its status, progress, dates, rating, or special label from the library. For completed works, open **Scores → Ranking** to compare titles and build a preference order.
 5. For manga or novels, enable **Latest release tracking** under Settings → Features if you want source-backed latest chapter/volume information.
 6. Inside a media note, use the editor context menu **AnimeList** submenu to insert an Image Section or Moments section where you want it.
 
-AnimeList can display its main interface in Traditional Chinese, English, Japanese, or Korean. The Settings page itself stays in English. Choose a language there or follow Obsidian's interface language. Recognized provider-supplied tag/category labels are displayed in the selected interface language, while media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, and existing templates are not rewritten.
+AnimeList can display its main interface in Traditional Chinese, Simplified Chinese, English, Japanese, or Korean. The Settings page itself stays in English. Choose a language there or follow Obsidian's interface language. Recognized provider-supplied tag/category labels are displayed in the selected interface language, while media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, and existing templates are not rewritten.
 
 ## Documentation
 
