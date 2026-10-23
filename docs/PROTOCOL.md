@@ -139,6 +139,17 @@ No note or external ID is changed merely because a candidate ranked highly.
   per-provider cursors and search category across Load more requests. It does not
   restart pagination from only the user's original string. Provider failures are
   surfaced and must not block successful results from the others.
+- Each new UI search receives an **opaque interaction-specific `sessionId`**.
+  The Load more API accepts an optional fourth argument with that ID; two
+  searches of the same text must never share or replace cursor state. The
+  three-argument legacy host call remains supported via the latest query
+  session, but UI pagination must always provide the explicit ID. Expired or
+  mismatched explicit IDs fail closed rather than silently requesting page N
+  from unrelated query state or another user interaction.
+- Search first-result progress callbacks must be forwarded through
+  `main.ts` to the search service. UI updates from stale queries are ignored;
+  subsequent pages use the same verified provider identity deduplication rules,
+  including preserving distinct results with no stable provider ID.
 - Searches are read-only. In particular, changes to this search layer never
   migrate titles, alter source IDs in existing notes, rename Markdown files,
   or mutate user-owned metadata. Provider-neutral display title selection and
