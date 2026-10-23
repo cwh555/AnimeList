@@ -138,13 +138,30 @@ export class PairwiseRankingStore {
       if (oldValue === newValue) { answer = current; return; }
       const adapter = this.app.vault.adapter;
       const found = await adapter.exists(this.path);
-      const onDisk = found ? new TextDecoder().decode(await adapter.readBinary(this.path)) : null;
-      if (onDisk !== this.original) throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
       const folder = this.path.slice(0, this.path.lastIndexOf("/"));
       if (!(await adapter.exists(folder))) await adapter.mkdir(folder);
-      const bytes = new TextEncoder().encode(newValue + "\n");
-      await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-      this.original = newValue + "\n";
+      const serialized = newValue + "\n";
+      if (found) {
+        // Ranking is UTF-8 JSON. Obsidian's DataAdapter.process() atomically
+        // reads, validates and writes the current text, so a second device
+        // cannot modify the file between our conflict check and our write.
+        // Never update this.loaded/original if this atomic operation fails.
+        const expected = this.original;
+        await adapter.process(this.path, (onDisk) => {
+          if (onDisk !== expected) {
+            throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
+          }
+          return serialized;
+        });
+      } else {
+        if (this.original !== null) {
+          throw new Error("Ranking data changed on another device. Reload Obsidian before editing.");
+        }
+        // First-time initialization: process() requires an existing file.
+        const bytes = new TextEncoder().encode(serialized);
+        await adapter.writeBinary(this.path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+      this.original = serialized;
       this.loaded = next;
       answer = next;
     });
