@@ -248,11 +248,53 @@ export function renderScoreDashboardWithBatchDrag(
       applyPathDrop(paths, lane, true);
     }, { ...options, capture: true });
 
-    installScoreDashboardTouchInteractions(container, shell, batchButton, controller.signal, {
+    let touchDragPaths: string[] = [];
+    let touchDragOffset = { x: 0, y: 0 };
+    const touchLaneAt = (point: { x: number; y: number }): HTMLElement | null => {
+      const target = container.ownerDocument.elementFromPoint(point.x, point.y);
+      const lane = target?.closest<HTMLElement>(".al-score-lane") ?? null;
+      return lane && container.contains(lane) ? lane : null;
+    };
+    const positionTouchPreview = (point: { x: number; y: number }): void => {
+      if (!dragPreview) return;
+      dragPreview.style.transform = `translate3d(${Math.round(point.x - touchDragOffset.x)}px, ${Math.round(point.y - touchDragOffset.y)}px, 0)`;
+    };
+    installScoreDashboardTouchInteractions(container, controller.signal, {
       onTouchInput: () => {
         touchInputSeen = true;
         lastPointerInput = "touch";
         syncDraggablePosters();
+      },
+      onDragStart: (poster, point) => {
+        if (operationPending || dragPreview) return false;
+        const source = poster.dataset.filePath ?? "";
+        const selected = new Set(selectedPosters().map((item) => item.dataset.filePath ?? ""));
+        const batchSelected = shell.classList.contains("is-batch-mode") && selected.has(source);
+        touchDragPaths = scoreDashboardDraggedPaths(source, batchSelected, selected);
+        if (!touchDragPaths.length) return false;
+        const rect = poster.getBoundingClientRect();
+        touchDragOffset = { x: point.x - rect.left, y: point.y - rect.top };
+        dragPreview = createScoreDashboardDragPreview(container.ownerDocument, poster, touchDragPaths.length);
+        dragPreview.style.left = "0px";
+        dragPreview.style.top = "0px";
+        positionTouchPreview(point);
+        poster.classList.add("is-dragging");
+        autoScroller = new ScoreDashboardDragAutoScroller(container);
+        autoScroller.start();
+        return true;
+      },
+      onDragMove: (point) => {
+        positionTouchPreview(point);
+        autoScroller?.update(point.y);
+        clearDropTargets();
+        touchLaneAt(point)?.classList.add("is-drop-target");
+      },
+      onDragEnd: (point, cancelled) => {
+        const paths = touchDragPaths;
+        touchDragPaths = [];
+        const lane = cancelled ? null : touchLaneAt(point);
+        if (lane && paths.length) applyPathDrop(paths, lane, false);
+        else finishDrag();
       },
     });
     // A hybrid device must not lose desktop drag-and-drop for the rest of the
