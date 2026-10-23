@@ -45,6 +45,9 @@ export function diverseRankingOrder(items: readonly MediaItem[], generation: num
     });
   }
   // Colliding series are delayed until the end of the first stage.
-  pairs.sort((a, b) => a.collision - b.collision || a.bias - b.bias);
+  // An odd-sized round has one bye. Keep it last so flattening does not
+  // accidentally pair members of two otherwise independent matches.
+  pairs.sort((a, b) => (a.entries.length === 1 ? 1 : 0) - (b.entries.length === 1 ? 1 : 0)
+    || a.collision - b.collision || a.bias - b.bias);
   return pairs.flatMap(({ entries }) => entries.map(item => item.filePath));
 }
