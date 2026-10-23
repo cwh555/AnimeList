@@ -9,6 +9,7 @@ import {
 import { imageSectionRootFromCoverFolder } from "../domain/image-section";
 import { MediaAssetReferenceService, type MediaAssetReferenceSnapshot } from "./media-asset-reference-service";
 import { moveAdapterFileToVaultTrash } from "./vault-trash";
+import { VaultMarkdownRevisionGuard } from "./vault-markdown-revision-guard";
 
 export interface MediaAssetGarbageCollectionExecution {
   result: MediaAssetCleanupResult;
@@ -41,11 +42,19 @@ export class MediaAssetGarbageCollector {
   }
 
   async cleanup(leasedPaths: ReadonlySet<string> = new Set()): Promise<MediaAssetGarbageCollectionExecution> {
-    const references = await this.references.collect();
+    // Capture the note set before asynchronous disk reads. If any Markdown is
+    // changed or newly created during cleanup, stop rather than act on a stale
+    // reference snapshot. This guard is intentionally conservative.
+    const revision = new VaultMarkdownRevisionGuard(this.app);
+    const references = await this.references.collect({ freshRead: true });
+    revision.assertUnchanged();
     const leases = new Set([...leasedPaths].map(normalizeMediaAssetPath).filter(Boolean));
     let removedManagedFiles = 0;
     for (const file of this.candidateFiles()) {
       if (!shouldRemoveManagedMediaAsset(file.path, this.settings().coverFolder, references.referencedPaths, leases)) continue;
+      revision.assertUnchanged();
+      // The same path may have been replaced by another file since enumeration.
+      if (this.app.vault.getAbstractFileByPath(file.path) !== file) continue;
       await this.app.fileManager.trashFile(file);
       removedManagedFiles += 1;
     }
