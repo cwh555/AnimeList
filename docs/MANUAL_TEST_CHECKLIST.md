@@ -307,13 +307,13 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] Only completed Anime / Manga / Novel notes participate; each original media note is ranked independently.
 - [ ] Opening a comparison launches an Obsidian modal; clicking a cover selects the preferred work, Skip never creates a tie.
 - [ ] The modal closes on Pause / Escape, then Continue restores the pending comparison without losing answers.
-- [ ] Long Chinese/Japanese/English titles fit within two lines inside modal cards at 320px/390px/desktop widths.
+- [ ] At 320px/390px, long Chinese/Japanese/English titles wrap completely in the modal, confirmed and pending rows, without page overflow; desktop rows remain compact.
 - [ ] The main ranking page remains visible behind the modal; modal controls and native Obsidian close behavior work.
 - [ ] Ranking page has no work-search field; all completed ranked works remain visible after edits and category switching.
-- [ ] The unresolved group keeps works without a unique position; retrying a skipped reference is possible.
+- [ ] On empty, in-progress, skipped, completed and post-rename views, the confirmed ranks and pending rows are disjoint and cover exactly all completed eligible works; no participant disappears mid-round.
 - [ ] New entries are inserted without reshuffling the existing ranked order.
-- [ ] Tournament-like merge rounds interleave comparisons; full rankings remain strict and skip never fabricates placement.
-- [ ] Manual rank changes only use the drag handle; comparison modal has Skip and Pause but no Undo. Confirmed complete reset works, numeric scores stay unchanged.
+- [ ] Successive full reranks with at least 3 works vary their initial pairs across rotation cycles. Compare seasons and films of the same series only late when possible. Every adjacent confirmed pair has a strict-comparison/transitive evidence path; skipped or unverifiable works are pending, never auto-guessed.
+- [ ] Compare two works, tap Back to previous pair, and confirm the exact earlier question and persisted state return. Answer again, undo a Skip, and test Back after the final comparison before Finish and close. Pause, native X, Escape and re-entry preserve committed comparisons. Manual rank moves use the drag handle. Numeric scores stay unchanged.
 - [ ] Each ranked work has one full-width compact row at every viewport (320, 390, 768, 1200px), with rank, cover, left-aligned two-line title and one trailing drag handle. No oversized gray inner card.
 - [ ] While dragging, a pointer-following visual clone and source placeholder stay visible, with a clear drop highlight.
 - [ ] No redundant move-to-rank, range-rerank, or per-item more buttons remain; drag handle ArrowUp/ArrowDown provides keyboard sorting.
