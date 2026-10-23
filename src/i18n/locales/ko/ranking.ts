@@ -26,6 +26,8 @@ export const KO_RANKING_MESSAGES = {
   "cancel": "취소",
   "hint": "더 좋아하는 작품의 표지를 선택하세요",
   "skip": "건너뛰기",
+  "back": "이전 비교로 돌아가기",
+  "finish": "완료하고 닫기",
   "pause": "일시 중지",
   "exit": "저장하고 나가기",
   "noCompleted": "완료한 작품 없음",
