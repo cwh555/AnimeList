@@ -252,7 +252,6 @@
 .al-delete-button:hover,
 .al-detail-delete:hover { color:#fff; background:color-mix(in srgb,var(--text-error,#d86a70) 75%,#321); }
 .al-confirm-actions { justify-content:flex-end; }
-.animelist-confirm-modal .modal-content { max-width:520px; }
 .animelist-confirm-modal p { color:var(--text-muted); line-height:1.65; }
 
 .al-detail-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0 20px; padding:10px 12px; border:1px solid var(--background-modifier-border); border-radius:12px; background:var(--background-secondary); }
@@ -6277,8 +6276,6 @@ button.al-moment-stack-strip:focus-visible {
 .al-edit-cover-empty { display: block; color: var(--text-muted); text-align: center; font-size: var(--font-ui-small); }
 .al-edit-cover-filename { max-width: 100%; overflow-wrap: anywhere; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .al-edit-cover-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.al-edit-cover-file-label { display: grid; gap: 5px; font-size: var(--font-ui-small); }
-.al-edit-cover-file { max-width: 100%; font-size: var(--font-ui-small); }
 .al-edit-cover-clear[hidden] { display: none; }
 @media (max-width: 420px) {
   .al-edit-cover-previews { gap: 8px; }
