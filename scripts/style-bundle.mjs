@@ -37,6 +37,8 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/media-cover-replacement.css",
   "styles/mobile-touch-refinements.css",
   "styles/updates-cleanup.css",
+  "styles/ui-primitives.css",
+  "styles/media-editor-layout.css",
 ]);
 
 export function renderStyleBundle(sourceContents) {
