@@ -55,15 +55,19 @@ A successful older SHA is not sufficient after the branch changes. If a validati
 
 The Community preflight must stay free of suppressions and browser-feature workarounds that exceed the minimum supported Obsidian baseline. Release CSS should avoid unsupported or partially supported features when an equivalent baseline layout exists. The current preflight explicitly protects against reintroducing CSS multi-column layout and `scrollbar-width` / `scrollbar-color` into the generated release stylesheet.
 
-## Pre-release merge, tag and release sequence
+## 1.6.0 publication sequence and exact-tag verification
 
-For 1.6.0, `release/1.6.0-preparation` is a review branch based on `preview`. Version metadata and documentation may be reviewed there without mutating the published `main`.
+The release candidate is based on `preview`. The user's explicit 1.6.0 approval authorizes a **non-squash history-preserving merge to `main`**. Verify the source head, review state and exact-head CI before merging; do not rewrite the published history or replace unrelated commits.
 
-1. Validate the exact release-candidate PR head and obtain explicit manual Test Vault approval.
-2. Synchronize with the current `preview`, re-run required checks, and squash merge the release-preparation PR to `preview` only after approval.
-3. Once the user explicitly authorizes publication, merge the verified `preview` state into `main` according to the project release procedure, then verify the resulting `main` commit and its CI.
-4. **Only after the published `main` commit is confirmed**, create and push the exact Git tag `1.6.0` on that commit (no `v` prefix). This tag triggers `.github/workflows/release.yml`, which creates a GitHub Release automatically. Do not push a pre-release tag from a feature or review branch.
-5. Confirm the tagged commit, successful tag workflow and exact published `main.js`, `manifest.json` and `styles.css` assets. Synchronize `preview` with `main` after release.
+1. Merge the approved 1.6.0 release candidate into `main` **without squash**, preserving the distinct component and documentation commits.
+2. Confirm the resulting `main` commit and wait for the **push-triggered CI on that exact commit**. Do not publish from a merely successful PR-head CI.
+3. For 1.6.0 only, `.github/workflows/publish-1.6.0.yml` runs after a successful `main` push CI. It checks that the verified CI commit is still the current `main` head and that all four version metadata files agree; it then creates the exact lightweight `1.6.0` tag on that commit. The promotion is idempotent and refuses a conflicting existing tag.
+4. A tag pushed by GitHub Actions' built-in `GITHUB_TOKEN` does **not** trigger another `push.tags` workflow. Accordingly, the promotion explicitly dispatches the existing `release.yml` through its new `workflow_dispatch` entry point with `tag=1.6.0`. Direct human tag pushes continue to use the original `push.tags` trigger.
+5. The release workflow **checks out the exact tag**, validates it is on the published `main` history and matches `package.json`, runs npm checks/build/`release:check`, attests the assets and publishes `manifest.json`, `main.js`, and `styles.css`.
+6. Verify the `1.6.0` Git ref points to the released commit, the GitHub Release is public, the assets contain version `1.6.0`, and both `main` CI and the dispatched release run succeeded. Synchronize `preview` with released `main` by fast-forward, preserving history.
+
+The one-off promoter does **not** publish any other version. Never create a tag against a feature/review branch, use a mismatched `v` prefix, or claim that tag creation alone proves assets were published.
+
 
 ## Test Vault
 

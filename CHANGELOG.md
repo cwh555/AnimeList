@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.0 - Unreleased (release candidate)
+## 1.6.0 - 2026-10-23
 
 ### Added
 

@@ -15,7 +15,7 @@ Always compare this checklist with the latest official Obsidian developer docume
 
 1. Set the plugin version once with `npm run release:version -- <new-version>`. `package.json` is authoritative; the command synchronizes `package-lock.json`, `manifest.json`, and `versions.json`, while runtime metadata reads the package version directly. Do not hand-edit the derived version fields.
 2. Add the intentionally authored release notes for that version to `CHANGELOG.md`, then run `npm run release:check`.
-3. **After** the user approves the Test Vault release candidate and the verified commit has reached `main` with successful `main` CI, create a tag that exactly matches the package/manifest version, without a `v` prefix. **Do not tag a preview, feature or Draft PR commit:** pushing the tag immediately triggers `.github/workflows/release.yml` and the public GitHub Release.
+3. **After** the user approves the Test Vault release candidate and the verified commit reaches `main` with successful **main push CI**, create the exact package/manifest version tag (no `v` prefix). Never tag a feature/review branch. For 1.6.0, the restricted `publish-1.6.0.yml` workflow handles this gate and explicitly dispatches `release.yml`, because a tag pushed using `GITHUB_TOKEN` cannot trigger a second push workflow. Direct human tag pushes continue to trigger `release.yml` normally.
 4. Confirm that the GitHub release contains these assets:
 
    ```text

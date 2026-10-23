@@ -139,7 +139,7 @@ This document preserves the product-level decisions introduced by each major dev
 
 ## 1.6.0 — Personal ranking, cover control, and multilingual discovery
 
-**Release state:** Release candidate; awaiting Test Vault approval and public release.
+**Release state:** Approved for publication to `main` (2026-10-23); tag and GitHub Release are verified separately after publication.
 
 ### Main outcomes
 
