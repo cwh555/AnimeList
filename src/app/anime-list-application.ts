@@ -255,7 +255,7 @@ export class AnimeListApplicationServices {
   }
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
-  async searchExternal(mediaType: MediaType, query: string): Promise<{ results: ExternalMediaResult[]; warnings: string[] }> { return this.externalMediaSearch().search(mediaType, query); }
+  async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> { return this.externalMediaSearch().search(mediaType, query, onProgress); }
   async searchExternalPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> { return this.externalMediaSearch().searchPage(mediaType, query, page); }
   async searchBangumi(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("bangumi", mediaType, query); }
   async searchAniList(mediaType: MediaType, query: string): Promise<ExternalMediaResult[]> { return this.externalMediaSearch().searchProvider("anilist", mediaType, query); }
@@ -264,7 +264,14 @@ export class AnimeListApplicationServices {
     result: ExternalMediaResult, purpose: "new-media" | "metadata-only" = "new-media",
   ): Promise<ExternalMediaResult> {
     let base = result;
-    if (result.provider === "bangumi" && result.sourceId && (!result.people.length || !result.rawGenres.length)) {
+    const requestedLocale = normalizeSupportedLocale(getActiveLocale()) ?? "zh-TW";
+    const needsChineseAlias = purpose === "new-media"
+      && (requestedLocale === "zh-TW" || requestedLocale === "zh-CN")
+      && !result.titleVariants?.localized?.[requestedLocale]
+      && !result.titleVariants?.displayAliases?.[requestedLocale]
+      && /[\\p{Script=Hangul}\\p{Script=Hiragana}\\p{Script=Katakana}]/u.test(result.originalTitle);
+    if (result.provider === "bangumi" && result.sourceId
+      && (!result.people.length || !result.rawGenres.length || needsChineseAlias)) {
       try {
         base = await this.metadataProviders().bangumi.fetchById(result.mediaType, result.sourceId) ?? result;
       } catch (error) {
@@ -281,6 +288,7 @@ export class AnimeListApplicationServices {
     if (purpose === "metadata-only") return localized;
     if (localized.provider !== MANUAL_MEDIA_PROVIDER
       && !localized.titleVariants?.localized?.[locale]
+      && !localized.titleVariants?.displayAliases?.[locale]
       && localized.wikidataTitleEvidence?.locale !== locale) {
       try {
         this.wikidataTitles ??= new WikidataTitleService();

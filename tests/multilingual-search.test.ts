@@ -164,6 +164,168 @@ describe("multilingual provider search", () => {
     assert.equal(response.results.some((item) => item.provider === "anilist" && item.sourceId === "138705"), true);
   });
 
+  it("discovers an alternate Chinese localization without hard-coded title synonyms", async () => {
+    const calls: string[] = [];
+    const response = await searchMultilingualProviders({
+      query: "我想成為影之強者",
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          calls.push(query);
+          if (query !== "成为影之") return [];
+          return [result({
+            mediaType: "novel", sourceId: "shadow-1",
+            title: "想成為影之實力者",
+            originalTitle: "陰の実力者になりたくて！",
+            searchTitles: ["想成為影之實力者"],
+          })];
+        },
+      }],
+    });
+    assert.ok(calls.includes("成为影之"));
+    assert.equal(response.results[0]?.sourceId, "shadow-1");
+    assert.equal(response.results[0]?.title, "想成為影之實力者");
+  });
+
+  it("recovers the real Bangumi novel title even when its translation inserts 要", async () => {
+    const input = "我想成為影之強者";
+    const variants = collectChineseDiscoveryQueries(input);
+    assert.ok(variants.includes("成为影之"));
+    assert.ok(variants.length <= 5);
+
+    const searched: string[] = [];
+    const response = await searchMultilingualProviders({
+      query: input,
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          searched.push(query);
+          // The real Bangumi series is 270200; its cataloged Chinese title
+          // includes the extra 要, which defeats the naive 5-char prefix.
+          if (!"想要成为影之实力者！".includes(query)) return [];
+          return [result({
+            provider: "bangumi", sourceId: "270200", mediaType: "novel",
+            format: "light_novel",
+            title: "想要成為影之實力者！",
+            originalTitle: "陰の実力者になりたくて!",
+            searchTitles: ["我想要成為影之強者！"],
+          })];
+        },
+      }],
+    });
+    assert.ok(searched.includes("成为影之"));
+    assert.equal(response.results[0]?.sourceId, "270200");
+  });
+
+  it("serializes variants for one provider and preserves results before an API failure", async () => {
+    const calls: string[] = [];
+    let concurrent = 0;
+    let peak = 0;
+    const response = await searchMultilingualProviders({
+      query: "作品 第二季",
+      providers: [{
+        label: "Sample",
+        async search(query: string): Promise<ExternalMediaResult[]> {
+          concurrent += 1;
+          peak = Math.max(peak, concurrent);
+          calls.push(query);
+          try {
+            await Promise.resolve();
+            if (query === "作品") throw new Error("provider temporarily unavailable");
+            return [result({ sourceId: "test-1", title: "作品 第二季", searchTitles: [] })];
+          } finally {
+            concurrent -= 1;
+          }
+        },
+      }],
+      languages: { chinese: true, english: true, original: true },
+    });
+    assert.equal(peak, 2);
+    assert.deepEqual(calls, ["作品 第二季", "作品"]);
+    assert.equal(response.results.some(x => x.sourceId === "test-1"), true);
+    assert.match(response.warnings[0], /temporarily unavailable/);
+  });
+
+  it("shows Bangumi's Korean-title hit before another source returns, even without an exposed Chinese alias", async () => {
+    const progress: ExternalMediaResult[][] = [];
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const run = searchMultilingualProviders({
+      query: "漫畫裡的羅康林",
+      providers: [{
+        label: "Bangumi",
+        supportsChineseDiscovery: true,
+        async search(query) {
+          if (query !== "漫画里的罗康林") return [];
+          return [naKangLim({ searchTitles: ["수요웹툰의 나강림"], title: "수요웹툰의 나강림" })];
+        },
+      }, {
+        label: "AniList",
+        async search() {
+          await pending;
+          return [];
+        },
+      }],
+      onProgress(results) { progress.push(results); },
+    });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.ok(progress.some(results => results.some(item => item.sourceId === "399671")));
+    release();
+    await run;
+  });
+
+  it("bounds impossible and ambiguous searches independently of the input length", async () => {
+    for (const term of ["不存在的漫畫暫稱甲乙丙丁", "我想成為影之強者"]) {
+      const requests: string[] = [];
+      const response = await searchMultilingualProviders({
+        query: term,
+        providers: [{
+          label: "Bangumi",
+          supportsChineseDiscovery: true,
+          async search(query): Promise<ExternalMediaResult[]> {
+            requests.push(query);
+            return [];
+          },
+        }],
+      });
+      assert.deepEqual(response.results, []);
+      assert.ok(requests.length <= 4, JSON.stringify(requests));
+      assert.equal(new Set(requests).size, requests.length);
+    }
+  });
+
+  it("emits first-provider results while a second provider is still in flight", async () => {
+    let release!: () => void;
+    const delayed = new Promise<void>(resolve => { release = resolve; });
+    const events: string[] = [];
+    const waiting = searchMultilingualProviders({
+      query: "輝夜姬想讓人告白",
+      providers: [{
+        label: "Bangumi",
+        async search(): Promise<ExternalMediaResult[]> {
+          return [result()];
+        },
+      }, {
+        label: "AniList",
+        async search(): Promise<ExternalMediaResult[]> {
+          await delayed;
+          return [];
+        },
+      }],
+      onProgress(results) {
+        if (results.some(candidate => candidate.sourceId === "248175")) events.push("first-result");
+      },
+    });
+    // Wait until the current event-loop turn finishes; this must publish
+    // before the deferred second provider has been released.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.ok(events.includes("first-result"));
+    release();
+    await waiting;
+  });
+
   it("does not issue disabled language discovery or alias expansions", async () => {
     const queries: string[] = [];
     const response = await searchMultilingualProviders({

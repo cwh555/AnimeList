@@ -1,3 +1,4 @@
+import { deduplicateMediaIdentities } from "../domain/search/entity-resolution";
 import { normalizeAniListClassification } from "../domain/media-classification";
 import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres, normalizeStructuredAnimationStudios } from "../domain/media-metadata";
 import type { ExternalMediaResult, MediaType } from "../domain/media-types";
@@ -141,11 +142,27 @@ function bangumiInfoboxValues(infobox: unknown, keys: readonly string[]): string
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+/**
+ * A Bangumi infobox alias belongs to the SAME subject ID, so it is a safe
+ * display alternative but it is not a provider-verified localized release name.
+ * Use it only when the original is clearly non-Chinese (Hangul/Kana).
+ */
+function bangumiChineseAlias(subject: Record<string, unknown>): string {
+  const original = stringValue(subject.name);
+  if (!/[\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(original)) return "";
+  const aliases = bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名"]);
+  return aliases.find(value => {
+    const han = value.match(/\p{Script=Han}/gu)?.length ?? 0;
+    return han >= 3 && !/[\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value);
+  }) ?? "";
+}
+
 export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): ExternalMediaResult {
   const subject = record(value);
   const originalTitle = stringValue(subject.name).trim();
   const simplifiedTitle = stringValue(subject.name_cn).trim();
   const traditionalTitle = bangumiInfoboxValues(subject.infobox, ["繁體中文名", "繁体中文名"])[0] ?? "";
+  const chineseAlias = !simplifiedTitle && !traditionalTitle ? bangumiChineseAlias(subject) : "";
   const providerFallback = simplifiedTitle || originalTitle || uiText("media.untitled");
   const images = record(subject.images);
   const people = mediaType === "anime"
@@ -175,6 +192,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     titleVariants: {
       fallback: providerFallback,
       original: originalTitle,
+      ...(chineseAlias ? { displayAliases: { "zh-CN": chineseAlias } } : {}),
       localized: {
         ...(simplifiedTitle ? { "zh-CN": simplifiedTitle } : {}),
         ...(traditionalTitle ? { "zh-TW": traditionalTitle } : {}),
@@ -200,6 +218,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
       originalTitle,
       simplifiedTitle,
       traditionalTitle,
+      chineseAlias,
       ...bangumiInfoboxValues(subject.infobox, ["别名", "別名", "中文名", "简体中文名", "簡體中文名", "繁体中文名", "繁體中文名"]),
     ].map((title) => title.trim()).filter(Boolean))],
     sources: subjectId ? [{ provider: "bangumi", sourceId: subjectId, sourceUrl: `https://bgm.tv/subject/${subjectId}` }] : [],
@@ -316,66 +335,5 @@ export function normalizeOpenLibraryBook(value: unknown): ExternalMediaResult {
 }
 
 export function dedupeSearchResults(results: readonly ExternalMediaResult[]): ExternalMediaResult[] {
-  const sourceIndexes = new Map<string, number>();
-  const titleOwners = new Map<string, { provider: string; index: number }>();
-  const output: ExternalMediaResult[] = [];
-
-  const sourceRefs = (result: ExternalMediaResult) => {
-    const refs = result.sources?.length
-      ? result.sources
-      : result.sourceId
-        ? [{ provider: result.provider, sourceId: result.sourceId, sourceUrl: result.sourceUrl }]
-        : [];
-    const seen = new Set<string>();
-    return refs.filter((ref) => {
-      const key = `${ref.provider}:${ref.sourceId}`;
-      if (!ref.sourceId || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
-
-  const mergeResult = (left: ExternalMediaResult, right: ExternalMediaResult): ExternalMediaResult => {
-    const sources = sourceRefs({ ...left, sources: [...sourceRefs(left), ...sourceRefs(right)] });
-    const classification = left.classification ?? right.classification;
-    return {
-      ...left,
-      sources,
-      ...(classification ? {
-        classification,
-        genres: classification.genres.length ? classification.genres : left.genres,
-        people: left.mediaType === "anime" && classification.studios.length
-          ? classification.studios
-          : left.people,
-      } : {}),
-    };
-  };
-
-  for (const rawResult of results) {
-    const result: ExternalMediaResult = { ...rawResult, sources: sourceRefs(rawResult) };
-    const sourceKey = result.sourceId ? `${result.provider}:${result.sourceId}` : "";
-    const sourceIndex = sourceKey ? sourceIndexes.get(sourceKey) : undefined;
-    if (sourceIndex !== undefined) {
-      output[sourceIndex] = mergeResult(output[sourceIndex], result);
-      continue;
-    }
-
-    const comparableTitle = normalizeComparable(result.title || result.originalTitle);
-    const titleKey = comparableTitle
-      ? `${result.mediaType}:${comparableTitle}:${result.year || ""}:${result.format || ""}`
-      : "";
-    const titleOwner = titleKey ? titleOwners.get(titleKey) : undefined;
-    if (titleOwner && titleOwner.provider !== result.provider) {
-      output[titleOwner.index] = mergeResult(output[titleOwner.index], result);
-      for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, titleOwner.index);
-      continue;
-    }
-
-    const index = output.length;
-    output.push(result);
-    if (sourceKey) sourceIndexes.set(sourceKey, index);
-    for (const ref of sourceRefs(result)) sourceIndexes.set(`${ref.provider}:${ref.sourceId}`, index);
-    if (titleKey && !titleOwner) titleOwners.set(titleKey, { provider: result.provider, index });
-  }
-  return output;
+  return deduplicateMediaIdentities(results);
 }

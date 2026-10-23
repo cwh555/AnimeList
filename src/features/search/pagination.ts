@@ -30,6 +30,7 @@ export interface PaginationState {
   hasMore: boolean;
   loading: boolean;
   sourceResults: ExternalMediaResult[] | null;
+  loadToken?: object;
 }
 
 function resultKey(result: ExternalMediaResult): string {
@@ -83,8 +84,9 @@ function resetFromInitialSearch(modal: PaginatedSearchModal, state: PaginationSt
   state.results = [...modal.results];
   state.warnings = [...modal.warnings];
   state.loads = 0;
-  state.hasMore = modal.results.length > 0;
+  state.hasMore = modal.hasMore ?? modal.results.length > 0;
   state.loading = false;
+  state.loadToken = undefined;
   state.sourceResults = modal.results;
 }
 
@@ -113,26 +115,41 @@ export async function appendNextSearchPage(
 ): Promise<number> {
   if (!canLoadMore(state)) return 0;
   state.loading = true;
+  const token = {};
+  state.loadToken = token;
   const page = state.loads + 2;
+  const signature = state.signature;
+  const startingResults = state.sourceResults;
+  const requestMediaType = modal.mediaType;
+  const requestQuery = modal.query;
   try {
-    const response = await host.searchExternalPage(modal.mediaType, modal.query, page);
+    const response = await host.searchExternalPage(requestMediaType, requestQuery, page);
+    // A new search may have started while a provider request was pending.
+    // Never insert stale rows into a different query's result container.
+    if (state.signature !== signature || state.sourceResults !== startingResults
+      || searchSignature(modal.mediaType, modal.query) !== signature) return 0;
     const existingKeys = new Set(state.results.map(resultKey));
     const merged = mergeSearchPages(state.results, [response.results]);
     const appended = merged.filter((result) => !existingKeys.has(resultKey(result)));
     state.loads += 1;
     state.results = merged;
     state.warnings = [...new Set([...state.warnings, ...response.warnings])];
-    state.hasMore = response.hasMore && appended.length > 0;
+    // A provider page can contain only duplicates; later pages may still have matches.
+    state.hasMore = response.hasMore;
     state.sourceResults = merged;
     modal.results = merged;
     modal.warnings = [...state.warnings];
+    modal.hasMore = state.hasMore;
 
     const scrollTop = modal.contentEl.scrollTop;
     appendSearchResultRows(resultsEl, appended, (result) => modal.createResultRow(result));
     modal.contentEl.scrollTop = scrollTop;
     return appended.length;
   } finally {
-    state.loading = false;
+    if (state.loadToken === token) {
+      state.loading = false;
+      state.loadToken = undefined;
+    }
   }
 }
 

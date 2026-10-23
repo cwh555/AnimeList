@@ -7,6 +7,8 @@ export interface MediaTitleVariants {
   original?: string;
   romaji?: string;
   localized?: Partial<Record<SupportedLocale, string>>;
+  /** Script-inferred aliases from the SAME verified provider work, not official translations. */
+  displayAliases?: Partial<Record<SupportedLocale, string>>;
 }
 
 /**
@@ -64,5 +66,15 @@ export function selectNewMediaTitle(
   if (verified) return { title: verified };
   const converted = chineseScriptCandidate(variants, locale);
   if (converted) return { title: converted, scriptConversion: converted };
+  const sourceAlias = variants.displayAliases?.[locale]?.trim();
+  if (sourceAlias) return { title: sourceAlias };
+  if (locale === "zh-TW" || locale === "zh-CN") {
+    const other = locale === "zh-TW" ? "zh-CN" : "zh-TW";
+    const alias = variants.displayAliases?.[other]?.trim();
+    if (alias) {
+      const title = convertChineseScriptForReview(alias, locale) ?? alias;
+      return { title, scriptConversion: title };
+    }
+  }
   return { title: resolveMediaTitle(variants, locale) };
 }

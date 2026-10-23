@@ -47,9 +47,14 @@ Application wiring may compose services, but it must not implement provider norm
 - `providers/ndl-release-client.ts`: NDL/JPRO publication discovery for novels.
 - `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
-- `provider-normalizers.ts`: pure provider payload normalization and cross-provider result deduplication.
-- `media-classification-service.ts`: optional classification enrichment after a work is selected; failure never blocks note creation.
-- `external-media-service.ts`: the single multi-provider orchestration boundary for multilingual discovery, direct provider search, warnings, ranking, and pagination.
+- `provider-normalizers.ts`: pure provider payload normalization, plus a thin call to typed, identity-safe result deduplication; no fuzzy source-ID inference.
+- `media-classification-service.ts`: optional exact-AniList-ID classification enrichment after a work is selected. Title/year matching alone is not evidence of cross-provider identity; failure never blocks note creation.
+- `external-media-service.ts`: the single multi-provider orchestration boundary for enabled sources, warnings, direct lookup, and bounded search sessions. It owns clients and pagination cursors, but not title semantics, entity identity heuristics, or transport throttling.
+- `search-session.ts`: per-query buffered results, verified-ID deduplication across pages and per-provider cursor state; it never writes Markdown.
+- `app/search/multilingual-search.ts`: provider-neutral staged search orchestration with incremental first-result callbacks and partial failure isolation; request budgets are defined in the domain query planner.
+- `domain/search/query-plan.ts`, `chinese-variants.ts`, `ranking.ts`: pure query-plan construction, bounded Chinese substring discovery, scoring and edition-aware ranking.
+- `domain/search/entity-resolution.ts`: single source-identity policy used by search deduplication; overlapping nonconflicting provider IDs, not title/year/format similarity, are required to merge works.
+- `domain/bangumi-book-type.ts`: explicit Book-type evidence shared by Bangumi metadata search and serial-cover candidate discovery; novel and manga are never inferred from a title alone.
 - `media-note-service.ts`: note creation and series-cover download workflow.
 - `title-localization-service.ts`: preview-first per-work title migration with bounded provider I/O and selective frontmatter writes; see docs/PROTOCOL.md for the language contract.
 - `media-update-service.ts`: the shared typed update path used by edit forms and feature submit contributions.
@@ -152,9 +157,9 @@ All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.str
 
 ## Provider-neutral localization boundary
 
-- `domain/media-title-localization.ts`: single typed rule for verified variants, Chinese script conversion, and fallback; the conversion candidate is reused by existing-note migration.
+- `domain/media-title-localization.ts`: single typed rule for verified variants, Chinese script conversion, source-ID-backed nonofficial `displayAliases`, and fallback; the conversion candidate is reused by existing-note migration.
 - `data/media-title-service.ts`: immutable `ExternalMediaResult` adapter, including provenance-aware title selection and searchable aliases; reads the active locale only in a thin integration helper.
-- `data/provider-normalizers.ts`: Bangumi, AniList and Open Library extract provider-specific language evidence, but do not implement their own selection policies.
+- `data/provider-normalizers.ts`: Bangumi, AniList and Open Library extract provider-specific language evidence, but do not implement their own selection policies; Bangumi infobox aliases may carry a distinct nonofficial `displayAliases` provenance and are never promoted to verified `localized` variants.
 - `data/providers/open-library-client.ts`: interface-locale edition preference, not an assertion of an official localized name.
 - `app/anime-list-application.ts`: reapplies the common selector after metadata enrichment before displaying the create-note form; manually edited form titles remain authoritative.
 - The existing-title migration remains opt-in. Provenance-verified translations and script conversions are stored separately for compatibility.
@@ -165,3 +170,13 @@ All active `src/**/*.ts` modules and Obsidian type shims must pass `tsconfig.str
 - `data/media-title-service.ts`: applies ordered language evidence without mutating source names, authors, provider IDs or original variants.
 - `domain/media-title-suggestion.ts`: last-resort cross-provider heuristic suggestions for human review only.
 - `data/cleanup-scan-history.ts`: versioned, task/locale-specific checkpoint persistence independent from Markdown; `ui/cleanup-scan-controls.ts` owns the shared Settings selector. Each migration service accepts an optional file-selection predicate and avoids rewriting unrelated content.
+
+## Search UI and provider latency boundary
+
+- `ui/media-modals.ts` renders current candidates and rejects stale asynchronous generations. It cannot implement translation, fuzzy identity reconciliation or API transport. Search updates are incremental and must not steal keyboard focus.
+- `features/search/pagination.ts` owns the Load more control and DOM row append, consumes `SearchSession`-backed service pages and protects against stale pages. Loading state always releases after success/error for the current request.
+- `data/providers/anilist-client.ts` owns its one physical GraphQL queue, batching/cache and 403/429 cooldown; provider-neutral search must **not** create a second rate limiter or bypass it.
+- `data/providers/bangumi-client.ts` handles Bangumi search/fetch boundaries, validates explicit Book subtype evidence and preserves the subject ID; infobox detail enrichment is an exact-ID request only after user selection.
+- Provider responses are external hints. Newly imported note defaults may use verified provenance rules; already-owned Markdown titles/frontmatter remain authoritative. Any existing-note migration stays a separate opt-in, review-first workflow.
+
+The public API/identity/alias, request-budget and fallback rules are defined in `docs/PROTOCOL.md`; avoid duplicating them in UI components or release-tracking services.

@@ -37,6 +37,35 @@ describe("cross-provider title localization contract", () => {
     }
   });
 
+  it("displays a Bangumi Korean work's own Chinese infobox alias without claiming official localization", () => {
+    const raw = {
+      id: 399671,
+      name: "수요웹툰의 나강림",
+      name_cn: "",
+      infobox: [{
+        key: "别名",
+        value: [
+          { k: "", v: "漫画里的罗康林" },
+          { k: "日版", v: "水曜マンガに俺降臨" },
+          { k: "非官方1", v: "Webtoon Character Na Kang Lim" },
+        ],
+      }],
+    };
+    const chinese = withActiveLocale("zh-TW", () => normalizeBangumiSubject(raw, "manga"));
+    assert.equal(chinese.title, "漫畫裡的羅康林");
+    assert.equal(chinese.originalTitle, "수요웹툰의 나강림");
+    assert.equal(chinese.titleVariants?.displayAliases?.["zh-CN"], "漫画里的罗康林");
+    assert.equal(chinese.titleVariants?.localized?.["zh-TW"], undefined);
+    assert.deepEqual(chinese.titleScriptConversions, { "zh-TW": "漫畫裡的羅康林" });
+    assert.ok(chinese.searchTitles?.includes("漫画里的罗康林"));
+    assert.ok(chinese.searchTitles?.includes("수요웹툰의 나강림"));
+    const korean = localizeExternalMediaResult(chinese, "ko");
+    assert.equal(korean.title, "수요웹툰의 나강림");
+    const markdown = note(chinese);
+    assert.match(markdown, /title: "漫畫裡的羅康林"/);
+    assert.doesNotMatch(markdown, /title_localizations:.*漫畫裡的羅康林/);
+  });
+
   it("selects only provenance-labeled AniList English, Japanese and Korean titles", () => {
     const japanese = {
       id: 10, countryOfOrigin: "JP", title: {
