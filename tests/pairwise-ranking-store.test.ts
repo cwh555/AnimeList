@@ -9,6 +9,9 @@ import { startRankingRound } from "../src/domain/ranking-rounds";
 class FakeAdapter {
   files = new Map<string, ArrayBuffer>();
   failure = false;
+  writeBinaryCalls = 0;
+  processCalls = 0;
+  beforeProcess: ((path: string) => void) | null = null;
   async exists(path: string): Promise<boolean> { return this.files.has(path) || path === ".obsidian"; }
   async mkdir(): Promise<void> { /* already configured */ }
   async readBinary(path: string): Promise<ArrayBuffer> {
@@ -17,8 +20,20 @@ class FakeAdapter {
     return value;
   }
   async writeBinary(path: string, value: ArrayBuffer): Promise<void> {
+    this.writeBinaryCalls += 1;
     if (this.failure) throw new Error("disk full");
     this.files.set(path, value);
+  }
+  async process(path: string, change: (current: string) => string): Promise<string> {
+    this.processCalls += 1;
+    this.beforeProcess?.(path);
+    if (this.failure) throw new Error("disk full");
+    const data = this.files.get(path);
+    if (!data) throw new Error("missing");
+    const current = new TextDecoder().decode(data);
+    const result = change(current);
+    this.put(path, result);
+    return result;
   }
   put(path: string, contents: string): void { this.files.set(path, new TextEncoder().encode(contents).buffer); }
 }
@@ -48,6 +63,41 @@ describe("ranking vault storage", () => {
     await assert.rejects(service.mutate((state) => { state.anime.ordered = ["A", "B"]; }), /another device/);
     assert.deepEqual((await service.load()).anime.ordered, ["A"]);
   });
+  it("uses atomic processing on subsequent writes while preserving the v1 JSON path", async () => {
+    const { app, adapter } = setup();
+    const store = new PairwiseRankingStore(app);
+    await store.mutate((state) => { state.anime.ordered = ["anime/A.md"]; });
+    assert.equal(adapter.writeBinaryCalls, 1, "initial creation may use writeBinary");
+    await store.mutate((state) => { state.anime.ordered.push("anime/B.md"); });
+    assert.equal(adapter.processCalls, 1, "an existing ranking file must use atomic process");
+    assert.equal(adapter.writeBinaryCalls, 1, "the live JSON must not be overwritten directly");
+    assert.deepEqual((await new PairwiseRankingStore(app).load()).anime.ordered, ["anime/A.md", "anime/B.md"]);
+  });
+
+  it("detects a remote edit made inside the atomic read-modify-write window", async () => {
+    const { app, adapter } = setup();
+    const store = new PairwiseRankingStore(app);
+    await store.mutate((state) => { state.anime.ordered = ["A"]; });
+    const path = ".obsidian/animelist-ranking.json";
+    const remote = emptyRankingState();
+    remote.anime.ordered = ["remote-device.md"];
+    const remoteBytes = JSON.stringify(remote) + "\n";
+    adapter.beforeProcess = (target) => {
+      if (target === path) adapter.put(path, remoteBytes);
+    };
+    await assert.rejects(
+      store.mutate((state) => { state.anime.ordered.push("B"); }),
+      /changed on another device/,
+    );
+    assert.equal(new TextDecoder().decode(adapter.files.get(path)), remoteBytes);
+    adapter.beforeProcess = null;
+    await assert.rejects(
+      store.mutate((state) => { state.anime.ordered.push("C"); }),
+      /changed on another device/,
+      "a failed conflict must never advance the local revision",
+    );
+  });
+
   it("retains last saved state when a write fails", async () => {
     const { app, adapter } = setup();
     const service = new PairwiseRankingStore(app);
