@@ -116,6 +116,7 @@ const html = `<!doctype html>
     const poster = (path) => dashboard.querySelector('.al-score-poster[data-file-path="' + path + '"]');
     const lane = (score) => dashboard.querySelector('.al-score-lane[data-score="' + score + '"]');
     const shell = () => dashboard.querySelector('.al-score-dashboard');
+    window.__scoreTouchHarness = { dashboard, poster, lane, applied, opened };
     const selectedCount = () => dashboard.querySelectorAll('.al-score-poster.is-selected').length;
 
     (async () => {
@@ -314,6 +315,42 @@ try {
     testName: "Score Dashboard mobile touch interaction test",
     requireEnvironment: "ANIMELIST_REQUIRE_CHROMIUM",
     viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    interact: async ({ send, sleep }) => {
+      const evaluate = async (expression) => {
+        const output = await send("Runtime.evaluate", { expression, returnByValue: true });
+        if (output.exceptionDetails) throw new Error(output.exceptionDetails.text);
+        return output.result.value;
+      };
+      for (let attempt = 0; attempt < 160; attempt++) {
+        if (await evaluate("document.body.dataset.result") !== "pending") break;
+        await sleep(30);
+      }
+      if (await evaluate("document.body.dataset.result") !== "pass") return;
+      const points = JSON.parse(await evaluate(`JSON.stringify((() => {
+        const { poster, lane } = window.__scoreTouchHarness;
+        const source = poster("Alpha.md"), target = lane("9.0");
+        source.scrollIntoView({ block:"center" });
+        const middle = el => { const r=el.getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 }; };
+        return { source:middle(source), target:middle(target) };
+      })())`));
+      await send("Emulation.setTouchEmulationEnabled", { enabled:true, maxTouchPoints:1 });
+      await send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[points.source] });
+      await sleep(520);
+      const armed = await evaluate('Boolean(document.querySelector(".al-score-drag-preview.is-touch-drag"))');
+      await send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[points.target] });
+      await sleep(50);
+      await send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] });
+      await sleep(220);
+      const after = JSON.parse(await evaluate(`JSON.stringify((() => {
+        const { applied, poster } = window.__scoreTouchHarness;
+        return { count:applied.length, score:poster("Alpha.md")?.dataset.score,
+          overlays:document.querySelectorAll(".al-score-drag-preview,.al-score-lane.is-drop-target").length };
+      })())`));
+      const passed = armed && after.count === 3 && after.score === "9.0" && after.overlays === 0;
+      await evaluate("document.body.dataset.realTouch=" + JSON.stringify(JSON.stringify({ armed, ...after }))
+        + ";document.body.dataset.result=" + JSON.stringify(passed ? "pass" : "fail")
+        + ";document.body.dataset.details=" + JSON.stringify(JSON.stringify({ realTouchArmed:armed, realTouchAfter:after })));
+    },
   });
   await runChromiumDatasetTest({
     html,
