@@ -72,6 +72,19 @@ describe("ranking never reasks strict-transitive comparisons", () => {
     assert.throws(()=>provenRankingBounds(["A","B"],{path:"X",comparisons:{B:"better"}},
       {A:["B","X"],B:["X"]}),/Contradictory/);
   });
+  it("rejects a stale UI answer before it can be applied to another pending pair", () => {
+    const eligible = ["A","B","C","X"].map(item);
+    const list = emptyRankingCollection();
+    list.ordered = ["A","B","C"];
+    list.evidence = legacyRankingEvidence(list.ordered);
+    list.active = { path:"X", comparisons:{} };
+    const displayed = nextRankingPair(list)!;
+    recordRankingEvidence(list.evidence, "A", "X");
+    recordRankingEvidence(list.evidence, "X", "C");
+    assert.notDeepEqual(nextRankingPair(list),displayed);
+    assert.throws(() => decideRanking(list,eligible,"better",displayed), /question changed/);
+    assert.deepEqual(list.active?.comparisons,{});
+  });
   it("never presents known pairs for adversarial votes across full and resumed rounds", () => {
     for (const count of [5,13,33,176]) {
       const eligible = Array.from({length:count},(_,i)=>item("media-"+String(i).padStart(3,"0")));
