@@ -292,8 +292,12 @@ export function prepareRankingRounds(
     }
   }
   const generation = list.roundGeneration ?? 0;
-  list.roundGeneration = generation + 1;
-  if (kind === "full") list.evidence = {};
+  // An append/range operation must not consume a full-rerank matching: two
+  // successive full resets should vary even if incremental inserts intervened.
+  if (kind === "full") {
+    list.roundGeneration = generation + 1;
+    list.evidence = {};
+  }
   const participantSet = new Set(participants);
   const scheduled = diverseRankingOrder(eligible.filter(item => participantSet.has(item.filePath)), generation);
   // Preserve baseline as one sorted run for incremental merge.
