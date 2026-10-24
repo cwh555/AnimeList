@@ -48,6 +48,7 @@ const ZH = {
   externalPath: "貼上本機圖片的絕對路徑（僅 Desktop）",
   linkExternal: "引用原檔，不複製",
   desktopOnly: "Vault 外圖片僅能在原電腦使用，Mobile 無法載入。",
+  rename: "修改名稱", displayName: "角色顯示名稱",
 } as const;
 const EN = {
   title: "Characters", add: "Add character", search: "Search character names", find: "Search",
@@ -72,6 +73,7 @@ const EN = {
   assignToCharacter: "Add image to character",
   externalPath: "Absolute local file path (Desktop only)", linkExternal: "Link without copying",
   desktopOnly: "External files are only available on the original desktop.",
+  rename: "Rename", displayName: "Display name",
 } satisfies Record<keyof typeof ZH, string>;
 const JA = { title:"キャラクター", add:"キャラクターを追加", search:"キャラクター名を検索", find:"検索",
   manual:"手動追加", select:"作品からキャラクターを選択", loading:"読み込み中…", empty:"キャラクターがまだありません。",
@@ -84,7 +86,8 @@ const JA = { title:"キャラクター", add:"キャラクターを追加", sear
   related:"この作品の追加済みキャラクター", searchAction:"キャラクターを検索", saved:"追加しました",
   library:"キャラクター",allPictures:"全キャラクター画像",ranking:"キャラクターランキング",beginRanking:"比較を開始",continueRanking:"比較を続行",resolveRanking:"未確定を解決",restartRanking:"再ランキング",restartConfirm:"すべてのキャラクターを再比較しますか？",comparePrompt:"どちらが好き？",skip:"スキップ",cancel:"キャンセル",
   assignToCharacter:"キャラクターに画像を追加",
-  externalPath:"ローカル画像の絶対パス（Desktop）",linkExternal:"コピーせず参照",desktopOnly:"外部画像は元のデスクトップでのみ利用できます。"
+  externalPath:"ローカル画像の絶対パス（Desktop）",linkExternal:"コピーせず参照",desktopOnly:"外部画像は元のデスクトップでのみ利用できます。",
+  rename:"名前を変更",displayName:"表示名"
 } satisfies Record<keyof typeof ZH, string>;
 const KO = {title:"캐릭터", add:"캐릭터 추가", search:"캐릭터 이름 검색", find:"검색",
   manual:"직접 추가",select:"작품에서 선택",loading:"불러오는 중…",empty:"아직 수집한 캐릭터가 없습니다.",
@@ -97,7 +100,8 @@ const KO = {title:"캐릭터", add:"캐릭터 추가", search:"캐릭터 이름 
   searchAction:"캐릭터 검색",saved:"수집함",
   library:"캐릭터",allPictures:"모든 캐릭터 이미지",ranking:"캐릭터 순위",beginRanking:"비교 시작",continueRanking:"비교 계속",resolveRanking:"미결정 순위",restartRanking:"다시 순위 지정",restartConfirm:"모든 캐릭터를 다시 비교할까요?",comparePrompt:"어떤 캐릭터가 더 좋나요?",skip:"건너뛰기",cancel:"취소",
   assignToCharacter:"캐릭터에 이미지 추가",
-  externalPath:"이미지의 절대 경로(Desktop)",linkExternal:"복사 없이 참조",desktopOnly:"외부 이미지는 원래 데스크톱에서만 사용할 수 있습니다."
+  externalPath:"이미지의 절대 경로(Desktop)",linkExternal:"복사 없이 참조",desktopOnly:"외부 이미지는 원래 데스크톱에서만 사용할 수 있습니다.",
+  rename:"이름 변경",displayName:"표시 이름"
 } satisfies Record<keyof typeof ZH, string>;
 const CN = { title:"Characters",add:"收藏角色",search:"搜索角色名称",find:"搜索",manual:"手动添加",
   select:"从作品选择角色",loading:"正在获取角色…",empty:"还没有收藏角色。可以从作品选择或搜索。",
@@ -110,7 +114,8 @@ const CN = { title:"Characters",add:"收藏角色",search:"搜索角色名称",f
   searchAction:"搜索角色",saved:"已加入 Characters",
   library:"角色收藏",allPictures:"所有角色插画",ranking:"角色排名",beginRanking:"开始比较",continueRanking:"继续比较",resolveRanking:"处理未定排名",restartRanking:"重新排序",restartConfirm:"确定重新比较所有角色？",comparePrompt:"更喜欢哪个角色？",skip:"跳过",cancel:"取消",
   assignToCharacter:"将图片收藏到角色",
-  externalPath:"本机图片的绝对路径（仅 Desktop）",linkExternal:"引用原文件，不复制",desktopOnly:"外部图片仅可在原电脑上查看。"
+  externalPath:"本机图片的绝对路径（仅 Desktop）",linkExternal:"引用原文件，不复制",desktopOnly:"外部图片仅可在原电脑上查看。",
+  rename:"修改名称",displayName:"角色显示名称"
 } satisfies Record<keyof typeof ZH, string>;
 const catalog = defineTextCatalog("characters", ZH);
 registerLocaleMessages("characters", "en", EN);

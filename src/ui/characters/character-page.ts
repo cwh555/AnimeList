@@ -50,6 +50,7 @@ function msg(error: unknown): string { return error instanceof Error ? error.mes
 
 function imageResource(host: AnimeListFeatureHost, image: string, sourcePath: string): string {
   if (/^https:\/\//i.test(image)) return image;
+  if (/^file:\/\//i.test(image)) return externalImagesForHost(host).get(image);
   const file = host.app.metadataCache.getFirstLinkpathDest(image, sourcePath)
     ?? host.app.vault.getAbstractFileByPath(image);
   return file instanceof TFile
@@ -103,6 +104,17 @@ async function renderDetails(
       .catch(error => new Notice(t("failed", { reason: msg(error) })));
   });
   intro.appendChild(tier);
+  const nameRow = makeEl("div", "al-character-rename-row");
+  const name = makeEl("input");
+  name.type = "text";
+  name.value = record.name;
+  name.setAttribute("aria-label", t("displayName"));
+  nameRow.append(name, button(t("rename"), () => {
+    if (!name.value.trim() || name.value.trim() === record.name) return;
+    void service.setName(record.path, name.value).then(() => host.refreshViews())
+      .catch(error => new Notice(t("failed", { reason: msg(error) })));
+  }));
+  intro.appendChild(nameRow);
   intro.appendChild(button(t("open"), () => { void host.openMediaFile(record.path); }));
   header.appendChild(intro);
   root.appendChild(header);
@@ -210,6 +222,10 @@ export async function renderCharacterPage(
 ): Promise<void> {
   const state = pageState(host);
   const records = await service.list();
+  if (hasDesktopFileBridge()) {
+    await Promise.allSettled(records.filter(record => /^file:\/\//i.test(record.portrait))
+      .map(record => externalImagesForHost(host).prepare(record.portrait)));
+  }
   if (context.signal.aborted || !container.isConnected) return;
   const redraw = (): void => {
     void renderCharacterPage(host, service, container, context);

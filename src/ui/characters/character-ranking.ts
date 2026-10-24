@@ -136,13 +136,19 @@ export async function renderCharacterRanking(
   const positions = new Map(projection.possible.map(p => [p.path, p]));
   const confirmed = new Map(projection.confirmed.map(p => [p.path, p.position]));
   const rows = makeEl("div", "al-character-ranking-list");
-  for (const record of characters) {
+  const displayed = [...characters].sort((a, b) => {
+    const x = confirmed.get(a.path) ?? positions.get(a.path)?.first ?? Number.POSITIVE_INFINITY;
+    const y = confirmed.get(b.path) ?? positions.get(b.path)?.first ?? Number.POSITIVE_INFINITY;
+    return x - y || a.name.localeCompare(b.name);
+  });
+  for (const record of displayed) {
     const position = confirmed.get(record.path), bounds = positions.get(record.path);
     const row = action(record.name, () => open(record.path));
     row.classList.add("al-character-ranking-row");
     const positionText = position != null ? "#" + position
       : bounds ? "#" + bounds.first + "–" + bounds.last : "—";
     row.prepend(makeEl("span", "al-character-rank", positionText));
+    row.appendChild(face(record, host));
     rows.appendChild(row);
   }
   container.appendChild(rows);

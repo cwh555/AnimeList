@@ -112,6 +112,41 @@ export class CharacterLibraryService {
     });
   }
 
+  async renameAppearance(from: string, to: string): Promise<void> {
+    if (!from || !to || from === to) return;
+    await this.queue(async () => {
+      const matching = (await this.list()).filter(item => item.appearances.includes(from));
+      for (const record of matching) {
+        const file = this.app.vault.getAbstractFileByPath(record.path);
+        if (!(file instanceof TFile)) continue;
+        const appearances = [...new Set(record.appearances.map(path => path === from ? to : path))];
+        await this.app.fileManager.processFrontMatter(file, fm => {
+          fm.character_appearances = appearances;
+        });
+        if (this.staged.has(record.id)) this.staged.set(record.id, { ...record, appearances });
+      }
+    });
+  }
+
+  renameCharacterPath(oldPath: string, newPath: string): void {
+    for (const [id, record] of this.staged) {
+      if (record.path === oldPath) this.staged.set(id, { ...record, path: newPath });
+    }
+  }
+
+  async setName(path: string, name: string): Promise<void> {
+    const next = name.trim();
+    if (!next) throw new Error("Character name is required");
+    await this.queue(async () => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile) || !file.path.startsWith(this.folder() + "/")) throw new Error("Character not found");
+      await this.app.fileManager.processFrontMatter(file, fm => { fm.character_name = next; });
+      for (const [id, record] of this.staged) {
+        if (record.path === path) this.staged.set(id, { ...record, name: next });
+      }
+    });
+  }
+
   async setTier(path: string, tier: CharacterTier): Promise<void> {
     await this.queue(async () => {
       const file = this.app.vault.getAbstractFileByPath(path);

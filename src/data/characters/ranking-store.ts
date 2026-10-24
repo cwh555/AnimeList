@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { emptyRankingCollection, type RankingCollection } from "../../domain/pairwise-ranking";
+import { emptyRankingCollection, renameRankingPath, type RankingCollection } from "../../domain/pairwise-ranking";
 import { saveRankingRevision } from "../pairwise-ranking/atomic-write";
 import { recoverStoredRankingRound } from "../pairwise-ranking/round-schema";
 
@@ -47,6 +47,15 @@ export class CharacterRankingStore {
       this.state = checked(JSON.parse(this.original) as unknown);
     } else this.state = initial();
     return this.state.characters;
+  }
+  async rename(from: string, to: string): Promise<void> {
+    if (!from || !to || from === to) return;
+    await this.mutate(list => {
+      renameRankingPath({
+        version: 1, anime: list,
+        manga: emptyRankingCollection(), novel: emptyRankingCollection(),
+      }, from, to);
+    });
   }
   async mutate(edit: (rank: RankingCollection) => void): Promise<RankingCollection> {
     let result: RankingCollection | null = null;
