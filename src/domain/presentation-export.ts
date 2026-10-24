@@ -1,4 +1,4 @@
-import type { MediaItem, MediaType } from "./media-types";
+import type { MediaItem } from "./media-types";
 import { buildScoreDashboardData, type ScoreDashboardMediaType } from "./score-dashboard/model";
 import {
   completedRankingItems, rankingPositionProjection, type RankingState,
