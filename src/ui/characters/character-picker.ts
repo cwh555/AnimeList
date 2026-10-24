@@ -72,7 +72,9 @@ export class CharacterPickerModal extends AnimeListModal {
       void api.fromSubject(this.subjectId, this.appearance ?? "").then(
         characters => {
           if (revision !== this.revision) return;
-          return this.renderCandidates(results, characters);
+          void this.renderCandidates(results, characters).catch(error => {
+            if (revision === this.revision) results.replaceChildren(makeEl("p", "", t("failed", { reason: message(error) })));
+          });
         },
         error => {
           if (revision === this.revision) results.replaceChildren(makeEl("p", "", t("failed", { reason: message(error) })));
