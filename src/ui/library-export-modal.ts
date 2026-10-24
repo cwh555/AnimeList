@@ -77,6 +77,11 @@ export class LibraryExportModal extends AnimeListModal {
   private presentationText: HTMLTextAreaElement | null = null;
   private presentationImage: HTMLImageElement | null = null;
   private presentationNote: HTMLElement | null = null;
+  private presentationPager: HTMLElement | null = null;
+  private presentationPagerLabel: HTMLElement | null = null;
+  private presentationPagePrevious: HTMLButtonElement | null = null;
+  private presentationPageNext: HTMLButtonElement | null = null;
+  private presentationPageIndex = 0;
   private presentationOutput = "";
   private pngPages: Blob[] | null = null;
   private previewUrl: string | null = null;
@@ -322,6 +327,21 @@ export class LibraryExportModal extends AnimeListModal {
     this.previewUrl = null;
   }
 
+  private showPngPage(index: number): void {
+    const pages = this.pngPages;
+    if (!pages?.length || !this.presentationImage) return;
+    this.presentationPageIndex = Math.max(0, Math.min(index, pages.length - 1));
+    this.releasePreview();
+    this.previewUrl = URL.createObjectURL(pages[this.presentationPageIndex]);
+    this.presentationImage.src = this.previewUrl;
+    if (this.presentationPager) this.presentationPager.hidden = pages.length < 2;
+    if (this.presentationPagerLabel) {
+      this.presentationPagerLabel.textContent = `${this.presentationPageIndex + 1} / ${pages.length}`;
+    }
+    if (this.presentationPagePrevious) this.presentationPagePrevious.disabled = this.presentationPageIndex === 0;
+    if (this.presentationPageNext) this.presentationPageNext.disabled = this.presentationPageIndex === pages.length - 1;
+  }
+
   private buildPresentationSurface(body: HTMLElement): void {
     const controls = makeEl("section", "al-presentation-export-options");
     const preview = makeEl("section", "al-presentation-export-preview");
@@ -393,7 +413,25 @@ export class LibraryExportModal extends AnimeListModal {
     Object.assign(image.style, {
       display: "none", width: "100%", maxHeight: "48dvh", objectFit: "contain",
     });
-    preview.append(heading, note, output, image);
+    const pager = makeEl("nav", "al-presentation-export-pager");
+    pager.setAttribute("aria-label", "PNG pages");
+    Object.assign(pager.style, { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" });
+    const previous = makeEl("button", "al-secondary-button", "‹");
+    previous.type = "button";
+    previous.setAttribute("aria-label", "Previous PNG page");
+    previous.addEventListener("click", () => this.showPngPage(this.presentationPageIndex - 1));
+    const pageLabel = makeEl("span", "", "");
+    const next = makeEl("button", "al-secondary-button", "›");
+    next.type = "button";
+    next.setAttribute("aria-label", "Next PNG page");
+    next.addEventListener("click", () => this.showPngPage(this.presentationPageIndex + 1));
+    pager.append(previous, pageLabel, next);
+    pager.hidden = true;
+    preview.append(heading, note, output, image, pager);
+    this.presentationPager = pager;
+    this.presentationPagerLabel = pageLabel;
+    this.presentationPagePrevious = previous;
+    this.presentationPageNext = next;
     this.presentationText = output;
     this.presentationImage = image;
     this.presentationNote = note;
@@ -430,6 +468,7 @@ export class LibraryExportModal extends AnimeListModal {
     const epoch = ++this.renderEpoch;
     this.pngPages = null;
     this.releasePreview();
+    if (this.presentationPager) this.presentationPager.hidden = true;
     const note = this.presentationNote;
     const image = this.presentationImage;
     const text = this.presentationText;
@@ -462,8 +501,7 @@ export class LibraryExportModal extends AnimeListModal {
         const png = await rasterizePresentation(this.host, doc, this.presentation.theme);
         if (epoch !== this.renderEpoch) return;
         this.pngPages = png.pages;
-        this.previewUrl = URL.createObjectURL(png.pages[0]);
-        image.src = this.previewUrl;
+        this.showPngPage(0);
         Object.assign(image.style, { display: "block" });
         note.textContent = libraryExportText("presentationPages", {
           count: png.pages.length, missing: png.missingCovers,
@@ -493,6 +531,10 @@ export class LibraryExportModal extends AnimeListModal {
     this.presentationText = null;
     this.presentationImage = null;
     this.presentationNote = null;
+    this.presentationPager = null;
+    this.presentationPagerLabel = null;
+    this.presentationPagePrevious = null;
+    this.presentationPageNext = null;
     this.presentationButtons.length = 0;
     this.pngPages = null;
     this.contentEl.replaceChildren();
