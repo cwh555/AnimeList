@@ -11,7 +11,7 @@ import type { WorkspacePageRenderContext } from "../workspace-contracts";
 import { CharacterPickerModal } from "./character-picker";
 import { CharacterRankingStore } from "../../data/characters/ranking-store";
 import { renderCharacterRanking } from "./character-ranking";
-import { buildImageGalleryWork } from "../../domain/image-gallery";
+import { ImageGalleryService } from "../../data/image-gallery-service";
 import { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "../image-gallery-renderer";
 import { characterRankingItems } from "../../domain/characters/ranking-items";
 import { externalImageUri } from "../../domain/characters/external-image";
@@ -27,6 +27,13 @@ interface CharacterPageState {
 
 const pageStates = new WeakMap<object, CharacterPageState>();
 const rankingStores = new WeakMap<object, CharacterRankingStore>();
+const galleryServices = new WeakMap<object, ImageGalleryService>();
+function galleryService(host: AnimeListFeatureHost): ImageGalleryService {
+  let service = galleryServices.get(host);
+  if (!service) { service = new ImageGalleryService(host); galleryServices.set(host, service); }
+  return service;
+}
+const activeRender = new WeakMap<object, number>();
 function rankingStore(host: AnimeListFeatureHost): CharacterRankingStore {
   let store = rankingStores.get(host);
   if (!store) { store = new CharacterRankingStore(host.app); rankingStores.set(host, store); }
@@ -221,12 +228,16 @@ export async function renderCharacterPage(
   container: HTMLElement, context: WorkspacePageRenderContext,
 ): Promise<void> {
   const state = pageState(host);
+  const generation = (activeRender.get(container) ?? 0) + 1;
+  activeRender.set(container, generation);
+  const isStale = (): boolean => context.signal.aborted
+    || activeRender.get(container) !== generation || !container.isConnected;
   const records = await service.list();
   if (hasDesktopFileBridge()) {
     await Promise.allSettled(records.filter(record => /^file:\/\//i.test(record.portrait))
       .map(record => externalImagesForHost(host).prepare(record.portrait)));
   }
-  if (context.signal.aborted || !container.isConnected) return;
+  if (isStale()) return;
   const redraw = (): void => {
     void renderCharacterPage(host, service, container, context);
   };
@@ -261,19 +272,14 @@ export async function renderCharacterPage(
     container.replaceChildren(root);
     const content = makeEl("div");
     root.appendChild(content);
-    const galleryWorks = await Promise.all(records.map(async record => {
-      const file = host.app.vault.getAbstractFileByPath(record.path);
-      if (!(file instanceof TFile)) return null;
-      const markdown = await host.app.vault.cachedRead(file);
-      if (hasDesktopFileBridge()) {
-        const external = findImageSectionBlocks(markdown).flatMap(block => block.paths)
-          .filter(path => /^file:\/\//i.test(path));
-        await Promise.allSettled(external.map(path => externalImagesForHost(host).prepare(path)));
-      }
-      const eligible = characterRankingItems([record])[0];
-      return buildImageGalleryWork(eligible, markdown);
-    }));
-    if (context.signal.aborted || !container.isConnected) return;
+    const galleryWorks = await galleryService(host).collect(characterRankingItems(records));
+    if (isStale()) return;
+    if (hasDesktopFileBridge()) {
+      const externals = galleryWorks.flatMap(work => work.images.map(image => image.path))
+        .filter(path => /^file:\/\//i.test(path));
+      await Promise.allSettled(externals.map(path => externalImagesForHost(host).prepare(path)));
+    }
+    if (isStale()) return;
     const imageService = imageSectionServiceForHost(host);
     renderImageGallery(content, galleryWorks.filter(work => work !== null), {
       ...DEFAULT_IMAGE_GALLERY_STATE, type: "all", mode: "all",
