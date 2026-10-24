@@ -41,6 +41,7 @@
     "test:browser:workspace-actions": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-workspace-header-actions.mjs",
     "test:browser:score-mobile": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-rating-input-interactions.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-rating-empty-state.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-dashboard-mobile-interactions.mjs",
     "test:browser:ranking": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-ranking-interactions.mjs",
+    "test:browser:characters": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-characters-ui.mjs",
     "test:browser:ranking-drag": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-ranking-drag-preview.mjs",
     "test:browser:score-ranking": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-ranking-workspace.mjs",
     "test:browser:rating": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-rating-input-interactions.mjs && ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-rating-empty-state.mjs",

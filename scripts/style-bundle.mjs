@@ -10,6 +10,7 @@ export const STYLE_SOURCES = Object.freeze([
   "styles/workspace.css",
   "styles/workspace-material.css",
   "styles/image-gallery.css",
+  "styles/characters.css",
   "styles/timeline.css",
   "styles/timeline-workspace.css",
   "styles/serial-reading.css",
