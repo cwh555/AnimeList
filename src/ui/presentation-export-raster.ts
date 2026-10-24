@@ -186,6 +186,13 @@ function drawScoreSection(
   lineText(ctx, String(section.cards.length), x + PRESENTATION_SCORE_LABEL_WIDTH / 2,
     section.y + section.height / 2 + 22, PRESENTATION_SCORE_LABEL_WIDTH - 8, 12);
   ctx.textAlign = "left";
+  if (section.cards.length === 0) {
+    ctx.fillStyle = p.muted;
+    lineText(ctx, scoreDashboardText.emptyLane,
+      x + PRESENTATION_SCORE_LABEL_WIDTH + 20,
+      section.y + section.height / 2 + 5,
+      w - PRESENTATION_SCORE_LABEL_WIDTH - 40, 14);
+  }
 }
 function drawRankingSection(
   ctx: CanvasRenderingContext2D, section: PresentationPage["sections"][number], p: Palette,
