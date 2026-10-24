@@ -80,6 +80,7 @@ export const TEST_TARGETS = [
   { path: "tests/pairwise-ranking.test.ts", kind: "test", suite: "unit", features: ["ranking"], smoke: true },
   { path: "tests/ranking-rounds.test.ts", kind: "test", suite: "unit", features: ["ranking"] },
   { path: "tests/ranking-evidence-scheduler.test.ts", kind: "test", suite: "unit", features: ["ranking"] },
+  { path: "tests/ranking-resolution.test.ts", kind: "test", suite: "unit", features: ["ranking"] },
   { path: "tests/pairwise-ranking-store.test.ts", kind: "test", suite: "integration", features: ["ranking", "markdown"] },
   { path: "tests/pairwise-ranking-status.test.ts", kind: "test", suite: "integration", features: ["ranking", "progress"] },
   { path: "scripts/check-ranking-test-vault-fixtures.mjs", kind: "script", suite: "contract", features: ["ranking", "test-vault"] },

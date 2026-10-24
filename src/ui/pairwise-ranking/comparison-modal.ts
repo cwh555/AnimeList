@@ -58,9 +58,13 @@ export class RankingComparisonModal extends AnimeListModal {
 
   private async refresh(): Promise<void> {
     try {
-      const state = await this.options.store.load();
-      this.list = JSON.parse(JSON.stringify(state[this.options.type])) as RankingCollection;
-      reconcileRanking(this.list, this.options.eligible);
+      // Persist inferred (previously answered) steps before displaying a pair.
+      // This keeps the modal's undo snapshots byte-for-byte aligned with the
+      // saved collection and avoids replaying a question already proven.
+      const state = await this.options.store.mutate((draft) => {
+        reconcileRanking(draft[this.options.type], this.options.eligible);
+      });
+      this.list = structuredClone(state[this.options.type]);
       if (!this.closed) this.render();
     } catch (error) {
       this.fail(error);
@@ -149,14 +153,14 @@ export class RankingComparisonModal extends AnimeListModal {
         makeEl("span", "al-ranking-choice-title", name),
       );
       card.addEventListener("click", () => {
-        void this.change((list) => { decideRanking(list, this.options.eligible, answer); });
+        void this.change((list) => { decideRanking(list, this.options.eligible, answer, pair ?? undefined); });
       });
       choices.appendChild(card);
     }
     const toolbar = makeEl("div", "al-ranking-dialog-toolbar");
     if (pair) {
       const skip = action(t("skip"), "skip-forward", () => {
-        void this.change((list) => { decideRanking(list, this.options.eligible, "skip"); });
+        void this.change((list) => { decideRanking(list, this.options.eligible, "skip", pair ?? undefined); });
       });
       skip.addClass("al-ranking-skip");
       toolbar.append(skip);

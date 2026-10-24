@@ -5,6 +5,7 @@ import {
 } from "./ranking-rounds";
 export { roundProgress } from "./ranking-rounds";
 import { diverseRankingOrder, rankingSeriesKey } from "./ranking-scheduler";
+import { provenRankingBounds, resolveProvenRoundPairs } from "./ranking-resolution";
 import {
   projectRankingPositions, certifiedAbsoluteRankingPositions,
   type RankingPositionProjection, type AbsoluteRankingPosition,
@@ -75,16 +76,7 @@ export function completedRankingItems(items: readonly MediaItem[], type: MediaTy
 }
 
 export function rankingBounds(list: RankingCollection, attempt: RankingAttempt): RankingBounds {
-  let first = 0;
-  let last = list.ordered.length;
-  for (const [path, decision] of Object.entries(attempt.comparisons)) {
-    const index = list.ordered.indexOf(path);
-    if (index < 0) continue;
-    if (decision === "better") last = Math.min(last, index);
-    if (decision === "worse") first = Math.max(first, index + 1);
-  }
-  if (first > last) throw new Error("Conflicting ranking comparisons. Recompare this item.");
-  return { first, last };
+  return provenRankingBounds(list.ordered, attempt, list.evidence);
 }
 
 export function nextRankingPair(list: RankingCollection): RankingPair | null {
@@ -168,6 +160,7 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
     mapRankingRound(list.round, (path) => allowed.has(path) ? path : null);
     const finished = advanceRound(list.round);
     if (finished) finishRankingRound(list, finished);
+    else settleProvenRound(list);
   }
   list.ordered = [...new Set(list.ordered.filter((path) => allowed.has(path)))];
   const ranked = new Set(list.ordered);
@@ -188,6 +181,7 @@ export function reconcileRanking(list: RankingCollection, eligible: readonly Med
   if (list.active) {
     list.active = clean(list.active);
     delete list.pending[list.active.path];
+    if (!list.round) settleActive(list);
   }
 }
 
@@ -246,6 +240,13 @@ function finishRankingRound(list: RankingCollection, sequence: string[]): void {
   }
   for (const path of list.ordered) delete list.pending[path];
   settleUnambiguousPending(list);
+}
+
+/** Advance only outcomes already provable; keep real user answers separate. */
+function settleProvenRound(list: RankingCollection): void {
+  if (!list.round) return;
+  const completed = resolveProvenRoundPairs(list.round, list.evidence);
+  if (completed) finishRankingRound(list, completed);
 }
 
 /**
@@ -309,6 +310,7 @@ export function prepareRankingRounds(
     Object.fromEntries(eligible.map(item => [item.filePath, rankingSeriesKey(item)])));
   const finished = advanceRound(list.round);
   if (finished) finishRankingRound(list, finished);
+  else settleProvenRound(list);
   return Boolean(nextRankingPair(list)) || participants.length > 0;
 }
 
@@ -366,9 +368,19 @@ export function decideRanking(
   list: RankingCollection,
   eligible: readonly MediaItem[],
   choice: RankingChoice,
+  expectedPair?: RankingPair,
 ): boolean {
+  // A saved round may contain old, already-proven pairs. Drain them before
+  // accepting a new user choice rather than asking for contradictory evidence.
+  if (list.round) settleProvenRound(list);
   const pair = nextRankingPair(list);
   if (!pair) return false;
+  // Reject a stale modal choice rather than applying it to a different pair
+  // that became current after another mutation or automatic proof resolution.
+  if (expectedPair && (pair.candidate !== expectedPair.candidate
+    || pair.reference !== expectedPair.reference)) {
+    throw new Error("Ranking question changed; reopen the comparison.");
+  }
   if (list.round) {
     const result = answerRound(list.round, choice);
     if (result.better && result.worse) {
@@ -382,6 +394,7 @@ export function decideRanking(
       };
     }
     if (result.done) finishRankingRound(list, result.done);
+    else settleProvenRound(list);
     return true;
   }
   if (!list.active) return false;

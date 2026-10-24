@@ -107,7 +107,7 @@ export function nextRoundPair(round: RankingRound): RoundPair | null {
   return { candidate: current.left[0], reference: current.right[0] };
 }
 export function answerRound(
-  round: RankingRound, choice: RoundChoice,
+  round: RankingRound, choice: RoundChoice, countAsAnswer = true,
 ): { done: string[] | null; skipped: string | null; against: string | null; better: string | null; worse: string | null } {
   const selectedIndex = nextJobIndex(round);
   if (selectedIndex < 0) return { done: advanceRound(round), skipped: null, against: null, better: null, worse: null };
@@ -125,7 +125,7 @@ export function answerRound(
     skipped = removeLeft ? current.left.shift() : current.right.shift();
     against = removeLeft ? current.right[0] : current.left[0];
   }
-  round.comparisons += 1;
+  if (countAsAnswer) round.comparisons += 1;
   round.cursor = (selectedIndex + 1) % round.jobs.length;
   return { done: advanceRound(round), skipped, against,
     better: choice === "better" ? before : choice === "worse" ? after : null,
