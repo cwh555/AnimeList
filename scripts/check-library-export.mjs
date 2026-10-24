@@ -16,6 +16,8 @@ await build({
     contents: `
       export { LibraryExportModal } from "./src/ui/library-export-modal";
       export { TFile } from "obsidian";
+      export { buildPresentationDocument } from "./src/domain/presentation-export";
+      export { planPresentationPages } from "./src/domain/presentation-export-layout";
     `,
     resolveDir: root,
     loader: "ts",
@@ -306,9 +308,22 @@ try {
     checkCanvas.height = imagePreview.naturalHeight;
     const checker = checkCanvas.getContext("2d");
     checker.drawImage(imagePreview, 0, 0);
-    // Within the first Scoreboard cover rectangle after the 1.5x raster scale.
-    const pixel = checker.getImageData(190, 240, 1, 1).data;
-    details.presentationPngContainsActualArtwork = pixel[0] > 180 && pixel[1] < 100 && pixel[2] < 100;
+    // Sample a known cover using actual presentation geometry, not hard-coded pixels.
+    const projection = AnimeListLibraryExport.buildPresentationDocument(items, {
+      kind: "scoreboard", mediaType: "anime",
+    });
+    const pagePlan = AnimeListLibraryExport.planPresentationPages(projection);
+    const placement = pagePlan.pages[0].sections.flatMap(section => section.cards)
+      .find(card => card.entry.item.filePath === items[0].filePath);
+    const pixel = placement
+      ? checker.getImageData(
+          Math.floor((placement.x + placement.width / 2) * pagePlan.pixelRatio),
+          Math.floor((placement.y + placement.height / 2) * pagePlan.pixelRatio),
+          1, 1,
+        ).data
+      : null;
+    details.presentationPngContainsActualArtwork = pixel != null
+      && pixel[0] > 180 && pixel[1] < 100 && pixel[2] < 100;
   } else {
     details.presentationPngContainsActualArtwork = false;
   }
