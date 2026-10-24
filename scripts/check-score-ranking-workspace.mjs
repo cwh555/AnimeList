@@ -28,7 +28,7 @@ try {
         ctx.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "stub" }));
         ctx.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
           loader: "js",
-          contents: 'export class ItemView {constructor(){this.contentEl=document.createElement("div")}} export class TAbstractFile{} export class TFile extends TAbstractFile{} export class Notice{} export class Menu{addItem(){return this}showAtPosition(){}} export class Modal{constructor(){this.contentEl=document.createElement("div")}open(){}close(){}} export function setIcon(){} export function normalizePath(x){return x}',
+          contents: 'export class ItemView {constructor(){this.contentEl=document.createElement("div")}} export class TAbstractFile{} export class TFile extends TAbstractFile{} export class Notice{} export class Menu{addItem(){return this}showAtPosition(){}} export class Modal{constructor(){this.contentEl=document.createElement("div")}open(){}close(){}} export function setIcon(){} export function normalizePath(x){return x} export async function requestUrl(){throw new Error("Unexpected remote request in workspace fixture")}',
         }));
       },
     }],
