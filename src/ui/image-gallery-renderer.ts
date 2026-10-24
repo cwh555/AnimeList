@@ -164,7 +164,7 @@ function createImageTile(
   if (adapters.onAssignCharacter) {
     const character = makeEl("button", "al-gallery-source-button");
     character.type = "button";
-    character.title = "Add to Characters";
+    character.title = "Add to characters";
     character.setAttribute("aria-label", character.title);
     setAnimeListIcon(character, "contact-round");
     character.addEventListener("click", event => {

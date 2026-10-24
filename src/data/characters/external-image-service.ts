@@ -30,7 +30,7 @@ export class ExternalImageService {
     const already = this.cached.get(uri);
     if (already) { already.accessed = ++this.tick; return already.resource; }
     const ongoing = this.pending.get(uri);
-    if (ongoing) return ongoing;
+    if (ongoing !== undefined) return ongoing;
     const work = this.load(uri).finally(() => this.pending.delete(uri));
     this.pending.set(uri, work);
     return work;
