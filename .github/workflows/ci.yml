@@ -36,6 +36,8 @@ jobs:
         run: npm run test:browser:title-localization
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Validate Characters cards, gallery and ranking in mobile Chromium
+        run: npm run test:browser:characters
       - name: Run shared modal UI protocol in Chromium
         run: npm run test:browser:ui
       - name: Run Lightbox layout and interaction regressions in Chromium
