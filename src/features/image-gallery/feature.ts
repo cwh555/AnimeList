@@ -12,6 +12,8 @@ import {
 import { makeEl, setAnimeListIcon } from "../../ui/ui-helpers";
 import type { WorkspacePageRenderContext } from "../../ui/workspace-contracts";
 import { imageGalleryText } from "./text";
+import { CharacterImageAssignmentModal } from "../../ui/characters/character-assign-image";
+import { characterService } from "../characters/feature";
 
 const STATES = new WeakMap<object, ImageGalleryUiState>();
 
@@ -50,6 +52,9 @@ async function renderGalleryPage(
     },
     openSource: (path) => host.openMediaFile(path),
     onStateChange: (state) => STATES.set(host, { ...state }),
+    onAssignCharacter: image => {
+      new CharacterImageAssignmentModal(host, characterService(host), image.path).open();
+    },
   });
 }
 

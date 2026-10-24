@@ -7,7 +7,7 @@ import { makeEl } from "../../ui/ui-helpers";
 import { characterText as t } from "./text";
 
 const services = new WeakMap<object, CharacterLibraryService>();
-function characterService(host: AnimeListFeatureHost): CharacterLibraryService {
+export function characterService(host: AnimeListFeatureHost): CharacterLibraryService {
   let service = services.get(host);
   if (!service) {
     service = new CharacterLibraryService(host.app, () => host.settings.libraryRoot);

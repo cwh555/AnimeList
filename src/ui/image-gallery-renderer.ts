@@ -30,6 +30,9 @@ export interface ImageGalleryUiAdapters {
   openLightbox(images: readonly ImageGalleryImage[], startIndex: number): void;
   openSource(path: string): void | Promise<void>;
   onStateChange?(state: ImageGalleryUiState): void;
+  onAssignCharacter?(image: ImageGalleryImage): void;
+  hideMediaFilters?: boolean;
+  pageTitle?: string;
 }
 
 export const DEFAULT_IMAGE_GALLERY_STATE: ImageGalleryUiState = {
@@ -158,6 +161,19 @@ function createImageTile(
     void adapters.openSource(image.sourcePath);
   });
   overlay.appendChild(source);
+  if (adapters.onAssignCharacter) {
+    const character = makeEl("button", "al-gallery-source-button");
+    character.type = "button";
+    character.title = "Add to Characters";
+    character.setAttribute("aria-label", character.title);
+    setAnimeListIcon(character, "contact-round");
+    character.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      adapters.onAssignCharacter?.(image);
+    });
+    overlay.appendChild(character);
+  }
   tile.append(open, overlay);
   return tile;
 }
@@ -296,7 +312,7 @@ export function renderImageGallery(
   const root = makeEl("section", "al-image-gallery-page");
   const header = makeEl("header", "al-gallery-page-header");
   const copy = makeEl("div", "al-gallery-page-copy");
-  copy.appendChild(makeEl("h1", "al-gallery-page-title", imageGalleryText("title")));
+  copy.appendChild(makeEl("h1", "al-gallery-page-title", adapters.pageTitle ?? imageGalleryText("title")));
   const summary = makeEl("div", "al-gallery-page-summary");
   header.append(copy, summary);
 
@@ -342,6 +358,7 @@ export function renderImageGallery(
   const columnsOutput = makeEl("output", "", String(state.columns));
   columns.append(columnsLabel, columnsInput, columnsOutput);
   filters.append(typeFilters, search, columns);
+  if (adapters.hideMediaFilters) typeFilters.hidden = true;
 
   const content = makeEl("div", "al-gallery-content");
   root.append(header, modeTabs, filters, content);
@@ -365,7 +382,7 @@ export function renderImageGallery(
       : null;
     root.classList.toggle("is-work-detail", selectedWork !== null);
     columns.hidden = state.mode === "works" && selectedWork === null;
-    typeFilters.hidden = selectedWork !== null;
+    typeFilters.hidden = adapters.hideMediaFilters === true || selectedWork !== null;
     search.hidden = selectedWork !== null;
 
     if (selectedWork) {

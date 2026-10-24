@@ -22,6 +22,7 @@ export class CharacterPickerModal extends AnimeListModal {
     private readonly library: CharacterLibraryService,
     private readonly appearance?: string,
     private readonly subjectId?: string,
+    private readonly afterCollect?: (path: string) => Promise<void>,
   ) { super(host.app); }
 
   onOpen(): void {
@@ -95,7 +96,8 @@ export class CharacterPickerModal extends AnimeListModal {
     if (button.disabled) return;
     button.disabled = true;
     try {
-      await this.library.collect(candidate);
+      const record = await this.library.collect(candidate);
+      await this.afterCollect?.(record.path);
       button.textContent = t("collected");
       this.host.refreshViews();
       new Notice(t("saved"));

@@ -1,5 +1,6 @@
 import { normalizePath, TFile, type App } from "obsidian";
 import { getScopedMarkdownFiles } from "./vault-scope";
+import { findImageSectionBlocks, normalizeImageSectionPath, replaceImageSectionPaths } from "../domain/image-section";
 import type { CharacterCandidate, CharacterRecord, CharacterTier } from "../domain/characters/character";
 import {
   characterFromFrontmatter, characterNoteSource, findExistingCharacter, mergeCharacterAppearances,
@@ -82,6 +83,32 @@ export class CharacterLibraryService {
       };
       this.staged.set(id, record);
       return record;
+    });
+  }
+
+  /** Link an existing vault/remote image into a character's Image Section without copying its bytes. */
+  async attachImage(path: string, imagePath: string): Promise<boolean> {
+    return this.queue(async () => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile) || !file.path.startsWith(this.folder() + "/")) {
+        throw new Error("Character not found");
+      }
+      const normalized = normalizeImageSectionPath(imagePath);
+      if (!normalized) throw new Error("Image path is empty");
+      if (!/^https?:\/\//i.test(normalized)
+        && !(this.app.vault.getAbstractFileByPath(normalized) instanceof TFile)
+        && !this.app.metadataCache.getFirstLinkpathDest(normalized, path)) {
+        throw new Error("Image path cannot be resolved inside the vault");
+      }
+      let changed = false;
+      await this.app.vault.process(file, markdown => {
+        const section = findImageSectionBlocks(markdown)[0];
+        if (!section) throw new Error("Character has no Image Section");
+        if (section.paths.includes(normalized)) return markdown;
+        changed = true;
+        return replaceImageSectionPaths(markdown, section, [...section.paths, normalized]);
+      });
+      return changed;
     });
   }
 
