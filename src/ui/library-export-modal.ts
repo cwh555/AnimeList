@@ -21,7 +21,6 @@ import {
 } from "../features/library-export/format";
 import { libraryExportText } from "../features/library-export/text";
 import { uiText } from "../ui-text";
-import type { MediaType } from "../domain/media-types";
 import {
   buildPresentationDocument, formatPresentationText, rankingLabelsForLibrary,
   type PresentationDocument, type PresentationKind, type PresentationMediaType,
@@ -70,7 +69,7 @@ export class LibraryExportModal extends AnimeListModal {
     kind: "scoreboard", format: "text", mediaType: "anime",
     theme: "light", includeUnrated: false, top: null,
   };
-  private readonly presentationButtons: HTMLButtonElement[] = [];
+  private readonly presentationButtons: Array<HTMLSelectElement | HTMLInputElement> = [];
   private libraryControls: HTMLElement | null = null;
   private libraryPreview: HTMLElement | null = null;
   private presentationControls: HTMLElement | null = null;
@@ -82,7 +81,6 @@ export class LibraryExportModal extends AnimeListModal {
   private pngPages: Blob[] | null = null;
   private previewUrl: string | null = null;
   private renderEpoch = 0;
-  private presentationBusy = false;
   private readonly state: LibraryExportModalState = {
     format: "json",
     scope: { mediaType: "all", status: "all" },
@@ -462,7 +460,6 @@ export class LibraryExportModal extends AnimeListModal {
           ? libraryExportText("previewTruncated") : "";
       } else {
         note.textContent = libraryExportText("presentationLoading");
-        this.presentationBusy = true;
         const png = await rasterizePresentation(this.host, doc, this.presentation.theme);
         if (epoch !== this.renderEpoch) return;
         this.pngPages = png.pages;
@@ -481,7 +478,7 @@ export class LibraryExportModal extends AnimeListModal {
     } catch (error) {
       if (epoch === this.renderEpoch) note.textContent = errorMessage(error);
     } finally {
-      if (epoch === this.renderEpoch) this.presentationBusy = false;
+      // The generation token makes stale async output harmless after tab changes.
     }
   }
 

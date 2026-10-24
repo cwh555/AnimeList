@@ -73,6 +73,7 @@ export const TEST_TARGETS = [
   { path: "tests/serial-entry-scroll.test.ts", kind: "test", suite: "unit", features: ["progress"] },
   { path: "tests/serial-entry-keyboard-navigation.test.ts", kind: "test", suite: "unit", features: ["progress"] },
 
+  { path: "tests/presentation-export.test.ts", kind: "test", suite: "unit", features: ["export", "ranking", "score-dashboard"] },
   { path: "tests/score-dashboard.test.ts", kind: "test", suite: "unit", features: ["score-dashboard", "rating"], smoke: true },
   { path: "tests/score-dashboard-selection.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
   { path: "tests/score-dashboard-drag-scroll.test.ts", kind: "test", suite: "unit", features: ["score-dashboard"] },
