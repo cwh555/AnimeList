@@ -15,6 +15,7 @@ await build({
   stdin: {
     contents: `
       export { LibraryExportModal } from "./src/ui/library-export-modal";
+      export { TFile } from "obsidian";
     `,
     resolveDir: root,
     loader: "ts",
@@ -51,6 +52,7 @@ await build({
           export class TFile {}
           export function normalizePath(value) { return String(value || ""); }
           export function setIcon() {}
+          export async function requestUrl() { throw new Error("Unexpected remote request in browser fixture"); }
         `,
       }));
     },
@@ -134,14 +136,39 @@ try {
       ],
     }))},
   ];
+  // MediaRepository provides a display URL, not a Vault filename.
+  items[0].cover = "app://obsidian.md/vault/AnimeList/Covers/Work.png";
+  const mediaNote = new AnimeListLibraryExport.TFile();
+  mediaNote.path = items[0].filePath;
+  const coverFile = new AnimeListLibraryExport.TFile();
+  coverFile.path = "AnimeList/Covers/Work.png";
+  const imageCanvas = document.createElement("canvas");
+  imageCanvas.width = 20;
+  imageCanvas.height = 30;
+  const imageContext = imageCanvas.getContext("2d");
+  imageContext.fillStyle = "#ed372a";
+  imageContext.fillRect(0, 0, 20, 30);
+  const fixtureBlob = await new Promise(resolve => imageCanvas.toBlob(resolve, "image/png"));
+  const fixtureBytes = await fixtureBlob.arrayBuffer();
   const creates = [];
   const host = {
     app: {
       vault: {
-        getAbstractFileByPath(){ return null; },
+        getAbstractFileByPath(path){
+          return path === mediaNote.path ? mediaNote : path === coverFile.path ? coverFile : null;
+        },
+        async readBinary(file){
+          if (file !== coverFile) throw new Error("Unexpected binary read");
+          return fixtureBytes;
+        },
         async create(path, content){ creates.push({path,content}); return {path}; },
       },
-      metadataCache: { getFileCache(){ return null; } },
+      metadataCache: {
+        getFileCache(file){ return file === mediaNote ? {frontmatter:{cover:"Covers/Work.png"}} : null; },
+        getFirstLinkpathDest(path, from){
+          return path === "Covers/Work.png" && from === mediaNote.path ? coverFile : null;
+        },
+      },
     },
     settings: { libraryRoot: "AnimeList", specialLabelMode: "masterpiece" },
     collectMediaItems(){ return items; },
@@ -260,6 +287,31 @@ try {
     previewFitsViewport: previewRect.right <= innerWidth + 1 && modalRect.right <= innerWidth + 1,
     noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth + 1,
   };
+  // Verify the exported image contains real Vault pixels, not just an absence of errors.
+  content.querySelector('[data-export-kind="scoreboard"]').click();
+  const pngSelect = content.querySelector(".al-presentation-export-options select");
+  pngSelect.value = "png";
+  pngSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  const imagePreview = content.querySelector(".al-presentation-export-preview img");
+  for (let trial = 0; trial < 75 && !imagePreview?.src.startsWith("blob:"); trial += 1) {
+    await new Promise(resolve => setTimeout(resolve, 80));
+  }
+  const exportStatus = content.querySelector(".al-presentation-export-preview p")?.textContent || "";
+  details.presentationPngLoadsVaultCover = imagePreview?.src.startsWith("blob:")
+    && exportStatus.includes("0 張封面");
+  if (details.presentationPngLoadsVaultCover) {
+    await imagePreview.decode();
+    const checkCanvas = document.createElement("canvas");
+    checkCanvas.width = imagePreview.naturalWidth;
+    checkCanvas.height = imagePreview.naturalHeight;
+    const checker = checkCanvas.getContext("2d");
+    checker.drawImage(imagePreview, 0, 0);
+    // Within the first Scoreboard cover rectangle after the 1.5x raster scale.
+    const pixel = checker.getImageData(190, 240, 1, 1).data;
+    details.presentationPngContainsActualArtwork = pixel[0] > 180 && pixel[1] < 100 && pixel[2] < 100;
+  } else {
+    details.presentationPngContainsActualArtwork = false;
+  }
   document.body.dataset.details = JSON.stringify(details);
   document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
 } catch (error) {

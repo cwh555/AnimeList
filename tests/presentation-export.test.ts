@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { TFile } from "obsidian";
+import type { AnimeListFeatureHost } from "../src/app/feature-types";
+import { presentationCoverCandidates, readPresentationCover, resolvePresentationCoverSources } from "../src/data/presentation-cover-service";
 import { describe, it } from "node:test";
 import { emptyRankingState } from "../src/domain/pairwise-ranking";
 import type { MediaItem } from "../src/domain/media-types";
@@ -56,5 +59,47 @@ describe("presentation export", () => {
         assert.ok(card.y + card.height <= page.height);
       }
     }
+  });
+});
+
+describe("presentation cover resolution", () => {
+  it("recovers the original local cover when MediaItem has a display URL", async () => {
+    const note = new TFile();
+    note.path = "AnimeList/Anime/Work.md";
+    const cover = new TFile();
+    cover.path = "AnimeList/Covers/Work.webp";
+    const itemValue = item("Work", 10);
+    itemValue.cover = "app://obsidian.md/vault/AnimeList/Covers/Work.webp";
+    const binary = new Uint8Array([82, 73, 70, 70]).buffer;
+    const host = {
+      app: {
+        metadataCache: {
+          getFileCache(file: TFile) {
+            return file === note ? { frontmatter: { cover: "[[Covers/Work.webp]]" } } : null;
+          },
+          getFirstLinkpathDest(reference: string, source: string) {
+            return reference === "Covers/Work.webp" && source === note.path ? cover : null;
+          },
+        },
+        vault: {
+          getAbstractFileByPath(path: string) {
+            return path === note.path ? note : path === cover.path ? cover : null;
+          },
+          async readBinary(file: TFile) {
+            assert.equal(file, cover);
+            return binary;
+          },
+        },
+      },
+    } as unknown as AnimeListFeatureHost;
+    assert.deepEqual(presentationCoverCandidates(
+      "[[Covers/Work.webp]]", "https://example.com/fallback.jpg", itemValue.cover,
+    ), ["Covers/Work.webp", "https://example.com/fallback.jpg"]);
+    assert.deepEqual(resolvePresentationCoverSources(host, itemValue), [
+      { kind: "file", path: cover.path },
+    ]);
+    const loaded = await readPresentationCover(host, itemValue);
+    assert.equal(loaded?.contentType, "image/webp");
+    assert.deepEqual(new Uint8Array(loaded?.data), new Uint8Array(binary));
   });
 });
