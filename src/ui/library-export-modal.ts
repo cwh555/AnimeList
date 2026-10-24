@@ -412,7 +412,7 @@ export class LibraryExportModal extends AnimeListModal {
     const image = makeEl("img");
     image.alt = libraryExportText("preview");
     image.addEventListener("error", () => {
-      image.hidden = true;
+      Object.assign(image.style, { display: "none" });
       note.textContent = libraryExportText("copyFailed", { error: "PNG preview image could not be decoded" });
     });
     Object.assign(image.style, {
@@ -420,7 +420,7 @@ export class LibraryExportModal extends AnimeListModal {
     });
     const pager = makeEl("nav", "al-presentation-export-pager");
     pager.setAttribute("aria-label", "PNG pages");
-    Object.assign(pager.style, { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" });
+    Object.assign(pager.style, { textAlign: "center", marginTop: "10px" });
     const previous = makeEl("button", "al-secondary-button", "‹");
     previous.type = "button";
     previous.setAttribute("aria-label", "Previous PNG page");
