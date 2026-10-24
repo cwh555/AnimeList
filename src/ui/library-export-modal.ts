@@ -106,6 +106,10 @@ export class LibraryExportModal extends AnimeListModal {
     this.activeKind = preset.kind ?? "library";
     if (this.activeKind !== "library") this.presentation.kind = this.activeKind;
     this.presentation.mediaType = preset.mediaType ?? "anime";
+    // A share image should match the active Obsidian appearance by default.
+    if (this.modalEl.ownerDocument.body.classList.contains("theme-dark")) {
+      this.presentation.theme = "dark";
+    }
     if (this.presentation.kind === "ranking" && this.presentation.mediaType === "all") {
       this.presentation.mediaType = "anime";
     }
