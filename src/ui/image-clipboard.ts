@@ -1,3 +1,5 @@
+import { copyPngBlobToClipboard } from "./png-clipboard";
+export { copyPngBlobToClipboard };
 import type { ImageSectionService, ImageSectionAssetInput } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
 import { decodeRasterImage, encodeRasterImage } from "../data/image-raster";
@@ -18,8 +20,6 @@ function clipboardAvailable(): boolean {
   return Boolean(navigator.clipboard?.write && typeof ClipboardItem !== "undefined");
 }
 
-import { copyPngBlobToClipboard } from "./png-clipboard";
-export { copyPngBlobToClipboard };
 
 async function blobDataUrl(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
