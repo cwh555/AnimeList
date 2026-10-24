@@ -337,8 +337,7 @@ export class LibraryExportModal extends AnimeListModal {
       const label = makeEl("label", "al-form-field");
       label.appendChild(makeEl("span", "al-form-label", name));
       const select = makeEl("select");
-      select.style.width = "100%";
-      select.style.minHeight = "38px";
+      Object.assign(select.style, { width: "100%", minHeight: "38px" });
       for (const [value, text] of values) {
         const option = makeEl("option", "", text);
         option.value = value;
@@ -404,10 +403,10 @@ export class LibraryExportModal extends AnimeListModal {
 
   private refreshModes(): void {
     const isLibrary = this.activeKind === "library";
-    if (this.libraryControls) this.libraryControls.style.display = isLibrary ? "flex" : "none";
-    if (this.libraryPreview) this.libraryPreview.style.display = isLibrary ? "flex" : "none";
-    if (this.presentationControls) this.presentationControls.style.display = isLibrary ? "none" : "flex";
-    if (this.presentationPreview) this.presentationPreview.style.display = isLibrary ? "none" : "block";
+    if (this.libraryControls) Object.assign(this.libraryControls.style, { display: isLibrary ? "flex" : "none" });
+    if (this.libraryPreview) Object.assign(this.libraryPreview.style, { display: isLibrary ? "flex" : "none" });
+    if (this.presentationControls) Object.assign(this.presentationControls.style, { display: isLibrary ? "none" : "flex" });
+    if (this.presentationPreview) Object.assign(this.presentationPreview.style, { display: isLibrary ? "none" : "block" });
     this.contentEl.querySelectorAll<HTMLButtonElement>("[data-export-kind]").forEach(button => {
       button.classList.toggle("is-active", button.dataset.exportKind === this.activeKind);
     });
@@ -422,9 +421,9 @@ export class LibraryExportModal extends AnimeListModal {
     theme.value = this.presentation.theme;
     top.value = String(this.presentation.top ?? 0);
     unrated.checked = this.presentation.includeUnrated;
-    theme.parentElement!.style.display = this.presentation.format === "png" ? "" : "none";
-    top.parentElement!.style.display = this.presentation.kind === "ranking" ? "" : "none";
-    unrated.parentElement!.style.display = this.presentation.kind === "scoreboard" ? "flex" : "none";
+    if (theme.parentElement) Object.assign(theme.parentElement.style, { display: this.presentation.format === "png" ? "" : "none" });
+    if (top.parentElement) Object.assign(top.parentElement.style, { display: this.presentation.kind === "ranking" ? "" : "none" });
+    if (unrated.parentElement) Object.assign(unrated.parentElement.style, { display: this.presentation.kind === "scoreboard" ? "flex" : "none" });
   }
 
   private async renderPresentation(): Promise<void> {
@@ -437,8 +436,8 @@ export class LibraryExportModal extends AnimeListModal {
     if (!note || !image || !text) return;
     if (this.copyButton) this.copyButton.disabled = true;
     if (this.saveButton) this.saveButton.disabled = true;
-    image.style.display = "none";
-    text.style.display = "none";
+    Object.assign(image.style, { display: "none" });
+    Object.assign(text.style, { display: "none" });
     if (!this.rankingLoaded && this.presentation.kind === "ranking") {
       note.textContent = libraryExportText("presentationLoading");
       return;
@@ -455,7 +454,7 @@ export class LibraryExportModal extends AnimeListModal {
       if (this.presentation.format === "text") {
         text.value = this.presentationOutput.length > 16000
           ? this.presentationOutput.slice(0, 16000) + "\n…" : this.presentationOutput;
-        text.style.display = "block";
+        Object.assign(text.style, { display: "block" });
         note.textContent = this.presentationOutput.length > 16000
           ? libraryExportText("previewTruncated") : "";
       } else {
@@ -465,7 +464,7 @@ export class LibraryExportModal extends AnimeListModal {
         this.pngPages = png.pages;
         this.previewUrl = URL.createObjectURL(png.pages[0]);
         image.src = this.previewUrl;
-        image.style.display = "block";
+        Object.assign(image.style, { display: "block" });
         note.textContent = libraryExportText("presentationPages", {
           count: png.pages.length, missing: png.missingCovers,
         });
@@ -477,8 +476,6 @@ export class LibraryExportModal extends AnimeListModal {
       }
     } catch (error) {
       if (epoch === this.renderEpoch) note.textContent = errorMessage(error);
-    } finally {
-      // The generation token makes stale async output harmless after tab changes.
     }
   }
 
