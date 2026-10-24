@@ -31,6 +31,7 @@ export const TEST_FEATURES = [
 ];
 
 export const TEST_TARGETS = [
+  { path: "tests/character-collection.test.ts", kind: "test", suite: "integration", features: ["characters", "markdown", "ranking", "image-sections"] },
   { path: "tests/characters.test.ts", kind: "test", suite: "unit", features: ["characters", "markdown", "image-sections"] },
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
   { path: "tests/media-cover-replacement.test.ts", kind: "test", suite: "contract", features: ["covers", "library", "markdown", "ui"], smoke: true },
