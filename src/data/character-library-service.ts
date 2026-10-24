@@ -95,7 +95,7 @@ export class CharacterLibraryService {
       }
       const normalized = normalizeImageSectionPath(imagePath);
       if (!normalized) throw new Error("Image path is empty");
-      if (!/^https?:\/\//i.test(normalized)
+      if (!/^(?:https?|file):\/\//i.test(normalized)
         && !(this.app.vault.getAbstractFileByPath(normalized) instanceof TFile)
         && !this.app.metadataCache.getFirstLinkpathDest(normalized, path)) {
         throw new Error("Image path cannot be resolved inside the vault");

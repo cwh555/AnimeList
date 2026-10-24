@@ -14,6 +14,9 @@ import { renderCharacterRanking } from "./character-ranking";
 import { buildImageGalleryWork } from "../../domain/image-gallery";
 import { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "../image-gallery-renderer";
 import { characterRankingItems } from "../../domain/characters/ranking-items";
+import { externalImageUri } from "../../domain/characters/external-image";
+import { externalImagesForHost } from "../../data/characters/external-image-service";
+import { Platform } from "obsidian";
 import { characterText as t } from "../../features/characters/text";
 
 interface CharacterPageState {
@@ -119,6 +122,10 @@ async function renderDetails(
   if (context.signal.aborted) return;
   const blocks = findImageSectionBlocks(markdown);
   const images = [...new Set(blocks.flatMap(block => block.paths))];
+  const external = externalImagesForHost(host);
+  if (Platform.isDesktopApp) {
+    await Promise.allSettled(images.filter(path => /^file:\/\//i.test(path)).map(path => external.prepare(path)));
+  }
   const gallery = makeEl("div", "al-character-images");
   const imageService = imageSectionServiceForHost(host);
   for (const [index, path] of images.entries()) {
@@ -171,6 +178,23 @@ async function renderDetails(
     upload,
     makeEl("small", "", t("pictureHelp")),
   );
+  if (Platform.isDesktopApp) {
+    const link = makeEl("input");
+    link.type = "text";
+    link.placeholder = t("externalPath");
+    link.setAttribute("aria-label", t("externalPath"));
+    addRow.append(link, button(t("linkExternal"), () => {
+      let uri: string;
+      try { uri = externalImageUri(link.value); }
+      catch (error) { new Notice(t("failed", { reason: msg(error) })); return; }
+      void external.prepare(uri).then(async () => {
+        await service.attachImage(record.path, uri);
+        host.refreshViews();
+      }).catch(error => new Notice(t("failed", { reason: msg(error) })));
+    }));
+  } else if (images.some(path => /^file:\/\//i.test(path))) {
+    addRow.appendChild(makeEl("small", "", t("desktopOnly")));
+  }
   root.appendChild(addRow);
   container.replaceChildren(root);
 }
@@ -220,6 +244,11 @@ export async function renderCharacterPage(
       const file = host.app.vault.getAbstractFileByPath(record.path);
       if (!(file instanceof TFile)) return null;
       const markdown = await host.app.vault.cachedRead(file);
+      if (Platform.isDesktopApp) {
+        const external = findImageSectionBlocks(markdown).flatMap(block => block.paths)
+          .filter(path => /^file:\/\//i.test(path));
+        await Promise.allSettled(external.map(path => externalImagesForHost(host).prepare(path)));
+      }
       const eligible = characterRankingItems([record])[0];
       return buildImageGalleryWork(eligible, markdown);
     }));
@@ -235,6 +264,8 @@ export async function renderCharacterPage(
         })), index).open();
       },
       openSource(path) { void host.openMediaFile(path); },
+      hideMediaFilters: true,
+      pageTitle: t("allPictures"),
     });
     return;
   }

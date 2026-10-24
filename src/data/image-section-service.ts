@@ -1,5 +1,6 @@
 import { Notice, TFile, requestUrl, type App } from "obsidian";
 import { uiText } from "../ui-text";
+import { externalImagesForHost } from "./characters/external-image-service";
 import type { CoverSources } from "../types";
 import type { AnimeListSettings } from "../domain/settings-types";
 import {
@@ -92,6 +93,9 @@ export class ImageSectionService {
 
   resolve(pathValue: unknown, sourcePath: string): ResolvedImageSectionAsset {
     const path = normalizeImageSectionPath(pathValue);
+    if (/^file:\/\//i.test(path)) {
+      return { path, resourcePath: externalImagesForHost(this.host).get(path), file: null, remote: false };
+    }
     if (/^https?:\/\//i.test(path)) {
       return { path, resourcePath: path, file: null, remote: true };
     }
@@ -131,6 +135,10 @@ export class ImageSectionService {
   }
 
   async readAsset(pathValue: unknown, sourcePath: string): Promise<ImageSectionAssetInput> {
+    if (typeof pathValue === "string" && /^file:\/\//i.test(pathValue)) {
+      return { name: decodeURIComponent(new URL(pathValue).pathname.split("/").pop() ?? "image"),
+        data: await externalImagesForHost(this.host).read(pathValue) };
+    }
     const resolved = this.resolve(pathValue, sourcePath);
     if (resolved.file) {
       return {

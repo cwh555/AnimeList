@@ -5,6 +5,7 @@ import { CharacterPickerModal } from "../../ui/characters/character-picker";
 import { renderCharacterPage } from "../../ui/characters/character-page";
 import { makeEl } from "../../ui/ui-helpers";
 import { characterText as t } from "./text";
+import { externalImagesForHost } from "../../data/characters/external-image-service";
 
 const services = new WeakMap<object, CharacterLibraryService>();
 export function characterService(host: AnimeListFeatureHost): CharacterLibraryService {
@@ -22,6 +23,7 @@ export const characterFeature = {
   contributions: [{
     kind: "lifecycle" as const,
     activate(host: AnimeListFeatureHost) {
+      host.register(() => externalImagesForHost(host).dispose());
       host.addCommand({
         id: "open-characters",
         name: t("title"),
