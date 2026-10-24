@@ -36,10 +36,11 @@ describe("presentation export", () => {
     const planned = planPresentationPages(output);
     assert.deepEqual(planned.pages.flatMap(page => page.sections).map(section => section.label),
       output.sections.map(section => section.label));
-    assert.ok(planned.pages.flatMap(page => page.sections)
-      .filter(section => section.cards.length === 0)
-      .every(section => section.height > 0 && section.y + section.height <=
-        planned.pages.find(page => page.sections.includes(section))!.height));
+    for (const page of planned.pages) {
+      for (const section of page.sections) {
+        assert.ok(section.height > 0 && section.y + section.height <= page.height);
+      }
+    }
     const withUnrated = buildPresentationDocument(items, { kind: "scoreboard", mediaType: "anime", includeUnrated: true });
     assert.equal(withUnrated.sections.at(-1)?.entries[0].item.title, "Missing");
   });
@@ -55,14 +56,22 @@ describe("presentation export", () => {
     assert.equal(ranked.total, 4);
     assert.equal(ranked.pending, 4);
     assert.equal(ranked.sections.at(-1)?.entries.length, 4);
-    assert.deepEqual(ranked.sections.at(-1)?.entries.map(entry => entry.badge),
-      ["#1~2", "#1~3", "#1~4", "#1~4"]);
+    const badgesByPath = new Map(ranked.sections.flatMap(section => section.entries)
+      .map(entry => [entry.item.filePath, entry.badge]));
+    assert.equal(badgesByPath.get(items[0].filePath), "#1~2");
+    assert.equal(badgesByPath.get(items[3].filePath), "#1~4");
     assert.match(formatPresentationText(ranked), /#1~4\/4/);
     assert.ok(ranked.sections.flatMap(section => section.entries)
       .every(entry => !entry.badge.includes("/")));
     assert.equal(formatRankingBadge(3, 3), "#3");
     assert.equal(formatRankingBadge(3, 8), "#3~8");
     assert.equal(formatRankingPosition(3, 8, 176), "#3~8/176");
+    const complete = emptyRankingState();
+    complete.anime.ordered = items.map(entry => entry.filePath);
+    const done = buildPresentationDocument(items, {kind: "ranking", mediaType: "anime", ranking: complete});
+    assert.deepEqual(done.sections[0].entries.map(entry => entry.badge),
+      ["#1", "#2", "#3", "#4"]);
+    assert.match(formatPresentationText(done), /#1\/4  A/);
     assert.equal(rankingLabelsForLibrary([...items, item("Ongoing", 5, "ongoing")], state).has("AnimeList/Anime/Ongoing.md"), false);
   });
   it("splits large galleries before canvas limits and includes each work once", () => {
