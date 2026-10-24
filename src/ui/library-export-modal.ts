@@ -333,6 +333,7 @@ export class LibraryExportModal extends AnimeListModal {
     this.presentationPageIndex = Math.max(0, Math.min(index, pages.length - 1));
     this.releasePreview();
     this.previewUrl = URL.createObjectURL(pages[this.presentationPageIndex]);
+    this.presentationImage.hidden = false;
     this.presentationImage.src = this.previewUrl;
     if (this.presentationPager) this.presentationPager.hidden = pages.length < 2;
     if (this.presentationPagerLabel) {
@@ -410,6 +411,10 @@ export class LibraryExportModal extends AnimeListModal {
     });
     const image = makeEl("img");
     image.alt = libraryExportText("preview");
+    image.addEventListener("error", () => {
+      image.hidden = true;
+      note.textContent = libraryExportText("copyFailed", { error: "PNG preview image could not be decoded" });
+    });
     Object.assign(image.style, {
       display: "none", width: "100%", maxHeight: "48dvh", objectFit: "contain",
     });
