@@ -1,4 +1,5 @@
 import type { PresentationDocument, PresentationEntry } from "./presentation-export";
+import { SCORE_DASHBOARD_THUMBNAIL_WIDTH, SCORE_DASHBOARD_THUMBNAIL_HEIGHT } from "./score-dashboard/model";
 
 export const PRESENTATION_IMAGE_WIDTH = 1000;
 export const PRESENTATION_IMAGE_MAX_HEIGHT = 2600;
@@ -15,6 +16,7 @@ export interface PresentationPlacement {
 export interface PresentationPageSection {
   label: string;
   y: number;
+  height: number;
   cards: PresentationPlacement[];
 }
 export interface PresentationPage {
@@ -27,13 +29,16 @@ export interface PresentationPagePlan {
   pages: PresentationPage[];
   pixelRatio: number;
 }
-const MARGIN = 26;
-const HEADER = 128;
-const SECTION_HEADER = 47;
-const FOOTER = 36;
-const CARD_GAP = 12;
-const POSTER_WIDTH = 74;
-const POSTER_HEIGHT = 110;
+export const PRESENTATION_MARGIN = 24;
+export const PRESENTATION_HEADER_HEIGHT = 114;
+export const PRESENTATION_FOOTER_HEIGHT = 30;
+export const PRESENTATION_SCORE_LABEL_WIDTH = 88;
+const CARD_GAP = 10;
+const SECTION_GAP = 12;
+const SCORE_PADDING = 12;
+// Use exactly the same 2:3 cover geometry as the Scoreboard at a readable export scale.
+export const PRESENTATION_POSTER_WIDTH = Math.round(SCORE_DASHBOARD_THUMBNAIL_WIDTH * 1.42);
+export const PRESENTATION_POSTER_HEIGHT = Math.round(SCORE_DASHBOARD_THUMBNAIL_HEIGHT * 1.42);
 const RANK_WIDTH = 222;
 const RANK_HEIGHT = 148;
 
@@ -41,34 +46,50 @@ export function planPresentationPages(
   document: PresentationDocument,
   maxHeight = PRESENTATION_IMAGE_MAX_HEIGHT,
 ): PresentationPagePlan {
-  const availableHeight = Math.max(HEADER + SECTION_HEADER + RANK_HEIGHT + FOOTER + MARGIN, Math.min(maxHeight, PRESENTATION_IMAGE_MAX_HEIGHT));
   const isRanking = document.kind === "ranking";
-  const cardWidth = isRanking ? RANK_WIDTH : POSTER_WIDTH;
-  const cardHeight = isRanking ? RANK_HEIGHT : POSTER_HEIGHT;
-  const columns = Math.max(1, Math.floor((PRESENTATION_IMAGE_WIDTH - 2 * MARGIN + CARD_GAP) / (cardWidth + CARD_GAP)));
+  const cardWidth = isRanking ? RANK_WIDTH : PRESENTATION_POSTER_WIDTH;
+  const cardHeight = isRanking ? RANK_HEIGHT : PRESENTATION_POSTER_HEIGHT;
+  const labelWidth = isRanking ? 0 : PRESENTATION_SCORE_LABEL_WIDTH;
+  const contentX = PRESENTATION_MARGIN + labelWidth + SCORE_PADDING;
+  const columns = Math.max(1, Math.floor(
+    (PRESENTATION_IMAGE_WIDTH - contentX - PRESENTATION_MARGIN - SCORE_PADDING + CARD_GAP)
+      / (cardWidth + CARD_GAP),
+  ));
+  const requestedHeight = Number.isFinite(maxHeight) ? maxHeight : PRESENTATION_IMAGE_MAX_HEIGHT;
+  const availableHeight = Math.max(
+    PRESENTATION_HEADER_HEIGHT + cardHeight + 2 * SCORE_PADDING + PRESENTATION_FOOTER_HEIGHT,
+    Math.min(requestedHeight, PRESENTATION_IMAGE_MAX_HEIGHT),
+  );
   const pages: PresentationPage[] = [];
   let sections: PresentationPageSection[] = [];
-  let y = HEADER;
+  let y = PRESENTATION_HEADER_HEIGHT;
   const flush = (): void => {
-    pages.push({ width: PRESENTATION_IMAGE_WIDTH, height: Math.min(availableHeight, y + FOOTER), index: pages.length, sections });
+    const used = Math.min(availableHeight, y + PRESENTATION_FOOTER_HEIGHT);
+    pages.push({ width: PRESENTATION_IMAGE_WIDTH, height: used, index: pages.length, sections });
     sections = [];
-    y = HEADER;
+    y = PRESENTATION_HEADER_HEIGHT;
   };
   for (const section of document.sections) {
     let offset = 0;
     while (offset < section.entries.length) {
-      if (y + SECTION_HEADER + cardHeight + FOOTER > availableHeight && sections.length) flush();
-      const availableRows = Math.max(1, Math.floor((availableHeight - y - SECTION_HEADER - FOOTER + CARD_GAP) / (cardHeight + CARD_GAP)));
+      const headingHeight = isRanking ? 40 : 0;
+      const minimum = headingHeight + cardHeight + 2 * SCORE_PADDING;
+      if (y + minimum + PRESENTATION_FOOTER_HEIGHT > availableHeight && sections.length) flush();
+      const usableHeight = availableHeight - y - headingHeight - 2 * SCORE_PADDING - PRESENTATION_FOOTER_HEIGHT;
+      const availableRows = Math.max(1, Math.floor((usableHeight + CARD_GAP) / (cardHeight + CARD_GAP)));
       const count = Math.min(section.entries.length - offset, availableRows * columns);
       const cards = section.entries.slice(offset, offset + count).map((entry, index) => ({
         entry,
-        x: MARGIN + (index % columns) * (cardWidth + CARD_GAP),
-        y: y + SECTION_HEADER + Math.floor(index / columns) * (cardHeight + CARD_GAP),
+        x: contentX + (index % columns) * (cardWidth + CARD_GAP),
+        y: y + headingHeight + SCORE_PADDING + Math.floor(index / columns) * (cardHeight + CARD_GAP),
         width: cardWidth,
         height: cardHeight,
       }));
-      sections.push({ label: offset ? `${section.label} (continued)` : section.label, y, cards });
-      y += SECTION_HEADER + Math.ceil(count / columns) * (cardHeight + CARD_GAP) + 16;
+      const height = headingHeight + 2 * SCORE_PADDING
+        + Math.ceil(count / columns) * cardHeight
+        + (Math.ceil(count / columns) - 1) * CARD_GAP;
+      sections.push({ label: offset ? `${section.label} (continued)` : section.label, y, height, cards });
+      y += height + SECTION_GAP;
       offset += count;
       if (offset < section.entries.length) flush();
     }
