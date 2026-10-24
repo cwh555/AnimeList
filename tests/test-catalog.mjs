@@ -1,6 +1,7 @@
 export const TEST_SUITES = ["unit", "integration", "contract", "legacy-update", "legacy"];
 
 export const TEST_FEATURES = [
+  "characters",
   "covers",
   "export",
   "import",
@@ -30,6 +31,7 @@ export const TEST_FEATURES = [
 ];
 
 export const TEST_TARGETS = [
+  { path: "tests/characters.test.ts", kind: "test", suite: "unit", features: ["characters", "markdown", "image-sections"] },
   { path: "tests/cover-cache.test.ts", kind: "test", suite: "integration", features: ["covers"] },
   { path: "tests/media-cover-replacement.test.ts", kind: "test", suite: "contract", features: ["covers", "library", "markdown", "ui"], smoke: true },
   { path: "tests/media-asset-cleanup.test.ts", kind: "test", suite: "unit", features: ["covers", "image-sections", "moments", "markdown"] },
