@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { emptyRankingState } from "../src/domain/pairwise-ranking";
 import type { MediaItem } from "../src/domain/media-types";
 import {
-  buildPresentationDocument, formatPresentationText,
+  buildPresentationDocument, formatPresentationText, formatRankingBadge, formatRankingPosition,
   rankingLabelsForLibrary,
 } from "../src/domain/presentation-export";
 import { planPresentationPages, PRESENTATION_IMAGE_MAX_PIXELS } from "../src/domain/presentation-export-layout";
@@ -25,10 +25,21 @@ describe("presentation export", () => {
   it("uses exactly the score dashboard lanes, including zero and optional unrated", () => {
     const items = [item("Top", 10), item("Zero", 0), item("Missing", null)];
     const output = buildPresentationDocument(items, { kind: "scoreboard", mediaType: "anime" });
-    assert.deepEqual(output.sections.map(x => x.label), ["10.0", "0.0"]);
+    assert.equal(output.sections.length, 21);
+    assert.deepEqual(output.sections.map(x => x.label),
+      Array.from({ length: 21 }, (_, n) => (10 - 0.5 * n).toFixed(1)));
+    assert.equal(output.sections.find(x => x.label === "9.5")?.entries.length, 0);
     assert.equal(output.total, 3);
     assert.equal(output.pending, 1);
     assert.doesNotMatch(formatPresentationText(output), /Missing/);
+    assert.match(formatPresentationText(output), /## 9\.5 \(0\)/);
+    const planned = planPresentationPages(output);
+    assert.deepEqual(planned.pages.flatMap(page => page.sections).map(section => section.label),
+      output.sections.map(section => section.label));
+    assert.ok(planned.pages.flatMap(page => page.sections)
+      .filter(section => section.cards.length === 0)
+      .every(section => section.height > 0 && section.y + section.height <=
+        planned.pages.find(page => page.sections.includes(section))!.height));
     const withUnrated = buildPresentationDocument(items, { kind: "scoreboard", mediaType: "anime", includeUnrated: true });
     assert.equal(withUnrated.sections.at(-1)?.entries[0].item.title, "Missing");
   });
@@ -44,6 +55,14 @@ describe("presentation export", () => {
     assert.equal(ranked.total, 4);
     assert.equal(ranked.pending, 4);
     assert.equal(ranked.sections.at(-1)?.entries.length, 4);
+    assert.deepEqual(ranked.sections.at(-1)?.entries.map(entry => entry.badge),
+      ["#1~2", "#1~3", "#1~4", "#1~4"]);
+    assert.match(formatPresentationText(ranked), /#1~4\/4/);
+    assert.ok(ranked.sections.flatMap(section => section.entries)
+      .every(entry => !entry.badge.includes("/")));
+    assert.equal(formatRankingBadge(3, 3), "#3");
+    assert.equal(formatRankingBadge(3, 8), "#3~8");
+    assert.equal(formatRankingPosition(3, 8, 176), "#3~8/176");
     assert.equal(rankingLabelsForLibrary([...items, item("Ongoing", 5, "ongoing")], state).has("AnimeList/Anime/Ongoing.md"), false);
   });
   it("splits large galleries before canvas limits and includes each work once", () => {

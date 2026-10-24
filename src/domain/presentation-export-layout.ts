@@ -36,6 +36,7 @@ export const PRESENTATION_SCORE_LABEL_WIDTH = 88;
 const CARD_GAP = 10;
 const SECTION_GAP = 12;
 const SCORE_PADDING = 12;
+const EMPTY_SCORE_LANE_HEIGHT = 76;
 // Use exactly the same 2:3 cover geometry as the Scoreboard at a readable export scale.
 export const PRESENTATION_POSTER_WIDTH = Math.round(SCORE_DASHBOARD_THUMBNAIL_WIDTH * 1.42);
 export const PRESENTATION_POSTER_HEIGHT = Math.round(SCORE_DASHBOARD_THUMBNAIL_HEIGHT * 1.42);
@@ -70,6 +71,14 @@ export function planPresentationPages(
     y = PRESENTATION_HEADER_HEIGHT;
   };
   for (const section of document.sections) {
+    if (!isRanking && section.entries.length === 0) {
+      if (y + EMPTY_SCORE_LANE_HEIGHT + PRESENTATION_FOOTER_HEIGHT > availableHeight && sections.length) {
+        flush();
+      }
+      sections.push({ label: section.label, y, height: EMPTY_SCORE_LANE_HEIGHT, cards: [] });
+      y += EMPTY_SCORE_LANE_HEIGHT + SECTION_GAP;
+      continue;
+    }
     let offset = 0;
     while (offset < section.entries.length) {
       const headingHeight = isRanking ? 40 : 0;

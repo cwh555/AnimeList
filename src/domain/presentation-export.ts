@@ -12,6 +12,8 @@ export interface PresentationEntry {
   item: MediaItem;
   /** Absolute rank or score-specific annotation; never a guessed ordinal. */
   badge: string;
+  /** Text-only rank includes the eligible total; PNG displays just the rank. */
+  textRank?: string;
 }
 export interface PresentationSection {
   label: string;
@@ -32,8 +34,12 @@ export interface PresentationOptions {
   top?: number | null;
 }
 
+export function formatRankingBadge(first: number, last: number): string {
+  return first === last ? `#${first}` : `#${first}~${last}`;
+}
+
 export function formatRankingPosition(first: number, last: number, total: number): string {
-  return first === last ? `#${first}/${total}` : `#${first}~${last}/${total}`;
+  return `${formatRankingBadge(first, last)}/${total}`;
 }
 
 /** No mutation, and no false ranks inferred from rating or list insertion order. */
@@ -58,12 +64,11 @@ export function buildPresentationDocument(
   const { kind, mediaType } = options;
   if (kind === "scoreboard") {
     const data = buildScoreDashboardData(items, mediaType);
-    const sections = data.groups.flatMap(group => group.lanes
-      .filter(lane => lane.items.length > 0)
-      .map(lane => ({
-        label: lane.label,
-        entries: lane.items.map(item => ({ item, badge: lane.label })),
-      })));
+    // Every 0.5-point score lane is part of the board, including empty lanes.
+    const sections = data.groups.flatMap(group => group.lanes.map(lane => ({
+      label: lane.label,
+      entries: lane.items.map(item => ({ item, badge: lane.label })),
+    })));
     if (options.includeUnrated && data.unrated.length) {
       sections.push({
         label: "Unrated",
@@ -81,7 +86,11 @@ export function buildPresentationDocument(
   const confirmed = projection.confirmed.filter(row => row.position <= max)
     .flatMap(row => {
       const item = byPath.get(row.path);
-      return item ? [{ item, badge: `#${row.position}` }] : [];
+      return item ? [{
+        item,
+        badge: formatRankingBadge(row.position, row.position),
+        textRank: formatRankingPosition(row.position, row.position, eligible.length),
+      }] : [];
     });
   const known = new Set(projection.confirmed.map(row => row.path));
   const pending = projection.possible
@@ -89,7 +98,11 @@ export function buildPresentationDocument(
     .sort((a, b) => a.first - b.first || a.last - b.last || a.path.localeCompare(b.path))
     .flatMap(row => {
       const item = byPath.get(row.path);
-      return item ? [{ item, badge: formatRankingPosition(row.first, row.last, eligible.length) }] : [];
+      return item ? [{
+        item,
+        badge: formatRankingBadge(row.first, row.last),
+        textRank: formatRankingPosition(row.first, row.last, eligible.length),
+      }] : [];
     });
   return {
     kind, mediaType, total: eligible.length,
@@ -108,7 +121,7 @@ export function formatPresentationText(document: PresentationDocument): string {
     lines.push(`## ${section.label} (${section.entries.length})`);
     for (const entry of section.entries) {
       lines.push(document.kind === "ranking"
-        ? `${entry.badge}  ${entry.item.title}`
+        ? `${entry.textRank ?? entry.badge}  ${entry.item.title}`
         : `- ${entry.item.title}`);
     }
     lines.push("");
