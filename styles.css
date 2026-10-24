@@ -1588,6 +1588,21 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
   .al-character-picker-search { flex-wrap: wrap; }
 }
 
+/* Mode navigation and shared strict-ranking result */
+.al-character-mode-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 16px; }
+.al-character-mode-tabs button { min-height: 36px; border: 1px solid var(--background-modifier-border); border-radius: 10px; }
+.al-character-mode-tabs button.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.al-character-ranking-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+.al-character-ranking-head h2 { margin: 0; }
+.al-character-ranking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.al-character-ranking-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.al-character-ranking-row { display: flex; align-items: center; justify-content: flex-start; gap: 16px; width: 100%; text-align: left; }
+.al-character-rank { font-variant-numeric: tabular-nums; min-width: 80px; font-weight: 700; }
+.al-character-compare-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 12px 0; }
+.al-character-compare-choice { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 10px; white-space: normal; }
+.al-character-compare-cover { width: 100%; max-width: 240px; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 12px; background: var(--background-secondary); display: grid; place-items: center; }
+.al-character-compare-cover img { width: 100%; height: 100%; object-fit: cover; }
+
 /* Timeline poster cards share one compact 2:3 footprint in modal and workspace presentations. */
 .al-timeline-card {
   height: 180px;

@@ -9,19 +9,31 @@ import { bindImageFallback } from "../image-fallback";
 import { makeEl } from "../ui-helpers";
 import type { WorkspacePageRenderContext } from "../workspace-contracts";
 import { CharacterPickerModal } from "./character-picker";
+import { CharacterRankingStore } from "../../data/characters/ranking-store";
+import { renderCharacterRanking } from "./character-ranking";
+import { buildImageGalleryWork } from "../../domain/image-gallery";
+import { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "../image-gallery-renderer";
+import { characterRankingItems } from "../../domain/characters/ranking-items";
 import { characterText as t } from "../../features/characters/text";
 
 interface CharacterPageState {
   query: string;
   tier: "all" | CharacterTier;
   selected: string | null;
+  mode: "library" | "images" | "ranking";
 }
 
 const pageStates = new WeakMap<object, CharacterPageState>();
+const rankingStores = new WeakMap<object, CharacterRankingStore>();
+function rankingStore(host: AnimeListFeatureHost): CharacterRankingStore {
+  let store = rankingStores.get(host);
+  if (!store) { store = new CharacterRankingStore(host.app); rankingStores.set(host, store); }
+  return store;
+}
 function pageState(host: AnimeListFeatureHost): CharacterPageState {
   let state = pageStates.get(host);
   if (!state) {
-    state = { query: "", tier: "all", selected: null };
+    state = { query: "", tier: "all", selected: null, mode: "library" };
     pageStates.set(host, state);
   }
   return state;
@@ -179,7 +191,54 @@ export async function renderCharacterPage(
     return;
   }
   if (state.selected) state.selected = null;
+  const toolbar = makeEl("div", "al-character-mode-tabs");
+  for (const mode of ["library", "images", "ranking"] as const) {
+    const tab = button(t(mode === "library" ? "title" : mode === "images" ? "allPictures" : "ranking"), () => {
+      state.mode = mode; redraw();
+    }, state.mode === mode ? "is-active" : "");
+    tab.setAttribute("aria-pressed", String(state.mode === mode));
+    toolbar.appendChild(tab);
+  }
   const root = makeEl("section", "al-character-page");
+  root.appendChild(toolbar);
+  const add = button(t("add"), () => new CharacterPickerModal(host, service).open(), "mod-cta");
+  context.pageActions.replaceChildren(add);
+  if (state.mode === "ranking") {
+    container.replaceChildren(root);
+    const content = makeEl("div");
+    root.appendChild(content);
+    await renderCharacterRanking(content, host, rankingStore(host), records, redraw, path => {
+      state.selected = path; redraw();
+    });
+    return;
+  }
+  if (state.mode === "images") {
+    container.replaceChildren(root);
+    const content = makeEl("div");
+    root.appendChild(content);
+    const galleryWorks = await Promise.all(records.map(async record => {
+      const file = host.app.vault.getAbstractFileByPath(record.path);
+      if (!(file instanceof TFile)) return null;
+      const markdown = await host.app.vault.cachedRead(file);
+      const eligible = characterRankingItems([record])[0];
+      return buildImageGalleryWork(eligible, markdown);
+    }));
+    if (context.signal.aborted || !container.isConnected) return;
+    const imageService = imageSectionServiceForHost(host);
+    renderImageGallery(content, galleryWorks.filter(work => work !== null), {
+      ...DEFAULT_IMAGE_GALLERY_STATE, type: "all", mode: "all",
+    }, {
+      resolve: image => imageService.resolve(image.path, image.sourcePath),
+      openLightbox(images, index) {
+        new ImageLightboxModal(host.app, imageService, images.map(image => ({
+          path: image.path, sourcePath: image.sourcePath,
+        })), index).open();
+      },
+      openSource(path) { void host.openMediaFile(path); },
+    });
+    return;
+  }
+  const filterRoot = makeEl("div");
   const tools = makeEl("div", "al-character-tools");
   const query = makeEl("input");
   query.type = "search";
@@ -212,9 +271,8 @@ export async function renderCharacterPage(
   query.addEventListener("input", () => { state.query = query.value; renderCards(); });
   tier.addEventListener("change", () => { state.tier = tier.value as CharacterPageState["tier"]; renderCards(); });
   tools.append(query, tier);
-  root.append(tools, grid);
-  const add = button(t("add"), () => new CharacterPickerModal(host, service).open(), "mod-cta");
-  context.pageActions.replaceChildren(add);
+  filterRoot.append(tools, grid);
+  root.appendChild(filterRoot);
   container.replaceChildren(root);
   renderCards();
 }

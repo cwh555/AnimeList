@@ -122,8 +122,14 @@ export async function renderCharacterRanking(
   }));
   if (list.ordered.length || list.round) controls.appendChild(action(t("restartRanking"), () => {
     // Explicit re-ranking only. No automatic reset on library refresh.
-    if (!window.confirm(t("restartConfirm"))) return;
-    void change(draft => { draft.round = null; prepareRankingRounds(draft, eligible, "full"); }, true);
+    const modal = new Modal(host.app);
+    modal.contentEl.appendChild(makeEl("h3", "", t("restartRanking")));
+    modal.contentEl.appendChild(makeEl("p", "", t("restartConfirm")));
+    modal.contentEl.append(action(t("cancel"), () => modal.close()), action(t("restartRanking"), () => {
+      modal.close();
+      void change(draft => { draft.round = null; prepareRankingRounds(draft, eligible, "full"); }, true);
+    }));
+    modal.open();
   }));
   head.appendChild(controls);
   container.appendChild(head);
