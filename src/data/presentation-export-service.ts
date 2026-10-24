@@ -1,7 +1,7 @@
 import { normalizePath } from "obsidian";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { PresentationKind, PresentationMediaType } from "../domain/presentation-export";
-import { copyPngBlobToClipboard } from "../ui/image-clipboard";
+import { copyPngBlobToClipboard } from "../ui/png-clipboard";
 
 /** Presentation exports are new artifacts, never writes to media Markdown. */
 export class PresentationExportService {
