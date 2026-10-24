@@ -1,4 +1,4 @@
-import { Modal, Notice } from "obsidian";
+import { Modal, Notice, TFile } from "obsidian";
 import type { AnimeListFeatureHost } from "../../app/feature-types";
 import { characterRankingItems } from "../../domain/characters/ranking-items";
 import type { CharacterRecord } from "../../domain/characters/character";
@@ -25,7 +25,7 @@ function face(record: CharacterRecord, host: AnimeListFeatureHost): HTMLElement 
   if (src && !/^https?:\/\//i.test(src)) {
     const file = host.app.metadataCache.getFirstLinkpathDest(src, record.path)
       ?? host.app.vault.getAbstractFileByPath(src);
-    src = file && "extension" in file ? host.app.vault.getResourcePath(file) : "";
+    src = file instanceof TFile ? host.app.vault.getResourcePath(file) : "";
   }
   if (src) {
     const img = makeEl("img");
