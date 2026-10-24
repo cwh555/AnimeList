@@ -428,11 +428,13 @@ export class LibraryExportModal extends AnimeListModal {
     const previous = makeEl("button", "al-secondary-button", "‹");
     previous.type = "button";
     previous.setAttribute("aria-label", "Previous PNG page");
+    Object.assign(previous.style, { minWidth: "44px", minHeight: "44px" });
     previous.addEventListener("click", () => this.showPngPage(this.presentationPageIndex - 1));
     const pageLabel = makeEl("span", "", "");
     const next = makeEl("button", "al-secondary-button", "›");
     next.type = "button";
     next.setAttribute("aria-label", "Next PNG page");
+    Object.assign(next.style, { minWidth: "44px", minHeight: "44px" });
     next.addEventListener("click", () => this.showPngPage(this.presentationPageIndex + 1));
     pager.append(previous, pageLabel, next);
     pager.hidden = true;

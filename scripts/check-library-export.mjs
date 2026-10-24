@@ -153,6 +153,7 @@ try {
   const fixtureBlob = await new Promise(resolve => imageCanvas.toBlob(resolve, "image/png"));
   const fixtureBytes = await fixtureBlob.arrayBuffer();
   const creates = [];
+  const binaryCreates = [];
   const host = {
     app: {
       vault: {
@@ -164,6 +165,7 @@ try {
           return fixtureBytes;
         },
         async create(path, content){ creates.push({path,content}); return {path}; },
+        async createBinary(path, data){ binaryCreates.push({path,data}); return {path}; },
       },
       metadataCache: {
         getFileCache(file){ return file === mediaNote ? {frontmatter:{cover:"Covers/Work.png"}} : null; },
@@ -326,6 +328,51 @@ try {
       && pixel[0] > 180 && pixel[1] < 100 && pixel[2] < 100;
   } else {
     details.presentationPngContainsActualArtwork = false;
+  }
+  // Exercise multi-page PNG preview and Vault saving in a mobile viewport.
+  // The sample uses real Canvas generation while avoiding remote test fixtures.
+  if (isMobile) {
+    const firstWork = items[0];
+    for (let index = 0; index < 55; index += 1) {
+      items.push({
+        ...firstWork, title: "Extra work " + index,
+        filePath: "AnimeList/anime/extra-" + index + ".md",
+        cover: "", score: 10,
+      });
+    }
+    pngSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    const pageNav = content.querySelector(".al-presentation-export-pager");
+    const pageButtons = [...pageNav.querySelectorAll("button")];
+    const pageCountText = () => pageNav.querySelector("span")?.textContent || "";
+    for (let trial = 0; trial < 120 && pageNav.hidden; trial += 1) {
+      await new Promise(resolve => setTimeout(resolve, 80));
+    }
+    const totalPages = Number(pageCountText().split("/")[1]?.trim());
+    details.mobilePngSplitsIntoPages = !pageNav.hidden && Number.isInteger(totalPages) && totalPages > 1;
+    details.mobilePngPagerTouchTargets = pageButtons.length === 2 && pageButtons.every(button => {
+      const r = button.getBoundingClientRect();
+      return r.width >= 44 && r.height >= 44;
+    });
+    const originalPageSrc = imagePreview.src;
+    pageButtons[1]?.click();
+    details.mobilePngNextPageWorks = pageCountText().startsWith("2 / ")
+      && imagePreview.src !== originalPageSrc && !pageButtons[1].disabled === (totalPages > 2);
+    pageButtons[0]?.click();
+    details.mobilePngPreviousPageWorks = pageCountText().startsWith("1 / ")
+      && imagePreview.src !== originalPageSrc && pageButtons[0].disabled;
+    const imageRect = imagePreview.getBoundingClientRect();
+    details.mobilePngPreviewFits = imageRect.width > 0 && imageRect.left >= -1
+      && imageRect.right <= innerWidth + 1
+      && document.documentElement.scrollWidth <= innerWidth + 1;
+    details.mobilePngCopyBlocked = copyButton.disabled;
+    saveButton?.click();
+    for (let trial = 0; trial < 40 && binaryCreates.length !== totalPages; trial += 1) {
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+    details.mobilePngSaveAllPages = binaryCreates.length === totalPages
+      && binaryCreates.every(file => file.path.endsWith(".png")
+        && file.path.startsWith("AnimeList/Exports/AnimeList-scoreboard-anime")
+        && file.data?.byteLength > 100);
   }
   document.body.dataset.details = JSON.stringify(details);
   document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
