@@ -53,7 +53,10 @@ async function renderGalleryPage(
     openSource: (path) => host.openMediaFile(path),
     onStateChange: (state) => STATES.set(host, { ...state }),
     onAssignCharacter: image => {
-      new CharacterImageAssignmentModal(host, characterService(host), image.path).open();
+      // The image may use a note-relative link. Store the resolved Vault path so
+      // the same file remains valid when referenced from a character note.
+      const asset = imageService.resolve(image.path, image.sourcePath);
+      new CharacterImageAssignmentModal(host, characterService(host), asset.file?.path ?? image.path).open();
     },
   });
 }
