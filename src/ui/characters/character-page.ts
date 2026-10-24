@@ -5,6 +5,7 @@ import type { CharacterLibraryService } from "../../data/character-library-servi
 import { findImageSectionBlocks, parseImageSectionSource } from "../../domain/image-section";
 import { imageAssetFromFile, imageSectionServiceForHost } from "../../data/image-section-service";
 import { ImageLightboxModal } from "../image-lightbox";
+import { bindImageFallback } from "../image-fallback";
 import { makeEl } from "../ui-helpers";
 import type { WorkspacePageRenderContext } from "../workspace-contracts";
 import { CharacterPickerModal } from "./character-picker";
@@ -45,15 +46,12 @@ function portrait(host: AnimeListFeatureHost, record: CharacterRecord): HTMLElem
   const src = imageResource(host, record.portrait, record.path);
   if (src) {
     const image = makeEl("img");
-    image.src = src;
     image.alt = record.name;
     image.loading = "lazy";
     image.decoding = "async";
-    image.addEventListener("error", () => {
-      image.remove();
-      wrap.appendChild(makeEl("span", "al-character-cover-fallback", "☆"));
-    }, { once: true });
+    bindImageFallback(image, () => makeEl("span", "al-character-cover-fallback", "☆"));
     wrap.appendChild(image);
+    image.src = src;
   } else wrap.appendChild(makeEl("span", "al-character-cover-fallback", "☆"));
   return wrap;
 }
@@ -119,10 +117,11 @@ async function renderDetails(
           images.map(value => ({ path: value, sourcePath: record.path })), index).open();
       }, "al-character-image-open");
       const image = makeEl("img");
-      image.src = src;
       image.alt = record.name;
       image.loading = "lazy";
+      bindImageFallback(image, () => makeEl("span", "al-character-cover-fallback", "☆"));
       open.appendChild(image);
+      image.src = src;
       thumb.appendChild(open);
       thumb.appendChild(button(t("portrait"), () => {
         void service.setPortrait(record.path, path).then(() => host.refreshViews())

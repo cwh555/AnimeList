@@ -4,6 +4,7 @@ import type { CharacterCandidate } from "../../domain/characters/character";
 import type { CharacterLibraryService } from "../../data/character-library-service";
 import { BangumiCharacterClient } from "../../data/providers/bangumi-character-client";
 import { AnimeListModal } from "../animelist-modal";
+import { bindImageFallback } from "../image-fallback";
 import { makeEl } from "../ui-helpers";
 import { characterText as t } from "../../features/characters/text";
 
@@ -117,10 +118,11 @@ export class CharacterPickerModal extends AnimeListModal {
       const card = makeEl("article", "al-character-candidate");
       if (candidate.portrait) {
         const image = makeEl("img");
-        image.src = candidate.portrait;
         image.alt = candidate.name;
         image.loading = "lazy";
+        bindImageFallback(image, () => makeEl("div", "al-character-placeholder", "☆"));
         card.appendChild(image);
+        image.src = candidate.portrait;
       } else card.appendChild(makeEl("div", "al-character-placeholder", "☆"));
       card.appendChild(makeEl("div", "al-character-candidate-name", candidate.name));
       if (candidate.relation) card.appendChild(makeEl("small", "", candidate.relation));
