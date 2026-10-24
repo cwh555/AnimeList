@@ -33,7 +33,7 @@ export const characterFeature = {
       });
       const ranking = new CharacterRankingStore(host.app);
       host.registerEvent(host.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof TFile)) return;
+        if (!(file instanceof TFile) || typeof oldPath !== "string") return;
         if (oldPath.includes("/Characters/")) {
           characterService(host).renameCharacterPath(oldPath, file.path);
           void ranking.rename(oldPath, file.path).catch(error => {
