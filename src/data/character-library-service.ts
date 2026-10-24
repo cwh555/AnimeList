@@ -8,6 +8,8 @@ import {
 /** Local Markdown is authoritative. Character notes are outside the anime/manga/novel indices. */
 export class CharacterLibraryService {
   private serial: Promise<void> = Promise.resolve();
+  /** Obsidian metadata indexing may finish after a note is created. */
+  private readonly staged = new Map<string, CharacterRecord>();
   constructor(private readonly app: App, private readonly root: () => string) {}
 
   private folder(): string {
@@ -29,9 +31,18 @@ export class CharacterLibraryService {
 
   async list(): Promise<CharacterRecord[]> {
     const files = getScopedMarkdownFiles(this.app, [this.folder()]);
-    const records = files.map(file => this.read(file));
-    return records.filter((item): item is CharacterRecord => item !== null)
-      .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant") || a.id.localeCompare(b.id));
+    const records = files.map(file => this.read(file))
+      .filter((item): item is CharacterRecord => item !== null);
+    const indexed = new Set(records.map(item => item.id));
+    const filePaths = new Set(files.map(file => file.path));
+    for (const [id, pending] of this.staged) {
+      if (indexed.has(id) || !filePaths.has(pending.path)) {
+        this.staged.delete(id);
+      } else {
+        records.push(pending);
+      }
+    }
+    return records.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant") || a.id.localeCompare(b.id));
   }
 
   private queue<T>(run: () => Promise<T>): Promise<T> {
@@ -54,7 +65,9 @@ export class CharacterLibraryService {
             frontmatter.character_appearances = appearances;
           });
         }
-        return { ...existing, appearances };
+        const result = { ...existing, appearances };
+        if (this.staged.has(existing.id)) this.staged.set(existing.id, result);
+        return result;
       }
       await this.ensureFolder();
       const id = crypto.randomUUID();
@@ -62,11 +75,13 @@ export class CharacterLibraryService {
       await this.app.vault.create(path, characterNoteSource(id, { ...candidate, name }));
       // The Obsidian metadata cache can lag behind file creation.
       // Return the known written data; metadata-driven lists update when indexing catches up.
-      return {
+      const record: CharacterRecord = {
         id, path, name, tier: "liked",
         bangumiId: candidate.bangumiId ?? "", portrait: candidate.portrait ?? "",
         appearances: mergeCharacterAppearances([], candidate.appearance),
       };
+      this.staged.set(id, record);
+      return record;
     });
   }
 
@@ -77,6 +92,9 @@ export class CharacterLibraryService {
       await this.app.fileManager.processFrontMatter(file, frontmatter => {
         frontmatter.character_tier = tier;
       });
+      for (const [id, record] of this.staged) {
+        if (record.path === path) this.staged.set(id, { ...record, tier });
+      }
     });
   }
 
@@ -87,6 +105,9 @@ export class CharacterLibraryService {
       await this.app.fileManager.processFrontMatter(file, frontmatter => {
         frontmatter.character_portrait = portrait;
       });
+      for (const [id, record] of this.staged) {
+        if (record.path === path) this.staged.set(id, { ...record, portrait });
+      }
     });
   }
 }

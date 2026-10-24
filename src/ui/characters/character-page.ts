@@ -38,7 +38,8 @@ function imageResource(host: AnimeListFeatureHost, image: string, sourcePath: st
   if (/^https:\/\//i.test(image)) return image;
   const file = host.app.metadataCache.getFirstLinkpathDest(image, sourcePath)
     ?? host.app.vault.getAbstractFileByPath(image);
-  return file instanceof TFile ? host.app.vault.getResourcePath(file) : "";
+  return file instanceof TFile
+    ? host.getImageThumbnailSources(file)?.src || host.app.vault.getResourcePath(file) : "";
 }
 
 function portrait(host: AnimeListFeatureHost, record: CharacterRecord): HTMLElement {
@@ -109,7 +110,8 @@ async function renderDetails(
   const gallery = makeEl("div", "al-character-images");
   const imageService = imageSectionServiceForHost(host);
   for (const [index, path] of images.entries()) {
-    const src = imageService.resolve(path, record.path).resourcePath;
+    const resolved = imageService.resolve(path, record.path);
+    const src = resolved.thumbnailSources?.src || resolved.resourcePath;
     const thumb = makeEl("div", "al-character-image");
     if (src) {
       const open = button("", () => {

@@ -46,3 +46,11 @@ it("normalizes Bangumi character candidates and tolerates missing images", () =>
   assert.equal(bangumiCharacterCandidate({ id: null, name: "Test" }), null);
   assert.equal(bangumiCharacterCandidate({ id: 5, name: "" }), null);
 });
+
+it("uses a real Image Section block for character notes, not a separate image store", async () => {
+  const { findImageSectionBlocks } = await import("../src/domain/image-section");
+  const note = characterNoteSource("identifier", { name: "Char" });
+  const blocks = findImageSectionBlocks(note);
+  assert.equal(blocks.length, 1);
+  assert.deepEqual(blocks[0].paths, []);
+});
