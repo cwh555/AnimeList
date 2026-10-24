@@ -1602,6 +1602,12 @@ button.al-gallery-back:hover { color:var(--text-normal); background:var(--backgr
 .al-character-compare-choice { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 10px; white-space: normal; }
 .al-character-compare-cover { width: 100%; max-width: 240px; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 12px; background: var(--background-secondary); display: grid; place-items: center; }
 .al-character-compare-cover img { width: 100%; height: 100%; object-fit: cover; }
+.al-character-ranking-row .al-character-compare-cover { flex: 0 0 44px; width: 44px; height: 60px; border-radius: 6px; }
+.al-character-ranking-row .al-character-rank-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.al-character-rename-row { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.al-character-rename-row input { flex: 1 1 150px; min-width: 0; }
+.al-character-photo-actions input[type="text"] { flex: 1 1 220px; min-width: 0; }
+.al-character-assign-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr)); gap: 8px; margin: 12px 0; max-height: 50vh; overflow: auto; }
 
 /* Timeline poster cards share one compact 2:3 footprint in modal and workspace presentations. */
 .al-timeline-card {

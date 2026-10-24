@@ -143,12 +143,12 @@ export async function renderCharacterRanking(
   });
   for (const record of displayed) {
     const position = confirmed.get(record.path), bounds = positions.get(record.path);
-    const row = action(record.name, () => open(record.path));
+    const row = action("", () => open(record.path));
     row.classList.add("al-character-ranking-row");
     const positionText = position != null ? "#" + position
       : bounds ? "#" + bounds.first + "–" + bounds.last : "—";
-    row.prepend(makeEl("span", "al-character-rank", positionText));
-    row.appendChild(face(record, host));
+    row.append(makeEl("span", "al-character-rank", positionText), face(record, host),
+      makeEl("span", "al-character-rank-name", record.name));
     rows.appendChild(row);
   }
   container.appendChild(rows);

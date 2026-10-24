@@ -8,6 +8,7 @@ import type { CharacterRecord } from "../src/domain/characters/character";
 import { emptyRankingCollection, nextRankingPair, prepareRankingRounds, decideRanking,
   rankingPositionProjection } from "../src/domain/pairwise-ranking";
 import { externalImageUri, localPathFromImageUri } from "../src/domain/characters/external-image";
+import { bangumiSubjectId } from "../src/domain/characters/work-source";
 
 function file(path: string): TFile {
   const value = new TFile();
@@ -127,4 +128,11 @@ it("stores ranking separately and protects concurrent edits", async () => {
   assert.deepEqual((await new CharacterRankingStore(app).load()).ordered, ["Char/A.md"]);
   data.set(".obsidian/animelist-character-ranking.json", "external-change");
   await assert.rejects(store.mutate(ranking => { ranking.ordered.push("Char/B.md"); }), /changed on another device/);
+});
+
+it("recognizes verified Bangumi work URLs but never guesses provider identities from titles", () => {
+  assert.equal(bangumiSubjectId({ source_provider: "bangumi", source_id: "123" }), "123");
+  assert.equal(bangumiSubjectId({ source_provider: "anilist", source_urls: ["https://bgm.tv/subject/456"] }), "456");
+  assert.equal(bangumiSubjectId({ source_provider: "anilist", source_id: "456", title: "Example" }), "");
+  assert.equal(bangumiSubjectId({ source_urls: ["https://malicious.site/subject/456"] }), "");
 });

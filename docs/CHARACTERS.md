@@ -1,34 +1,38 @@
-# Characters (feature preview)
+# Characters — Feature Preview
 
-Characters is an opt-in collection **inside AnimeList**, not a separate plugin.
+Characters is integrated into the AnimeList workspace, not a separate plugin. It shows **one cover card per collected character**, like Library, without a Graph View, achievements, forced completion goals, or an independent image engine.
 
-## Usage
+## Entry points and workflow
 
-1. Open AnimeList → **Characters** → **Add character** to search Bangumi or add a character manually. Each selected character occupies one cover card, like Library.
-2. On a media note, select **View / collect characters** under the detail block. A work with a verified Bangumi subject ID offers its cast. Without an ID, search by character name or add manually.
-3. Select a card to choose Like/Love/Favorite, follow related AnimeList works, import images, change the character portrait, or open the underlying Markdown note.
-4. The character note contains a standard \`animelist-images\` Markdown block and works with the existing Image Section and Lightbox. No automatically discovered character is collected without a user action.
+1. **Characters:** open the main tab, search Bangumi characters or add names manually; only selected characters enter your collection. Each card opens its profile.
+2. **Library media note:** beneath the media detail block, choose "View / collect characters" to see an on-demand Bangumi cast list (when a verified subject ID or Bangumi subject URL exists), or search manually. Selected characters link back to the work. The same verified Bangumi character appearing in different seasons remains one entry.
+3. **Images:** each image in the existing Gallery has an action to link that image into an existing character or create a character first, without copying the same image file.
 
-## Data and compatibility
+The Characters tab offers a local cover-card **Library**, mixed-character **Images Gallery** (also supports browsing by character/section) and **Ranking**. From the existing Scoreboard → Ranking panel, choose "Characters" to enter character comparisons. The sorting uses the existing strict pairwise evidence, skips, transitive reasoning and possible-rank intervals; character ranking is stored separately from all media rankings.
 
-Records are separate Markdown notes under \`<libraryRoot>/Characters/character-<UUID>.md\`, marked \`animelist_character: true\`. They have no \`media_type\` and therefore cannot pollute anime/manga/novel lists. Stable local IDs and confirmed Bangumi character IDs are tracked independently; identical names alone are not treated as proof of identity. Appearance paths reference the original media notes. Existing media notes, ratings, rank evidence and Image Sections are not migrated or rewritten.
+Within a character, set the three-level preference, change the display name, choose the cover image, see linked media, add images, and open the underlying Markdown note. Standard Image Sections and Image Lightbox remain available, including multiple manually arranged image sections.
 
-## Deliberate limitations
+## Storage and backwards compatibility
 
-- External filesystem paths outside the Obsidian vault are not supported yet, especially for mobile. Uploaded images are copied into the Vault through AnimeList's existing Image Section service.
-- Automatic work cast lookup requires a verified Bangumi subject ID. No title-only cross-provider matching is performed.
-- The shared Images gallery and Ranking have not yet acquired character-specific filters. Character images are accessible via the Character page and existing Image Sections.
-- Work note rename and relocation handling for stored appearance paths is not part of this first preview. Character identity itself is stable.
-- This is not a release. Desktop and mobile test vault acceptance is still required.
+- Character notes are created only after an explicit user action under `<libraryRoot>/Characters/character-<UUID>.md`.
+- `animelist_character: true` and stable local UUID identify the note; optional Bangumi ID is separate. Characters have **no** `media_type` and are ignored by Anime/Manga/Novel indexing.
+- Character metadata lives in YAML; images are stored as references in standard `animelist-images` Markdown blocks. Existing media notes are not migrated, and unrelated frontmatter and body contents remain untouched.
+- Pairwise character state is stored in `.obsidian/animelist-character-ranking.json` with optimistic write conflict detection. Existing `animelist-ranking.json` is unchanged.
+- Work-note renames update stored character appearance links, and character-note renames update ranking paths.
+- Local image upload **copies** the image into the Vault via the existing Image Section service. Linking an existing Gallery image references it without copying. On Desktop only, users can also paste an absolute file path and choose **Link without copying**; it is converted to a local `file:` URL in the note. Local bytes are read through a Desktop bridge only and never uploaded to providers. Mobile cannot load that file reference, and should show the missing-image state instead. Source files remain untouched.
 
-## Manual test-vault checklist
+## Verification
 
-1. Open Characters in an empty vault; create a manual character, close and reopen the plugin, and confirm it remains.
-2. Load the cast of a known Bangumi work; add a main and a supporting character, and confirm only these two are collected.
-3. Collect the same Bangumi character from two works; confirm no duplicate and both appearances are visible.
-4. Change all three preference levels and reload; check the data persists.
-5. Import JPG / PNG / WebP images into a character and choose a new portrait. Open Lightbox, then edit the image list in the character Markdown note.
-6. Check empty sections, offline/error behavior, desktop card layout, mobile scrolling and touch behavior.
-7. Regress Library, Timeline, Scoreboard, Ranking, Images, export and ordinary work notes.
+Unit and integration tests cover stable character identity, source normalization, image references, strict ranking and conflict-safe persistence. The branch must pass `npm ci`, `npm run check`, and `npm run release:check`.
 
-Do not merge without feature CI and explicit user approval.
+Manual Desktop / Mobile test-vault checklist:
+
+- Empty Character Library; manual addition; Bangumi search; verified work cast; no unselected character collected.
+- Same verified character from two seasons is not duplicated; conflicting same-name identities remain separate.
+- Portrait fallback on broken or missing URLs; rename display name; three preference levels; note reload; work links.
+- JPG/PNG/WebP image imports, existing Gallery image assignment without duplication, image Lightbox, image section reorder, multiple sessions, mixed-character Gallery, and mobile gallery scrolling.
+- Characters Ranking: first compare, skip, resume, full rerank, exact positions and possible ranges; existing media Ranking unchanged.
+- Desktop `file:` references without copying, after app reload; confirm Mobile displays an unavailable-image placeholder rather than pretending to sync.
+- Regression: existing Library / Timeline / Scoreboard / Ranking / Images / Export and images in media notes.
+
+**Do not merge before user review and approval.**
