@@ -7,6 +7,7 @@ import { SCORE_DASHBOARD_DEFAULT_SCALE } from "../../domain/score-dashboard/mode
 import { disposeScoreDashboardInteractions, renderScoreDashboardWithBatchDrag } from "../../ui/score-dashboard/batch-drag";
 import { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { renderRankingPanel } from "../../ui/pairwise-ranking/panel";
+import { openCharacterRanking } from "../../ui/characters/character-page";
 import { rankingText } from "../pairwise-ranking/text";
 import { LibraryExportModal } from "../../ui/library-export-modal";
 import { errorMessage } from "../../ui/ui-helpers";
@@ -242,6 +243,7 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     store: rankingStore,
     items: dashboardHost.collectMediaItems(),
     type: rankState.type,
+    openCharacterRanking: () => openCharacterRanking(plugin),
     setType(value) {
       rankState.type = value;
       RANK_STATES.set(container, rankState);

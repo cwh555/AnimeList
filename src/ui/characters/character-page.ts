@@ -198,6 +198,12 @@ async function renderDetails(
   container.replaceChildren(root);
 }
 
+export function openCharacterRanking(host: AnimeListFeatureHost): void {
+  pageState(host).mode = "ranking";
+  pageState(host).selected = null;
+  void host.openLibrarySection("characters");
+}
+
 export async function renderCharacterPage(
   host: AnimeListFeatureHost, service: CharacterLibraryService,
   container: HTMLElement, context: WorkspacePageRenderContext,

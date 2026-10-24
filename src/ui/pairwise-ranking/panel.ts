@@ -19,6 +19,7 @@ interface RankingPanelOptions {
   items: readonly MediaItem[];
   type: MediaType;
   setType(value: MediaType): void;
+  openCharacterRanking?(): void;
   redraw(): void;
   openNote(path: string): Promise<void>;
   showNotice(message: string): void;
@@ -127,6 +128,10 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     const tab = button(t(type), () => options.setType(type), undefined, type === options.type ? "is-active" : "");
     tab.setAttribute("aria-pressed", String(type === options.type));
     typeTabs.appendChild(tab);
+  }
+  if (options.openCharacterRanking) {
+    const characters = button("Characters", options.openCharacterRanking);
+    typeTabs.appendChild(characters);
   }
   const stats = makeEl("div", "al-ranking-stats");
   stats.append(
