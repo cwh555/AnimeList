@@ -130,7 +130,7 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
     typeTabs.appendChild(tab);
   }
   if (options.openCharacterRanking) {
-    const characters = button("Characters", options.openCharacterRanking);
+    const characters = button("Characters", () => options.openCharacterRanking?.());
     typeTabs.appendChild(characters);
   }
   const stats = makeEl("div", "al-ranking-stats");
