@@ -27,6 +27,7 @@ try {
             'export class TFile { constructor(path=""){ this.path=path;this.name=path.split("/").pop();this.basename=this.name.replace(/\\.md$/,"");this.extension=path.endsWith(".md")?"md":"png";this.stat={ctime:1,mtime:1,size:100}; } }',
             'export class Modal { constructor(app){this.app=app;this.modalEl=document.createElement("div");this.modalEl.className="modal";this.contentEl=document.createElement("div");this.contentEl.className="modal-content";this.modalEl.append(this.contentEl);} open(){document.body.append(this.modalEl);this.onOpen?.();} close(){this.onClose?.();this.modalEl.remove();} }',
             'export class Notice { constructor(message){ (window.__notices ||= []).push(message); } }',
+            'export class Menu { addItem(handler){handler({setTitle(){return this},setIcon(){return this},onClick(){return this}});return this;} showAtMouseEvent(){} }',
             'export function normalizePath(path){return String(path || "");}',
             'export function requestUrl(){return Promise.reject(new Error("No network fixture"));}',
             'export function setIcon(element,name){element.dataset.icon=name;}',
