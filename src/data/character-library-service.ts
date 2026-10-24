@@ -1,4 +1,5 @@
-import { normalizePath, parseYaml, TFile, type App } from "obsidian";
+import { normalizePath, TFile, type App } from "obsidian";
+import { getScopedMarkdownFiles } from "./vault-scope";
 import type { CharacterCandidate, CharacterRecord, CharacterTier } from "../domain/characters/character";
 import {
   characterFromFrontmatter, characterNoteSource, findExistingCharacter, mergeCharacterAppearances,
@@ -22,18 +23,13 @@ export class CharacterLibraryService {
     }
   }
 
-  private async read(file: TFile): Promise<CharacterRecord | null> {
-    const source = await this.app.vault.read(file);
-    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(source);
-    if (!match) return null;
-    try { return characterFromFrontmatter(parseYaml(match[1]), file.path); }
-    catch { return null; }
+  private read(file: TFile): CharacterRecord | null {
+    return characterFromFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter, file.path);
   }
 
   async list(): Promise<CharacterRecord[]> {
-    const prefix = this.folder() + "/";
-    const files = this.app.vault.getMarkdownFiles().filter(file => file.path.startsWith(prefix));
-    const records = await Promise.all(files.map(file => this.read(file)));
+    const files = getScopedMarkdownFiles(this.app, [this.folder()]);
+    const records = files.map(file => this.read(file));
     return records.filter((item): item is CharacterRecord => item !== null)
       .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant") || a.id.localeCompare(b.id));
   }
@@ -63,17 +59,21 @@ export class CharacterLibraryService {
       await this.ensureFolder();
       const id = crypto.randomUUID();
       const path = normalizePath(this.folder() + "/character-" + id + ".md");
-      const file = await this.app.vault.create(path, characterNoteSource(id, { ...candidate, name }));
-      const record = await this.read(file);
-      if (!record) throw new Error("Unable to read the newly created character");
-      return record;
+      await this.app.vault.create(path, characterNoteSource(id, { ...candidate, name }));
+      // The Obsidian metadata cache can lag behind file creation.
+      // Return the known written data; metadata-driven lists update when indexing catches up.
+      return {
+        id, path, name, tier: "liked",
+        bangumiId: candidate.bangumiId ?? "", portrait: candidate.portrait ?? "",
+        appearances: mergeCharacterAppearances([], candidate.appearance),
+      };
     });
   }
 
   async setTier(path: string, tier: CharacterTier): Promise<void> {
     await this.queue(async () => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile) || !(await this.read(file))) throw new Error("Character not found");
+      if (!(file instanceof TFile) || !file.path.startsWith(this.folder() + "/")) throw new Error("Character not found");
       await this.app.fileManager.processFrontMatter(file, frontmatter => {
         frontmatter.character_tier = tier;
       });
@@ -83,7 +83,7 @@ export class CharacterLibraryService {
   async setPortrait(path: string, portrait: string): Promise<void> {
     await this.queue(async () => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile) || !(await this.read(file))) throw new Error("Character not found");
+      if (!(file instanceof TFile) || !file.path.startsWith(this.folder() + "/")) throw new Error("Character not found");
       await this.app.fileManager.processFrontMatter(file, frontmatter => {
         frontmatter.character_portrait = portrait;
       });
