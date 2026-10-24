@@ -1,0 +1,90 @@
+import { defineTextCatalog, registerLocaleMessages } from "../../i18n/catalog";
+
+const ZH = {
+  title: "Characters",
+  add: "收藏角色",
+  search: "搜尋角色名稱",
+  find: "搜尋",
+  manual: "手動新增",
+  select: "從作品挑選角色",
+  loading: "正在取得角色…",
+  empty: "還沒有收藏角色。你可以從作品選擇角色，或直接搜尋新增。",
+  noResults: "沒有找到角色；仍可手動新增。",
+  unavailable: "這部作品沒有已確認的 Bangumi ID。可以搜尋角色名稱或手動新增。",
+  failed: "操作失敗：{reason}",
+  collected: "已收藏",
+  collect: "加入收藏",
+  open: "打開角色筆記",
+  back: "返回角色收藏",
+  level: "喜愛程度",
+  all: "全部",
+  top: "最喜歡",
+  high: "很喜歡",
+  liked: "喜歡",
+  works: "相關作品",
+  pictures: "收藏圖片",
+  noPictures: "尚未有圖片。可以加入圖片，或到角色筆記使用 Image Section。",
+  addPictures: "加入圖片",
+  portrait: "設為代表圖片",
+  pictureHelp: "在角色筆記內也能使用現有 Image Section 編輯與排序圖片。",
+  name: "角色姓名",
+  source: "Bangumi",
+  showCast: "查看／收藏角色",
+  related: "已收藏的相關角色",
+  searchAction: "搜尋角色",
+  saved: "已加入 Characters",
+} as const;
+const EN = {
+  title: "Characters", add: "Add character", search: "Search character names", find: "Search",
+  manual: "Add manually", select: "Choose characters from work", loading: "Loading characters…",
+  empty: "No characters collected yet. Choose characters from a work or search for them.",
+  noResults: "No characters found. You can still add one manually.",
+  unavailable: "This work has no verified Bangumi ID. Search characters or add them manually.",
+  failed: "Operation failed: {reason}", collected: "Collected", collect: "Collect",
+  open: "Open character note", back: "Back to characters", level: "Preference",
+  all: "All", top: "Favorite", high: "Love", liked: "Like", works: "Related works",
+  pictures: "Collected images", noPictures: "No images yet. Add images or edit an Image Section in this note.",
+  addPictures: "Add images", portrait: "Set as portrait",
+  pictureHelp: "You can also manage images in the character note using existing Image Sections.",
+  name: "Character name", source: "Bangumi", showCast: "View / collect characters",
+  related: "Collected characters from this work", searchAction: "Search characters",
+  saved: "Added to Characters",
+} satisfies Record<keyof typeof ZH, string>;
+const JA = { title:"キャラクター", add:"キャラクターを追加", search:"キャラクター名を検索", find:"検索",
+  manual:"手動追加", select:"作品からキャラクターを選択", loading:"読み込み中…", empty:"キャラクターがまだありません。",
+  noResults:"見つかりません。手動追加もできます。", unavailable:"Bangumi ID が未確認です。検索または手動追加してください。",
+  failed:"失敗：{reason}", collected:"追加済み", collect:"追加", open:"ノートを開く", back:"一覧へ戻る",
+  level:"好み", all:"すべて", top:"大好き", high:"とても好き", liked:"好き", works:"関連作品",
+  pictures:"画像", noPictures:"画像がありません。画像を追加するか Image Section から編集できます。",
+  addPictures:"画像を追加", portrait:"代表画像に設定", pictureHelp:"キャラクターノートの Image Section からも編集できます。",
+  name:"キャラクター名", source:"Bangumi", showCast:"キャラクターを見る／追加する",
+  related:"この作品の追加済みキャラクター", searchAction:"キャラクターを検索", saved:"追加しました"
+} satisfies Record<keyof typeof ZH, string>;
+const KO = {title:"캐릭터", add:"캐릭터 추가", search:"캐릭터 이름 검색", find:"검색",
+  manual:"직접 추가",select:"작품에서 선택",loading:"불러오는 중…",empty:"아직 수집한 캐릭터가 없습니다.",
+  noResults:"검색 결과가 없습니다. 직접 추가할 수 있습니다.",unavailable:"확인된 Bangumi ID가 없습니다. 검색하거나 직접 추가하세요.",
+  failed:"실패: {reason}", collected:"수집됨",collect:"수집",open:"캐릭터 노트 열기",back:"목록으로",
+  level:"선호도",all:"전체",top:"최애",high:"매우 좋아함",liked:"좋아함",works:"관련 작품",
+  pictures:"이미지",noPictures:"이미지가 없습니다. 이미지를 추가하거나 Image Section을 편집하세요.",
+  addPictures:"이미지 추가",portrait:"대표 이미지로",pictureHelp:"캐릭터 노트의 Image Section에서도 이미지를 관리할 수 있습니다.",
+  name:"캐릭터 이름",source:"Bangumi",showCast:"캐릭터 보기 / 수집",related:"이 작품에서 수집한 캐릭터",
+  searchAction:"캐릭터 검색",saved:"수집함"
+} satisfies Record<keyof typeof ZH, string>;
+const CN = { title:"Characters",add:"收藏角色",search:"搜索角色名称",find:"搜索",manual:"手动添加",
+  select:"从作品选择角色",loading:"正在获取角色…",empty:"还没有收藏角色。可以从作品选择或搜索。",
+  noResults:"没有找到角色；仍可手动添加。",unavailable:"没有已确认的 Bangumi ID。可以搜索或手动添加。",
+  failed:"操作失败：{reason}",collected:"已收藏",collect:"加入收藏",open:"打开角色笔记",back:"返回角色收藏",
+  level:"喜爱程度",all:"全部",top:"最喜欢",high:"很喜欢",liked:"喜欢",works:"相关作品",
+  pictures:"收藏图片",noPictures:"尚未有图片。可以添加图片或在 Image Section 中编辑。",
+  addPictures:"添加图片",portrait:"设为代表图片",pictureHelp:"也可以使用角色笔记已有的 Image Section 管理图片。",
+  name:"角色姓名",source:"Bangumi",showCast:"查看／收藏角色",related:"已收藏的相关角色",
+  searchAction:"搜索角色",saved:"已加入 Characters"
+} satisfies Record<keyof typeof ZH, string>;
+const catalog = defineTextCatalog("characters", ZH);
+registerLocaleMessages("characters", "en", EN);
+registerLocaleMessages("characters", "ja", JA);
+registerLocaleMessages("characters", "ko", KO);
+registerLocaleMessages("characters", "zh-CN", CN);
+export function characterText(key: keyof typeof ZH, vars: Record<string, string | number> = {}): string {
+  return catalog.text(key, vars);
+}
