@@ -51,7 +51,7 @@ export function resolvePresentationCoverSources(
 ): PresentationCoverReference[] {
   const note = host.app.vault.getAbstractFileByPath(item.filePath);
   const fm = note instanceof TFile ? host.app.metadataCache.getFileCache(note)?.frontmatter : undefined;
-  return presentationCoverCandidates(fm?.cover, fm?.cover_remote, item.cover).flatMap(reference => {
+  return presentationCoverCandidates(fm?.cover, fm?.cover_remote, item.cover).flatMap((reference): PresentationCoverReference[] => {
     if (/^https?:\/\//i.test(reference)) return [{ kind: "remote" as const, url: reference }];
     const file = host.app.metadataCache.getFirstLinkpathDest(reference, item.filePath)
       ?? host.app.vault.getAbstractFileByPath(reference);
