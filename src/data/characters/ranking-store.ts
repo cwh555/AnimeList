@@ -82,3 +82,10 @@ export class CharacterRankingStore {
     return result;
   }
 }
+
+const sharedStores = new WeakMap<App, CharacterRankingStore>();
+export function characterRankingStoreForApp(app: App): CharacterRankingStore {
+  let store = sharedStores.get(app);
+  if (!store) { store = new CharacterRankingStore(app); sharedStores.set(app, store); }
+  return store;
+}

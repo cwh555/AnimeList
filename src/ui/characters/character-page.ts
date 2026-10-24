@@ -9,7 +9,7 @@ import { bindImageFallback } from "../image-fallback";
 import { makeEl } from "../ui-helpers";
 import type { WorkspacePageRenderContext } from "../workspace-contracts";
 import { CharacterPickerModal } from "./character-picker";
-import { CharacterRankingStore } from "../../data/characters/ranking-store";
+import { characterRankingStoreForApp } from "../../data/characters/ranking-store";
 import { renderCharacterRanking } from "./character-ranking";
 import { ImageGalleryService } from "../../data/image-gallery-service";
 import { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "../image-gallery-renderer";
@@ -26,7 +26,6 @@ interface CharacterPageState {
 }
 
 const pageStates = new WeakMap<object, CharacterPageState>();
-const rankingStores = new WeakMap<object, CharacterRankingStore>();
 const galleryServices = new WeakMap<object, ImageGalleryService>();
 function galleryService(host: AnimeListFeatureHost): ImageGalleryService {
   let service = galleryServices.get(host);
@@ -34,11 +33,7 @@ function galleryService(host: AnimeListFeatureHost): ImageGalleryService {
   return service;
 }
 const activeRender = new WeakMap<object, number>();
-function rankingStore(host: AnimeListFeatureHost): CharacterRankingStore {
-  let store = rankingStores.get(host);
-  if (!store) { store = new CharacterRankingStore(host.app); rankingStores.set(host, store); }
-  return store;
-}
+
 function pageState(host: AnimeListFeatureHost): CharacterPageState {
   let state = pageStates.get(host);
   if (!state) {
@@ -166,7 +161,8 @@ async function renderDetails(
         void service.setPortrait(record.path, path).then(() => host.refreshViews())
           .catch(error => new Notice(t("failed", { reason: msg(error) })));
       }, "al-character-image-select"));
-    } else thumb.appendChild(makeEl("span", "", path));
+    } else thumb.appendChild(makeEl("span", "al-character-hint",
+      /^file:\/\//i.test(path) ? t("desktopOnly") : t("noPictures")));
     gallery.appendChild(thumb);
   }
   if (images.length) root.appendChild(gallery);
@@ -263,9 +259,13 @@ export async function renderCharacterPage(
     container.replaceChildren(root);
     const content = makeEl("div");
     root.appendChild(content);
-    await renderCharacterRanking(content, host, rankingStore(host), records, redraw, path => {
-      state.selected = path; redraw();
-    });
+    try {
+      await renderCharacterRanking(content, host, characterRankingStoreForApp(host.app), records, redraw, path => {
+        state.selected = path; redraw();
+      });
+    } catch (error) {
+      content.replaceChildren(makeEl("p", "al-character-hint", t("failed", { reason: msg(error) })));
+    }
     return;
   }
   if (state.mode === "images") {

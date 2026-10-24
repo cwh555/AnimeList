@@ -6,7 +6,7 @@ import { renderCharacterPage } from "../../ui/characters/character-page";
 import { makeEl } from "../../ui/ui-helpers";
 import { characterText as t } from "./text";
 import { bangumiSubjectId } from "../../domain/characters/work-source";
-import { CharacterRankingStore } from "../../data/characters/ranking-store";
+import { characterRankingStoreForApp } from "../../data/characters/ranking-store";
 import { externalImagesForHost } from "../../data/characters/external-image-service";
 
 const services = new WeakMap<object, CharacterLibraryService>();
@@ -31,7 +31,7 @@ export const characterFeature = {
         name: t("title"),
         callback: () => { void host.openLibrarySection("characters"); },
       });
-      const ranking = new CharacterRankingStore(host.app);
+      const ranking = characterRankingStoreForApp(host.app);
       host.registerEvent(host.app.vault.on("rename", (file, oldPath) => {
         if (!(file instanceof TFile) || typeof oldPath !== "string") return;
         if (oldPath.includes("/Characters/")) {
