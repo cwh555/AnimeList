@@ -93,6 +93,8 @@ export interface LibraryExportDocumentV1 {
 }
 
 export interface LibraryTextExportRow {
+  path: string;
+  ranking?: string;
   time: string;
   work: string;
   entryLabel?: string;
@@ -140,6 +142,7 @@ export function sortLibraryExportRecords(records: readonly LibraryExportRecordV1
 export function buildLibraryTextExportRows(items: readonly MediaItem[]): LibraryTextExportRow[] {
   return buildLibraryCompletionEvents(items)
     .map((event): LibraryTextExportRow => ({
+      path: event.item.filePath,
       time: event.completedAt,
       work: event.item.title,
       entryLabel: event.serialEntry?.label,

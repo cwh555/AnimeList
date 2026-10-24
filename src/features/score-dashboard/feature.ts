@@ -8,6 +8,7 @@ import { disposeScoreDashboardInteractions, renderScoreDashboardWithBatchDrag } 
 import { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { renderRankingPanel } from "../../ui/pairwise-ranking/panel";
 import { rankingText } from "../pairwise-ranking/text";
+import { LibraryExportModal } from "../../ui/library-export-modal";
 import { errorMessage } from "../../ui/ui-helpers";
 import { pathBelongsToLibraryRoot } from "../../data/library-change-scope";
 import { normalizeMediaStatus } from "../../domain/media-status";
@@ -199,6 +200,22 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
     });
     tabs.appendChild(tab);
   }
+  const exportAction = createEl("button");
+  exportAction.type = "button";
+  exportAction.className = "al-ranking-workspace-export";
+  exportAction.textContent = "Export";
+  exportAction.title = "Export";
+  exportAction.addEventListener("click", () => {
+    new LibraryExportModal(plugin, {
+      kind: rankState.mode === "rating" ? "scoreboard" : "ranking",
+      mediaType: rankState.mode === "rating" ? scoreState.type : rankState.type,
+    }).open();
+  });
+  const modeChrome = createDiv("al-ranking-workspace-chrome");
+  Object.assign(modeChrome.style, {
+    display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px",
+  });
+  modeChrome.append(tabs, exportAction);
   if (rankState.mode === "rating") {
     // Preserve the original scroll host: the existing rating drag/scroll logic
     // deliberately operates on this exact workspace container.
@@ -209,13 +226,13 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
       confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
       showNotice: (message) => dashboardHost.showNotice(message),
       onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
-    }, tabs);
+    }, modeChrome);
     return;
   }
 
   const body = createDiv();
   body.className = "al-score-mode-content";
-  container.append(tabs, body);
+  container.append(modeChrome, body);
   const redraw = () => {
     if (!container.isConnected || rankState.mode !== "ranking") return;
     renderWorkspaceScoreDashboard(plugin, container);

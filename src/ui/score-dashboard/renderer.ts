@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { scoreDashboardColor } from "../../domain/score-dashboard/color";
 import { bindImageFallback } from "../image-fallback";
 import {
   SCORE_DASHBOARD_MAX_SCALE,
@@ -56,11 +57,6 @@ function create<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", l
   if (className) element.className = className;
   if (label) element.textContent = label;
   return element;
-}
-
-function scoreColor(score: number): string {
-  const hue = Math.round(8 + score * 26.2);
-  return `hsl(${hue} 72% 62%)`;
 }
 
 function typeCount(items: readonly MediaItem[], type: ScoreDashboardMediaType): number {
@@ -448,7 +444,7 @@ export function renderScoreDashboard(
     });
 
     const label = create("div", "al-score-lane-label", score == null ? "—" : score.toFixed(1));
-    if (score != null) label.style.setProperty("--al-score-color", scoreColor(score));
+    if (score != null) label.style.setProperty("--al-score-color", scoreDashboardColor(score));
     const posters = isolateHorizontalSwipeSurface(create("div", "al-score-lane-posters"));
     if (mountPosters) {
       if (laneItems.length) laneItems.forEach((item) => posters.appendChild(renderCover(item)));
@@ -482,7 +478,7 @@ export function renderScoreDashboard(
       const groupElement = create("section", "al-score-group");
       groupElement.dataset.majorScore = String(group.major);
       const major = create("div", "al-score-major");
-      major.style.setProperty("--al-score-color", scoreColor(group.major));
+      major.style.setProperty("--al-score-color", scoreDashboardColor(group.major));
       major.append(
         create("strong", "al-score-major-number", String(group.major)),
         create("span", "al-score-major-count", `${group.itemCount} ${text.works}`),

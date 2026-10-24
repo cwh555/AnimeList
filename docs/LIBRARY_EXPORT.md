@@ -116,3 +116,17 @@ Text is a human-readable report and is not intended to be reversible. Future Imp
 10. Copy and paste into a text editor; the full output must be copied even when preview is truncated.
 11. Use **Save export file** and confirm the displayed destination matches the created file under `<Library root>/Exports/` with `.animelist.json` / `.txt` extension.
 12. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
+
+## Presentation exports (feature branch)
+
+The Export dialog offers **Library / Scoreboard / Ranking**. Library retains its existing JSON v1 envelope, Timeline-based Text semantics, category/status scope, and safe template validation. A `{$排名}` / locale equivalent is added to Text templates; values are `#rank/total` or `#first~last/total` and remain blank for entries not eligible for ranking. It uses the same current ranking certificate as the Ranking page. Manga and novel completion events of the same work reuse its work-level rank. JSON is intentionally unchanged.
+
+Scoreboard exports Text or PNG from **all 21 of the existing 0.5-point score lanes**, from 10.0 through 0.0 even when a lane contains no works. Empty lanes use a compact PNG row with the same Scoreboard empty hint, rather than occupying a full-height poster row. Unrated entries are optional.
+
+Ranking exports Text or PNG with proven absolute positions separate from unresolved intervals, and optional Top 10/20/50 (no guessed ranks). **Ranking PNG labels include rank only** (e.g. `#3`, or `#3~8` for an unresolved position), without the total. **Ranking Text and Library Text's `{$排名}` variable** include the eligible denominator (e.g. `#3/176`, `#3~8/176`). Rankings are separated by media type and exclude unfinished works.
+
+PNG is synthesized from the projection in bounded pages (1000 layout pixels wide, 1.5× scale, up to 2600 layout pixels high). Each cover is decoded and released individually; missing or unreadable covers use a visible placeholder and are counted in the preview notice. Copy is enabled for one-page PNG, while multi-page exports are saved as separate PNG files in the regular `<Library root>/Exports/` folder. Copy/Save never modify ranking data or media notes.
+
+The Scoreboard/Ranking workspace has an Export shortcut which preselects the current page and media type. The Library workspace's existing Export entry opens the same dialog.
+
+**Review in test vault:** switch all three export modes, run the original Library JSON import compatibility checks, insert the Ranking template variable, verify confirmed and pending rank labels, generate both image layouts, export hundreds of covers, exercise missing images and mobile PNG behavior, and verify score drag/ranking compare are unaffected.

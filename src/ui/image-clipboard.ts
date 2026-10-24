@@ -1,3 +1,5 @@
+import { copyPngBlobToClipboard } from "./png-clipboard";
+export { copyPngBlobToClipboard };
 import type { ImageSectionService, ImageSectionAssetInput } from "../data/image-section-service";
 import { imageAssetFromFile } from "../data/image-section-service";
 import { decodeRasterImage, encodeRasterImage } from "../data/image-raster";
@@ -18,15 +20,6 @@ function clipboardAvailable(): boolean {
   return Boolean(navigator.clipboard?.write && typeof ClipboardItem !== "undefined");
 }
 
-export async function copyPngBlobToClipboard(blob: Blob): Promise<void> {
-  if (!clipboardAvailable()) {
-    throw new Error("Image clipboard writing is unavailable in this Obsidian build");
-  }
-  if (blob.type.split(";")[0].trim().toLocaleLowerCase() !== "image/png") {
-    throw new Error("Clipboard image must be PNG");
-  }
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-}
 
 async function blobDataUrl(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
