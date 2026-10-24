@@ -1,3 +1,5 @@
+import { TFile } from "obsidian";
+import { normalizedCoverPath } from "../domain/value-normalization";
 import type { AnimeListFeatureHost } from "../app/feature-types";
 import type { MediaItem } from "../domain/media-types";
 import type { PresentationDocument } from "../domain/presentation-export";
@@ -56,13 +58,17 @@ async function drawCover(
   x: number, y: number, w: number, h: number,
   p: Palette,
 ): Promise<boolean> {
-  const path = item.cover ? host.resolveMediaCoverPath(item.cover, item.filePath) : "";
-  if (!path || /^https?:\/\//i.test(path) || !(await host.app.vault.adapter.exists(path))) {
+  const reference = normalizedCoverPath(item.cover);
+  const file = reference && !/^https?:\/\//i.test(reference)
+    ? (host.app.metadataCache.getFirstLinkpathDest(reference, item.filePath)
+      ?? host.app.vault.getAbstractFileByPath(reference))
+    : null;
+  if (!(file instanceof TFile)) {
     placeholder(ctx, x, y, w, h, p);
     return false;
   }
   try {
-    const bytes = await host.app.vault.adapter.readBinary(path);
+    const bytes = await host.app.vault.readBinary(file);
     const image = await decodeRasterImage(bytes);
     try {
       const factor = Math.max(w / image.width, h / image.height);
