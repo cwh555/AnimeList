@@ -211,7 +211,11 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
       mediaType: rankState.mode === "rating" ? scoreState.type : rankState.type,
     }).open();
   });
-  tabs.appendChild(exportAction);
+  const modeChrome = createDiv("al-ranking-workspace-chrome");
+  Object.assign(modeChrome.style, {
+    display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px",
+  });
+  modeChrome.append(tabs, exportAction);
   if (rankState.mode === "rating") {
     // Preserve the original scroll host: the existing rating drag/scroll logic
     // deliberately operates on this exact workspace container.
@@ -222,13 +226,13 @@ function renderWorkspaceScoreDashboard(plugin: ScoreDashboardPlugin, container: 
       confirmClamp: (summary) => dashboardHost.confirmScoreClamp(summary),
       showNotice: (message) => dashboardHost.showNotice(message),
       onStateChange: (nextState) => STATES.set(plugin, { ...nextState }),
-    }, tabs);
+    }, modeChrome);
     return;
   }
 
   const body = createDiv();
   body.className = "al-score-mode-content";
-  container.append(tabs, body);
+  container.append(modeChrome, body);
   const redraw = () => {
     if (!container.isConnected || rankState.mode !== "ranking") return;
     renderWorkspaceScoreDashboard(plugin, container);
