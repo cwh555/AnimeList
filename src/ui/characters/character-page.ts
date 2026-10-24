@@ -15,8 +15,7 @@ import { buildImageGalleryWork } from "../../domain/image-gallery";
 import { renderImageGallery, DEFAULT_IMAGE_GALLERY_STATE } from "../image-gallery-renderer";
 import { characterRankingItems } from "../../domain/characters/ranking-items";
 import { externalImageUri } from "../../domain/characters/external-image";
-import { externalImagesForHost } from "../../data/characters/external-image-service";
-import { Platform } from "obsidian";
+import { externalImagesForHost, hasDesktopFileBridge } from "../../data/characters/external-image-service";
 import { characterText as t } from "../../features/characters/text";
 
 interface CharacterPageState {
@@ -123,7 +122,7 @@ async function renderDetails(
   const blocks = findImageSectionBlocks(markdown);
   const images = [...new Set(blocks.flatMap(block => block.paths))];
   const external = externalImagesForHost(host);
-  if (Platform.isDesktopApp) {
+  if (hasDesktopFileBridge()) {
     await Promise.allSettled(images.filter(path => /^file:\/\//i.test(path)).map(path => external.prepare(path)));
   }
   const gallery = makeEl("div", "al-character-images");
@@ -178,7 +177,7 @@ async function renderDetails(
     upload,
     makeEl("small", "", t("pictureHelp")),
   );
-  if (Platform.isDesktopApp) {
+  if (hasDesktopFileBridge()) {
     const link = makeEl("input");
     link.type = "text";
     link.placeholder = t("externalPath");
@@ -244,7 +243,7 @@ export async function renderCharacterPage(
       const file = host.app.vault.getAbstractFileByPath(record.path);
       if (!(file instanceof TFile)) return null;
       const markdown = await host.app.vault.cachedRead(file);
-      if (Platform.isDesktopApp) {
+      if (hasDesktopFileBridge()) {
         const external = findImageSectionBlocks(markdown).flatMap(block => block.paths)
           .filter(path => /^file:\/\//i.test(path));
         await Promise.allSettled(external.map(path => externalImagesForHost(host).prepare(path)));

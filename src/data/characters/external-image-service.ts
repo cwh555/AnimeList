@@ -1,4 +1,3 @@
-import { Platform } from "obsidian";
 import { externalImageUri, localPathFromImageUri } from "../../domain/characters/external-image";
 
 const MAX_BYTES = 40 * 1024 * 1024;
@@ -8,8 +7,11 @@ interface FsLike {
     readFile(path: string): Promise<Uint8Array>;
   };
 }
+export function hasDesktopFileBridge(): boolean {
+  return typeof (window as Window & { require?: (name: string) => unknown }).require === "function";
+}
 function desktopFilesystem(): FsLike {
-  if (!Platform.isDesktopApp) throw new Error("External image references are only available on Desktop");
+  if (!hasDesktopFileBridge()) throw new Error("External file access is not available on this device");
   const bridge = window as Window & { require?: (name: string) => unknown };
   if (typeof bridge.require !== "function") throw new Error("Desktop filesystem bridge is unavailable");
   const value = bridge.require("fs") as FsLike | null;
