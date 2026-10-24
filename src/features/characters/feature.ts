@@ -60,7 +60,8 @@ export const characterFeature = {
       const row = makeEl("div", "al-character-work-list");
       section.appendChild(row);
       const subjectId = frontmatter.source_provider === "bangumi"
-        ? String(frontmatter.source_id ?? "") : "";
+        ? typeof frontmatter.source_id === "string" || typeof frontmatter.source_id === "number"
+          ? String(frontmatter.source_id) : "" : "";
       const choose = makeEl("button", "al-secondary-button", t("showCast"));
       choose.type = "button";
       choose.addEventListener("click", () =>

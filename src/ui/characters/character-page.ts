@@ -1,4 +1,4 @@
-import { TFile } from "obsidian";
+import { Notice, TFile } from "obsidian";
 import type { AnimeListFeatureHost } from "../../app/feature-types";
 import type { CharacterRecord, CharacterTier } from "../../domain/characters/character";
 import type { CharacterLibraryService } from "../../data/character-library-service";
@@ -31,7 +31,7 @@ function button(label: string, action: () => void, cls = ""): HTMLButtonElement 
   el.addEventListener("click", action);
   return el;
 }
-function msg(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+function msg(error: unknown): string { return error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error"; }
 
 function imageResource(host: AnimeListFeatureHost, image: string, sourcePath: string): string {
   if (/^https:\/\//i.test(image)) return image;
@@ -75,7 +75,7 @@ async function renderDetails(
   header.appendChild(portrait(host, record));
   const intro = makeEl("div", "al-character-profile-main");
   intro.appendChild(makeEl("h2", "", record.name));
-  const tier = makeEl("select") as HTMLSelectElement;
+  const tier = makeEl("select");
   tier.setAttribute("aria-label", t("level"));
   for (const key of ["top", "high", "liked"] as const) {
     const option = makeEl("option");
@@ -87,7 +87,7 @@ async function renderDetails(
   tier.addEventListener("change", () => {
     void service.setTier(record.path, tier.value as CharacterTier)
       .then(() => host.refreshViews())
-      .catch(error => window.alert(t("failed", { reason: msg(error) })));
+      .catch(error => new Notice(t("failed", { reason: msg(error) })));
   });
   intro.appendChild(tier);
   intro.appendChild(button(t("open"), () => { void host.openMediaFile(record.path); }));
@@ -126,7 +126,7 @@ async function renderDetails(
       thumb.appendChild(open);
       thumb.appendChild(button(t("portrait"), () => {
         void service.setPortrait(record.path, path).then(() => host.refreshViews())
-          .catch(error => window.alert(t("failed", { reason: msg(error) })));
+          .catch(error => new Notice(t("failed", { reason: msg(error) })));
       }, "al-character-image-select"));
     } else thumb.appendChild(makeEl("span", "", path));
     gallery.appendChild(thumb);
@@ -134,7 +134,7 @@ async function renderDetails(
   if (images.length) root.appendChild(gallery);
   else root.appendChild(makeEl("p", "al-character-hint", t("noPictures")));
   const addRow = makeEl("div", "al-character-photo-actions");
-  const upload = makeEl("input") as HTMLInputElement;
+  const upload = makeEl("input");
   upload.type = "file";
   upload.accept = "image/jpeg,image/png,image/webp,image/gif,image/avif";
   upload.multiple = true;
@@ -150,7 +150,7 @@ async function renderDetails(
       const added = parseImageSectionSource(result.source);
       if (!record.portrait && added.length) await service.setPortrait(record.path, added[0]);
       host.refreshViews();
-    }).catch(error => window.alert(t("failed", { reason: msg(error) })))
+    }).catch(error => new Notice(t("failed", { reason: msg(error) })))
       .finally(() => { upload.disabled = false; upload.value = ""; });
   });
   addRow.append(
@@ -180,12 +180,12 @@ export async function renderCharacterPage(
   if (state.selected) state.selected = null;
   const root = makeEl("section", "al-character-page");
   const tools = makeEl("div", "al-character-tools");
-  const query = makeEl("input") as HTMLInputElement;
+  const query = makeEl("input");
   query.type = "search";
   query.placeholder = t("search");
   query.setAttribute("aria-label", t("search"));
   query.value = state.query;
-  const tier = makeEl("select") as HTMLSelectElement;
+  const tier = makeEl("select");
   tier.setAttribute("aria-label", t("level"));
   for (const key of ["all", "top", "high", "liked"] as const) {
     const option = makeEl("option");

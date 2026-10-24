@@ -50,7 +50,7 @@ export function characterFromFrontmatter(value: unknown, path: string): Characte
     path,
     name: fm.character_name.trim(),
     tier: characterTier(fm.character_tier),
-    bangumiId: typeof fm.bangumi_character_id === "string" ? fm.bangumi_character_id : String(fm.bangumi_character_id ?? ""),
+    bangumiId: typeof fm.bangumi_character_id === "string" ? fm.bangumi_character_id : typeof fm.bangumi_character_id === "number" && Number.isSafeInteger(fm.bangumi_character_id) ? String(fm.bangumi_character_id) : "",
     portrait: typeof fm.character_portrait === "string" ? fm.character_portrait : "",
     appearances: characterAppearances(fm.character_appearances),
   };

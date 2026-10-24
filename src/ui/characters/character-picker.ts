@@ -10,7 +10,7 @@ import { characterText as t } from "../../features/characters/text";
 const api = new BangumiCharacterClient();
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
 }
 
 /** Search is explicit: no request burst while the user is typing. */
@@ -28,7 +28,7 @@ export class CharacterPickerModal extends AnimeListModal {
     this.contentEl.replaceChildren();
     this.contentEl.appendChild(makeEl("h2", "", t("add")));
     const searchRow = makeEl("div", "al-character-picker-search");
-    const query = makeEl("input") as HTMLInputElement;
+    const query = makeEl("input");
     query.type = "search";
     query.placeholder = t("search");
     query.setAttribute("aria-label", t("search"));
@@ -54,7 +54,7 @@ export class CharacterPickerModal extends AnimeListModal {
     this.contentEl.appendChild(searchRow);
 
     const manualRow = makeEl("div", "al-character-picker-search");
-    const manual = makeEl("input") as HTMLInputElement;
+    const manual = makeEl("input");
     manual.placeholder = t("name");
     manual.setAttribute("aria-label", t("name"));
     const add = makeEl("button", "", t("manual"));
