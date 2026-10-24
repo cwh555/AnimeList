@@ -32,7 +32,8 @@ const VARIABLE_TEXT_KEYS: Readonly<Record<LibraryTextTemplateVariableId,
   | "templateVarStartedAt"
   | "templateVarStatus"
   | "templateVarFavorite"
-  | "templateVarGenres">> = {
+  | "templateVarGenres"
+  | "templateVarRanking">> = {
   completedAt: "templateVarCompletedAt",
   work: "templateVarWork",
   seriesTitle: "templateVarSeriesTitle",
@@ -45,6 +46,7 @@ const VARIABLE_TEXT_KEYS: Readonly<Record<LibraryTextTemplateVariableId,
   status: "templateVarStatus",
   favorite: "templateVarFavorite",
   genres: "templateVarGenres",
+  ranking: "templateVarRanking",
 };
 
 export interface LibraryTextTemplateVariableOption {
@@ -153,6 +155,7 @@ function templateValues(
     status: mediaStatusLabel(row.status, row.mediaType),
     favorite: specialLabelValue(row, specialLabelMode),
     genres: row.genres.join(", "),
+    ranking: row.ranking ?? "",
   };
 }
 

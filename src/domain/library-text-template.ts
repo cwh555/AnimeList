@@ -14,6 +14,7 @@ export const LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS = [
   "status",
   "favorite",
   "genres",
+  "ranking",
 ] as const;
 
 export type LibraryTextTemplateVariableId = (typeof LIBRARY_TEXT_TEMPLATE_VARIABLE_IDS)[number];

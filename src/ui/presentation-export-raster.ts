@@ -139,7 +139,7 @@ export async function rasterizePresentation(
   let missingCovers = 0;
   let maxHeight = 0;
   for (const page of plan.pages) {
-    const canvas = document.createElement("canvas");
+    const canvas = window.document.createElement("canvas");
     canvas.width = Math.ceil(page.width * plan.pixelRatio);
     canvas.height = Math.ceil(page.height * plan.pixelRatio);
     maxHeight = Math.max(maxHeight, canvas.height);
