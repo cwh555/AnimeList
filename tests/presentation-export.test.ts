@@ -43,6 +43,12 @@ describe("presentation export", () => {
     }
     const withUnrated = buildPresentationDocument(items, { kind: "scoreboard", mediaType: "anime", includeUnrated: true });
     assert.equal(withUnrated.sections.at(-1)?.entries[0].item.title, "Missing");
+    const onlyRated = buildPresentationDocument([item("Top", 10)], {
+      kind: "scoreboard", mediaType: "anime", includeUnrated: true,
+    });
+    assert.equal(onlyRated.sections.length, 22);
+    assert.equal(onlyRated.sections.at(-1)?.label, "Unrated");
+    assert.equal(onlyRated.sections.at(-1)?.entries.length, 0);
   });
   it("preserves certified absolute ranks and uncertain intervals", () => {
     const items = [item("A", 10), item("B", 9), item("C", 8), item("D", 7)];

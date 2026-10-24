@@ -69,7 +69,7 @@ export function buildPresentationDocument(
       label: lane.label,
       entries: lane.items.map(item => ({ item, badge: lane.label })),
     })));
-    if (options.includeUnrated && data.unrated.length) {
+    if (options.includeUnrated) {
       sections.push({
         label: "Unrated",
         entries: data.unrated.map(item => ({ item, badge: "—" })),
