@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.2 - Unreleased (release candidate)
+## 1.6.2
 
 ### Added
 
@@ -19,7 +19,7 @@
 
 - Library JSON remains `animelist-library-export` version `1`, with no Import behavior change. Existing Markdown/frontmatter schema (`6`) and independent ranking file (`v1`) remain unchanged; no migration is required.
 - Export only creates new files or copies output. It does not rewrite notes, scores, rankings, image sections, or stored settings.
-- Added presentation-domain tests, real-cover-pixel Chromium checks, and mobile multi-page navigation/storage regressions. Candidate build and publication must be verified on the exact release commit before tagging; public 1.6.2 release is not yet published.
+- Added presentation-domain tests, real-cover-pixel Chromium checks, and mobile multi-page navigation/storage regressions. The release gate requires exact-commit verification before tagging and publishing the three plugin assets.
 
 ## 1.6.1 - 2026-10-23
 

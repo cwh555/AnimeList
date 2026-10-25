@@ -57,7 +57,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 
 **1.6.1 maintenance update:** Ranking now supports reversible comparisons, more diverse pairings, evidence-backed confirmed positions, and visible possible-rank ranges for every unresolved work. Mobile Ranking displays full work titles, and the Score Dashboard supports long-press poster dragging.
 
-**1.6.2 release candidate:** **Export** now offers **Library / Scoreboard / Ranking** in one dialog. Keep the existing Library JSON/Text workflow and export per-work rank in Text templates with `{$排名}` (for example, `#3/176` or `#3~8/176`); share the complete Scoreboard (including empty score lanes) or preference Ranking as Text/PNG. PNG uses available local covers, theme-aware presentation, and bounded multi-page output with a mobile-friendly preview. The existing 1.6.0 major-feature overview above remains unchanged. See the [Changelog](CHANGELOG.md) and [Export Guide](docs/LIBRARY_EXPORT.md).
+**1.6.2 Export update:** **Export** now offers **Library / Scoreboard / Ranking** in one dialog. Keep the existing Library JSON/Text workflow and export per-work rank in Text templates with `{$排名}` (for example, `#3/176` or `#3~8/176`); share the complete Scoreboard (including empty score lanes) or preference Ranking as Text/PNG. PNG uses available local covers, theme-aware presentation, and bounded multi-page output with a mobile-friendly preview. The existing 1.6.0 major-feature overview above remains unchanged. See the [Changelog](CHANGELOG.md) and [Export Guide](docs/LIBRARY_EXPORT.md).
 
 ## Features
 
