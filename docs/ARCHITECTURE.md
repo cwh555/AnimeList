@@ -35,6 +35,15 @@ Application wiring may compose services, but it must not implement provider norm
 
 `src/types.ts` remains a compatibility re-export barrel. New modules should import the responsible domain module directly.
 
+### Presentation export (1.6.2)
+
+- `domain/presentation-export.ts` projects score lanes and confirmed/unresolved ranking positions using the **existing** Score Dashboard and pairwise-ranking services; it also provides the work-level Library Text ranking variable without inventing score-derived order.
+- `domain/presentation-export-layout.ts` produces bounded PNG pages, preserving empty half-point lanes and optional Unrated. `domain/score-dashboard/color.ts` is the shared live dashboard/export score-color mapping.
+- `data/presentation-cover-service.ts` resolves real Vault cover references from frontmatter rather than treating Obsidian `app://` display URLs as filesystem paths. `data/presentation-export-service.ts` writes new Text or PNG files under the export directory; `ui/png-clipboard.ts` is the isolated clipboard boundary.
+- `ui/presentation-export-raster.ts` decodes/paints one cover at a time and closes its resources. `ui/library-export-modal.ts` provides the common mode selector, preview and mobile multi-page navigation. The Scores/Ranking workspace provides only a shortcut.
+- Export never changes Library JSON v1, media Markdown/frontmatter schema 6, or independent ranking state v1; it is a read-only projection and new-file output layer.
+
+
 ### Data and services
 
 `src/data/` owns persistent and external boundaries:

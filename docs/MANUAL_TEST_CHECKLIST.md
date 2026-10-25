@@ -266,9 +266,14 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] A custom-template image, a body image at another location, an ambiguous path, or an image not exactly matching `cover` is skipped.
 - [ ] Cleanup preserves frontmatter, Image Sections, Moments, unrelated embeds, and note prose.
 
-## Library Export
+## Export: Library / Scoreboard / Ranking
 
-- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens without changing workspace data.
+- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens with **Library / Scoreboard / Ranking**, without changing workspace data. The Scores/Ranking shortcut preselects the correct report and media type.
+- [ ] Switch Library Text templates to include `{$排名}`. A confirmed rank shows `#3/176`; an unresolved one shows a proven interval like `#3~8/176`, not a guessed fixed rank. An ineligible work has an empty value. Serial entries reuse the same owning work's rank.
+- [ ] Scoreboard Text/PNG include all 21 lanes (10.0 to 0.0), **even empty ones**. If Unrated is selected it remains visible when empty; 0.0 is a real score. Check the light and dark theme palettes.
+- [ ] Ranking Text includes `/total`; Ranking PNG badges do **not** include `/total`. Check confirmed rank gaps, unresolved intervals, and Top 10/20/50 without invented certainty.
+- [ ] On desktop and a 390px mobile viewport, open PNG preview with local covers and intentionally missing covers; no horizontal overflow or blank real artwork. Preview large collections over multiple pages; Previous/Next are usable touch targets.
+- [ ] Copy a one-page PNG if supported. For multi-page PNG confirm Copy is disabled and Save writes **every** page as a separate PNG under `<Library root>/Exports/`, without truncating or rewriting notes.
 - [ ] JSON output uses `animelist-library-export` version `1`, applies media/status scope correctly, and preserves portable status/progress/serial/source identity without exporting arbitrary frontmatter, note-body Markdown, Images, or Moments.
 - [ ] Text output uses the same Timeline completion semantics and keeps serial-entry unit labels. Editing the safe template updates preview without replacing the editor DOM or losing focus.
 - [ ] Remove a required variable or enter an unknown variable; Copy and Save remain disabled until the template is valid.
@@ -314,6 +319,7 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] All Pending rows show possible absolute rank intervals instead of “Comparing” (e.g. for four completed works: initially `1～4`; after a choice, the winner `1～3`, loser `2～4`). Skip must not narrow ranges; restarting/reopening retains the saved bounds, and deductions from transitivity shrink ranges without inventing comparisons.
 - [ ] New entries are inserted without reshuffling the existing ranked order.
 - [ ] Successive full reranks with at least 3 works vary their initial pairs across rotation cycles. Compare seasons and films of the same series only late when possible. An exact displayed rank must be determined against every eligible work through strict user answers or their transitive consequences; unresolved comparisons move even previously ordered works to Pending instead of assigning guessed absolute positions. Verify gaps in rank numbers and that drag handles are offered once every rank is confirmed.
+- [ ] Start or resume a ranking round with transitive comparison evidence. Pairs already proven by stored strict preferences should be skipped automatically, not asked again; a stale dialog answer must never apply to a different pair.
 - [ ] Compare two works, tap Back to previous pair, and confirm the exact earlier question and persisted state return. Answer again, undo a Skip, and test Back after the final comparison before Finish and close. Pause, native X, Escape and re-entry preserve committed comparisons. Manual rank moves use the drag handle. Numeric scores stay unchanged.
 - [ ] Each ranked work has one full-width compact row at every viewport (320, 390, 768, 1200px), with rank, cover, left-aligned two-line title and one trailing drag handle. No oversized gray inner card.
 - [ ] While dragging, a pointer-following visual clone and source placeholder stay visible, with a clear drop highlight.
