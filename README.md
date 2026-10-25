@@ -1,6 +1,6 @@
 # AnimeList
 
-AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a shared workspace for the Library, Timeline, Score Dashboard, and Images, plus metadata search, local covers, progress tracking, ratings, templates, release tracking, reusable note media, and portable Library export.
+AnimeList is a local-first Obsidian plugin for tracking anime, manga, and novels in ordinary Markdown files. It provides a shared workspace for the Library, Timeline, Score Dashboard, and Images, plus metadata search, local covers, progress tracking, ratings, templates, release tracking, reusable note media, and shareable Library/Scoreboard/Ranking exports.
 
 Your Markdown notes remain the source of truth. Removing the plugin does not remove your records, notes, or images.
 
@@ -55,7 +55,9 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 > - **Maintain older libraries with more control:** Incremental or full rescan choices, review-first updates, and stronger protection for existing notes, images, and ranking data.
 > - **Smoother day-to-day use:** More consistent Add/Edit dialogs, faster first-result presentation, and refined touch navigation on phones while preserving desktop behavior.
 
-**1.6.1 maintenance update:** Ranking now supports reversible comparisons, more diverse pairings, evidence-backed confirmed positions, and visible possible-rank ranges for every unresolved work. Mobile Ranking displays full work titles, and the Score Dashboard supports long-press poster dragging. See [Changelog](CHANGELOG.md) for details. The main 1.6.0 feature overview above is retained.
+**1.6.1 maintenance update:** Ranking now supports reversible comparisons, more diverse pairings, evidence-backed confirmed positions, and visible possible-rank ranges for every unresolved work. Mobile Ranking displays full work titles, and the Score Dashboard supports long-press poster dragging.
+
+**1.6.2 release candidate:** **Export** now offers **Library / Scoreboard / Ranking** in one dialog. Keep the existing Library JSON/Text workflow and export per-work rank in Text templates with `{$排名}` (for example, `#3/176` or `#3~8/176`); share the complete Scoreboard (including empty score lanes) or preference Ranking as Text/PNG. PNG uses available local covers, theme-aware presentation, and bounded multi-page output with a mobile-friendly preview. The existing 1.6.0 major-feature overview above remains unchanged. See the [Changelog](CHANGELOG.md) and [Export Guide](docs/LIBRARY_EXPORT.md).
 
 ## Features
 
@@ -71,7 +73,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 - Pairwise preference **Ranking** for completed works, stored independently of scores and media-note Markdown.
 - Favorite mode or reusable Masterpiece categories.
 - A pannable, independently scalable completion timeline with History mode and a density overview.
-- Versioned JSON and readable Text Library export with safe templates.
+- Unified **Library / Scoreboard / Ranking Export**: portable Library JSON and safe-template Text, plus shareable Scoreboard and preference Ranking Text/PNG with preview and mobile-friendly multi-page save.
 - Local series, serial-entry, Image Section, and Moment images with safe reference-aware cleanup.
 - Replace an existing series cover with a local image from its Edit dialog; original media files are preserved.
 - Traditional Chinese, Simplified Chinese, English, Japanese, and Korean interface support.
@@ -99,12 +101,13 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 4. Update its status, progress, dates, rating, or special label from the library. For completed works, open **Scores → Ranking** to compare titles and build a preference order.
 5. For manga or novels, enable **Latest release tracking** under Settings → Features if you want source-backed latest chapter/volume information.
 6. Inside a media note, use the editor context menu **AnimeList** submenu to insert an Image Section or Moments section where you want it.
+7. Choose **Export** from Library or the Scores/Ranking shortcut to output Library JSON/Text or share the Scoreboard/Ranking as Text/PNG.
 
 AnimeList can display its main interface in Traditional Chinese, Simplified Chinese, English, Japanese, or Korean. The Settings page itself stays in English. Choose a language there or follow Obsidian's interface language. Recognized provider-supplied tag/category labels are displayed in the selected interface language, while media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, and existing templates are not rewritten.
 
 ## Documentation
 
-See the [User Guide](docs/USER_GUIDE.md) for workspace navigation, Library layouts, status rules, progress units, serial-entry covers, metadata and filters, reusable tags, release tracking, Images, Image Sections, Moments, Library Export, cleanup tools, Masterpiece categories, the Score Dashboard, Timeline, Markdown data, and templates.
+See the [User Guide](docs/USER_GUIDE.md) for workspace navigation, Library layouts, status rules, progress units, serial-entry covers, metadata and filters, reusable tags, release tracking, Images, Image Sections, Moments, Library/Scoreboard/Ranking Export, cleanup tools, Masterpiece categories, the Score Dashboard, Timeline, Markdown data, and templates.
 
 ## Metadata, network access, and privacy
 

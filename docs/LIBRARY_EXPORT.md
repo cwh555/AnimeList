@@ -1,12 +1,12 @@
-# Library Export
+# Export: Library / Scoreboard / Ranking
 
-Library Export is a portable view of AnimeList's Library state. It is intentionally not a full Vault backup: Markdown bodies, Image Sections, Moments, cached thumbnails, plugin settings, and arbitrary unknown frontmatter are not copied into the export.
+AnimeList's Export dialog provides three independent report types. **Library JSON** is a portable view of Library state, not a full Vault backup: Markdown bodies, Image Sections, Moments, cached thumbnails, plugin settings, and arbitrary unknown frontmatter are not copied into the export. Scoreboard and Ranking are read-only presentation exports intended for sharing.
 
 ## Entry point
 
 Open the AnimeList workspace and choose the explicit **Export** action in the top workspace navigation. The command palette also exposes **Export Library**. Up to two workspace actions are shown directly; only additional actions use the overflow menu. When Release Tracking is enabled, **Release updates** and **Export** therefore remain directly visible instead of both being hidden behind `…`.
 
-The export modal supports:
+Select **Library**, **Scoreboard**, or **Ranking** at the top of the dialog. The Library mode supports:
 
 - JSON or Text output.
 - All / Anime / Manga / Novel scope.
@@ -82,7 +82,7 @@ or:
 {$作品名稱} | {$評分}
 ```
 
-The variable buttons insert supported tokens at the caret. Available values include completion time, Timeline-style work name, base series name, media type, serial unit, original title, score, progress, started time, status, the active special-label value, and genres/tags.
+The variable buttons insert supported tokens at the caret. Available values include completion time, Timeline-style work name, base series name, media type, serial unit, original title, score, progress, started time, status, the active special-label value, genres/tags, and the eligible work's preference **ranking**. For example, `{$作品名稱} | {$評分} | {$排名}` could emit `Example | 9.5 | #3/176` or `Example | 9.5 | #3~8/176`. Work-level ranking values are not calculated from scores or serial-event order. An ineligible work has an empty ranking field.
 
 The special-label variable follows **Settings → Special label mode**. In Favorite mode its visible variable name is the localized Favorite label (for example `{$最愛}` in Traditional Chinese); the value is emitted only for favorite works and is blank for other works. In Masterpiece mode the visible variable name is the localized Masterpiece label (currently `{$masterpiece}` in Traditional Chinese); marked works output their actual masterpiece category names, while unmarked works output nothing. If a legacy masterpiece has no explicit category, the existing default `masterpiece` category semantics are preserved. Previously valid Favorite/Masterpiece token names remain accepted as aliases when the setting is changed, so switching modes does not invalidate an existing template.
 
@@ -117,7 +117,7 @@ Text is a human-readable report and is not intended to be reversible. Future Imp
 11. Use **Save export file** and confirm the displayed destination matches the created file under `<Library root>/Exports/` with `.animelist.json` / `.txt` extension.
 12. Confirm exporting never changes media notes, frontmatter, Images, Moments, covers, or Library settings.
 
-## Presentation exports (feature branch)
+## Scoreboard and Ranking presentation exports (1.6.2)
 
 The Export dialog offers **Library / Scoreboard / Ranking**. Library retains its existing JSON v1 envelope, Timeline-based Text semantics, category/status scope, and safe template validation. A `{$排名}` / locale equivalent is added to Text templates; values are `#rank/total` or `#first~last/total` and remain blank for entries not eligible for ranking. It uses the same current ranking certificate as the Ranking page. Manga and novel completion events of the same work reuse its work-level rank. JSON is intentionally unchanged.
 
@@ -129,4 +129,6 @@ PNG is synthesized from the projection in bounded pages (1000 layout pixels wide
 
 The Scoreboard/Ranking workspace has an Export shortcut which preselects the current page and media type. The Library workspace's existing Export entry opens the same dialog.
 
-**Review in test vault:** switch all three export modes, run the original Library JSON import compatibility checks, insert the Ranking template variable, verify confirmed and pending rank labels, generate both image layouts, export hundreds of covers, exercise missing images and mobile PNG behavior, and verify score drag/ranking compare are unaffected.
+**Mobile and troubleshooting:** The PNG preview may span multiple pages. Use the preview page buttons to check each page; when the output contains multiple images, Copy is disabled by design and **Save export file** creates every PNG under the Library Exports folder. Missing local or remote covers are replaced by placeholders instead of cancelling the entire export. The dialog uses compact stacking on mobile. No export writes back into Markdown, media frontmatter, scores, ranking data, Images, Moments, or settings.
+
+**Review in Test Vault:** switch all three export modes, run the original Library JSON contract checks, insert the Ranking Text variable, verify confirmed and pending rank labels, generate both PNG layouts, export hundreds of covers, exercise missing images and mobile multi-page saving, and verify score drag/ranking comparison remain unaffected.

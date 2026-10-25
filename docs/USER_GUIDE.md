@@ -297,15 +297,17 @@ Completed chapter, season, or volume entries appear as separate dated events. Ea
 
 On mobile Obsidian, AnimeList keeps horizontal interactions inside its workspace pages (Library, Timeline, Score Dashboard, and Images) and its note-media/dialog surfaces. Start a swipe from the outermost roughly 24 px at either edge when you want Obsidian's native left/right sidebar gesture instead. The central area remains available for AnimeList's horizontal controls, timeline panning, and image interaction.
 
-## Library Export
+## Export: Library / Scoreboard / Ranking
 
-Choose **Export** from the shared AnimeList workspace (or the Export Library command) to create a portable Library report without rewriting any media note.
+Choose **Export** in the AnimeList workspace (or the **Export Library** command). The same dialog offers three output families. Scores and Ranking also offer an **Export** shortcut that preselects the current view and media type.
 
-- **JSON** uses the versioned `animelist-library-export` envelope and contains portable Library state suitable for a future reviewed Import path. It deliberately excludes arbitrary frontmatter, note-body Markdown, Image Sections, Moments, and cache data.
-- **Text** is a human-readable completion report built from the same completion-event source as Timeline. A bounded literal template can change the output layout; it is not JavaScript, shell, or an expression evaluator.
-- Scope controls can limit media type and personal status. Copy always uses the complete output even when the preview is truncated. **Save export file** writes a new `.animelist.json` or `.txt` file under the configured Library `Exports` folder and does not mutate Library notes.
+- **Library → JSON / Text:** JSON preserves the existing versioned `animelist-library-export` v1 portable record contract, without arbitrary frontmatter, note-body Markdown, Images, Moments, or cache files. Text remains a completion-event report, using a bounded literal template and media/status filters. Insert `{$排名}` into a Traditional Chinese Text template to include the work's eligible completed-work rank; for example `#3/176` if confirmed or `#3~8/176` if unresolved. Manga/novel serial completion events use the rank of the owning work. Ineligible works output no rank. The variable label is localized for other interface languages.
+- **Scoreboard → Text / PNG:** Each of the 21 score lanes from 10.0 to 0.0 appears even if it has no works. The optional Unrated lane can be included; valid `0.0` ratings are not treated as Unrated. Choose All/Anime/Manga/Novel, and use a light or dark PNG theme.
+- **Ranking → Text / PNG:** Completed anime/manga/novels have independent rankings, with confirmed absolute positions shown separately from pending possible rank intervals. PNG badges show rank only (`#3` or `#3~8`); Ranking Text includes the denominator (`#3/176` or `#3~8/176`). Optional Top 10/20/50 displays positions that could fall in the selected range without assigning invented ranks.
 
-See [`LIBRARY_EXPORT.md`](LIBRARY_EXPORT.md) for the exact JSON/Text contracts and template safety rules.
+For PNG, the preview supports multiple pages and displays the number of missing covers. One-page PNG can be copied when the device supports image clipboard writes; **save** is the reliable multi-page option, creating each PNG under `<Library root>/Exports/`. Local covers are read from their original Vault references where available; unavailable artwork uses a placeholder. JSON/Text copying uses the full output even when its preview is shortened. Export does not modify media notes or ranking data.
+
+See [`LIBRARY_EXPORT.md`](LIBRARY_EXPORT.md) for format details, constraints, and troubleshooting.
 
 ## Markdown data and templates
 

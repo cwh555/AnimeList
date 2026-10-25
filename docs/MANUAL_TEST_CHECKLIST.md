@@ -266,9 +266,14 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 - [ ] A custom-template image, a body image at another location, an ambiguous path, or an image not exactly matching `cover` is skipped.
 - [ ] Cleanup preserves frontmatter, Image Sections, Moments, unrelated embeds, and note prose.
 
-## Library Export
+## Export: Library / Scoreboard / Ranking
 
-- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens without changing workspace data.
+- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens with **Library / Scoreboard / Ranking**, without changing workspace data. The Scores/Ranking shortcut preselects the correct report and media type.
+- [ ] Switch Library Text templates to include `{$排名}`. A confirmed rank shows `#3/176`; an unresolved one shows a proven interval like `#3~8/176`, not a guessed fixed rank. An ineligible work has an empty value. Serial entries reuse the same owning work's rank.
+- [ ] Scoreboard Text/PNG include all 21 lanes (10.0 to 0.0), **even empty ones**. If Unrated is selected it remains visible when empty; 0.0 is a real score. Check the light and dark theme palettes.
+- [ ] Ranking Text includes `/total`; Ranking PNG badges do **not** include `/total`. Check confirmed rank gaps, unresolved intervals, and Top 10/20/50 without invented certainty.
+- [ ] On desktop and a 390px mobile viewport, open PNG preview with local covers and intentionally missing covers; no horizontal overflow or blank real artwork. Preview large collections over multiple pages; Previous/Next are usable touch targets.
+- [ ] Copy a one-page PNG if supported. For multi-page PNG confirm Copy is disabled and Save writes **every** page as a separate PNG under `<Library root>/Exports/`, without truncating or rewriting notes.
 - [ ] JSON output uses `animelist-library-export` version `1`, applies media/status scope correctly, and preserves portable status/progress/serial/source identity without exporting arbitrary frontmatter, note-body Markdown, Images, or Moments.
 - [ ] Text output uses the same Timeline completion semantics and keeps serial-entry unit labels. Editing the safe template updates preview without replacing the editor DOM or losing focus.
 - [ ] Remove a required variable or enter an unknown variable; Copy and Save remain disabled until the template is valid.

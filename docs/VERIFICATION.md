@@ -55,7 +55,18 @@ A successful older SHA is not sufficient after the branch changes. If a validati
 
 The Community preflight must stay free of suppressions and browser-feature workarounds that exceed the minimum supported Obsidian baseline. Release CSS should avoid unsupported or partially supported features when an equivalent baseline layout exists. The current preflight explicitly protects against reintroducing CSS multi-column layout and `scrollbar-width` / `scrollbar-color` into the generated release stylesheet.
 
-## 1.6.1 preview → main fast-forward release gate
+## 1.6.2 release-candidate and publication gate
+
+This release introduces unified Library / Scoreboard / Ranking exports. Its source baseline is the `preview` squash commit `52363acc` (PR #258) plus the previous Ranking evidence fix. Confirm the **current** branch heads rather than relying on these historical SHAs when making a release decision.
+
+1. On a dedicated preparation branch from the latest `preview`, run `npm run release:version -- 1.6.2` or perform its exact `package.json` / derived-metadata updates. Verify `package.json`, `package-lock.json`, `manifest.json`, and `versions.json` all specify `1.6.2`. Keep `manifest.minAppVersion` at `1.5.0` and the historical README **1.6.0** major feature overview intact.
+2. Review the 1.6.2 changelog, User Guide, unified Export reference, mobile/desktop checklist, and the bundled Export text labels. Confirm there are no Markdown/frontmatter or Ranking JSON changes. Use the user's Test Vault to verify Export content, real covers and multi-page mobile saving.
+3. Run `npm ci`, `npm run check`, and `npm run release:check` on the preparation branch and require successful GitHub Actions on the exact PR head SHA. Only after explicit user verification and merge permission, squash-merge this preparation PR into `preview`; then independently verify the **preview push CI** for the squash commit.
+4. **Do not advance `main` or create tag `1.6.2` during preparation.** After the user explicitly approves publication, refresh `main` and `preview`, require that `main` is an ancestor of the verified `preview`, and fast-forward `main` to preserve all existing source and documentation commits without another squash or merge commit.
+5. Wait for successful **main push CI** on the precise new `main` SHA. The existing automated release promoter validates current `main`, exact version metadata, and tag immutability; it then creates tag `1.6.2` (no `v` prefix) and dispatches `release.yml` with `tag=1.6.2`.
+6. Verify the release workflow checked out the exact tag, passed build and `release:check`, and published a public `AnimeList 1.6.2` Release with precisely `main.js`, `manifest.json`, and `styles.css`. Report tag SHA, assets, and publication status separately from Test Vault approval.
+
+## Historical: 1.6.1 preview → main fast-forward release gate
 
 The 1.6.1 release candidate must be reviewed and accepted in the Test Vault while on `preview`. The user must explicitly authorize publication before advancing `main`; a successful PR or `preview` CI alone is insufficient.
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.6.2 - Unreleased (release candidate)
+
+### Added
+
+- **Unified Export:** One dialog with **Library / Scoreboard / Ranking** modes. Library keeps the original version-1 JSON contract and safe-template Text output; Scoreboard and Ranking each support shareable Text or PNG reports.
+- **Library Text ranking variable:** Add `{$排名}` (localized in the other supported interface languages) to a per-completion-event template. It reports the owning eligible completed work's independently maintained rank as `#rank/total` or a conservative unresolved interval such as `#3~8/176`. Unranked-ineligible works emit an empty value, and manga/novel serial events reuse the work-level rank.
+- **Scoreboard exports:** Preserve all 21 half-point lanes from 10.0 through 0.0, including empty lanes; optional Unrated is also retained when selected. PNG presents covers in compact, score-colored groups.
+- **Ranking exports:** Separate confirmed absolute ranks from unresolved possible positions. PNG badges use `#3` or `#3~8` without a denominator; Ranking Text includes the eligible total. Top 10/20/50 filtering never fabricates certainty about unresolved works.
+
+### Improved
+
+- **PNG presentation:** Theme-aware light/dark styling and existing Scoreboard color semantics, Vault-frontmatter/local-cover resolution with remote fallback, explicit placeholders for unavailable artwork, and bounded multi-page rasterization.
+- **Mobile Export:** Responsive preview, previous/next PNG page controls with touch-sized targets, save every generated PNG page under `<Library root>/Exports/`, and disable single-image clipboard copy for multi-page output.
+- **Ranking consistency:** Use the existing read-only ranking evidence and transitivity projection for both workspace and exports; no new ranking calculator or score-derived order.
+
+### Compatibility and validation
+
+- Library JSON remains `animelist-library-export` version `1`, with no Import behavior change. Existing Markdown/frontmatter schema (`6`) and independent ranking file (`v1`) remain unchanged; no migration is required.
+- Export only creates new files or copies output. It does not rewrite notes, scores, rankings, image sections, or stored settings.
+- Added presentation-domain tests, real-cover-pixel Chromium checks, and mobile multi-page navigation/storage regressions. Candidate build and publication must be verified on the exact release commit before tagging; public 1.6.2 release is not yet published.
+
 ## 1.6.1 - 2026-10-23
 
 ### Improved
