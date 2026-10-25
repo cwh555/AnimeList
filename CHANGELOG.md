@@ -9,6 +9,10 @@
 - **Scoreboard exports:** Preserve all 21 half-point lanes from 10.0 through 0.0, including empty lanes; optional Unrated is also retained when selected. PNG presents covers in compact, score-colored groups.
 - **Ranking exports:** Separate confirmed absolute ranks from unresolved possible positions. PNG badges use `#3` or `#3~8` without a denominator; Ranking Text includes the eligible total. Top 10/20/50 filtering never fabricates certainty about unresolved works.
 
+### Fixed
+
+- **Avoid redundant Ranking questions:** Previously answered strict pairwise preferences and their transitive consequences now resolve known comparison pairs automatically and tighten pending insertion bounds, rather than asking questions whose answers are already proven. Stale modal responses are rejected rather than applied to a different pair; prior Ranking JSON v1 and in-session undo semantics remain intact.
+
 ### Improved
 
 - **PNG presentation:** Theme-aware light/dark styling and existing Scoreboard color semantics, Vault-frontmatter/local-cover resolution with remote fallback, explicit placeholders for unavailable artwork, and bounded multi-page rasterization.
