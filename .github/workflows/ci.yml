@@ -36,6 +36,16 @@ jobs:
         run: npm run test:browser:title-localization
       - name: Run responsive mobile layout in Chromium
         run: npm run test:browser:mobile
+      - name: Validate Characters cards, gallery and ranking in mobile Chromium
+        run: npm run test:browser:characters
+      - name: Upload actual Characters UI browser captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: characters-ui-screenshots-${{ github.sha }}
+          path: .tmp/characters-ui-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Run shared modal UI protocol in Chromium
         run: npm run test:browser:ui
       - name: Run Lightbox layout and interaction regressions in Chromium

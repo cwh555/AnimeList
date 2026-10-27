@@ -64,7 +64,7 @@ try {
     'const tabs=root.querySelectorAll(".al-ranking-mode-tabs button");',
     'checks.twoModes=tabs.length===2 && tabs[0].textContent==="評分" && tabs[1].textContent==="排名";',
     'tabs[1].click();await delay();',
-    'checks.rankingInsideScores=root.querySelectorAll(".al-ranking-type-tabs button").length===3 && !root.querySelector(".al-score-dashboard") && root.querySelectorAll(".al-ranking-row").length===40;', 
+    'checks.rankingInsideScores=root.querySelectorAll(".al-ranking-type-tabs button").length===4 && root.querySelector(".al-ranking-type-tabs button:last-child")?.textContent==="Characters" && !root.querySelector(".al-score-dashboard") && root.querySelectorAll(".al-ranking-row").length===40;', 
     'root.scrollTop=360;',
     'const scrollBefore=root.scrollTop;',
     'root.querySelectorAll(".al-ranking-handle")[7].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true,cancelable:true}));await delay();',
