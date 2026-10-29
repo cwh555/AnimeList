@@ -94,6 +94,8 @@ try {
     'const secondImage=[...tiles].find(tile=>tile.dataset.galleryKey==="AnimeList/Characters/c0.md::Assets/b.png");const coverAction=secondImage?.querySelector(".al-gallery-cover-menu");if(!coverAction)throw Error("No second artwork cover menu");',
     'coverAction.click();const setCover=window.__menuItems?.at(-1)?.execute;if(!setCover)throw Error("Cover menu did not expose action");setCover();await delay();',
     'checks.gallerySetCoverPersisted=chars[0].portrait==="Assets/b.png";',
+    'const coverNotices=(window.__notices??[]).slice();',
+    'checks.galleryCoverNoErrors=coverNotices.length===0;',
 
     'checks.noIrrelevantMediaFilter=getComputedStyle(root.querySelector(".al-gallery-type-filters")).display==="none";',
     'clickRequired(".al-character-mode-tabs button:nth-child(3)");await delay();',
@@ -110,7 +112,7 @@ try {
     'checks.workDetailOffersCastPicker=!!media.querySelector(".al-character-work-add");',
     'clickRequired(".al-character-work-person");await delay();',
     'checks.workCharacterOpensNote=window.__openedPath==="AnimeList/Characters/c0.md";',
-    'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
+    'document.body.dataset.details=JSON.stringify({checks,coverNotices,allNotices:window.__notices??[],portrait:chars[0].portrait,source:srcText});document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail"});',
   ].join("\n");
   const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
