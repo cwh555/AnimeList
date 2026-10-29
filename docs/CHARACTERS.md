@@ -32,7 +32,7 @@ Manual Desktop / Mobile test-vault checklist:
 
 - Empty Character Library; manual addition; Bangumi search; verified work cast; no unselected character collected.
 - Same verified character from two seasons is not duplicated; conflicting same-name identities remain separate.
-- Portrait fallback on broken or missing URLs; **no cropping of tall/full-body illustrations**; compact one-item desktop grid; edit modal cover choice from saved images and upload; **card click opens the note**, pencil opens the editor, Manage Images opens the note. Verify real work-title labels and bidirectional links.
+- Portrait fallback on broken or missing URLs; **no cropping of tall/full-body illustrations**; compact one-item desktop grid; compact editor's gallery shortcut opens the character note, where the existing Image Section menu selects a saved or newly uploaded cover; **card click opens the note**, pencil opens the editor, Manage Images opens the note. Verify real work-title labels and bidirectional links.
 - JPG/PNG/WebP image imports, existing Gallery image assignment without duplication, image Lightbox, image section reorder, multiple sessions, mixed-character Gallery, and mobile gallery scrolling.
 - Characters Ranking: first compare, skip, resume, full rerank, exact positions and possible ranges; existing media Ranking unchanged.
 - Desktop `file:` references without copying, after app reload; confirm Mobile displays an unavailable-image placeholder rather than pretending to sync.
