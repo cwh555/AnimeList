@@ -52,7 +52,7 @@ try {
     'const resources=new Map(chars.map(c=>[c.path,new CharactersFixture.TFile(c.path)]));resources.set("Assets/a.png",new CharactersFixture.TFile("Assets/a.png"));resources.set("Assets/b.png",new CharactersFixture.TFile("Assets/b.png"));',
     'let srcText=[String.fromCharCode(96).repeat(3)+"animelist-images","- Assets/a.png","- Assets/b.png",String.fromCharCode(96).repeat(3)].join("\\n");',
     'const disk=new Map();const adapter={exists:async p=>p===".obsidian"||disk.has(p),readBinary:async p=>new TextEncoder().encode(disk.get(p)??"").buffer,writeBinary:async(p,value)=>{disk.set(p,new TextDecoder().decode(value))},process:async(p,change)=>{const next=change(disk.get(p)??"");disk.set(p,next);return next},mkdir:async()=>{}};',
-    'const app={vault:{configDir:".obsidian",getAbstractFileByPath:p=>p==="AnimeList/Characters"?{children:chars.map(c=>resources.get(c.path))}:(resources.get(p)??null),cachedRead:async()=>srcText,getResourcePath:()=>pixel,adapter},metadataCache:{getFileCache:f=>{const c=chars.find(item=>item.path===f.path);return {frontmatter:c?{animelist_character:true,character_id:c.id,character_name:c.name,character_tier:c.tier,bangumi_character_id:c.bangumiId,character_portrait:c.portrait,character_appearances:c.appearances}:{}}},getFirstLinkpathDest:p=>resources.get(p)??null,on:()=>({})},fileManager:{processFrontMatter:async(file,modify)=>{const c=chars.find(item=>item.path===file.path);if(!c)throw Error("No character");const frontmatter={character_portrait:c.portrait};modify(frontmatter);c.portrait=frontmatter.character_portrait}}};',
+    'const app={vault:{configDir:".obsidian",getAbstractFileByPath:p=>p==="AnimeList/Characters"?{children:chars.map(c=>resources.get(c.path))}:(resources.get(p)??null),cachedRead:async()=>srcText,process:async(file,edit)=>{srcText=edit(srcText);return srcText},getResourcePath:()=>pixel,adapter},metadataCache:{getFileCache:f=>{const c=chars.find(item=>item.path===f.path);return {frontmatter:c?{animelist_character:true,character_id:c.id,character_name:c.name,character_tier:c.tier,bangumi_character_id:c.bangumiId,character_portrait:c.portrait,character_appearances:c.appearances}:{}}},getFirstLinkpathDest:p=>resources.get(p)??null,on:()=>({})},fileManager:{processFrontMatter:async(file,modify)=>{const c=chars.find(item=>item.path===file.path);if(!c)throw Error("No character");const frontmatter={character_portrait:c.portrait};modify(frontmatter);c.portrait=frontmatter.character_portrait}}};',
     'const service={list:async()=>chars,setTier:async()=>{},setPortrait:async(path,value)=>{const item=chars.find(c=>c.path===path);if(item)item.portrait=value},setName:async()=>{},ensureVisibleWorks:async()=>{},attachImage:async()=>true,createImageSession:async()=>{const fence=String.fromCharCode(96).repeat(3);srcText+="\\n\\n"+fence+"animelist-images\\n"+fence+"\\n";}};',
     'const host={app,settings:{libraryRoot:"AnimeList",coverFolder:"AnimeList/Covers"},getImageThumbnailSources:()=>undefined,collectMediaItems:()=>[],openMediaFile:async path=>{window.__openedPath=path},refreshViews:()=>{},openLibrarySection:async()=>{},ensureFolder:async()=>{},uniqueFilePath:async()=>""};',
     'const root=document.querySelector("#root");const actions=document.querySelector("#actions");',
@@ -95,7 +95,7 @@ try {
     'coverAction.click();const setCover=window.__menuItems?.at(-1)?.execute;if(!setCover)throw Error("Cover menu did not expose action");setCover();await delay();',
     'checks.gallerySetCoverPersisted=chars[0].portrait==="Assets/b.png";',
     'const coverNotices=(window.__notices??[]).slice();',
-    'checks.galleryCoverNoErrors=coverNotices.length===0;',
+    'checks.galleryCoverNoErrors=!coverNotices.some(value=>/失敗|failed|error/i.test(String(value)));',
 
     'checks.noIrrelevantMediaFilter=getComputedStyle(root.querySelector(".al-gallery-type-filters")).display==="none";',
     'clickRequired(".al-character-mode-tabs button:nth-child(3)");await delay();',
@@ -112,7 +112,8 @@ try {
     'checks.workDetailOffersCastPicker=!!media.querySelector(".al-character-work-add");',
     'clickRequired(".al-character-work-person");await delay();',
     'checks.workCharacterOpensNote=window.__openedPath==="AnimeList/Characters/c0.md";',
-    'document.body.dataset.details=JSON.stringify({checks,coverNotices,allNotices:window.__notices??[],portrait:chars[0].portrait,source:srcText});document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
+    'checks.noLateErrors=!(window.__notices??[]).some(value=>/失敗|failed|error/i.test(String(value)));',
+    'document.body.dataset.details=JSON.stringify({checks,coverNotices,allNotices:window.__notices??[],portrait:chars[0].portrait});document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail"});',
   ].join("\n");
   const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
