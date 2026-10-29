@@ -14,10 +14,13 @@ export async function setCharacterGalleryCover(
   const file = app.vault.getAbstractFileByPath(sourcePath);
   if (!(file instanceof TFile) || !sourcePath.startsWith(folder)) return false;
   const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-  if (fm?.animelist_character !== true) return false;
+  const markdown = await app.vault.cachedRead(file);
+  // A just-created Character note can be used before metadata indexing finishes.
+  // Its generated identity header is the fallback; Markdown body text is not.
+  const unindexedCharacter = /^---\r?\nanimelist_character: true\r?\ncharacter_id: /.test(markdown);
+  if (fm?.animelist_character !== true && !unindexedCharacter) return false;
   const image = normalizeImageSectionPath(imagePath);
   if (!image) throw new Error("Image path is empty");
-  const markdown = await app.vault.cachedRead(file);
   if (!allImageSectionPaths(markdown).includes(image)) {
     throw new Error("This picture is not in the character's image gallery");
   }
