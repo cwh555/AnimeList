@@ -3,6 +3,7 @@ import { it } from "node:test";
 import { TFile, type App } from "obsidian";
 import { CharacterLibraryService } from "../src/data/character-library-service";
 import { setCharacterGalleryCover } from "../src/data/characters/gallery-cover";
+import { ImageSectionService } from "../src/data/image-section-service";
 import { CharacterRankingStore } from "../src/data/characters/ranking-store";
 import { CharacterRankingAdapter } from "../src/data/characters/ranking-adapter";
 import { characterRankingItems } from "../src/domain/characters/ranking-items";
@@ -244,6 +245,33 @@ it("sets a character cover only from its gallery and never changes the media cov
   const media = file("Anime/Another.md");
   h.files.set(media.path, media);
   assert.equal(await setCharacterGalleryCover(h.app, "AnimeList", media.path, "Assets/one.png"), false);
+});
+
+it("routes a newly created Character gallery cover correctly before metadata indexing", async () => {
+  const h = harness();
+  const library = new CharacterLibraryService(h.app, () => "AnimeList");
+  const character = await library.collect({ name: "New character" });
+  const image = file("Assets/new-character.png");
+  h.files.set(image.path, image);
+  await library.attachImage(character.path, image.path);
+
+  // Simulate Obsidian not yet having parsed YAML for a newly created file.
+  const cached = h.app.metadataCache.getFileCache;
+  h.app.metadataCache.getFileCache = () => null;
+  try {
+    const imageService = new ImageSectionService({
+      app: h.app,
+      settings: { libraryRoot: "AnimeList" },
+      refreshViews() {},
+    } as unknown as ConstructorParameters<typeof ImageSectionService>[0]);
+    await imageService.setAsCover(character.path, image.path);
+  } finally {
+    h.app.metadataCache.getFileCache = cached;
+  }
+
+  assert.equal(h.metadata.get(character.path)?.character_portrait, image.path);
+  assert.equal(h.metadata.get(character.path)?.cover, undefined,
+    "an unindexed Character must never fall through to the media-cover field");
 });
 
 it("upgrades older Character markdown notes on first open without duplicate info blocks", async () => {
