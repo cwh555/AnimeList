@@ -214,6 +214,9 @@ frontmatter and note content remain governed by the preceding storage/API contra
   A primary action uses `mod-cta`, a destructive confirmation uses `mod-warning`,
   and other actions remain secondary. Feature-specific icon tools and workspace
   gestures may differ, but must preserve the same focus, disabled and touch states.
+  Scoreboard batch commands and Ranking operation/confirmation controls reuse `createUiAction`; specialized tabs, posters and drag handles retain their task-specific behavior.
+- **Export entry:** The global workspace Export action owns Library, Scoreboard and Ranking exports; page renderers must not add a duplicate shortcut.
+- **Serial-entry cover providers:** Use configured metadata search for supported media types, with optional Google Books. Deduplicate by provider identity; keep automatic entry matching conservative and allow explicit manual selection of lower-confidence candidates.
 - **Media editing:** Search-result collection and editing a saved work use
   `createMediaEditorIdentity` in `src/ui/media-editor-layout.ts` and the existing
   `createMediaEditorFields` in `src/ui/media-form-controls.ts`. The source
