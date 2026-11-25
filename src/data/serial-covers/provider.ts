@@ -229,6 +229,40 @@ async function searchGoogleBooks(query: string): Promise<SerialCoverCandidate[]>
     .filter((candidate): candidate is SerialCoverCandidate => candidate !== null));
 }
 
+/**
+ * Provider selection, rate limits and network clients are owned by the main
+ * metadata search service. The only additional source is optional Google Books.
+ * Retry one abbreviated title only when the exact volume is still missing.
+ */
+async function searchConfiguredCoverSources(
+  metadataSearch: SerialCoverMetadataSearch,
+  mediaType: SerialMediaType,
+  queries: string[],
+  title: string,
+  label: string,
+): Promise<SerialCoverCandidate[]> {
+  let candidates: SerialCoverCandidate[] = [];
+  let firstError: unknown;
+  for (const query of queries.slice(0, 2)) {
+    try {
+      candidates = uniqueSerialCoverSources([
+        ...candidates,
+        ...await searchMetadataCoverCandidates(metadataSearch, mediaType, query),
+      ]);
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (rankSerialCoverCandidates(candidates, title, label, mediaType).length) break;
+  }
+  try {
+    candidates = uniqueSerialCoverSources([...candidates, ...await searchGoogleBooks(queries[0] ?? "")]);
+  } catch (error) {
+    firstError ??= error;
+  }
+  if (candidates.length === 0 && firstError !== undefined) throw firstError;
+  return candidates;
+}
+
 async function requestSerialCovers(
   query: string,
   originalTitle: string,
@@ -245,30 +279,8 @@ async function requestSerialCovers(
     queries.push(candidateQuery);
   }
   if (metadataSearch) {
-    let candidates: SerialCoverCandidate[] = [];
-    let metadataError: unknown;
-    // Search the configured Bangumi/AniList/Open Library clients together;
-    // retry a shorter title only when the exact volume is still unidentified.
-    for (const candidateQuery of queries.slice(0, 2)) {
-      try {
-        candidates = uniqueSerialCoverSources([
-          ...candidates,
-          ...await searchMetadataCoverCandidates(metadataSearch, mediaType, candidateQuery),
-        ]);
-      } catch (error) {
-        metadataError ??= error;
-      }
-      if (rankSerialCoverCandidates(candidates, originalTitle, label, mediaType).length) break;
-    }
-    try {
-      candidates = uniqueSerialCoverSources([...candidates, ...await searchGoogleBooks(query)]);
-    } catch (error) {
-      if (!candidates.length && metadataError === undefined) metadataError = error;
-    }
-    const ranked = rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
-    if (ranked.length) return ranked;
-    if (metadataError !== undefined && !candidates.length) throw metadataError;
-    return [];
+    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, originalTitle, label);
+    return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
   }
   let bangumiCandidates: SerialCoverCandidate[] = [];
   let bangumiError: unknown;
@@ -321,31 +333,8 @@ async function requestManualSerialCovers(
   }
 
   if (metadataSearch) {
-    let candidates: SerialCoverCandidate[] = [];
-    let metadataError: unknown;
-    // Unlike the automatic lookup, manual selection retains alternatives
-    // from all enabled providers even when Bangumi already has a result.
-    for (const candidateQuery of queries.slice(0, 2)) {
-      try {
-        candidates = uniqueSerialCoverSources([
-          ...candidates,
-          ...await searchMetadataCoverCandidates(metadataSearch, mediaType, candidateQuery),
-        ]);
-      } catch (error) {
-        metadataError ??= error;
-      }
-      if (rankSerialCoverCandidates(candidates, queryTitle, label, mediaType).length) break;
-    }
-    try {
-      candidates = uniqueSerialCoverSources([...candidates, ...await searchGoogleBooks(query)]);
-    } catch (error) {
-      if (!candidates.length && metadataError === undefined) metadataError = error;
-    }
-    if (candidates.length) {
-      return rankManualSerialCoverCandidates(candidates, queryTitle, label, mediaType, referenceTitle);
-    }
-    if (metadataError !== undefined) throw metadataError;
-    return [];
+    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, queryTitle, label);
+    return rankManualSerialCoverCandidates(candidates, queryTitle, label, mediaType, referenceTitle);
   }
 
   let bangumiCandidates: SerialCoverCandidate[] = [];
