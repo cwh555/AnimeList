@@ -1,5 +1,5 @@
 import type { ExternalMediaSearchPage } from "../../domain/media-types";
-import type { RankedSerialCoverCandidate, SerialCoverCandidate } from "../../domain/serial-covers/ranking";
+import type { SerialCoverCandidate } from "../../domain/serial-covers/ranking";
 
 export type SerialCoverMediaType = "manga" | "novel";
 
@@ -65,9 +65,3 @@ export function uniqueSerialCoverSources<T extends SerialCoverCandidate>(candida
   });
 }
 
-/** An automatically loaded cover must identify the specific volume. */
-export function hasExactVolumeCover(
-  candidates: readonly RankedSerialCoverCandidate[],
-): boolean {
-  return candidates.length > 0;
-}
