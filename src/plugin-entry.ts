@@ -6,6 +6,7 @@ import { mediaClassificationEditorFeature } from "./features/media-classificatio
 import { masterpieceFeature } from "./features/masterpiece/feature";
 import { imageSectionFeature } from "./features/image-sections/feature";
 import { imageGalleryFeature } from "./features/image-gallery/feature";
+import { characterFeature } from "./features/characters/feature";
 import { libraryLayoutSettingsFeature } from "./features/library-layout/settings";
 import { libraryExportFeature } from "./features/library-export/feature";
 import { momentsFeature } from "./features/moments/feature";
@@ -31,6 +32,7 @@ const FEATURES: readonly AnimeListFeature<AnimeListFeatureHost>[] = [
   ratingFeature,
   imageSectionFeature,
   imageGalleryFeature,
+  characterFeature,
   momentsFeature,
   libraryLayoutSettingsFeature,
   libraryExportFeature,

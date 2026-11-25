@@ -1,0 +1,142 @@
+/* Characters reuses AnimeList's native Library, detail, and filter UI primitives. */
+.al-character-page, .al-character-details { min-width: 0; padding: 2px 0 28px; }
+.al-character-mode-tabs.al-type-tabs { margin: 0 0 14px; }
+.al-character-mode-tabs .al-type-tab { font-size: .76rem; }
+.al-character-tools.al-toolbar { display:flex; align-items:stretch; flex-wrap:wrap; gap:9px; }
+.al-character-tools .al-search { flex:1 1 185px; min-width:0; }
+.al-character-tools .al-search input { min-width:0; width:100%; border:0; background:transparent; box-shadow:none; font-size:.78rem; }
+.al-character-tools .al-sort { flex:0 0 auto; }
+.al-character-tools .al-sort select { min-width:120px; height:38px; border:0; background:transparent; }
+.al-character-card.al-card { padding:0; text-align:left; }
+.al-character-card .al-cover-wrap { width:100%; aspect-ratio:2/3; }
+.al-character-card .al-card-top-actions { margin-left:auto; }
+.al-character-card .al-edit-button { cursor:pointer; }
+.al-character-cover-fallback { color:var(--text-faint); display:grid; place-items:center; width:100%; height:100%; }
+.al-character-hint { color:var(--text-muted); line-height:1.5; }
+.al-character-profile.al-detail-body { display:flex; align-items:flex-start; gap:20px; padding:12px 0 18px; }
+.al-character-remove-button { color:var(--text-error); }
+.al-character-remove-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.al-character-picker-modal .modal-content { min-width:0; }
+.al-character-picker-search { display:flex; align-items:center; gap:8px; margin:10px 0; min-width:0; }
+.al-character-picker-search input { flex:1 1 auto; min-width:0; }
+.al-character-manual-row { margin-bottom:14px; }
+.al-character-picker-results { overflow-y:auto; max-height:min(58vh,680px); }
+.al-character-candidate-grid.al-grid { grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); gap:12px; }
+.al-character-candidate.al-card { padding:0; display:flex; flex-direction:column; }
+.al-character-candidate.al-card .al-cover-wrap { width:100%; aspect-ratio:2/3; }
+.al-character-candidate.al-card .al-card-body { display:flex; flex:1; flex-direction:column; gap:8px; }
+.al-character-candidate .al-character-candidate-action { width:100%; margin-top:auto; }
+.al-character-work-section { grid-column:1/-1; margin-top:15px; padding:15px 0 3px; border-top:1px solid var(--al-border); min-width:0; }
+.al-character-work-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.al-character-work-heading h3 { margin:0; font-size:.86rem; }
+.al-character-work-list { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:8px; }
+.al-character-work-empty { margin:0; color:var(--text-muted); font-size:.75rem; }
+.al-character-work-person { display:flex; align-items:center; gap:8px; max-width:min(100%,220px); min-height:50px; padding:4px 9px 4px 4px; border:1px solid var(--al-border); border-radius:9px; background:var(--background-secondary); color:var(--text-normal); text-align:left; cursor:pointer; }
+.al-character-work-person:hover { border-color:var(--al-accent); background:var(--background-modifier-hover); }
+.al-character-work-portrait { display:grid; place-items:center; flex:0 0 36px; width:36px; height:46px; overflow:hidden; border-radius:6px; background:var(--background-primary-alt); }
+.al-character-work-portrait img { width:100%; height:100%; object-fit:cover; }
+.al-character-work-name { min-width:0; overflow-wrap:anywhere; font-size:.75rem; }
+.al-character-ranking-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.al-character-ranking-head h2 { margin:0; }
+.al-character-ranking-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.al-character-ranking-list { display:flex; flex-direction:column; gap:6px; margin-top:14px; }
+.al-character-ranking-row { display:flex; align-items:center; justify-content:flex-start; gap:16px; width:100%; text-align:left; }
+.al-character-rank { min-width:80px; font-weight:700; font-variant-numeric:tabular-nums; }
+.al-character-ranking-row .al-character-rank-name { min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
+.al-character-assign-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; margin:12px 0; max-height:50vh; overflow:auto; }
+@media (max-width:480px) {
+  .al-character-grid.al-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .al-character-profile.al-detail-body { gap:12px; flex-wrap:wrap; }
+  .al-character-profile > .al-character-cover { flex-basis:120px; max-width:120px; }
+  .al-character-images { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .al-character-picker-search { flex-wrap:wrap; }
+  .al-character-candidate-grid.al-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+/* Character portraits must not be treated as cropped 2:3 anime posters. */
+.al-character-grid.al-grid {
+  grid-template-columns: repeat(auto-fill, minmax(175px, 210px));
+  justify-content: start;
+}
+.al-character-card.al-card { width: 100%; max-width: 210px; }
+.al-character-card .al-character-cover.al-cover-wrap {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  background: var(--background-secondary-alt);
+}
+.al-character-card .al-character-cover .al-cover {
+  object-fit: contain;
+  object-position: center;
+}
+.al-character-card .al-card-body { padding: 10px 11px 13px; }
+.al-character-card .al-card-title { margin: 0; font-size: .86rem; line-height: 1.4; }
+.al-character-card .al-facts { margin-top: 5px; overflow-wrap: anywhere; line-height: 1.35; }
+.al-character-card .al-edit-button {
+  background: rgba(16, 17, 23, .76);
+  color: #fff;
+}
+.al-character-card .al-edit-button:hover,
+.al-character-card .al-edit-button:focus-visible {
+  background: var(--interactive-accent);
+}
+/* Compact, AnimeList-native Character editor. Images live in Image Sections. */
+.animelist-modal.al-character-edit-modal {
+  width: min(620px, calc(100vw - 28px));
+  max-width: 620px;
+  max-height: min(85vh, 790px);
+}
+.al-character-edit-modal .modal-content {
+  min-width: 0;
+  max-height: calc(85vh - 72px);
+  overflow-y: auto;
+}
+.al-character-edit-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.al-character-edit-heading h2 { margin:0; font-size:1.3rem; }
+.al-character-editor-more { display:grid; place-items:center; width:36px; height:36px; padding:0; background:var(--background-secondary); }
+.al-character-edit-information { display:grid; grid-template-columns: 160px minmax(0, 1fr); align-items:start; gap:16px; }
+.al-character-edit-current-cover { display:grid; place-items:center; width:100%; aspect-ratio:2/3; overflow:hidden; border-radius:var(--al-radius); background:var(--background-secondary); }
+.al-character-edit-current-cover img { display:block; width:100%; height:100%; object-fit:contain; object-position:center; }
+.al-character-edit-fields { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.al-character-edit-field { display:flex; flex-direction:column; gap:6px; font-size:.76rem; color:var(--text-muted); min-width:0; }
+.al-character-edit-field :is(input, select) { width:100%; min-width:0; height:40px; color:var(--text-normal); }
+.al-character-edit-works { min-width:0; color:var(--text-muted); font-size:.75rem; line-height:1.5; overflow-wrap:anywhere; }
+.al-character-edit-cover-link { margin:16px 0 0; padding-top:14px; border-top:1px solid var(--al-border); }
+.al-character-edit-cover-link h3 { margin:0 0 6px; font-size:.85rem; }
+.al-character-edit-cover-link p { margin:0 0 12px; color:var(--text-muted); font-size:.74rem; line-height:1.5; }
+.al-character-edit-cover-link button { max-width:100%; min-height:40px; }
+.al-character-edit-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:20px; }
+.al-character-edit-actions button { min-height:40px; }
+.al-character-current-cover { position:absolute; z-index:3; left:9px; top:9px; padding:4px 8px; border-radius:7px; font-size:.68rem; background:var(--interactive-accent); color:var(--text-on-accent); pointer-events:none; }
+.al-gallery-image-tile.is-current-character-cover { border-radius:var(--al-radius); outline:2px solid var(--interactive-accent); outline-offset:-2px; }
+@media (max-width:480px) {
+  .al-character-grid.al-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .al-character-card.al-card { max-width:none; }
+  .animelist-modal.al-character-edit-modal { max-height: calc(100dvh - 28px); }
+  .al-character-edit-modal .modal-content { max-height: calc(100dvh - 98px); }
+  .al-character-edit-information { grid-template-columns:105px minmax(0,1fr); gap:12px; }
+  .al-character-edit-current-cover { align-self:start; }
+  .al-character-edit-actions button { min-height:44px; }
+}
+
+/* Reuse the existing media detail surface for the canonical Character note. */
+.al-character-note-card {
+  display:flex; align-items:flex-start; gap:18px; padding:16px;
+  max-width: min(100%, 920px); min-width:0;
+}
+.al-character-note-cover {
+  display:grid; place-items:center; flex:0 0 165px;
+  width:165px; aspect-ratio:2/3; overflow:hidden; border-radius:var(--al-radius);
+  background:var(--background-secondary);
+}
+.al-character-note-cover img { width:100%; height:100%; object-fit:contain; }
+.al-character-note-summary { display:flex; flex-direction:column; gap:7px; min-width:0; flex:1 1 190px; }
+.al-character-note-label { color:var(--text-muted); font-size:.72rem; }
+.al-character-note-tier { font-size:1rem; font-weight:650; }
+.al-character-note-work-links { display:flex; gap:7px; flex-wrap:wrap; }
+.al-character-note-work-links button { text-align:left; white-space:normal; overflow-wrap:anywhere; }
+@media (max-width:480px) {
+  .al-character-note-card { gap:12px; padding:12px; }
+  .al-character-note-cover { flex:0 0 110px; width:110px; }
+  .al-character-note-work-links button { min-height:44px; }
+}

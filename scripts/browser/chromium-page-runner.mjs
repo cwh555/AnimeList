@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { access, readFile, rm } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -42,6 +42,7 @@ export async function runChromiumDatasetTest({
   testName,
   requireEnvironment = "ANIMELIST_REQUIRE_CHROMIUM",
   viewport,
+  screenshotPath,
   resultTimeoutMs = 3600,
   interact,
 }) {
@@ -159,6 +160,11 @@ export async function runChromiumDatasetTest({
       await sleep(resultPollIntervalMs);
     }
     assert.equal(dataset.result, "pass", dataset.details || "No browser details returned");
+    if (screenshotPath) {
+      const capture = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      await mkdir(path.dirname(screenshotPath), { recursive: true });
+      await writeFile(screenshotPath, Buffer.from(capture.data, "base64"));
+    }
     console.log(`${testName} passed in Chromium: ${dataset.details}`);
   } finally {
     socket?.close();

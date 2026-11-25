@@ -61,7 +61,7 @@ export function normalizeImageSectionPath(value: unknown): string {
   path = path.replace(/^[-*+]\s+/, "").trim();
   path = cleanWikiPath(path);
   if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path;
+  if (/^(?:https?|file):\/\//i.test(path)) return path;
   return normalizePath(path).replace(/^\/+/, "");
 }
 

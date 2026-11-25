@@ -11,7 +11,7 @@ import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { rankingText as t } from "../../features/pairwise-ranking/text";
 
 export interface RankingComparisonOptions {
-  store: PairwiseRankingStore;
+  store: Pick<PairwiseRankingStore, "load" | "mutate">;
   type: MediaType;
   eligible: readonly MediaItem[];
   onClose(): void;

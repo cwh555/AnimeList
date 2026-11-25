@@ -24,6 +24,7 @@
     "version": "npm run version:sync && git add package-lock.json manifest.json versions.json",
     "community:check": "node scripts/check-community-review.mjs",
     "test:browser": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-cover-picker-click.mjs",
+    "test:browser:characters": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-characters-ui.mjs",
     "test:browser:date": "ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-serial-entry-keyboard-browser.mjs",
     "test:unit": "node scripts/run-tests.mjs --suite unit",
     "test:integration": "node scripts/run-tests.mjs --suite integration",

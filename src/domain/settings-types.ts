@@ -8,7 +8,7 @@ import type { LanguagePreference } from "../i18n/locale";
 export type { LanguagePreference } from "../i18n/locale";
 
 export type StorageMode = "managed" | "flat";
-export type LibrarySection = "library" | "timeline" | "scores" | "images";
+export type LibrarySection = "library" | "timeline" | "scores" | "images" | "characters";
 export type SearchLanguage = "chinese" | "english" | "original";
 
 export interface ProviderSettings {
