@@ -80,6 +80,7 @@ Run this checklist before every public release and before any release-candidate 
 - [ ] Each dated row shows its label, optional start date, completion date, entry-cover area, and remove action.
 - [ ] Rapidly add several rows and confirm automatic cover requests show queued/loading state and run in insertion order without skipping an intermediate row.
 - [ ] A failed automatic cover request does not block later queued rows and does not apply a low-confidence candidate.
+- [ ] With Bangumi disabled and another supported provider enabled, search serial-entry covers and verify available provider-labeled results; check optional Google Books and confirm automatic lookup never applies unrelated series artwork.
 - [ ] Open manual cover search and confirm the result cards contain no separate Select control and the modal contains no Apply action.
 - [ ] Clicking anywhere on a candidate card immediately downloads and applies that cover, updates the row, and closes the search modal.
 - [ ] If a selected cover download fails, the search modal remains open, controls become usable again, and another candidate can be chosen.
@@ -268,7 +269,7 @@ Use the editor context menu **AnimeList → Add moments section** and also compl
 
 ## Export: Library / Scoreboard / Ranking
 
-- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens with **Library / Scoreboard / Ranking**, without changing workspace data. The Scores/Ranking shortcut preselects the correct report and media type.
+- [ ] Open **Export** from Library, Timeline, Score Dashboard, and Images; the same export modal opens with **Library / Scoreboard / Ranking**, without changing workspace data. Confirm neither Rating nor Ranking renders a second Export action; choose report and media type in the global dialog.
 - [ ] Switch Library Text templates to include `{$排名}`. A confirmed rank shows `#3/176`; an unresolved one shows a proven interval like `#3~8/176`, not a guessed fixed rank. An ineligible work has an empty value. Serial entries reuse the same owning work's rank.
 - [ ] Scoreboard Text/PNG include all 21 lanes (10.0 to 0.0), **even empty ones**. If Unrated is selected it remains visible when empty; 0.0 is a real score. Check the light and dark theme palettes.
 - [ ] Ranking Text includes `/total`; Ranking PNG badges do **not** include `/total`. Check confirmed rank gaps, unresolved intervals, and Top 10/20/50 without invented certainty.
