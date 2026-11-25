@@ -66,6 +66,7 @@ try {
     'let modal=document.querySelector(".al-ranking-comparison-modal");',
     'checks.modalOpened=!!modal && root.querySelector(".al-ranking-choice")===null && modal.querySelectorAll(".al-ranking-choice").length===2;',
     'checks.coverSelect=modal.querySelectorAll(".al-ranking-choice-cover img").length===2 && modal.querySelector(".al-ranking-dialog-title")?.textContent==="第 1 輪";',
+    'checks.sharedComparisonActions=[...modal.querySelectorAll(".al-ranking-dialog-action")].every(b=>b.classList.contains("al-ui-button-secondary")&&b.type==="button"&&(innerWidth>480||b.getBoundingClientRect().height>=44));',
     'checks.backInitiallyDisabled=modal.querySelector(".al-ranking-back")?.disabled===true && modal.querySelectorAll(".al-ranking-dialog-action").length===3;',
     'checks.hasRounds=data.anime.round?.stage===1 && data.anime.round?.jobs.length===2;',
     'checks.modalFits=modal.getBoundingClientRect().left>=-1 && modal.getBoundingClientRect().right<=innerWidth+1 && modal.getBoundingClientRect().height<=innerHeight+1;',
