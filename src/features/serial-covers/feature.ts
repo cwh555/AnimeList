@@ -176,7 +176,7 @@ class CoverSelector extends Modal {
       try {
         this.query = query;
         this.candidates = await findSerialCoverCandidates(
-          this.context, this.label, query, this.context.host.searchExternalPage.bind(this.context.host),
+          this.context, this.label, query, (mediaType, query, page) => this.context.host.searchExternalPage(mediaType, query, page),
         );
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
@@ -283,7 +283,7 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
     status.setText(serialCoverText("loading"));
     try {
       const candidates = await findSerialCoverCandidates(
-        context, label, query, context.host.searchExternalPage.bind(context.host),
+        context, label, query, (mediaType, query, page) => context.host.searchExternalPage(mediaType, query, page),
       );
       new CoverSelector(context.host, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
