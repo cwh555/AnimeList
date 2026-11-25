@@ -59,6 +59,8 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 
 **1.6.2 Export update:** Ranking also avoids re-asking comparisons already proven by previous preference evidence. **Export** now offers **Library / Scoreboard / Ranking** in one dialog. Keep the existing Library JSON/Text workflow and export per-work rank in Text templates with `{$排名}` (for example, `#3/176` or `#3~8/176`); share the complete Scoreboard (including empty score lanes) or preference Ranking as Text/PNG. PNG uses available local covers, theme-aware presentation, and bounded multi-page output with a mobile-friendly preview. The existing 1.6.0 major-feature overview above remains unchanged. See the [Changelog](CHANGELOG.md) and [Export Guide](docs/LIBRARY_EXPORT.md).
 
+**1.6.3 maintenance update:** Serial-entry cover search uses enabled metadata providers and optional Google Books; Scores/Ranking uses the single workspace Export action and shared operation buttons.
+
 ## Features
 
 - One Markdown-based library for anime, manga, and novels.
@@ -101,7 +103,7 @@ Your Markdown notes remain the source of truth. Removing the plugin does not rem
 4. Update its status, progress, dates, rating, or special label from the library. For completed works, open **Scores → Ranking** to compare titles and build a preference order.
 5. For manga or novels, enable **Latest release tracking** under Settings → Features if you want source-backed latest chapter/volume information.
 6. Inside a media note, use the editor context menu **AnimeList** submenu to insert an Image Section or Moments section where you want it.
-7. Choose **Export** from Library or the Scores/Ranking shortcut to output Library JSON/Text or share the Scoreboard/Ranking as Text/PNG.
+7. Choose **Export** from the top workspace header to output Library JSON/Text or share the Scoreboard/Ranking as Text/PNG.
 
 AnimeList can display its main interface in Traditional Chinese, Simplified Chinese, English, Japanese, or Korean. The Settings page itself stays in English. Choose a language there or follow Obsidian's interface language. Recognized provider-supplied tag/category labels are displayed in the selected interface language, while media titles, raw provider metadata, custom reusable tags, Markdown/frontmatter, and existing templates are not rewritten.
 
