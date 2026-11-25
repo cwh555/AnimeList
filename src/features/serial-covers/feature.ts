@@ -175,7 +175,9 @@ class CoverSelector extends Modal {
       renderResults();
       try {
         this.query = query;
-        this.candidates = await findSerialCoverCandidates(this.context, this.label, query);
+        this.candidates = await findSerialCoverCandidates(
+          this.context, this.label, query, this.context.host.searchExternalPage.bind(this.context.host),
+        );
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
@@ -280,7 +282,9 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
     if (!query) return;
     status.setText(serialCoverText("loading"));
     try {
-      const candidates = await findSerialCoverCandidates(context, label, query);
+      const candidates = await findSerialCoverCandidates(
+        context, label, query, context.host.searchExternalPage.bind(context.host),
+      );
       new CoverSelector(context.host, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
         context.autoStatus.delete(label);
