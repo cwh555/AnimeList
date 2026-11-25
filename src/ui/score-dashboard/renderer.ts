@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { createUiAction } from "../ui-primitives";
 import { scoreDashboardColor } from "../../domain/score-dashboard/color";
 import { bindImageFallback } from "../image-fallback";
 import {
@@ -161,10 +162,10 @@ export function renderScoreDashboard(
 
   const batchBar = create("div", "al-score-batch-toolbar");
   const selectedCount = create("strong", "al-score-batch-count");
-  const selectVisibleButton = create("button", "al-score-batch-secondary", text.selectVisible);
-  selectVisibleButton.type = "button";
-  const clearButton = create("button", "al-score-batch-secondary", text.clearSelection);
-  clearButton.type = "button";
+  const selectVisibleButton = createUiAction(text.selectVisible);
+  selectVisibleButton.classList.add("al-score-batch-secondary");
+  const clearButton = createUiAction(text.clearSelection);
+  clearButton.classList.add("al-score-batch-secondary");
   const targetSelect = create("select", "al-score-batch-target");
   const targetPlaceholder = create("option", "", text.moveTo);
   targetPlaceholder.value = "";
@@ -177,10 +178,10 @@ export function renderScoreDashboard(
     option.value = score.toFixed(1);
     targetSelect.appendChild(option);
   });
-  const shiftDown = create("button", "al-score-batch-shift", `− ${text.shiftDown}`);
-  shiftDown.type = "button";
-  const shiftUp = create("button", "al-score-batch-shift", `+ ${text.shiftUp}`);
-  shiftUp.type = "button";
+  const shiftDown = createUiAction(`− ${text.shiftDown}`);
+  shiftDown.classList.add("al-score-batch-shift");
+  const shiftUp = createUiAction(`+ ${text.shiftUp}`);
+  shiftUp.classList.add("al-score-batch-shift");
   batchBar.append(selectedCount, selectVisibleButton, clearButton, targetSelect, shiftDown, shiftUp);
 
   const board = create("div", "al-score-board");
@@ -465,6 +466,7 @@ export function renderScoreDashboard(
     TYPE_OPTIONS.forEach(([value, label]) => {
       const button = create("button", `al-score-dashboard-tab${state.type === value ? " is-active" : ""}`);
       button.type = "button";
+      button.setAttribute("aria-pressed", String(state.type === value));
       button.append(create("span", "", label), create("span", "al-score-dashboard-count", String(typeCount(items, value))));
       button.addEventListener("click", () => { state.type = value; selectedPaths.clear(); update(); emitState(); });
       typeTabs.appendChild(button);
