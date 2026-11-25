@@ -127,7 +127,7 @@ Ranking exports Text or PNG with proven absolute positions separate from unresol
 
 PNG is synthesized from the projection in bounded pages (1000 layout pixels wide, 1.5× scale, up to 2600 layout pixels high). Each cover is decoded and released individually; missing or unreadable covers use a visible placeholder and are counted in the preview notice. Copy is enabled for one-page PNG, while multi-page exports are saved as separate PNG files in the regular `<Library root>/Exports/` folder. Copy/Save never modify ranking data or media notes.
 
-The Scoreboard/Ranking workspace has an Export shortcut which preselects the current page and media type. The Library workspace's existing Export entry opens the same dialog.
+Since 1.6.3, Scores/Ranking uses the same top workspace Export action as the other pages. Choose the report and media type in the dialog; there is no duplicate page-level shortcut.
 
 **Mobile and troubleshooting:** The PNG preview may span multiple pages. Use the preview page buttons to check each page; when the output contains multiple images, Copy is disabled by design and **Save export file** creates every PNG under the Library Exports folder. Missing local or remote covers are replaced by placeholders instead of cancelling the entire export. The dialog uses compact stacking on mobile. No export writes back into Markdown, media frontmatter, scores, ranking data, Images, Moments, or settings.
 
