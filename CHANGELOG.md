@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.3
+
+### Fixed
+
+- Serial-entry cover search now uses enabled metadata providers (Bangumi, AniList and Open Library where supported), with optional Google Books. Manual selection retains lower-confidence candidates; automatic loading still requires a confident entry-level match.
+- Remove the duplicate Export shortcut inside Scores/Ranking; use the global workspace Export action.
+- Reuse shared UI actions for Scoreboard batch commands and Ranking controls and dialogs.
+
+### Compatibility
+
+- No Markdown/frontmatter, ranking storage or export-format migration.
+
 ## 1.6.2
 
 ### Added

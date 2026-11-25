@@ -47,7 +47,7 @@ Each dated manga or novel entry can store its own optional cover. The normal ser
 
 Automatic cover loading is intentionally conservative: AnimeList applies a result only when the title, media type, and entry label form an unambiguous match. Rapidly added entries are processed in insertion order, so a slower request cannot cause an intermediate chapter, season, or volume to be skipped. A failed lookup does not block later queued entries.
 
-Click an entry's cover area or retry action to open manual cover search. Manual search is broader than automatic loading: it searches the edited query and the stored original-language title, keeps lower-confidence candidates visible, and ranks likely title and entry-number matches first. Click anywhere on a candidate card to download and apply that cover immediately; there is no separate Select or Apply step. If the download fails, the search window stays open so another result can be chosen.
+Click an entry's cover area or retry action to open manual cover search. Both manual and automatic entry-cover lookup use enabled metadata providers (Bangumi, AniList, Open Library for supported book searches), plus Google Books when configured. Sources may expose series artwork rather than the requested volume. Manual search is broader than automatic loading: it searches the edited query and the stored original-language title, keeps lower-confidence candidates visible, and ranks likely title and entry-number matches first. Click anywhere on a candidate card to download and apply that cover immediately; there is no separate Select or Apply step. If the download fails, the search window stays open so another result can be chosen.
 
 Clear an entry cover to return that entry to the series-cover fallback. Existing notes can use **Settings → Maintenance → Serial cover recovery** to scan dated entries in a floating progress window. The migration reports loaded, not found, failed, and skipped records, supports cancellation, and never overwrites an existing entry cover.
 
@@ -299,7 +299,7 @@ On mobile Obsidian, AnimeList keeps horizontal interactions inside its workspace
 
 ## Export: Library / Scoreboard / Ranking
 
-Choose **Export** in the AnimeList workspace (or the **Export Library** command). The same dialog offers three output families. Scores and Ranking also offer an **Export** shortcut that preselects the current view and media type.
+Choose **Export** in the AnimeList workspace (or the **Export Library** command). The same dialog offers three output families. Use the single top workspace Export action and choose the desired report and media type; there is no separate Scores/Ranking shortcut.
 
 - **Library → JSON / Text:** JSON preserves the existing versioned `animelist-library-export` v1 portable record contract, without arbitrary frontmatter, note-body Markdown, Images, Moments, or cache files. Text remains a completion-event report, using a bounded literal template and media/status filters. Insert `{$排名}` into a Traditional Chinese Text template to include the work's eligible completed-work rank; for example `#3/176` if confirmed or `#3~8/176` if unresolved. Manga/novel serial completion events use the rank of the owning work. Ineligible works output no rank. The variable label is localized for other interface languages.
 - **Scoreboard → Text / PNG:** Each of the 21 score lanes from 10.0 to 0.0 appears even if it has no works. The optional Unrated lane can be included; valid `0.0` ratings are not treated as Unrated. Choose All/Anime/Manga/Novel, and use a light or dark PNG theme.

@@ -40,7 +40,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `domain/presentation-export.ts` projects score lanes and confirmed/unresolved ranking positions using the **existing** Score Dashboard and pairwise-ranking services; it also provides the work-level Library Text ranking variable without inventing score-derived order.
 - `domain/presentation-export-layout.ts` produces bounded PNG pages, preserving empty half-point lanes and optional Unrated. `domain/score-dashboard/color.ts` is the shared live dashboard/export score-color mapping.
 - `data/presentation-cover-service.ts` resolves real Vault cover references from frontmatter rather than treating Obsidian `app://` display URLs as filesystem paths. `data/presentation-export-service.ts` writes new Text or PNG files under the export directory; `ui/png-clipboard.ts` is the isolated clipboard boundary.
-- `ui/presentation-export-raster.ts` decodes/paints one cover at a time and closes its resources. `ui/library-export-modal.ts` provides the common mode selector, preview and mobile multi-page navigation. The Scores/Ranking workspace provides only a shortcut.
+- `ui/presentation-export-raster.ts` decodes/paints one cover at a time and closes its resources. `ui/library-export-modal.ts` provides the common mode selector, preview and mobile multi-page navigation. The global `library-export` workspace action is the single UI entry point; Scores/Ranking does not create another Export button.
 - Export never changes Library JSON v1, media Markdown/frontmatter schema 6, or independent ranking state v1; it is a read-only projection and new-file output layer.
 
 
@@ -58,6 +58,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `providers/ndl-release-client.ts`: NDL/JPRO publication discovery for novels.
 - `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
+- `data/serial-covers/metadata-candidates.ts` adapts configured metadata search results into cover candidates; `data/serial-covers/provider.ts` combines them with optional Google Books and retains strict automatic entry matching. Manual selection can include lower-confidence artwork.
 - `provider-normalizers.ts`: pure provider payload normalization, plus a thin call to typed, identity-safe result deduplication; no fuzzy source-ID inference.
 - `media-classification-service.ts`: optional exact-AniList-ID classification enrichment after a work is selected. Title/year matching alone is not evidence of cross-provider identity; failure never blocks note creation.
 - `external-media-service.ts`: the single multi-provider orchestration boundary for enabled sources, warnings, direct lookup, and bounded per-interaction search sessions. Explicit pagination session IDs are passed through the typed host; legacy calls remain supported. It owns clients and cursors, but not title semantics or transport throttling.
