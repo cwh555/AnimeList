@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import { SerialCoverLoadQueue } from "../src/app/serial-covers/load-queue";
+import { SerialCoverDirectApply } from "../src/app/serial-covers/direct-apply";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
@@ -250,4 +251,21 @@ test("metadata source adapter keeps cover variants from different providers and 
   );
   assert.deepEqual(result.map(item => item.provider), ["Bangumi", "AniList"]);
   assert.deepEqual(uniqueSerialCoverSources([...result, ...result]).map(item => item.provider), ["Bangumi", "AniList"]);
+});
+
+test("simultaneous provider IDs do not mark the wrong cover as applying", async () => {
+  const action = new SerialCoverDirectApply();
+  let resolve!: () => void;
+  const pending = new Promise<void>(complete => { resolve = complete; });
+  const chosen = { ...candidate("42"), provider: "AniList" };
+  const operation = action.run(chosen, async () => {
+    await pending;
+    return "applied";
+  });
+  assert.equal(action.activeSourceId, "42");
+  assert.equal(action.activeSourceKey, JSON.stringify(["AniList", "42"]));
+  assert.notEqual(action.activeSourceKey, JSON.stringify(["Bangumi", "42"]));
+  resolve();
+  assert.equal(await operation, "applied");
+  assert.equal(action.activeSourceKey, null);
 });
