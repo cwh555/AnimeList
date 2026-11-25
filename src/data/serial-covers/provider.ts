@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { USER_AGENT } from "../../app-metadata";
+import { searchMetadataCoverCandidates, uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "./metadata-candidates";
 import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import {
   confidentSerialCover,
@@ -228,11 +229,46 @@ async function searchGoogleBooks(query: string): Promise<SerialCoverCandidate[]>
     .filter((candidate): candidate is SerialCoverCandidate => candidate !== null));
 }
 
+/**
+ * Provider selection, rate limits and network clients are owned by the main
+ * metadata search service. The only additional source is optional Google Books.
+ * Retry one abbreviated title only when the exact volume is still missing.
+ */
+async function searchConfiguredCoverSources(
+  metadataSearch: SerialCoverMetadataSearch,
+  mediaType: SerialMediaType,
+  queries: string[],
+  title: string,
+  label: string,
+): Promise<SerialCoverCandidate[]> {
+  let candidates: SerialCoverCandidate[] = [];
+  let firstError: unknown;
+  for (const query of queries.slice(0, 2)) {
+    try {
+      candidates = uniqueSerialCoverSources([
+        ...candidates,
+        ...await searchMetadataCoverCandidates(metadataSearch, mediaType, query),
+      ]);
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (rankSerialCoverCandidates(candidates, title, label, mediaType).length) break;
+  }
+  try {
+    candidates = uniqueSerialCoverSources([...candidates, ...await searchGoogleBooks(queries[0] ?? "")]);
+  } catch (error) {
+    firstError ??= error;
+  }
+  if (candidates.length === 0 && firstError !== undefined) throw firstError;
+  return candidates;
+}
+
 async function requestSerialCovers(
   query: string,
   originalTitle: string,
   label: string,
   mediaType: SerialMediaType,
+  metadataSearch?: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
   const queries: string[] = [];
   const seenQueries = new Set<string>();
@@ -241,6 +277,10 @@ async function requestSerialCovers(
     if (!key || seenQueries.has(key)) continue;
     seenQueries.add(key);
     queries.push(candidateQuery);
+  }
+  if (metadataSearch) {
+    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, originalTitle, label);
+    return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
   }
   let bangumiCandidates: SerialCoverCandidate[] = [];
   let bangumiError: unknown;
@@ -277,6 +317,7 @@ async function requestManualSerialCovers(
   referenceTitle: string,
   label: string,
   mediaType: SerialMediaType,
+  metadataSearch?: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
   const queries: string[] = [];
   const seenQueries = new Set<string>();
@@ -289,6 +330,11 @@ async function requestManualSerialCovers(
     if (!key || seenQueries.has(key)) continue;
     seenQueries.add(key);
     queries.push(candidateQuery);
+  }
+
+  if (metadataSearch) {
+    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, queryTitle, label);
+    return rankManualSerialCoverCandidates(candidates, queryTitle, label, mediaType, referenceTitle);
   }
 
   let bangumiCandidates: SerialCoverCandidate[] = [];
@@ -322,7 +368,11 @@ export async function searchSerialCovers(
   originalTitle: string,
   label: string,
   mediaType: SerialMediaType,
+  metadataSearch?: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
+  // The host owns provider enablement and localization; do not reuse cached
+  // candidates after those settings change.
+  if (metadataSearch) return enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType, metadataSearch));
   const key = `${mediaType}:${query.normalize("NFKC").trim()}`;
   const cached = resultCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -348,7 +398,11 @@ export async function searchManualSerialCovers(
   referenceTitle: string,
   label: string,
   mediaType: SerialMediaType,
+  metadataSearch?: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
+  if (metadataSearch) {
+    return enqueue(() => requestManualSerialCovers(query, queryTitle, referenceTitle, label, mediaType, metadataSearch));
+  }
   const key = `manual:${mediaType}:${query.normalize("NFKC").trim()}:${referenceTitle.normalize("NFKC").trim()}`;
   const cached = resultCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;

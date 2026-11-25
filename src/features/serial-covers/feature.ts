@@ -136,7 +136,7 @@ class CoverSelector extends Modal {
       results.empty();
       if (!this.candidates.length) results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
       for (const candidate of this.candidates) {
-        const applying = this.directApply.activeSourceId === candidate.sourceId;
+        const applying = this.directApply.activeSourceKey === JSON.stringify([candidate.provider, candidate.sourceId]);
         renderSerialCoverCandidateRow(results, candidate, {
           disabled: searching || this.directApply.isApplying,
           applying,
@@ -175,7 +175,9 @@ class CoverSelector extends Modal {
       renderResults();
       try {
         this.query = query;
-        this.candidates = await findSerialCoverCandidates(this.context, this.label, query);
+        this.candidates = await findSerialCoverCandidates(
+          this.context, this.label, query, (mediaType, query, page) => this.context.host.searchExternalPage(mediaType, query, page),
+        );
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
@@ -280,7 +282,9 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
     if (!query) return;
     status.setText(serialCoverText("loading"));
     try {
-      const candidates = await findSerialCoverCandidates(context, label, query);
+      const candidates = await findSerialCoverCandidates(
+        context, label, query, (mediaType, query, page) => context.host.searchExternalPage(mediaType, query, page),
+      );
       new CoverSelector(context.host, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
         context.autoStatus.delete(label);

@@ -14,6 +14,7 @@ import {
   type MissingSerialCoverRecord,
 } from "../../domain/serial-covers/migration";
 import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-covers/provider";
+import type { SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
 import { serialCoverText } from "../../features/serial-covers/text";
 import type { ExternalMediaResult, MediaType } from "../../types";
 
@@ -154,6 +155,7 @@ export async function findSerialCoverCandidates(
   context: SerialCoverLookupContext,
   label: string,
   queryInput?: string,
+  metadataSearch?: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
   const normalized = queryInput === undefined
     ? (() => {
@@ -163,13 +165,14 @@ export async function findSerialCoverCandidates(
     : normalizeManualSerialCoverQuery(queryInput, label);
   if (!normalized) return [];
   return queryInput === undefined
-    ? searchSerialCovers(normalized.query, normalized.title, label, context.mediaType)
+    ? searchSerialCovers(normalized.query, normalized.title, label, context.mediaType, metadataSearch)
     : searchManualSerialCovers(
       normalized.query,
       normalized.title,
       context.originalTitle,
       label,
       context.mediaType,
+      metadataSearch,
     );
 }
 
@@ -193,7 +196,9 @@ export async function loadConfidentSerialCover(
   context: SerialCoverLookupContext,
   label: string,
 ): Promise<StoredSerialCover | null> {
-  const candidates = await findSerialCoverCandidates(context, label);
+  const candidates = await findSerialCoverCandidates(
+    context, label, undefined, (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page),
+  );
   const candidate = confidentSerialCover(candidates);
   return candidate ? downloadSelectedSerialCover(plugin, context, candidate, false) : null;
 }

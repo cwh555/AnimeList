@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import { SerialCoverLoadQueue } from "../src/app/serial-covers/load-queue";
+import { SerialCoverDirectApply } from "../src/app/serial-covers/direct-apply";
 import {
   clearSerialCoverProviderCache,
   configureSerialCoverProvider,
@@ -11,6 +12,8 @@ import { findSerialCoverCandidates } from "../src/app/serial-covers/serial-cover
 import { resolveSerialEntryCoverPaths } from "../src/domain/serial-covers/timeline";
 import { normalizeManualSerialCoverQuery } from "../src/domain/serial-covers/ranking";
 import { setRequestUrlMock } from "./mocks/obsidian";
+import type { ExternalMediaResult, MediaType } from "../src/domain/media-types";
+import { searchMetadataCoverCandidates, uniqueSerialCoverSources } from "../src/data/serial-covers/metadata-candidates";
 
 function candidate(sourceId: string, score = 200) {
   return {
@@ -163,4 +166,106 @@ test("timeline uses resolved serial-entry covers and falls back to the series co
 
   assert.equal(timeline[0]?.cover, "app://vault/mushoku-14.jpg");
   assert.equal(timeline[1]?.cover, "app://vault/mushoku-series.jpg");
+});
+
+
+function metadataCover(provider: string, sourceId: string, title: string, mediaType: MediaType = "novel"): ExternalMediaResult {
+  return {
+    provider, sourceId, title, originalTitle: title, romajiTitle: "",
+    mediaType, format: mediaType, total: 0, unit: "volume", year: "",
+    genres: [], rawGenres: [], people: [], platforms: [],
+    sourceUrl: `https://example.invalid/${provider}/${sourceId}`,
+    coverUrl: `https://example.invalid/covers/${provider}/${sourceId}.jpg`,
+    summary: "", externalScore: null, releaseStatus: "unknown",
+  };
+}
+
+test("manual serial cover picker combines enabled metadata providers rather than returning only Bangumi", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "" });
+  const queries: Array<[string, string, number]> = [];
+  const metadataSearch = async (type: "manga" | "novel", query: string, page: number) => {
+    queries.push([type, query, page]);
+    return {
+      results: [
+        metadataCover("bangumi", "17", "無職転生 20"),
+        metadataCover("anilist", "18", "無職転生 20"),
+        metadataCover("openlibrary", "19", "無職転生 20"),
+      ],
+      warnings: [],
+      hasMore: false,
+    };
+  };
+  const results = await findSerialCoverCandidates(
+    { mediaType: "novel", originalTitle: "無職転生" },
+    "20", "無職転生", metadataSearch,
+  );
+  assert.deepEqual(queries, [["novel", "無職転生 20", 1]]);
+  assert.deepEqual(results.map(result => result.provider), ["Bangumi", "AniList", "Open Library"]);
+  assert.equal(results.every(result => result.coverUrl.includes(".jpg")), true);
+});
+
+test("configured cover lookup respects provider selection and does not contact the old Bangumi-only endpoint", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "" });
+  let rawRequests = 0;
+  setRequestUrlMock(async () => {
+    rawRequests += 1;
+    throw new Error("unconfigured Bangumi request");
+  });
+  const metadataSearch = async () => ({ results: [], warnings: [], hasMore: false });
+  const results = await findSerialCoverCandidates(
+    { mediaType: "novel", originalTitle: "無職転生" },
+    "20", "無職転生", metadataSearch,
+  );
+  assert.deepEqual(results, []);
+  assert.equal(rawRequests, 0);
+});
+
+test("automatic serial lookup rejects a series-level cover when the requested volume is absent", async () => {
+  clearSerialCoverProviderCache();
+  configureSerialCoverProvider({ apiKey: "" });
+  const metadataSearch = async () => ({
+    results: [metadataCover("anilist", "1", "無職転生")],
+    warnings: [],
+    hasMore: false,
+  });
+  const context = { mediaType: "novel" as const, originalTitle: "無職転生" };
+  assert.deepEqual(await findSerialCoverCandidates(context, "20", undefined, metadataSearch), []);
+  const manual = await findSerialCoverCandidates(context, "20", "無職転生", metadataSearch);
+  assert.equal(manual[0]?.provider, "AniList");
+});
+
+test("metadata source adapter keeps cover variants from different providers and deduplicates repeated IDs", async () => {
+  const result = await searchMetadataCoverCandidates(
+    async () => ({
+      results: [
+        metadataCover("bangumi", "12", "作品 2"),
+        metadataCover("bangumi", "12", "作品 2"),
+        metadataCover("anilist", "12", "作品 2"),
+        metadataCover("openlibrary", "13", "作品 2", "anime"),
+      ],
+      warnings: [], hasMore: false,
+    }),
+    "novel", "作品 2",
+  );
+  assert.deepEqual(result.map(item => item.provider), ["Bangumi", "AniList"]);
+  assert.deepEqual(uniqueSerialCoverSources([...result, ...result]).map(item => item.provider), ["Bangumi", "AniList"]);
+});
+
+test("simultaneous provider IDs do not mark the wrong cover as applying", async () => {
+  const action = new SerialCoverDirectApply();
+  let resolve!: () => void;
+  const pending = new Promise<void>(complete => { resolve = complete; });
+  const chosen = { ...candidate("42"), provider: "AniList" };
+  const operation = action.run(chosen, async () => {
+    await pending;
+    return "applied";
+  });
+  assert.equal(action.activeSourceId, "42");
+  assert.equal(action.activeSourceKey, JSON.stringify(["AniList", "42"]));
+  assert.notEqual(action.activeSourceKey, JSON.stringify(["Bangumi", "42"]));
+  resolve();
+  assert.equal(await operation, "applied");
+  assert.equal(action.activeSourceKey, null);
 });

@@ -2,9 +2,14 @@ import type { RankedSerialCoverCandidate } from "../../domain/serial-covers/rank
 
 export class SerialCoverDirectApply {
   private activeSource: string | null = null;
+  private activeKey: string | null = null;
 
   get activeSourceId(): string | null {
     return this.activeSource;
+  }
+
+  get activeSourceKey(): string | null {
+    return this.activeKey;
   }
 
   get isApplying(): boolean {
@@ -17,10 +22,12 @@ export class SerialCoverDirectApply {
   ): Promise<T | undefined> {
     if (this.activeSource !== null) return undefined;
     this.activeSource = candidate.sourceId;
+    this.activeKey = JSON.stringify([candidate.provider, candidate.sourceId]);
     try {
       return await loader(candidate);
     } finally {
       this.activeSource = null;
+      this.activeKey = null;
     }
   }
 }
