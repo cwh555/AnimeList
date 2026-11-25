@@ -1,12 +1,18 @@
-import { makeEl } from "./ui-helpers";
+import { makeEl, setAnimeListIcon } from "./ui-helpers";
 
 export type UiActionKind = "primary" | "secondary" | "danger";
 
 /** Shared semantics for standard AnimeList modal actions; feature-specific icon buttons stay independent. */
-export function createUiAction(label: string, kind: UiActionKind = "secondary"): HTMLButtonElement {
+export function createUiAction(label: string, kind: UiActionKind = "secondary", icon?: string): HTMLButtonElement {
   const modifier = kind === "primary" ? " mod-cta" : kind === "danger" ? " mod-warning" : "";
   const button = makeEl("button", `al-ui-button al-ui-button-${kind}${modifier}`, label);
   button.type = "button";
+  if (icon) {
+    const glyph = makeEl("span");
+    glyph.setAttribute("aria-hidden", "true");
+    setAnimeListIcon(glyph, icon);
+    button.replaceChildren(glyph, makeEl("span", "", label));
+  }
   return button;
 }
 
