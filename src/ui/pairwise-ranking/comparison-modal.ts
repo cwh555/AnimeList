@@ -1,6 +1,7 @@
-import { setIcon, type App } from "obsidian";
+import type { App } from "obsidian";
 import { AnimeListModal } from "../animelist-modal";
 import { makeEl, errorMessage } from "../ui-helpers";
+import { createUiAction } from "../ui-primitives";
 import { rankingCover } from "./cover";
 import type { MediaItem, MediaType } from "../../domain/media-types";
 import {
@@ -19,11 +20,8 @@ export interface RankingComparisonOptions {
 }
 
 function action(label: string, icon: string, invoke: () => void): HTMLButtonElement {
-  const button = makeEl("button", "al-ranking-dialog-action");
-  button.type = "button";
-  const symbol = makeEl("span");
-  setIcon(symbol, icon);
-  button.append(symbol, makeEl("span", "", label));
+  const button = createUiAction(label, "secondary", icon);
+  button.classList.add("al-ranking-dialog-action");
   button.addEventListener("click", invoke);
   return button;
 }
