@@ -9,6 +9,7 @@ import {
 import type { PairwiseRankingStore } from "../../data/pairwise-ranking/store";
 import { rankingText as t } from "../../features/pairwise-ranking/text";
 import { makeEl } from "../ui-helpers";
+import { createUiAction, type UiActionKind } from "../ui-primitives";
 import { rankingCover } from "./cover";
 import { RankingComparisonModal } from "./comparison-modal";
 import { installRankingDrag } from "./drag";
@@ -37,17 +38,24 @@ function button(label: string, action: () => void, icon?: string, className = ""
   return el;
 }
 
+function rankingAction(label: string, action: () => void, icon?: string, kind: UiActionKind = "secondary"): HTMLButtonElement {
+  const el = createUiAction(label, kind, icon);
+  el.addEventListener("click", action);
+  return el;
+}
+
 class RankingConfirmModal extends Modal {
   constructor(app: App, private readonly confirm: () => void) { super(app); }
   onOpen(): void {
+    this.modalEl.addClass("animelist-modal", "al-dialog-compact");
     const body = this.contentEl;
     body.empty();
     body.createEl("h3", { text: t("resetTitle") });
     body.createEl("p", { text: t("resetDetails") });
-    const actions = makeEl("div", "al-ranking-modal-actions");
+    const actions = makeEl("div", "al-ranking-modal-actions al-modal-actions");
     actions.append(
-      button(t("cancel"), () => this.close()),
-      button(t("confirm"), () => { this.close(); this.confirm(); }, "alert-triangle", "mod-warning"),
+      rankingAction(t("cancel"), () => this.close()),
+      rankingAction(t("confirm"), () => { this.close(); this.confirm(); }, "alert-triangle", "danger"),
     );
     body.appendChild(actions);
   }
@@ -142,26 +150,28 @@ export async function renderRankingPanel(container: HTMLElement, options: Rankin
   }
 
   const actions = makeEl("div", "al-ranking-actions");
-  if (pair) actions.appendChild(button(t("continue"), compare, "play", "mod-cta"));
+  if (pair) actions.appendChild(rankingAction(t("continue"), compare, "play", "primary"));
   else if (hasNew) {
-    actions.appendChild(button(list.ordered.length ? t("newWorks") : t("start"), () => {
+    actions.appendChild(rankingAction(list.ordered.length ? t("newWorks") : t("start"), () => {
       if (list.ordered.length === 0 || unresolved.length > 1) {
         void mutate((draft) => {
           prepareRankingRounds(draft, eligible, list.ordered.length ? "append" : "full");
         }, true);
       } else start("new");
-    }, "play", "mod-cta"));
+    }, "play", "primary"));
   }
-  if (Object.keys(list.pending).length) actions.appendChild(button(t("resolve"), () => start("pending"), "refresh-cw"));
+  if (Object.keys(list.pending).length) actions.appendChild(rankingAction(t("resolve"), () => start("pending"), "refresh-cw"));
   if (list.ordered.length || list.round) {
-    actions.appendChild(button(t("reset"), () => {
+    const reset = rankingAction(t("reset"), () => {
       new RankingConfirmModal(options.app, () => {
         void mutate((draft) => {
           draft.round = null;
           prepareRankingRounds(draft, eligible, "full");
         }, true);
       }).open();
-    }, "rotate-ccw", "al-ranking-reset"));
+    }, "rotate-ccw");
+    reset.classList.add("al-ranking-reset");
+    actions.appendChild(reset);
   }
   panel.appendChild(actions);
 
