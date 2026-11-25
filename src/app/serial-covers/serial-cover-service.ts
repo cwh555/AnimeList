@@ -197,7 +197,7 @@ export async function loadConfidentSerialCover(
   label: string,
 ): Promise<StoredSerialCover | null> {
   const candidates = await findSerialCoverCandidates(
-    context, label, undefined, plugin.searchExternalPage.bind(plugin),
+    context, label, undefined, (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page),
   );
   const candidate = confidentSerialCover(candidates);
   return candidate ? downloadSelectedSerialCover(plugin, context, candidate, false) : null;
