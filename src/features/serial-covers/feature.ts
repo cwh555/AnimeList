@@ -136,7 +136,7 @@ class CoverSelector extends Modal {
       results.empty();
       if (!this.candidates.length) results.createDiv({ cls: "al-search-empty", text: serialCoverText("emptyResult") });
       for (const candidate of this.candidates) {
-        const applying = this.directApply.activeSourceId === candidate.sourceId;
+        const applying = this.directApply.activeSourceKey === JSON.stringify([candidate.provider, candidate.sourceId]);
         renderSerialCoverCandidateRow(results, candidate, {
           disabled: searching || this.directApply.isApplying,
           applying,
