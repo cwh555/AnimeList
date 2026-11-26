@@ -101,7 +101,8 @@ export class BangumiClient implements MetadataProviderClient {
     const data: unknown = response.json ?? JSON.parse(response.text || "[]");
     if (!Array.isArray(data)) throw new Error("Bangumi returned an invalid relation response.");
     return asArray<unknown>(data).map(record)
-      .filter(subject => subject.relation === "单行本" && (subject.type === 1 || subject.type === undefined))
+      .filter(subject => subject.relation === "单行本" && (subject.type === 1 || subject.type === undefined)
+        && matchesBookMediaType(subject, mediaType) && Boolean(stringValue(subject.id).trim()))
       .map(subject => normalizeBangumiSubject(subject, mediaType));
   }
 

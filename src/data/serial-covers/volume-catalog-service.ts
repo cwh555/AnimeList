@@ -88,8 +88,9 @@ export class SerialVolumeCatalogService {
   private async openLibraryEditions(request: VolumeCatalogRequest, aliases: readonly string[]): Promise<SerialCoverCandidate[]> {
     const candidates: SerialCoverCandidate[] = [];
     const errors: unknown[] = [];
+    const manualAliases = [...new Set([request.queryTitle, ...aliases])];
     const volumeMatches = (edition: OpenLibraryVolumeEdition): boolean =>
-      matchesCatalogVolume(edition.title, aliases, request.label) || matchesCatalogVolume(edition.workTitle, aliases, request.label);
+      matchesCatalogVolume(edition.title, manualAliases, request.label) || matchesCatalogVolume(edition.workTitle, manualAliases, request.label);
     const collectWork = async (id: string, title: string): Promise<void> => {
       try {
         const editions = await this.workEditionCache.get(id, () => this.clients.openlibrary.fetchWorkEditions(id, title));
@@ -113,7 +114,7 @@ export class SerialVolumeCatalogService {
           catch (error: unknown) { errors.push(error); return first.works; }
         });
       } catch (error: unknown) { errors.push(error); break; }
-      const matched = works.filter(work => matchesCatalogVolume(work.title, aliases, request.label)
+      const matched = works.filter(work => matchesCatalogVolume(work.title, manualAliases, request.label)
         || work.editions.some(volumeMatches));
       candidates.push(...matched.flatMap(work => work.editions.filter(volumeMatches)).map(editionCandidate));
       // Work-level search may have no indexed cover at all; expand exact work IDs
@@ -141,7 +142,7 @@ export class SerialVolumeCatalogService {
     }
     // Edition type is not established by an Open Library title or work key alone.
     // Keep these available for manual review, never silently assign manga/novel.
-    if (settings.openlibrary && (request.manual || !verified.length)) {
+    if (settings.openlibrary && request.manual) {
       try { alternatives.push(...await this.openLibraryEditions(request, aliases)); }
       catch (error) { warnings.push(`Open Library: ${String(error)}`); }
     }

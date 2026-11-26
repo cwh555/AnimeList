@@ -28,10 +28,15 @@ export async function searchMetadataCoverCandidates(
   const results: ExternalMediaSearchPage["results"] = [];
   const warnings: string[] = [];
   for (let index = 1; index <= 3; index += 1) {
-    const page = await search(mediaType, query, index);
-    results.push(...page.results);
-    warnings.push(...page.warnings);
-    if (!page.hasMore) break;
+    try {
+      const page = await search(mediaType, query, index);
+      results.push(...page.results);
+      warnings.push(...page.warnings);
+      if (!page.hasMore) break;
+    } catch (error: unknown) {
+      warnings.push(error instanceof Error ? error.message : String(error));
+      break;
+    }
   }
   if (!results.length && warnings.length) throw new Error([...new Set(warnings)].join("; "));
   const seen = new Set<string>();

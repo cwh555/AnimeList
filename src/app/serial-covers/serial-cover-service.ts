@@ -192,7 +192,7 @@ export async function findConfiguredSerialCoverCandidates(
     (mediaType, query, page) => plugin.searchSerialVolumePage?.(mediaType, query, page) ?? plugin.searchExternalPage(mediaType, query, page));
   if (!plugin.searchSerialVolumeCatalog) return fallback();
   const normalized = queryInput === undefined
-    ? { title: context.originalTitle }
+    ? (serialCoverQuery(context.originalTitle, label) ? { title: context.originalTitle } : null)
     : normalizeManualSerialCoverQuery(queryInput, label);
   if (!normalized) return [];
   const work = context.work;
@@ -200,8 +200,8 @@ export async function findConfiguredSerialCoverCandidates(
   const catalog = await plugin.searchSerialVolumeCatalog({
     mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
     sources: [...(work?.sources ?? []), ...(work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : [])],
-    queryTitle: normalized.title, label, manual: queryInput !== undefined,
-  });
+    queryTitle: normalized.title, label: label.normalize("NFKC").trim(), manual: queryInput !== undefined,
+  }).catch((error: unknown) => ({ verified: [], alternatives: [], warnings: [String(error)] }));
   const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
     rankManualSerialCoverCandidates(items, normalized.title, label, context.mediaType, context.originalTitle);
   const verified = rank(catalog.verified).map(candidate => ({ ...candidate, score: candidate.score + 100 }));
@@ -209,7 +209,7 @@ export async function findConfiguredSerialCoverCandidates(
   let other: RankedSerialCoverCandidate[] = [];
   try { other = await fallback(); }
   catch (error) {
-    if (!verified.length && !catalog.alternatives.length) throw error;
+    if (queryInput === undefined || (!verified.length && !catalog.alternatives.length)) throw error;
   }
   if (queryInput === undefined) {
     const exact = other.filter(candidate => matchesCatalogVolume(candidate.title, [context.originalTitle, ...aliases], label)
@@ -230,6 +230,7 @@ export async function downloadSelectedSerialCover(
   manual: boolean,
 ): Promise<StoredSerialCover> {
   const cover = await plugin.downloadCover(asMediaResult(candidate, context.mediaType));
+  if (!cover.trim()) throw new Error("No cover was downloaded.");
   return {
     cover,
     provider: candidate.provider,
@@ -342,17 +343,22 @@ export async function loadMissingSerialCovers(
             message: serialCoverText("notFound"),
           });
         } else {
+          let written = false;
+          try {
+            if (signal?.aborted) break;
           onProgress?.({
             completed,
             total,
             phase: "saving",
             message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
           });
+          if (signal?.aborted) break;
           await plugin.app.fileManager.processFrontMatter(file, (next) => {
-            if (!Array.isArray(next.volume_log)) return;
+            if (signal?.aborted || !Array.isArray(next.volume_log) || next.media_type !== work.mediaType) return;
             next.volume_log = next.volume_log.map((raw: unknown): unknown => {
               const entry = record(raw);
-              if (!entry || text(entry.label ?? entry.volume).trim() !== label || entry.cover) return raw;
+              if (!entry || text(entry.label ?? entry.volume).normalize("NFKC").trim() !== label || entry.cover) return raw;
+              written = true;
               return {
                 ...entry,
                 cover: cover.cover,
@@ -365,9 +371,12 @@ export async function loadMissingSerialCovers(
             filePath: file.path,
             title: work.title,
             label,
-            status: "loaded",
-            message: cover.provider,
+            status: written ? "loaded" : "skipped",
+            message: written ? cover.provider : serialCoverText("settings.metric.skipped"),
           });
+          } finally {
+            plugin.releaseDownloadedCover(cover.cover);
+          }
         }
       } catch (error) {
         details.push({

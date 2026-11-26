@@ -27,14 +27,15 @@ export function seriesIdentity(title: string): string {
 
 /** Match a volume suffix relative to a known series title; never treat an arbitrary digit as the volume. */
 export function matchesCatalogVolume(title: string, aliases: readonly string[], label: string): boolean {
-  if (!/^\d+(?:\.5)?$/.test(label)) return false;
+  const requested = normalized(label);
+  if (!/^\d+(?:\.5)?$/.test(requested)) return false;
   const value = normalized(title);
   for (const alias of aliases) {
     const prefix = normalized(alias);
     if (!prefix || !value.startsWith(prefix)) continue;
     const suffix = value.slice(prefix.length);
     const match = /^\s*[,，:：-]?\s*(?:vol(?:ume)?\.?\s*|第\s*)?\(?\s*(\d+(?:\.5)?)\s*(?:巻|卷|冊|册)?\s*\)?\s*(?:(?::|：)\s*[^\d].*)?$/u.exec(suffix);
-    if (match && Number(match[1]) === Number(label)) return true;
+    if (match && Number(match[1]) === Number(requested)) return true;
   }
   return false;
 }
