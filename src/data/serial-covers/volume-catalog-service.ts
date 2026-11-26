@@ -24,8 +24,10 @@ class CatalogCache<T> {
     });
     this.entries.set(key, entry);
     if (this.entries.size > 64) {
-      const first = this.entries.keys().next().value;
-      if (first !== undefined) this.entries.delete(first);
+      for (const first of this.entries.keys()) {
+        this.entries.delete(first);
+        break;
+      }
     }
     return entry.pending;
   }

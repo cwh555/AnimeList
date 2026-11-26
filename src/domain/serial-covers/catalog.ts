@@ -33,7 +33,7 @@ export function matchesCatalogVolume(title: string, aliases: readonly string[], 
     const prefix = normalized(alias);
     if (!prefix || !value.startsWith(prefix)) continue;
     const suffix = value.slice(prefix.length);
-    const match = /^\s*[,，:：\-]?\s*(?:vol(?:ume)?\.?\s*|第\s*)?\(?\s*(\d+(?:\.5)?)\s*(?:巻|卷|冊|册)?\s*\)?\s*(?:(?::|：)\s*[^\d].*)?$/u.exec(suffix);
+    const match = /^\s*[,，:：-]?\s*(?:vol(?:ume)?\.?\s*|第\s*)?\(?\s*(\d+(?:\.5)?)\s*(?:巻|卷|冊|册)?\s*\)?\s*(?:(?::|：)\s*[^\d].*)?$/u.exec(suffix);
     if (match && Number(match[1]) === Number(label)) return true;
   }
   return false;
