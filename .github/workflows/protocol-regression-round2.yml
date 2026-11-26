@@ -19,3 +19,20 @@ jobs:
       - run: git diff -- styles.css
       - run: npm run test:browser:ui
       - run: npm run test:browser:score-ranking
+  repeated-interactions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run styles:build
+      - run: npm run test:browser
+      - name: Score mobile/desktop repeated verification
+        run: |
+          for i in 1 2 3; do
+            echo "RUN $i"
+            ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-dashboard-mobile-interactions.mjs || exit 1
+          done
