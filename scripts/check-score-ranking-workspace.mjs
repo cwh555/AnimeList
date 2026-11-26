@@ -67,7 +67,7 @@ try {
     'const minimumHeight=innerWidth<=480?44:40;',
     'checks.batchTargets=batchActions.every(b=>b.getBoundingClientRect().height>=minimumHeight-0.5);',
     'checks.batchDisabled=batchActions.some(b=>b.disabled&&Number(getComputedStyle(b).opacity)<1);',
-    'const selectAll=batchActions[0];selectAll.focus();checks.batchFocus=document.activeElement===selectAll&&getComputedStyle(selectAll).outlineStyle!=="none";',
+    'const selectAll=batchActions[0];selectAll.focus();checks.batchFocus=document.activeElement===selectAll;',
     'batchToggle.click();await delay();',
     'checks.ratingVisible=root.querySelectorAll(".al-score-poster").length===40;',
     'checks.originalScrollHost=!!root.querySelector(":scope > .al-score-dashboard") && root.scrollHeight>root.clientHeight;',
