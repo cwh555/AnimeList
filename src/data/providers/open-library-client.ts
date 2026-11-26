@@ -39,6 +39,12 @@ export interface OpenLibraryVolumeEdition {
   coverUrl: string;
 }
 
+export interface OpenLibraryVolumeWork {
+  id: string;
+  title: string;
+  editions: OpenLibraryVolumeEdition[];
+}
+
 function editionRecord(workId: string, workTitle: string, value: unknown): OpenLibraryVolumeEdition | null {
   const edition = record(value);
   const editionId = stringValue(edition.key).replace(/^\/books\//, "");
@@ -58,7 +64,7 @@ export class OpenLibraryClient implements MetadataProviderClient {
   supports(mediaType: MediaType): boolean { return mediaType === "novel"; }
 
   /** Publication search: unlike Add Media, both comics and novels may have editions here. */
-  async searchBookEditions(query: string, page = 1): Promise<{ editions: OpenLibraryVolumeEdition[]; hasMore: boolean }> {
+  async searchBookEditions(query: string, page = 1): Promise<{ works: OpenLibraryVolumeWork[]; hasMore: boolean }> {
     const fields = "key,title,cover_i,isbn,editions,editions.key,editions.title,editions.isbn,editions.cover_i";
     const parameters = new URLSearchParams({ title: query, fields, limit: "50", page: String(page) });
     const response = await withProviderRequestDeadline("Open Library", () => requestUrl({
@@ -68,13 +74,15 @@ export class OpenLibraryClient implements MetadataProviderClient {
     }));
     const payload = record(response.json ?? JSON.parse(response.text || "{}"));
     const docs = asArray(payload.docs).map(record);
-    const editions = docs.flatMap(doc => {
-      const workId = stringValue(doc.key).replace(/^\/works\//, "");
-      return asArray(record(doc.editions).docs)
-        .map(value => editionRecord(workId, stringValue(doc.title), value))
+    const works = docs.map(doc => {
+      const id = stringValue(doc.key).replace(/^\/works\//, "");
+      const title = stringValue(doc.title);
+      const editions = asArray(record(doc.editions).docs)
+        .map(value => editionRecord(id, title, value))
         .filter((entry): entry is OpenLibraryVolumeEdition => entry !== null);
-    });
-    return { editions, hasMore: (optionalNumber(payload.start) ?? (page - 1) * 50) + docs.length < (optionalNumber(payload.numFound) ?? 0) };
+      return { id, title, editions };
+    }).filter(work => /^OL\d+W$/.test(work.id));
+    return { works, hasMore: (optionalNumber(payload.start) ?? (page - 1) * 50) + docs.length < (optionalNumber(payload.numFound) ?? 0) };
   }
 
   async fetchWorkEditions(workId: string, workTitle: string): Promise<OpenLibraryVolumeEdition[]> {

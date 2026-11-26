@@ -4,7 +4,7 @@ import type { ExternalMediaResult } from "../../domain/media-types";
 import { matchesCatalogVolume, seriesIdentity, type VolumeCatalogRequest, type VolumeCatalogResult } from "../../domain/serial-covers/catalog";
 import type { SerialCoverCandidate } from "../../domain/serial-covers/ranking";
 import type { HttpMetadataProviderClients } from "../metadata-provider-clients";
-import type { OpenLibraryVolumeEdition } from "../providers/open-library-client";
+import type { OpenLibraryVolumeEdition, OpenLibraryVolumeWork } from "../providers/open-library-client";
 import { uniqueSerialCoverSources } from "./metadata-candidates";
 
 type CatalogClients = Pick<HttpMetadataProviderClients, "bangumi" | "openlibrary">;
@@ -60,7 +60,7 @@ function editionCandidate(edition: OpenLibraryVolumeEdition): SerialCoverCandida
 
 export class SerialVolumeCatalogService {
   private readonly bangumiCache = new CatalogCache<ExternalMediaResult>();
-  private readonly editionCache = new CatalogCache<OpenLibraryVolumeEdition>();
+  private readonly editionCache = new CatalogCache<OpenLibraryVolumeWork>();
   private readonly workEditionCache = new CatalogCache<OpenLibraryVolumeEdition>();
 
   constructor(private readonly settings: () => ProviderSettings, private readonly clients: CatalogClients) {}
@@ -87,22 +87,29 @@ export class SerialVolumeCatalogService {
 
   private async openLibraryEditions(request: VolumeCatalogRequest, aliases: readonly string[]): Promise<SerialCoverCandidate[]> {
     const candidates: SerialCoverCandidate[] = [];
+    const volumeMatches = (edition: OpenLibraryVolumeEdition): boolean =>
+      matchesCatalogVolume(edition.title, aliases, request.label) || matchesCatalogVolume(edition.workTitle, aliases, request.label);
+    const collectWork = async (id: string, title: string): Promise<void> => {
+      const editions = await this.workEditionCache.get(id, () => this.clients.openlibrary.fetchWorkEditions(id, title));
+      candidates.push(...editions.filter(volumeMatches).map(editionCandidate));
+    };
+    // A stored Work ID is a direct lookup, even if its cover or search index is incomplete.
+    for (const id of [...new Set(request.sources.filter(source => source.provider.toLowerCase() === "openlibrary").map(source => source.sourceId))].slice(0, 2)) {
+      await collectWork(id, request.originalTitle);
+    }
     const titles = [...new Set([request.queryTitle, ...aliases])].filter(Boolean).slice(0, 3);
+    if (titles[0]) titles.push(`${titles[0]} ${request.label}`);
     for (const title of titles) {
-      const editions = await this.editionCache.get(title, async () => {
+      const works = await this.editionCache.get(title, async () => {
         const first = await this.clients.openlibrary.searchBookEditions(title);
-        return first.hasMore ? [...first.editions, ...(await this.clients.openlibrary.searchBookEditions(title, 2)).editions] : first.editions;
+        return first.hasMore ? [...first.works, ...(await this.clients.openlibrary.searchBookEditions(title, 2)).works] : first.works;
       });
-      const matched = editions.filter(edition => matchesCatalogVolume(edition.title, aliases, request.label)
-        || matchesCatalogVolume(edition.workTitle, aliases, request.label));
-      candidates.push(...matched.map(editionCandidate));
-      const workIds = [...new Set(matched.map(edition => edition.workId).filter(Boolean))].slice(0, 2);
-      for (const id of workIds) {
-        const workTitle = matched.find(edition => edition.workId === id)?.workTitle ?? "";
-        const all = await this.workEditionCache.get(id, () => this.clients.openlibrary.fetchWorkEditions(id, workTitle));
-        candidates.push(...all.filter(edition => matchesCatalogVolume(edition.title, aliases, request.label)
-          || matchesCatalogVolume(edition.workTitle, aliases, request.label)).map(editionCandidate));
-      }
+      const matched = works.filter(work => matchesCatalogVolume(work.title, aliases, request.label)
+        || work.editions.some(volumeMatches));
+      candidates.push(...matched.flatMap(work => work.editions.filter(volumeMatches)).map(editionCandidate));
+      // Work-level search may have no indexed cover at all; expand exact work IDs
+      // before concluding that editions do not exist.
+      for (const work of matched.slice(0, 2)) await collectWork(work.id, work.title);
       if (candidates.length) break;
     }
     return uniqueSerialCoverSources(candidates);
