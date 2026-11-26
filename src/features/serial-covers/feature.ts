@@ -1,4 +1,6 @@
-import { Modal, Notice, setIcon } from "obsidian";
+import { Notice, setIcon } from "obsidian";
+import { AnimeListModal } from "../../ui/animelist-modal";
+import { SerialCoverIntent } from "../../app/serial-covers/intent";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
 import { storedMediaExternalResult } from "../../data/stored-media-result";
 import { createUiAction } from "../../ui/ui-primitives";
@@ -39,6 +41,7 @@ interface EditorContext extends SerialCoverLookupContext {
   rowRenders: Map<HTMLInputElement, () => void>;
   leasedPaths: Set<string>;
   disposed: boolean;
+  intent: SerialCoverIntent;
 }
 
 async function downloadEditorCover(
@@ -95,7 +98,8 @@ function refreshRows(context: EditorContext): void {
   }
 }
 
-class CoverSelector extends Modal {
+class CoverSelector extends AnimeListModal {
+  private closed = false;
   private readonly directApply = new SerialCoverDirectApply();
   private candidates: RankedSerialCoverCandidate[];
   private query: string;
@@ -112,7 +116,10 @@ class CoverSelector extends Modal {
     this.query = serialCoverQuery(context.originalTitle, label) ?? context.originalTitle;
   }
 
+  onClose(): void { this.closed = true; }
+
   onOpen(): void {
+    this.closed = false;
     this.modalEl.addClass("animelist-modal", "al-serial-cover-modal");
     this.titleEl.setText(serialCoverText("selectorTitle", { unit: serialCoverText("entryUnit"), label: this.label }));
     this.contentEl.empty();
@@ -149,11 +156,19 @@ class CoverSelector extends Modal {
       updateControls();
     };
     const chooseCandidate = async (candidate: RankedSerialCoverCandidate): Promise<void> => {
-      if (searching || this.directApply.isApplying) return;
+      if (this.closed || this.context.disposed || searching || this.directApply.isApplying) return;
       const operation = directlyApplySerialCover(
         this.directApply,
         candidate,
-        (selected) => downloadEditorCover(this.context, selected, true),
+        async (selected) => {
+          const cover = await downloadEditorCover(this.context, selected, true);
+          if (this.closed) {
+            this.context.leasedPaths.delete(cover.cover);
+            this.context.host.releaseDownloadedCover(cover.cover);
+            throw new Error("Serial cover selector is closed");
+          }
+          return cover;
+        },
         this.applyCover,
         () => this.close(),
       );
@@ -162,12 +177,13 @@ class CoverSelector extends Modal {
         await operation;
       } catch (error) {
         console.error("AnimeList serial cover apply failed", error);
-        new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
+        if (!this.closed && !this.context.disposed) new Notice(error instanceof Error ? error.message : serialCoverText("applyFailed"));
       } finally {
-        renderResults();
+        if (!this.closed && !this.context.disposed) renderResults();
       }
     };
     const runSearch = async (): Promise<void> => {
+      if (this.closed || this.context.disposed || searching || this.directApply.isApplying) return;
       const query = input.value.trim();
       if (!query) {
         new Notice(serialCoverText("searchPlaceholder"));
@@ -178,14 +194,14 @@ class CoverSelector extends Modal {
       try {
         this.query = query;
         this.candidates = await findConfiguredSerialCoverCandidates(this.context.host, this.context, this.label, query);
-        if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
+        if (!this.closed && !this.context.disposed && !this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
         this.candidates = [];
-        new Notice(error instanceof Error ? error.message : serialCoverText("notFound"));
+        if (!this.closed && !this.context.disposed) new Notice(error instanceof Error ? error.message : serialCoverText("notFound"));
       } finally {
         searching = false;
-        renderResults();
+        if (!this.closed && !this.context.disposed) renderResults();
       }
     };
 
@@ -203,15 +219,17 @@ class CoverSelector extends Modal {
 function scheduleAutomaticCover(context: EditorContext, label: string): void {
   if (!serialCoverQuery(context.originalTitle, label)) return;
   if (context.covers.has(label) || context.attempted.has(label)) return;
+  const ticket = context.intent.capture(label);
   context.attempted.add(label);
   context.autoStatus.set(label, "queued");
   refreshRows(context);
   void context.autoQueue.enqueue(label, async () => {
+    if (!context.intent.isCurrent(ticket)) return null;
     context.autoStatus.set(label, "loading");
     refreshRows(context);
     return loadConfidentSerialCover(context.host, context, label);
   }).then((cover) => {
-    if (context.disposed) {
+    if (!context.intent.isCurrent(ticket)) {
       if (cover?.cover) context.host.releaseDownloadedCover(cover.cover);
       return;
     }
@@ -221,7 +239,7 @@ function scheduleAutomaticCover(context: EditorContext, label: string): void {
       context.autoStatus.delete(label);
     } else context.autoStatus.set(label, "not-found");
   }).catch((error: unknown) => {
-    if (context.disposed) return;
+    if (!context.intent.isCurrent(ticket)) return;
     console.error(`AnimeList serial cover automatic lookup failed for ${label}`, error);
     context.autoStatus.set(label, "failed");
   }).finally(() => {
@@ -276,22 +294,34 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
   };
   context.rowRenders.set(labelInput, render);
 
+  let searching = false;
   const search = async (): Promise<void> => {
+    if (searching || context.disposed) return;
     const label = labelInput.value.trim();
     const query = serialCoverQuery(context.originalTitle, label);
     if (!query) return;
+    searching = true;
     status.setText(serialCoverText("loading"));
     try {
       const candidates = await findConfiguredSerialCoverCandidates(context.host, context, label, query);
+      if (context.disposed || !row.isConnected || labelInput.value.trim() !== label) return;
       new CoverSelector(context.host, context, label, candidates, (cover) => {
+        if (context.disposed || !row.isConnected || labelInput.value.trim() !== label) {
+          context.leasedPaths.delete(cover.cover);
+          context.host.releaseDownloadedCover(cover.cover);
+          return;
+        }
+        context.intent.invalidate(label);
         context.covers.set(label, cover);
         context.autoStatus.delete(label);
         refreshRows(context);
       }).open();
       status.setText(candidates.length ? serialCoverText("series") : serialCoverText("notFound"));
     } catch (error) {
-      status.setText(serialCoverText("notFound"));
-      new Notice(error instanceof Error ? error.message : String(error));
+      if (!context.disposed) new Notice(error instanceof Error ? error.message : String(error));
+    } finally {
+      searching = false;
+      if (!context.disposed && row.isConnected) render();
     }
   };
   const scheduleCurrentLabel = (): void => {
@@ -303,6 +333,7 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
   retry.addEventListener("click", () => void search());
   coverButton.addEventListener("click", () => void search());
   clear.addEventListener("click", () => {
+    context.intent.invalidate(labelInput.value.trim());
     context.covers.delete(labelInput.value.trim());
     context.autoStatus.delete(labelInput.value.trim());
     render();
@@ -348,6 +379,7 @@ function configureSerialEditor(form: MediaFormContext<AnimeListFeatureHost>): vo
     rowRenders: new Map(),
     leasedPaths: new Set(),
     disposed: false,
+    intent: new SerialCoverIntent(),
   };
   for (const entry of reading.entries) {
     const stored = storedCover(entry);
@@ -358,6 +390,7 @@ function configureSerialEditor(form: MediaFormContext<AnimeListFeatureHost>): vo
   reading.listeners.add(refresh);
   form.onDispose(() => {
     context.disposed = true;
+    context.intent.close();
     reading.listeners.delete(refresh);
     context.rowRenders.clear();
     for (const path of context.leasedPaths) context.host.releaseDownloadedCover(path);
