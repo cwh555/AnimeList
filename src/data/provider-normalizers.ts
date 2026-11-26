@@ -1,3 +1,4 @@
+import { bangumiBookMediaType } from "../domain/bangumi-book-type";
 import { deduplicateMediaIdentities } from "../domain/search/entity-resolution";
 import { normalizeAniListClassification } from "../domain/media-classification";
 import { normalizeAnimeStudios, normalizeBroadGenres, normalizeGenres, normalizeStructuredAnimationStudios } from "../domain/media-metadata";
@@ -169,6 +170,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     ? normalizeAnimeStudios(bangumiInfoboxValues(subject.infobox, BANGUMI_ANIMATION_STUDIO_FIELDS))
     : bangumiInfoboxValues(subject.infobox, ["作者", "原作", "作画", "作畫"]);
   const platform = stringValue(subject.platform).trim();
+  const bookEvidence = mediaType === "anime" ? null : bangumiBookMediaType(platform, stringList(subject.meta_tags), asArray(subject.infobox).map(entry => stringValue(record(entry).key)));
   let format = mediaType === "anime" ? "tv" : mediaType === "manga" ? "manga" : "light_novel";
   if (/剧场|劇場|movie/i.test(platform)) format = "movie";
   else if (/ova/i.test(platform)) format = "ova";
@@ -186,6 +188,7 @@ export function normalizeBangumiSubject(value: unknown, mediaType: MediaType): E
     sourceId: subjectId,
     sourceUrl: subjectId ? `https://bgm.tv/subject/${subjectId}` : "",
     mediaType,
+    ...(bookEvidence ? { bookMediaTypeEvidence: bookEvidence } : {}),
     title: providerFallback,
     originalTitle,
     romajiTitle: "",
@@ -256,11 +259,16 @@ export function normalizeAniListMedia(value: unknown, mediaType: MediaType): Ext
   const cover = record(media.coverImage);
   const averageScore = optionalNumber(media.averageScore);
   const classification = normalizeAniListClassification(media);
+  const rawFormat = stringValue(media.format).toUpperCase();
+  const bookEvidence = stringValue(media.type).toUpperCase() === "MANGA"
+    ? rawFormat === "NOVEL" ? "novel" as const : rawFormat === "MANGA" || rawFormat === "ONE_SHOT" ? "manga" as const : undefined
+    : undefined;
   return localizeActiveMediaResult({
     provider: "anilist",
     sourceId: mediaId,
     sourceUrl: siteUrl,
     mediaType,
+    ...(bookEvidence ? { bookMediaTypeEvidence: bookEvidence } : {}),
     title: providerFallback,
     originalTitle,
     romajiTitle: stringValue(title.romaji),

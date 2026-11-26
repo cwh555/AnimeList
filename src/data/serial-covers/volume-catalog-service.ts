@@ -1,5 +1,4 @@
 import type { ProviderSettings } from "../../domain/settings-types";
-import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import type { ExternalMediaResult } from "../../domain/media-types";
 import { matchesCatalogVolume, seriesIdentity, type VolumeCatalogRequest, type VolumeCatalogResult } from "../../domain/serial-covers/catalog";
 import type { SerialCoverCandidate } from "../../domain/serial-covers/ranking";
@@ -39,7 +38,7 @@ function aliasesOf(request: VolumeCatalogRequest): string[] {
 
 function exactSeries(result: ExternalMediaResult, mediaType: "novel" | "manga", aliases: readonly string[]): boolean {
   const keys = new Set(aliases.map(seriesIdentity));
-  return result.platforms.some(platform => bangumiBookMediaType(platform) === mediaType)
+  return result.bookMediaTypeEvidence === mediaType
     && [result.originalTitle, result.title, ...(result.searchTitles ?? [])].some(title => keys.has(seriesIdentity(title)));
 }
 

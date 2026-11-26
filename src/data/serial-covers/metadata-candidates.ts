@@ -58,7 +58,7 @@ export async function searchMetadataCoverCandidates(
       infoUrl: result.sourceUrl,
       categories: [...result.platforms, ...result.genres],
       authors: result.people,
-      mediaTypeHint: mediaType,
+      mediaTypeHint: result.bookMediaTypeEvidence,
     });
   }
   return candidates;

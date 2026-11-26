@@ -16,7 +16,6 @@ import {
 import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-covers/provider";
 import { uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
 import { matchesCatalogVolume } from "../../domain/serial-covers/catalog";
-import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import { storedMediaExternalResult } from "../../data/stored-media-result";
 import { rankManualSerialCoverCandidates } from "../../domain/serial-covers/ranking";
 import { serialCoverText } from "../../features/serial-covers/text";
@@ -188,22 +187,23 @@ export async function findConfiguredSerialCoverCandidates(
   label: string,
   queryInput?: string,
 ): Promise<RankedSerialCoverCandidate[]> {
-  const fallback = () => findSerialCoverCandidates(context, label, queryInput,
-    (mediaType, query, page) => plugin.searchSerialVolumePage?.(mediaType, query, page) ?? plugin.searchExternalPage(mediaType, query, page));
-  if (!plugin.searchSerialVolumeCatalog) return fallback();
+  const lookupLabel = label.normalize("NFKC").trim();
+  const metadataSearch: SerialCoverMetadataSearch = (mediaType, query, page) => plugin.searchSerialVolumePage?.(mediaType, query, page) ?? plugin.searchExternalPage(mediaType, query, page);
+  const fallback = () => findSerialCoverCandidates(context, lookupLabel, queryInput ?? context.originalTitle, metadataSearch);
+  if (!plugin.searchSerialVolumeCatalog) return findSerialCoverCandidates(context, lookupLabel, queryInput, metadataSearch);
   const normalized = queryInput === undefined
-    ? (serialCoverQuery(context.originalTitle, label) ? { title: context.originalTitle } : null)
-    : normalizeManualSerialCoverQuery(queryInput, label);
+    ? (serialCoverQuery(context.originalTitle, lookupLabel) ? { title: context.originalTitle } : null)
+    : normalizeManualSerialCoverQuery(queryInput, lookupLabel);
   if (!normalized) return [];
   const work = context.work;
   const aliases = [...new Set([work?.title ?? "", work?.originalTitle ?? "", work?.romajiTitle ?? "", ...(work?.searchTitles ?? [])].filter(Boolean))];
   const catalog = await plugin.searchSerialVolumeCatalog({
     mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
     sources: [...(work?.sources ?? []), ...(work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : [])],
-    queryTitle: normalized.title, label: label.normalize("NFKC").trim(), manual: queryInput !== undefined,
+    queryTitle: normalized.title, label: lookupLabel, manual: queryInput !== undefined,
   }).catch((error: unknown) => ({ verified: [], alternatives: [], warnings: [error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown catalog error"] }));
   const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
-    rankManualSerialCoverCandidates(items, normalized.title, label, context.mediaType, context.originalTitle);
+    rankManualSerialCoverCandidates(items, normalized.title, lookupLabel, context.mediaType, context.originalTitle);
   const verified = rank(catalog.verified).map(candidate => ({ ...candidate, score: candidate.score + 100 }));
   if (queryInput === undefined && verified.length) return verified;
   let other: RankedSerialCoverCandidate[] = [];
@@ -212,8 +212,8 @@ export async function findConfiguredSerialCoverCandidates(
     if (queryInput === undefined || (!verified.length && !catalog.alternatives.length)) throw error;
   }
   if (queryInput === undefined) {
-    const exact = other.filter(candidate => matchesCatalogVolume(candidate.title, [context.originalTitle, ...aliases], label)
-      && bangumiBookMediaType("", candidate.categories ?? []) === context.mediaType);
+    const exact = other.filter(candidate => matchesCatalogVolume(candidate.title, [context.originalTitle, ...aliases], lookupLabel)
+      && candidate.mediaTypeHint === context.mediaType);
     if (!exact.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
     return exact;
   }
