@@ -4,7 +4,7 @@ import { remoteCoverExtension } from "../domain/remote-cover-format";
 import type { AnimeListSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, MediaNoteForm } from "../domain/media-types";
 import type { MediaCoverAssetInput } from "../domain/manual-media";
-import { slugify, stringValue } from "../domain/value-normalization";
+import { slugify } from "../domain/value-normalization";
 import { normalizeMediaStatus } from "../domain/media-status";
 import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../domain/progress-units";
 import { uiText } from "../ui-text";

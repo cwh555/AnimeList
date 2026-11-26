@@ -201,7 +201,7 @@ export async function findConfiguredSerialCoverCandidates(
     mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
     sources: [...(work?.sources ?? []), ...(work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : [])],
     queryTitle: normalized.title, label: label.normalize("NFKC").trim(), manual: queryInput !== undefined,
-  }).catch((error: unknown) => ({ verified: [], alternatives: [], warnings: [String(error)] }));
+  }).catch((error: unknown) => ({ verified: [], alternatives: [], warnings: [error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown catalog error"] }));
   const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
     rankManualSerialCoverCandidates(items, normalized.title, label, context.mediaType, context.originalTitle);
   const verified = rank(catalog.verified).map(candidate => ({ ...candidate, score: candidate.score + 100 }));

@@ -34,7 +34,7 @@ export async function searchMetadataCoverCandidates(
       warnings.push(...page.warnings);
       if (!page.hasMore) break;
     } catch (error: unknown) {
-      warnings.push(error instanceof Error ? error.message : String(error));
+      warnings.push(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown provider error");
       break;
     }
   }
