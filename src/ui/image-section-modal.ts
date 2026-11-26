@@ -40,7 +40,7 @@ export class AddImageSectionModal extends AnimeListModal {
   onOpen(): void {
     this.mounted = true;
     this.dragController = new AbortController();
-    this.modalEl.addClass("animelist-image-add-modal");
+    this.modalEl.addClass("animelist-modal", "animelist-image-add-modal");
     this.setTitle(imageSectionText("addImages"));
     this.render();
     this.modalEl.addEventListener("paste", this.handlePaste);
@@ -258,8 +258,7 @@ export class AddImageSectionModal extends AnimeListModal {
       if (event.key === "Enter") { event.preventDefault(); void this.addUrl(); }
     });
     urlGroup.appendChild(urlInput);
-    const addUrl = makeEl("button", "mod-cta", imageSectionText("urlAdd"));
-    addUrl.type = "button";
+    const addUrl = createUiAction(imageSectionText("urlAdd"), "primary");
     addUrl.disabled = this.busy;
     addUrl.addEventListener("click", () => void this.addUrl());
     urlRow.append(urlGroup, addUrl);
@@ -300,13 +299,11 @@ export class AddImageSectionModal extends AnimeListModal {
       this.contentEl.append(queueHead, queue);
     }
 
-    const actions = makeEl("div", "al-image-modal-actions");
-    const cancel = makeEl("button", "", imageSectionText("cancel"));
-    cancel.type = "button";
+    const actions = makeEl("div", "al-image-modal-actions al-modal-actions");
+    const cancel = createUiAction(imageSectionText("cancel"));
     cancel.disabled = this.busy;
     cancel.addEventListener("click", () => this.close());
-    const confirm = makeEl("button", "mod-cta", imageSectionText("confirmAdd", { count: this.queue.length }));
-    confirm.type = "button";
+    const confirm = createUiAction(imageSectionText("confirmAdd", { count: this.queue.length }), "primary");
     confirm.disabled = this.busy || this.queue.length === 0;
     confirm.addEventListener("click", () => void this.submit());
     actions.append(cancel, confirm);

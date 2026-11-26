@@ -1,3 +1,4 @@
+import { createUiAction } from "./ui-primitives";
 import { AnimeListModal } from "./animelist-modal";
 import { setIcon } from "obsidian";
 import type { App } from "obsidian";
@@ -176,10 +177,9 @@ export class ReleaseTrackingDashboardModal extends AnimeListModal {
       el("h2", "", releaseTrackingText("dashboard.title")),
       el("p", "", releaseTrackingText("dashboard.description")),
     );
-    const refreshAll = el("button", "mod-cta al-release-dashboard-refresh-all");
-    refreshAll.type = "button";
+    const refreshAll = createUiAction(releaseTrackingText("dashboard.refreshAll"), "primary", "refresh-cw");
+    refreshAll.classList.add("al-release-dashboard-refresh-all");
     refreshAll.disabled = this.allBusy || this.refreshing.size > 0 || tracked.length === 0;
-    refreshAll.append(icon("refresh-cw"), el("span", "", releaseTrackingText("dashboard.refreshAll")));
     refreshAll.addEventListener("click", () => { void this.refreshEverything(); });
     header.append(mark, copy, refreshAll);
     this.contentEl.appendChild(header);
@@ -210,8 +210,7 @@ export class ReleaseTrackingDashboardModal extends AnimeListModal {
     const footer = el("footer", "al-release-dashboard-footer");
     const note = el("div", "al-release-dashboard-note");
     note.append(icon("shield-check"), el("span", "", releaseTrackingText("modal.note")));
-    const close = el("button", "al-secondary-button", releaseTrackingText("modal.close"));
-    close.type = "button";
+    const close = createUiAction(releaseTrackingText("modal.close"));
     close.disabled = false;
     if (this.allBusy || this.refreshing.size > 0) close.textContent = releaseTrackingText("modal.stopAndClose");
     close.addEventListener("click", () => this.close());
@@ -317,14 +316,14 @@ export class ReleaseTrackingDashboardModal extends AnimeListModal {
 
     const actions = el("div", "al-release-dashboard-row-actions");
     if (!tracked) {
-      const add = el("button", "al-secondary-button al-release-dashboard-enable", releaseTrackingText("dashboard.addTracking"));
-      add.type = "button";
+      const add = createUiAction(releaseTrackingText("dashboard.addTracking"));
+      add.classList.add("al-release-dashboard-enable");
       add.disabled = busy || this.allBusy;
       add.addEventListener("click", () => { void this.enableTracking(item); });
       actions.appendChild(add);
     } else if (canChooseSource(status)) {
-      const choose = el("button", "al-secondary-button al-release-dashboard-choose", releaseTrackingText("modal.review"));
-      choose.type = "button";
+      const choose = createUiAction(releaseTrackingText("modal.review"));
+      choose.classList.add("al-release-dashboard-choose");
       choose.disabled = busy || this.allBusy;
       choose.addEventListener("click", () => {
         this.actions.reviewItem(item, (resolved) => {

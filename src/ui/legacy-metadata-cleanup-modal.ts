@@ -1,3 +1,4 @@
+import { createUiAction } from "./ui-primitives";
 import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
@@ -102,11 +103,11 @@ export class LegacyMetadataCleanupModal extends AnimeListModal {
 
     const scope = createScanModeControl(this.contentEl);
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const cancel = footer.createEl("button", { text: "Cancel" });
-    cancel.type = "button";
+    const cancel = createUiAction("Cancel");
+    footer.appendChild(cancel);
     cancel.addEventListener("click", () => this.close());
-    const confirm = footer.createEl("button", { cls: "mod-cta", text: "Confirm and run" });
-    confirm.type = "button";
+    const confirm = createUiAction("Confirm and run", "primary");
+    footer.appendChild(confirm);
     confirm.addEventListener("click", () => this.runCleanup(scope.value === "all" ? "all" : "pending"));
   }
 
@@ -144,8 +145,8 @@ export class LegacyMetadataCleanupModal extends AnimeListModal {
     const results = completion.createDiv({ cls: "al-search-results" });
 
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const close = footer.createEl("button", { cls: "mod-cta", text: legacyMetadataText("settings.close") });
-    close.type = "button";
+    const close = createUiAction(legacyMetadataText("settings.close"), "primary");
+    footer.appendChild(close);
     close.disabled = true;
     close.addEventListener("click", () => this.close());
 

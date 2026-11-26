@@ -1,3 +1,4 @@
+import { createUiAction } from "../../ui/ui-primitives";
 import { Modal, Notice, Setting, TFile } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
 import type { MediaItem } from "../../types";
@@ -95,11 +96,8 @@ class MasterpieceSelectionModal extends Modal {
         .onChange((value: string) => { newLabel = normalizeMasterpieceLabel(value); }));
 
     const actions = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const save = actions.createEl("button", {
-      cls: "mod-cta",
-      text: masterpieceFeatureText("modal.save"),
-    });
-    save.type = "button";
+    const save = createUiAction(masterpieceFeatureText("modal.save"), "primary");
+    actions.appendChild(save);
     save.addEventListener("click", () => {
       if (newLabel) this.selected.add(newLabel);
       const state = stateAfterMasterpieceSelection([...this.selected]);

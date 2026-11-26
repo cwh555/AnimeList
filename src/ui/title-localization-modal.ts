@@ -1,3 +1,4 @@
+import { createUiAction } from "./ui-primitives";
 import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
@@ -48,11 +49,11 @@ export class TitleLocalizationModal extends AnimeListModal {
     const scanMode = createScanModeControl(this.contentEl);
 
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const cancel = footer.createEl("button", { text: text("modal.cancel") });
-    cancel.type = "button";
+    const cancel = createUiAction(text("modal.cancel"));
+    footer.appendChild(cancel);
     cancel.addEventListener("click", () => this.close());
-    const preview = footer.createEl("button", { cls: "mod-cta", text: text("modal.preview") });
-    preview.type = "button";
+    const preview = createUiAction(text("modal.preview"), "primary");
+    footer.appendChild(preview);
     preview.addEventListener("click", () => {
       if (this.busy) return;
       const locale = normalizeSupportedLocale(select.value);
@@ -67,8 +68,8 @@ export class TitleLocalizationModal extends AnimeListModal {
     const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: text("modal.scanning", { completed: 0, total: 0 }) });
     const activity = this.contentEl.createDiv({ cls: "al-version-cleanup-list" });
     activity.setAttribute("aria-live", "polite");
-    const cancel = this.contentEl.createEl("button", { text: text("modal.cancel") });
-    cancel.type = "button";
+    const cancel = createUiAction(text("modal.cancel"));
+    this.contentEl.appendChild(cancel);
     cancel.addEventListener("click", () => this.close());
     const controller = new AbortController();
     this.abort = controller;
@@ -108,8 +109,8 @@ export class TitleLocalizationModal extends AnimeListModal {
         console.error("AnimeList title localization preview failed", error);
         this.contentEl.empty();
         this.contentEl.createEl("p", { cls: "al-modal-warning", text: text("modal.error", { error: error instanceof Error ? error.message : String(error) }) });
-        const back = this.contentEl.createEl("button", { text: text("modal.back") });
-        back.type = "button";
+        const back = createUiAction(text("modal.back"));
+        this.contentEl.appendChild(back);
         back.addEventListener("click", () => this.renderSelection());
       }
     }).finally(() => { this.busy = false; });
@@ -153,11 +154,11 @@ export class TitleLocalizationModal extends AnimeListModal {
       }
     }
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const back = footer.createEl("button", { text: text("modal.back") });
-    back.type = "button";
+    const back = createUiAction(text("modal.back"));
+    footer.appendChild(back);
     back.addEventListener("click", () => this.renderSelection());
-    const apply = footer.createEl("button", { cls: "mod-cta", text: text("modal.apply") });
-    apply.type = "button";
+    const apply = createUiAction(text("modal.apply"), "primary");
+    footer.appendChild(apply);
     apply.disabled = ![...checks.values()].some(checkbox => checkbox.checked);
     const updateApplyState = (): void => { apply.disabled = ![...checks.values()].some(checkbox => checkbox.checked); };
     for (const checkbox of checks.values()) checkbox.addEventListener("change", updateApplyState);
@@ -186,8 +187,8 @@ export class TitleLocalizationModal extends AnimeListModal {
           const errors = this.contentEl.createEl("ul");
           for (const error of result.errors) errors.createEl("li", { text: `${error.path}: ${error.message}` });
         }
-        const close = this.contentEl.createEl("button", { cls: "mod-cta", text: text("modal.close") });
-        close.type = "button";
+        const close = createUiAction(text("modal.close"), "primary");
+        this.contentEl.appendChild(close);
         close.addEventListener("click", () => this.close());
         new Notice(text("modal.done", { updated: result.updated, skipped: result.skipped, failed: result.failed }));
       }).catch((error) => {

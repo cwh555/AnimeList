@@ -82,7 +82,7 @@ export class MomentEditorModal extends AnimeListModal {
   }
 
   onOpen(): void {
-    this.modalEl.addClass("animelist-moment-editor-modal");
+    this.modalEl.addClass("animelist-modal", "animelist-moment-editor-modal");
     this.setTitle(this.isEdit ? momentsText("editMoment") : momentsText("addMoment"));
     this.modalEl.addEventListener("paste", this.handlePaste);
     this.render();
@@ -512,20 +512,17 @@ export class MomentEditorModal extends AnimeListModal {
     urlInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") { event.preventDefault(); void this.addUrl(); }
     });
-    const urlAdd = makeEl("button", "", momentsText("addUrl"));
-    urlAdd.type = "button";
+    const urlAdd = createUiAction(momentsText("addUrl"));
     urlAdd.disabled = this.busy;
     urlAdd.addEventListener("click", () => void this.addUrl());
     urlRow.append(urlInput, urlAdd);
     this.contentEl.appendChild(urlRow);
 
-    const actions = makeEl("div", "al-moment-editor-actions");
-    const cancel = makeEl("button", "", momentsText("cancel"));
-    cancel.type = "button";
+    const actions = makeEl("div", "al-moment-editor-actions al-modal-actions");
+    const cancel = createUiAction(momentsText("cancel"));
     cancel.disabled = this.busy;
     cancel.addEventListener("click", () => this.close());
-    const save = makeEl("button", "mod-cta", this.isEdit ? momentsText("save") : momentsText("create"));
-    save.type = "button";
+    const save = createUiAction(this.isEdit ? momentsText("save") : momentsText("create"), "primary");
     save.disabled = this.busy;
     save.addEventListener("click", () => void this.submit());
     actions.append(cancel, save);

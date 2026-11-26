@@ -1,3 +1,4 @@
+import { createUiAction } from "./ui-primitives";
 import { AnimeListModal } from "./animelist-modal";
 import { setIcon } from "obsidian";
 import type { App } from "obsidian";
@@ -90,10 +91,8 @@ export class ReleaseTrackingManagerModal extends AnimeListModal {
       count.textContent = releaseTrackingText("manager.selected", { selected: this.selectedCount(), total: this.items.length });
     };
     updateCount();
-    const all = el("button", "al-secondary-button", releaseTrackingText("manager.all"));
-    all.type = "button";
-    const none = el("button", "al-secondary-button", releaseTrackingText("manager.none"));
-    none.type = "button";
+    const all = createUiAction(releaseTrackingText("manager.all"));
+    const none = createUiAction(releaseTrackingText("manager.none"));
     toolbar.append(count, all, none);
     this.contentEl.appendChild(toolbar);
 
@@ -131,11 +130,9 @@ export class ReleaseTrackingManagerModal extends AnimeListModal {
     none.addEventListener("click", () => setAll(false));
 
     const footer = el("footer", "al-release-manager-actions");
-    const cancel = el("button", "al-secondary-button", releaseTrackingText("manager.cancel"));
-    cancel.type = "button";
+    const cancel = createUiAction(releaseTrackingText("manager.cancel"));
     cancel.addEventListener("click", () => this.close());
-    const apply = el("button", "mod-cta", releaseTrackingText("manager.apply"));
-    apply.type = "button";
+    const apply = createUiAction(releaseTrackingText("manager.apply"), "primary");
     apply.addEventListener("click", () => {
       apply.disabled = true;
       void (async () => {

@@ -1,3 +1,4 @@
+import { createUiAction } from "./ui-primitives";
 import { createScanModeControl } from "./cleanup-scan-controls";
 import { AnimeListModal } from "./animelist-modal";
 import { Notice } from "obsidian";
@@ -39,13 +40,13 @@ export class DuplicateCoverCleanupModal extends AnimeListModal {
     const status = this.contentEl.createEl("p", { cls: "al-version-cleanup-status", text: "Select scan scope and start." });
     const list = this.contentEl.createDiv({ cls: "al-version-cleanup-list" });
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions" });
-    const scan = footer.createEl("button", { text: "Scan" });
-    scan.type = "button";
-    const cancel = footer.createEl("button", { text: "Cancel" });
-    cancel.type = "button";
+    const scan = createUiAction("Scan");
+    footer.appendChild(scan);
+    const cancel = createUiAction("Cancel");
+    footer.appendChild(cancel);
     cancel.addEventListener("click", () => this.close());
-    const confirm = footer.createEl("button", { cls: "mod-cta", text: "Confirm cleanup" });
-    confirm.type = "button";
+    const confirm = createUiAction("Confirm cleanup", "primary");
+    footer.appendChild(confirm);
     confirm.disabled = true;
 
     let plan: VersionCleanupPlan | null = null;
