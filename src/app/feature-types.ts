@@ -1,3 +1,4 @@
+import type { VolumeCatalogRequest, VolumeCatalogResult } from "../domain/serial-covers/catalog";
 import type { Plugin, SettingDefinition, TFile } from "obsidian";
 import type { SettingsPageId } from "./settings-layout";
 import type {
@@ -48,6 +49,7 @@ export interface AnimeListFeatureHost extends Pick<
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
   releaseDownloadedCover(path: string): void;
+  searchSerialVolumeCatalog?(request: VolumeCatalogRequest): Promise<VolumeCatalogResult>;
   searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage>;
   enrichExternalMedia(result: ExternalMediaResult, purpose?: "new-media" | "metadata-only"): Promise<ExternalMediaResult>;
   enrichStoredMedia(frontmatter: Record<string, unknown>, mediaType: MediaType): Promise<ExternalMediaResult>;

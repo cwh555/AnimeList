@@ -1,5 +1,7 @@
 import { Modal, Notice, setIcon } from "obsidian";
 import { defineFeature, type AnimeListFeatureHost } from "../../app/feature-types";
+import { storedMediaExternalResult } from "../../data/stored-media-result";
+import { createUiAction } from "../../ui/ui-primitives";
 import { configureSerialCoverProvider } from "../../data/serial-covers/provider";
 import { directlyApplySerialCover, SerialCoverDirectApply } from "../../app/serial-covers/direct-apply";
 import { SerialCoverLoadQueue } from "../../app/serial-covers/load-queue";
@@ -8,7 +10,7 @@ import { resolveSerialEntryCoverPaths } from "../../domain/serial-covers/timelin
 import { selectOriginalTitle, serialCoverQuery, type RankedSerialCoverCandidate } from "../../domain/serial-covers/ranking";
 import {
   downloadSelectedSerialCover,
-  findSerialCoverCandidates,
+  findConfiguredSerialCoverCandidates,
   loadConfidentSerialCover,
   readSerialCovers,
   type SerialCoverLookupContext,
@@ -120,8 +122,8 @@ class CoverSelector extends Modal {
     const input = searchRow.createEl("input", { type: "search" });
     input.value = this.query;
     input.placeholder = serialCoverText("searchPlaceholder");
-    const searchButton = searchRow.createEl("button", { cls: "mod-cta", text: uiText("action.search") });
-    searchButton.type = "button";
+    const searchButton = createUiAction(uiText("action.search"), "primary");
+    searchRow.appendChild(searchButton);
     this.contentEl.createEl("p", { cls: "al-modal-hint", text: serialCoverText("searchHint") });
     const results = this.contentEl.createDiv({ cls: "al-search-results" });
     let searching = false;
@@ -175,9 +177,7 @@ class CoverSelector extends Modal {
       renderResults();
       try {
         this.query = query;
-        this.candidates = await findSerialCoverCandidates(
-          this.context, this.label, query, (mediaType, query, page) => this.context.host.searchExternalPage(mediaType, query, page),
-        );
+        this.candidates = await findConfiguredSerialCoverCandidates(this.context.host, this.context, this.label, query);
         if (!this.candidates.length) new Notice(serialCoverText("emptyResult"));
       } catch (error) {
         console.error("AnimeList serial cover search failed", error);
@@ -282,9 +282,7 @@ function configureRow(context: EditorContext, row: HTMLElement): void {
     if (!query) return;
     status.setText(serialCoverText("loading"));
     try {
-      const candidates = await findSerialCoverCandidates(
-        context, label, query, (mediaType, query, page) => context.host.searchExternalPage(mediaType, query, page),
-      );
+      const candidates = await findConfiguredSerialCoverCandidates(context.host, context, label, query);
       new CoverSelector(context.host, context, label, candidates, (cover) => {
         context.covers.set(label, cover);
         context.autoStatus.delete(label);
@@ -341,6 +339,7 @@ function configureSerialEditor(form: MediaFormContext<AnimeListFeatureHost>): vo
     reading,
     mediaType: form.mediaType,
     originalTitle,
+    work: form.result ?? storedMediaExternalResult(form.frontmatter, form.mediaType),
     covers,
     knownLabels: new Set(reading.entries.map((entry) => entry.label)),
     attempted: new Set(),

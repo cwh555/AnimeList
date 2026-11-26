@@ -1,3 +1,4 @@
+import type { VolumeCatalogRequest, VolumeCatalogResult } from "./domain/serial-covers/catalog";
 import { Notice, Plugin, TAbstractFile, TFile } from "obsidian";
 import { AnimeListApplicationServices } from "./app/anime-list-application";
 import { AnimeListFeatureRegistry } from "./app/feature-registry";
@@ -285,6 +286,10 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
   async readTemplate(path: string): Promise<string> { return this.services().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<ExternalMediaSearchPage> {
     return this.services().searchExternal(mediaType, query, onProgress);
+  }
+
+  async searchSerialVolumeCatalog(request: VolumeCatalogRequest): Promise<VolumeCatalogResult> {
+    return this.services().searchSerialVolumeCatalog(request);
   }
 
   async searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage> {

@@ -14,7 +14,9 @@ import {
   type MissingSerialCoverRecord,
 } from "../../domain/serial-covers/migration";
 import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-covers/provider";
-import type { SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
+import { uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
+import { storedMediaExternalResult } from "../../data/stored-media-result";
+import { rankManualSerialCoverCandidates } from "../../domain/serial-covers/ranking";
 import { serialCoverText } from "../../features/serial-covers/text";
 import type { ExternalMediaResult, MediaType } from "../../types";
 
@@ -28,6 +30,7 @@ export interface StoredSerialCover {
 export interface SerialCoverLookupContext {
   mediaType: "manga" | "novel";
   originalTitle: string;
+  work?: ExternalMediaResult;
 }
 
 export interface SerialCoverMigrationDetail {
@@ -176,6 +179,46 @@ export async function findSerialCoverCandidates(
     );
 }
 
+/** Both editor and maintenance share the same catalog-first lookup. */
+export async function findConfiguredSerialCoverCandidates(
+  plugin: AnimeListFeatureHost,
+  context: SerialCoverLookupContext,
+  label: string,
+  queryInput?: string,
+): Promise<RankedSerialCoverCandidate[]> {
+  const fallback = () => findSerialCoverCandidates(context, label, queryInput,
+    (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page));
+  if (!plugin.searchSerialVolumeCatalog) return fallback();
+  const normalized = queryInput === undefined
+    ? { title: context.originalTitle }
+    : normalizeManualSerialCoverQuery(queryInput, label);
+  if (!normalized) return [];
+  const work = context.work;
+  const aliases = [...new Set([work?.title ?? "", work?.originalTitle ?? "", work?.romajiTitle ?? "", ...(work?.searchTitles ?? [])].filter(Boolean))];
+  const catalog = await plugin.searchSerialVolumeCatalog({
+    mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
+    sources: work?.sources ?? (work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : []),
+    queryTitle: normalized.title, label, manual: queryInput !== undefined,
+  });
+  const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
+    rankManualSerialCoverCandidates(items, normalized.title, label, context.mediaType, context.originalTitle);
+  const verified = rank(catalog.verified).map(candidate => ({ ...candidate, score: candidate.score + 100 }));
+  if (queryInput === undefined && verified.length) return verified;
+  let other: RankedSerialCoverCandidate[] = [];
+  try { other = await fallback(); }
+  catch (error) {
+    if (!verified.length && !catalog.alternatives.length) throw error;
+  }
+  if (queryInput === undefined) {
+    if (!other.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
+    return other;
+  }
+  const results = uniqueSerialCoverSources([...verified, ...rank(catalog.alternatives), ...other])
+    .sort((left, right) => right.score - left.score);
+  if (!results.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
+  return results;
+}
+
 export async function downloadSelectedSerialCover(
   plugin: AnimeListFeatureHost,
   context: SerialCoverLookupContext,
@@ -196,9 +239,7 @@ export async function loadConfidentSerialCover(
   context: SerialCoverLookupContext,
   label: string,
 ): Promise<StoredSerialCover | null> {
-  const candidates = await findSerialCoverCandidates(
-    context, label, undefined, (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page),
-  );
+  const candidates = await findConfiguredSerialCoverCandidates(plugin, context, label);
   const candidate = confidentSerialCover(candidates);
   return candidate ? downloadSelectedSerialCover(plugin, context, candidate, false) : null;
 }
@@ -302,7 +343,7 @@ export async function loadMissingSerialCovers(
       continue;
     }
 
-    const context = { mediaType: work.mediaType, originalTitle: original };
+    const context = { mediaType: work.mediaType, originalTitle: original, work: storedMediaExternalResult(frontmatter, work.mediaType) };
     for (const label of work.labels) {
       if (signal?.aborted) break;
       onProgress?.({
