@@ -1037,7 +1037,7 @@ test("Open Library editions preserve different cover IDs without guessing book t
   setRequestUrlMock(options => {
     if (options.url.includes("/search.json")) return { json: { numFound: 1, start: 0, docs: [{
       key: "/works/OL24202662W", title: "Spice and Wolf, Volume 17: Epilogue",
-      editions: { docs: [{ key: capturedEditions[1].key, title: capturedEditions[1].title, cover_i: capturedEditions[1].covers[0], isbn: capturedEditions[1].isbn_13 }] },
+      editions: { docs: [] },
     }] } };
     if (options.url.includes("/OL24202662W/editions.json")) return { json: { entries: capturedEditions } };
     throw new Error("Unexpected request: " + options.url);
