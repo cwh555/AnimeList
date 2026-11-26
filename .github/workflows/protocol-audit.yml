@@ -1,0 +1,34 @@
+name: Project protocol audit and live catalog replay
+on:
+  push:
+    branches: [research/protocol-audit]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: node scripts/audit-protocol.mjs
+      - run: npm run architecture:check
+      - run: npm run styles:check
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: project-protocol-inventory
+          path: protocol-audit/inventory.json
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: node scripts/probe-volume-catalog.mjs
