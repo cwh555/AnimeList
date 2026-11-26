@@ -248,19 +248,9 @@ export async function loadConfidentSerialCover(
   return candidate ? downloadSelectedSerialCover(plugin, context, candidate, false) : null;
 }
 
-async function resolveOriginalTitle(
-  plugin: AnimeListFeatureHost,
-  mediaType: "manga" | "novel",
-  frontmatter: Record<string, unknown>,
-): Promise<string | null> {
-  const stored = selectOriginalTitle(frontmatter.title_original, frontmatter.title_aliases);
-  if (stored) return stored;
-  const title = text(frontmatter.title).trim();
-  if (!title) return null;
-  const results = await plugin.searchAniList(mediaType, title);
-  return results
-    .map((result) => selectOriginalTitle(result.originalTitle, result.searchTitles))
-    .find((value): value is string => Boolean(value)) ?? null;
+function resolveCoverSearchTitle(frontmatter: Record<string, unknown>): string | null {
+  return selectOriginalTitle(frontmatter.title_original, frontmatter.title_aliases)
+    ?? (text(frontmatter.title).trim() || null);
 }
 
 function summary(total: number, details: SerialCoverMigrationDetail[]): SerialCoverMigrationSummary {
@@ -316,22 +306,7 @@ export async function loadMissingSerialCovers(
       message: `${serialCoverText("migration.resolving")} · ${work.title}`,
     });
 
-    let original: string | null;
-    try {
-      original = await resolveOriginalTitle(plugin, work.mediaType, frontmatter);
-      if (original && !text(frontmatter.title_original)) {
-        await plugin.app.fileManager.processFrontMatter(file, (next) => {
-          next.title_original = original;
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      for (const label of work.labels) {
-        details.push({ filePath: file.path, title: work.title, label, status: "failed", message });
-        completed += 1;
-      }
-      continue;
-    }
+    const original = resolveCoverSearchTitle(frontmatter);
 
     if (!original) {
       for (const label of work.labels) {

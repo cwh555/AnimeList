@@ -64,7 +64,7 @@ export class SerialVolumeCatalogService {
   constructor(private readonly settings: () => ProviderSettings, private readonly clients: CatalogClients) {}
 
   private async bangumiVolumes(request: VolumeCatalogRequest, aliases: readonly string[]): Promise<ExternalMediaResult[]> {
-    const ids = request.sources.filter(source => source.provider.toLowerCase() === "bangumi").map(source => source.sourceId);
+    const ids = [...new Set(request.sources.filter(source => source.provider.toLowerCase() === "bangumi").map(source => source.sourceId))];
     return this.bangumiCache.get(JSON.stringify([request.mediaType, aliases, ids]), async () => {
       for (const id of ids) {
         const parent = await this.clients.bangumi.fetchById(request.mediaType, id);

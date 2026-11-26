@@ -30,6 +30,7 @@ import type { RankingState } from "../domain/pairwise-ranking";
 import { PresentationExportService } from "../data/presentation-export-service";
 import { rasterizePresentation, type PresentationTheme } from "./presentation-export-raster";
 import { errorMessage, makeEl } from "./ui-helpers";
+import { createUiAction } from "./ui-primitives";
 import { createLibraryExportOptions, type LibraryExportOptionsView } from "./library-export-options";
 import {
   createLibraryExportPreview,
@@ -308,14 +309,11 @@ export class LibraryExportModal extends AnimeListModal {
       fontSize: ".64rem",
       overflowWrap: "anywhere",
     });
-    const cancel = makeEl("button", "", uiText("action.cancel"));
-    cancel.type = "button";
+    const cancel = createUiAction(uiText("action.cancel"));
     cancel.addEventListener("click", () => this.close());
-    const copy = makeEl("button", "al-secondary-button", libraryExportText("copy"));
-    copy.type = "button";
+    const copy = createUiAction(libraryExportText("copy"));
     copy.addEventListener("click", () => { void this.copy(); });
-    const save = makeEl("button", "mod-cta", libraryExportText("save"));
-    save.type = "button";
+    const save = createUiAction(libraryExportText("save"), "primary");
     save.addEventListener("click", () => { void this.save(); });
     this.copyButton = copy;
     this.saveButton = save;
