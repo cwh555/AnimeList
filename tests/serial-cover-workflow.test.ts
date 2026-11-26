@@ -396,3 +396,19 @@ test("configured automatic lookup refuses ambiguous verified matches; manual kee
   assert.equal(manual.length, 3);
   assert.ok(manual.some(x => x.provider === "Open Library"));
 });
+
+
+test("automatic fallback accepts source-verified explicit book types and rejects requested-only types", async () => {
+  const context = {mediaType:"novel" as const, originalTitle:"無職転生"};
+  const result = metadataCover("anilist","safe","無職転生 20");
+  const host = {
+    async searchSerialVolumeCatalog(){return {verified:[],alternatives:[],warnings:[]};},
+    async searchSerialVolumePage(){return {results:[{...result,bookMediaTypeEvidence:"novel"},{...result,provider:"openlibrary",sourceId:"unknown"},{...result,provider:"bangumi",sourceId:"wrong",bookMediaTypeEvidence:"manga"}],warnings:[],hasMore:false};},
+    async searchExternalPage(){throw new Error("work-level search not expected");},
+    async downloadCover(item: ExternalMediaResult){return item.sourceId+".jpg";},
+  } as unknown as AnimeListFeatureHost;
+  clearSerialCoverProviderCache();configureSerialCoverProvider({apiKey:""});
+  assert.equal((await loadConfidentSerialCover(host,context,"２０"))?.cover,"safe.jpg");
+  const manual=await findConfiguredSerialCoverCandidates(host,context,"20","無職転生");
+  assert.equal(manual.length,3);
+});

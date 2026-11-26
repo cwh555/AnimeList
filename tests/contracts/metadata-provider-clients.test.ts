@@ -1084,3 +1084,83 @@ test("Open Library stored work ID retrieves editions without searching the work 
     assert.equal(calls.length, 1);
   } finally { setRequestUrlMock(null); }
 });
+
+
+test("catalog honors provider settings, validates parent medium and ignores opposite-type relations", async () => {
+  const title = "同名作品";
+  let settings = { bangumi: true, anilist: false, openlibrary: false };
+  const calls: string[] = [];
+  setRequestUrlMock(options => {
+    calls.push(options.url);
+    if (options.url.endsWith("/999")) return { json: { id: 999, name: title, platform: "漫画" } };
+    if (options.url.endsWith("/1000")) return { json: { id: 1000, name: title, platform: "小说" } };
+    if (options.url.endsWith("/1000/subjects")) return { json: [
+      { id: 12, name: title + " (2)", type: 1, relation: "单行本", platform: "小说", images: { large: "https://example.invalid/12.jpg" } },
+      { id: 13, name: title + " (2)", type: 1, relation: "单行本", platform: "漫画", images: { large: "https://example.invalid/13.jpg" } },
+      { id: 14, name: title + " (2)", type: 2, relation: "单行本", images: { large: "https://example.invalid/14.jpg" } },
+      { id: 15, name: title + " (2)", type: 1, relation: "番外篇", images: { large: "https://example.invalid/15.jpg" } },
+    ] };
+    throw new Error("Unexpected API call " + options.url);
+  });
+  try {
+    const service = new SerialVolumeCatalogService(() => settings, { bangumi: new BangumiClient(), openlibrary: new OpenLibraryClient() });
+    const request = { mediaType: "novel" as const, originalTitle: title, queryTitle: title, aliases: [], label: "２", manual: false, sources: [
+      { provider: "bangumi", sourceId: "999", sourceUrl: "" },
+      { provider: "bangumi", sourceId: "1000", sourceUrl: "" },
+    ] };
+    const output = await service.search(request);
+    assert.deepEqual(output.verified.map(x => x.sourceId), ["12"]);
+    assert.equal(calls.length, 3);
+    settings = { ...settings, bangumi: false };
+    assert.deepEqual((await service.search(request)).verified, []);
+    assert.equal(calls.length, 3);
+    settings = { ...settings, bangumi: true };
+    assert.deepEqual((await service.search(request)).verified.map(x=>x.sourceId), ["12"]);
+    assert.equal(calls.length, 3);
+  } finally { setRequestUrlMock(null); }
+});
+
+test("provider outage retains another provider's edition candidates and permits recovery on the next lookup", async () => {
+  let fail = true;
+  let bgCalls = 0;
+  setRequestUrlMock(options => {
+    if (options.url.includes("api.bgm.tv")) {
+      bgCalls++;
+      if (fail) throw new Error("503");
+      if (options.url.endsWith("/1000/subjects")) return {json:[{id:17, name:"Spice and Wolf (17)",type:1,relation:"单行本",images:{large:"https://example.invalid/17.jpg"}}]};
+      return {json:{id:1000,name:"Spice and Wolf",platform:"小说"}};
+    }
+    if (options.url.includes("/OL24202662W/editions.json")) return { json: { entries: capturedEditions } };
+    throw new Error("Unexpected API call " + options.url);
+  });
+  try {
+    const service = new SerialVolumeCatalogService(() => ({bangumi:true,anilist:false,openlibrary:true}),{bangumi:new BangumiClient(),openlibrary:new OpenLibraryClient()});
+    const request = { mediaType:"novel" as const, originalTitle:"Spice and Wolf",queryTitle:"Spice and Wolf",aliases:["Spice & Wolf"],label:"17",manual:true,sources:[
+      {provider:"bangumi",sourceId:"1000",sourceUrl:""},{provider:"openlibrary",sourceId:"OL24202662W",sourceUrl:""},
+    ] };
+    const first = await service.search(request);
+    assert.equal(first.verified.length,0);
+    assert.equal(first.alternatives.length,3);
+    assert.match(first.warnings.join(";"),/503/);
+    fail=false;
+    const second=await service.search(request);
+    assert.deepEqual(second.verified.map(x=>x.sourceId),["17"]);
+    assert.equal(second.alternatives.length,3);
+    assert.equal(bgCalls,3);
+    assert.deepEqual(second.warnings,[]);
+  } finally {setRequestUrlMock(null);}
+});
+
+test("manual edited title discovers an Open Library edition even when the stored title is different", async () => {
+  setRequestUrlMock(options=>{
+    if(options.url.includes("/search.json")) return {json:{numFound:1,start:0,docs:[{key:"/works/OL24202662W",title:"Spice and Wolf, Volume 17: Epilogue"}]}};
+    if(options.url.includes("/OL24202662W/editions.json")) return {json:{entries:capturedEditions}};
+    throw new Error("Unexpected API call "+options.url);
+  });
+  try {
+    const service = new SerialVolumeCatalogService(()=>({bangumi:false,anilist:false,openlibrary:true}),{bangumi:new BangumiClient(),openlibrary:new OpenLibraryClient()});
+    const output=await service.search({mediaType:"novel",originalTitle:"狼と香辛料",queryTitle:"Spice and Wolf",aliases:[],label:"17",manual:true,sources:[]});
+    assert.deepEqual(output.verified,[]);
+    assert.equal(output.alternatives.length,3);
+  }finally{setRequestUrlMock(null);}
+});
