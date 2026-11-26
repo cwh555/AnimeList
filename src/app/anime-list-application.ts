@@ -259,6 +259,10 @@ export class AnimeListApplicationServices {
   async getTemplates(mediaType: MediaType): Promise<Array<{ path: string; name: string }>> { return this.libraryStorage().templates(mediaType); }
   async readTemplate(path: string): Promise<string> { return this.libraryStorage().readTemplate(path); }
   async searchExternal(mediaType: MediaType, query: string, onProgress?: (results: ExternalMediaResult[]) => void): Promise<{ results: ExternalMediaResult[]; warnings: string[]; hasMore: boolean }> { return this.externalMediaSearch().search(mediaType, query, onProgress); }
+  async searchSerialVolumePage(mediaType: "manga" | "novel", query: string, page: number): Promise<ExternalMediaSearchPage> {
+    return this.externalMediaSearch().searchProviderPage(mediaType, query, page);
+  }
+
   async searchSerialVolumeCatalog(request: VolumeCatalogRequest): Promise<VolumeCatalogResult> {
     this.volumeCatalog ??= new SerialVolumeCatalogService(() => this.settings().providers, this.metadataProviders());
     return this.volumeCatalog.search(request);

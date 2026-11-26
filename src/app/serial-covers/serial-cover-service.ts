@@ -15,6 +15,8 @@ import {
 } from "../../domain/serial-covers/migration";
 import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-covers/provider";
 import { uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
+import { matchesCatalogVolume } from "../../domain/serial-covers/catalog";
+import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import { storedMediaExternalResult } from "../../data/stored-media-result";
 import { rankManualSerialCoverCandidates } from "../../domain/serial-covers/ranking";
 import { serialCoverText } from "../../features/serial-covers/text";
@@ -187,7 +189,7 @@ export async function findConfiguredSerialCoverCandidates(
   queryInput?: string,
 ): Promise<RankedSerialCoverCandidate[]> {
   const fallback = () => findSerialCoverCandidates(context, label, queryInput,
-    (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page));
+    (mediaType, query, page) => plugin.searchSerialVolumePage?.(mediaType, query, page) ?? plugin.searchExternalPage(mediaType, query, page));
   if (!plugin.searchSerialVolumeCatalog) return fallback();
   const normalized = queryInput === undefined
     ? { title: context.originalTitle }
@@ -197,7 +199,7 @@ export async function findConfiguredSerialCoverCandidates(
   const aliases = [...new Set([work?.title ?? "", work?.originalTitle ?? "", work?.romajiTitle ?? "", ...(work?.searchTitles ?? [])].filter(Boolean))];
   const catalog = await plugin.searchSerialVolumeCatalog({
     mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
-    sources: work?.sources ?? (work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : []),
+    sources: [...(work?.sources ?? []), ...(work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : [])],
     queryTitle: normalized.title, label, manual: queryInput !== undefined,
   });
   const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
@@ -210,8 +212,10 @@ export async function findConfiguredSerialCoverCandidates(
     if (!verified.length && !catalog.alternatives.length) throw error;
   }
   if (queryInput === undefined) {
-    if (!other.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
-    return other;
+    const exact = other.filter(candidate => matchesCatalogVolume(candidate.title, [context.originalTitle, ...aliases], label)
+      && bangumiBookMediaType("", candidate.categories ?? []) === context.mediaType);
+    if (!exact.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
+    return exact;
   }
   const results = uniqueSerialCoverSources([...verified, ...rank(catalog.alternatives), ...other])
     .sort((left, right) => right.score - left.score);

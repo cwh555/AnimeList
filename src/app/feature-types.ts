@@ -49,6 +49,7 @@ export interface AnimeListFeatureHost extends Pick<
   createMediaNote(result: ExternalMediaResult, form: MediaNoteForm, coverAsset?: MediaCoverAssetInput | null): Promise<TFile>;
   downloadCover(result: ExternalMediaResult): Promise<string>;
   releaseDownloadedCover(path: string): void;
+  searchSerialVolumePage?(mediaType: "manga" | "novel", query: string, page: number): Promise<ExternalMediaSearchPage>;
   searchSerialVolumeCatalog?(request: VolumeCatalogRequest): Promise<VolumeCatalogResult>;
   searchExternalPage(mediaType: MediaType, query: string, page: number, sessionId?: string): Promise<ExternalMediaSearchPage>;
   enrichExternalMedia(result: ExternalMediaResult, purpose?: "new-media" | "metadata-only"): Promise<ExternalMediaResult>;

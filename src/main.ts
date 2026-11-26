@@ -288,6 +288,10 @@ export class AnimeListPlugin extends Plugin implements AnimeListUiHost {
     return this.services().searchExternal(mediaType, query, onProgress);
   }
 
+  async searchSerialVolumePage(mediaType: "manga" | "novel", query: string, page: number): Promise<ExternalMediaSearchPage> {
+    return this.services().searchSerialVolumePage(mediaType, query, page);
+  }
+
   async searchSerialVolumeCatalog(request: VolumeCatalogRequest): Promise<VolumeCatalogResult> {
     return this.services().searchSerialVolumeCatalog(request);
   }
