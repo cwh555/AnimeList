@@ -210,7 +210,7 @@ state, and preservation of the original note metadata.
 This section is authoritative for AnimeList UI consistency. Metadata, provider identity,
 frontmatter and note content remain governed by the preceding storage/API contracts.
 
-- **Shared component ownership:** Common modal actions use `src/ui/ui-primitives.ts`.
+- **Shared component ownership:** Common modal and workspace actions use `src/ui/ui-primitives.ts`.
   A primary action uses `mod-cta`, a destructive confirmation uses `mod-warning`,
   and other actions remain secondary. Feature-specific icon tools and workspace
   gestures may differ, but must preserve the same focus, disabled and touch states.
@@ -232,7 +232,7 @@ frontmatter and note content remain governed by the preceding storage/API contra
 - **Dialog dimensions:** Confirmation dialogs use a compact, centered modal,
   not a wide outer dialog with a narrow content column. Standard editing dialogs
   can remain wider, while Timeline and image workspaces retain task-dependent
-  geometry. The CSS contract is scoped under `.animelist-modal` rather than
+  geometry. The CSS contract is scoped to AnimeList modal and workspace surfaces rather than
   modifying Obsidian's global `.modal` or other plugins.
 - **Text layout:** Long CJK titles, arbitrary aliases, file names and paths
   must not overflow any dialog. Use `min-width: 0` in flex/grid children;
@@ -261,5 +261,6 @@ release or merge gate; targeted/smoke tests are for routine iteration.
 - Work search ranks and paginates series; volume matching consumes the raw provider page before work ranking, deduplication or the visible 24-result limit. Provider configuration applies to both paths.
 - Resolve a Bangumi series using its stored source ID or an unambiguous exact title and explicit book medium. Follow only single-volume relations and match the requested volume suffix against known series aliases; never infer a volume from its position in the response. Cache relation catalogs per series, not per volume.
 - Open Library Work and Edition IDs are distinct. Retain Work IDs even without indexed covers, expand their editions, and retain distinct cover-bearing editions. A stored Work ID is tried directly. Edition title alone is not sufficient evidence of manga versus novel, so unverified editions are manual alternatives rather than automatic replacements.
-- Manual selection, automatic resolution and missing-cover recovery share the catalog service. Recovery preserves unrelated frontmatter, existing cover references and titles; provider failures must not overwrite a valid cover or prevent other available sources from being considered.
+- Manual selection, automatic resolution and missing-cover recovery share the catalog service. Recovery preserves unrelated frontmatter, existing cover references and titles; provider failures must not overwrite a valid cover or prevent other available sources from being considered. Recheck cancellation and current frontmatter at write time; release downloaded assets on every exit path. A manual cover selection or clear invalidates older automatic requests.
+- Automatic publication fallback requires provider-verified book subtype and an explicit volume suffix. Requesting a media type is not evidence that a returned work has that type. Reject non-image download payloads and use the detected raster format for remote covers.
 - Bound discovery requests and cache only for a finite lifetime. Missing records, API outages and ambiguous matches are not evidence that a volume does not exist.

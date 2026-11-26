@@ -65,10 +65,13 @@ try {
     'checks.compactOuterMatchesContent=confirm.getBoundingClientRect().width<=521&&content.getBoundingClientRect().width<=confirm.getBoundingClientRect().width+1;',
     'checks.confirmNoOverflow=bounded(confirm)&&bounded(content)&&bounded(desc);',
     'checks.actionVisible=cancel.getBoundingClientRect().width>=40&&remove.getBoundingClientRect().width>=40;',
+    'const target=innerWidth<=480?44:40;checks.touchTargets=[cancel,remove,picker.trigger].every(b=>b.getBoundingClientRect().height>=target-0.5);',
+    'let activations=0;cancel.addEventListener("click",()=>activations++);cancel.click();cancel.disabled=true;cancel.click();checks.disabledPreventsClick=activations===1&&Number(getComputedStyle(cancel).opacity)<1;',
+    'remove.id="keyboard-test-target";window.__uiChecks=checks;',
     'checks.pickerUsesStyledButton=!!picker.element.querySelector("button.al-ui-button")&&picker.input.type==="file"&&picker.input.accept==="image/png";',
     'checks.fileInputNotVisuallyExposed=getComputedStyle(picker.input).opacity==="0";',
     'checks.longTitleWrap=getComputedStyle(a.querySelector("h2")).whiteSpace==="normal";',
-    'document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";',
+    'document.body.dataset.ready="true";',
     '})().catch(e=>{document.body.dataset.details=String(e?.stack||e);document.body.dataset.result="fail";});</script></body></html>',
   ].join("");
   for (const width of [320, 390, 768, 1200]) {
@@ -77,6 +80,16 @@ try {
       profile: path.join(output, "profile-" + width),
       viewport: { width, height: 800, deviceScaleFactor: width < 600 ? 2 : 1, mobile: width < 600 },
       testName: "Modal UI protocol " + width + "px",
+      interact: async ({send,sleep}) => {
+        for(let i=0;i<40;i++){
+          const r=await send("Runtime.evaluate",{expression:'document.body.dataset.ready==="true"',returnByValue:true});
+          if(r.result.value)break;
+          await sleep(25);
+        }
+        await send("Input.dispatchKeyEvent",{type:"keyDown",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
+        await send("Input.dispatchKeyEvent",{type:"keyUp",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
+        await send("Runtime.evaluate",{expression:'(()=>{const el=document.getElementById("keyboard-test-target");el.focus();const checks=window.__uiChecks;checks.visibleFocus=document.activeElement===el&&el.matches(":focus-visible")&&getComputedStyle(el).outlineStyle!=="none";document.body.dataset.details=JSON.stringify(checks);document.body.dataset.result=Object.values(checks).every(Boolean)?"pass":"fail";})()'});
+      },
     });
   }
 } finally {
