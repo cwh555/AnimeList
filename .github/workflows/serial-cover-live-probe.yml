@@ -1,0 +1,19 @@
+name: Serial cover live API diagnostic
+on:
+  push:
+    branches: [research/serial-cover-live-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - name: Probe public book APIs
+        run: python3 scripts/probe-serial-cover-live.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: live-api-responses
+          path: probe-results/
