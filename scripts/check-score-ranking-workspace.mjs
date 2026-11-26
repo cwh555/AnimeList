@@ -62,6 +62,13 @@ try {
     'const localExportAbsent=()=>![...root.querySelectorAll("button")].some(b=>/^(Export|匯出|导出|エクスポート|내보내기)$/i.test(b.textContent.trim()));',
     'checks.ratingHasNoDuplicateExport=localExportAbsent();',
     'checks.batchActionsShared=[...root.querySelectorAll(".al-score-batch-toolbar button")].every(b=>b.type==="button"&&b.classList.contains("al-ui-button"))&&root.querySelectorAll(".al-score-batch-toolbar button").length===4;',
+    'const batchToggle=root.querySelector(".al-score-dashboard-action-group button:last-child");batchToggle.click();await delay();',
+    'const batchActions=[...root.querySelectorAll(".al-score-batch-toolbar button")];',
+    'const minimumHeight=innerWidth<=480?44:40;',
+    'checks.batchTargets=batchActions.every(b=>b.getBoundingClientRect().height>=minimumHeight-0.5);',
+    'checks.batchDisabled=batchActions.some(b=>b.disabled&&Number(getComputedStyle(b).opacity)<1);',
+    'const selectAll=batchActions[0];selectAll.focus();checks.batchFocus=document.activeElement===selectAll&&getComputedStyle(selectAll).outlineStyle!=="none";',
+    'batchToggle.click();await delay();',
     'checks.ratingVisible=root.querySelectorAll(".al-score-poster").length===40;',
     'checks.originalScrollHost=!!root.querySelector(":scope > .al-score-dashboard") && root.scrollHeight>root.clientHeight;',
     'const tabs=root.querySelectorAll(".al-ranking-mode-tabs button");',
@@ -69,6 +76,7 @@ try {
     'tabs[1].click();await delay();',
     'checks.rankingHasNoDuplicateExport=localExportAbsent();',
     'checks.rankingActionsShared=root.querySelectorAll(".al-ranking-actions button").length>0&&[...root.querySelectorAll(".al-ranking-actions button")].every(b=>b.classList.contains("al-ui-button"));',
+    'checks.rankingTargets=[...root.querySelectorAll(".al-ranking-actions button")].every(b=>b.getBoundingClientRect().height>=minimumHeight-0.5);',
     'checks.rankingInsideScores=root.querySelectorAll(".al-ranking-type-tabs button").length===3 && !root.querySelector(".al-score-dashboard") && root.querySelectorAll(".al-ranking-row").length===40;', 
     'root.scrollTop=360;',
     'const scrollBefore=root.scrollTop;',
@@ -87,7 +95,9 @@ try {
     '</script></body></html>',
   ].join("\n");
   for (const viewport of [
+    { width: 320, height: 800, deviceScaleFactor: 2, mobile: true },
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+    { width: 768, height: 900, deviceScaleFactor: 1, mobile: false },
     { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false },
   ]) {
     await runChromiumDatasetTest({

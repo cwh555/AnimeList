@@ -1,0 +1,21 @@
+name: UI protocol round two
+on:
+  push:
+    branches: [research/protocol-regression-round2]
+permissions:
+  contents: read
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run styles:build
+      - run: npm run styles:check
+      - run: git diff -- styles.css
+      - run: npm run test:browser:ui
+      - run: npm run test:browser:score-ranking

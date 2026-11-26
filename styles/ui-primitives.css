@@ -1,5 +1,5 @@
-/* Shared modal primitives. Scoped to AnimeList dialogs to avoid changing Obsidian or other plugins. */
-.animelist-modal .al-ui-button {
+/* Shared action primitives, scoped to AnimeList dialogs and workspaces. */
+:is(.animelist-modal, .al-workspace-shell, .animelist-ranking-view, .animelist-score-dashboard-view) .al-ui-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8,6 +8,7 @@
   min-height: 40px;
   padding: 8px 16px;
   border-radius: var(--button-radius, 8px);
+  font-size: var(--font-ui-small, 13px);
   font-weight: var(--font-medium);
   line-height: 1.35;
   text-align: center;
@@ -15,12 +16,12 @@
   overflow-wrap: anywhere;
   cursor: pointer;
 }
-.animelist-modal .al-ui-button:focus-visible,
+:is(.animelist-modal, .al-workspace-shell, .animelist-ranking-view, .animelist-score-dashboard-view) .al-ui-button:focus-visible,
 .animelist-modal .al-file-picker-trigger:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
-.animelist-modal .al-ui-button:disabled { cursor: not-allowed; opacity: .55; }
+:is(.animelist-modal, .al-workspace-shell, .animelist-ranking-view, .animelist-score-dashboard-view) .al-ui-button:disabled { cursor: not-allowed; opacity: .55; }
 .animelist-modal .al-modal-actions {
   display: flex;
   min-width: 0;
@@ -45,7 +46,8 @@
 .al-dialog-compact .modal-content { width: 100%; max-width: none; min-width: 0; }
 .animelist-confirm-modal p,
 .al-dialog-compact p { white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+.al-workspace-shell[data-window-size="compact"] .al-ui-button { min-height: 44px; }
 @media (max-width: 480px) {
-  .animelist-modal .al-ui-button { min-height: 44px; }
+  :is(.animelist-modal, .al-workspace-shell, .animelist-ranking-view, .animelist-score-dashboard-view) .al-ui-button { min-height: 44px; }
   .animelist-modal .al-modal-actions > .al-ui-button { flex: 1 1 auto; }
 }
