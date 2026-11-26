@@ -254,3 +254,12 @@ frontmatter and note content remain governed by the preceding storage/API contra
 
 See `docs/TESTING.md` for fast/full test tiers. Full tests must run for a
 release or merge gate; targeted/smoke tests are for routine iteration.
+
+
+## Serial publication identity protocol
+
+- Work search ranks and paginates series; volume matching consumes the raw provider page before work ranking, deduplication or the visible 24-result limit. Provider configuration applies to both paths.
+- Resolve a Bangumi series using its stored source ID or an unambiguous exact title and explicit book medium. Follow only single-volume relations and match the requested volume suffix against known series aliases; never infer a volume from its position in the response. Cache relation catalogs per series, not per volume.
+- Open Library Work and Edition IDs are distinct. Retain Work IDs even without indexed covers, expand their editions, and retain distinct cover-bearing editions. A stored Work ID is tried directly. Edition title alone is not sufficient evidence of manga versus novel, so unverified editions are manual alternatives rather than automatic replacements.
+- Manual selection, automatic resolution and missing-cover recovery share the catalog service. Recovery preserves unrelated frontmatter, existing cover references and titles; provider failures must not overwrite a valid cover or prevent other available sources from being considered.
+- Bound discovery requests and cache only for a finite lifetime. Missing records, API outages and ambiguous matches are not evidence that a volume does not exist.
