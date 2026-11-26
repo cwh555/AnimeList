@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { after, before, describe, it, test } from "node:test";
 import { setRequestUrlMock } from "../mocks/obsidian";
 import { AniListClient } from "../../src/data/providers/anilist-client";
 import { BangumiClient } from "../../src/data/providers/bangumi-client";
 import { OpenLibraryClient } from "../../src/data/providers/open-library-client";
+import { SerialVolumeCatalogService } from "../../src/data/serial-covers/volume-catalog-service";
+import { matchesCatalogVolume } from "../../src/domain/serial-covers/catalog";
 
 const originalWindow = globalThis.window;
 before(() => {
@@ -705,4 +707,362 @@ describe("metadata provider clients", () => {
       setRequestUrlMock(null);
     }
   });
+});
+
+/** Captured response fields from public APIs, GitHub Actions run 45733961345. */
+const capturedRelations = [
+  {
+    "id": 561419,
+    "name": "イヴと偽りの天使たち ロクでなし魔術講師と禁忌教典【正典】",
+    "relation": "相同世界观",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/fc/bb/561419_QtWQO.jpg"
+    }
+  },
+  {
+    "id": 530025,
+    "name": "ロクでなし魔術講師と福音後記",
+    "relation": "番外篇",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/89/23/530025_HnsDS.jpg"
+    }
+  },
+  {
+    "id": 162853,
+    "name": "ロクでなし魔術講師と禁忌教典",
+    "relation": "书籍",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/42/13/162853_f9aF0.jpg"
+    }
+  },
+  {
+    "id": 174138,
+    "name": "ロクでなし魔術講師と禁忌教典",
+    "relation": "动画",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/b2/af/174138_0BOO7.jpg"
+    }
+  },
+  {
+    "id": 212926,
+    "name": "ロクでなし魔術講師と追想日誌",
+    "relation": "番外篇",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/a3/5a/212926_8Jyfw.jpg"
+    }
+  },
+  {
+    "id": 109636,
+    "name": "ロクでなし魔術講師と禁忌教典 (1)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/fa/5f/109636_jp.jpg"
+    }
+  },
+  {
+    "id": 339465,
+    "name": "ロクでなし魔術講師と絵画回想 三嶋くろね画集 vol.1",
+    "relation": "画集",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/e5/05/339465_67V6A.jpg"
+    }
+  },
+  {
+    "id": 143639,
+    "name": "ロクでなし魔術講師と禁忌教典 (2)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/c5/66/143639_jp.jpg"
+    }
+  },
+  {
+    "id": 347383,
+    "name": "ロクでなし魔術講師と絵画回想 三嶋くろね画集 vol.2",
+    "relation": "画集",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/43/03/347383_LudO3.jpg"
+    }
+  },
+  {
+    "id": 146901,
+    "name": "ロクでなし魔術講師と禁忌教典 (3)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/e6/3c/146901_jp.jpg"
+    }
+  },
+  {
+    "id": 537994,
+    "name": "ロクでなし魔術講師と絵画回想 三嶋くろね画集 vol.3",
+    "relation": "画集",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/13/7d/537994_RJ9ig.jpg"
+    }
+  },
+  {
+    "id": 146902,
+    "name": "ロクでなし魔術講師と禁忌教典 (4)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/b4/1f/146902_jp.jpg"
+    }
+  },
+  {
+    "id": 159307,
+    "name": "ロクでなし魔術講師と禁忌教典 (5)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/53/0e/159307_jp.jpg"
+    }
+  },
+  {
+    "id": 186910,
+    "name": "ロクでなし魔術講師と禁忌教典 (6)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/e0/6d/186910_jp.jpg"
+    }
+  },
+  {
+    "id": 195825,
+    "name": "ロクでなし魔術講師と禁忌教典 (7)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/fa/01/195825_jp.jpg"
+    }
+  },
+  {
+    "id": 208683,
+    "name": "ロクでなし魔術講師と禁忌教典 (8)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/52/cf/208683_1o1MM.jpg"
+    }
+  },
+  {
+    "id": 220280,
+    "name": "ロクでなし魔術講師と禁忌教典 (9)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/ef/cf/220280_vA0ND.jpg"
+    }
+  },
+  {
+    "id": 230954,
+    "name": "ロクでなし魔術講師と禁忌教典 (10)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/b0/4e/230954_Q4U6Q.jpg"
+    }
+  },
+  {
+    "id": 240819,
+    "name": "ロクでなし魔術講師と禁忌教典 (11)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/af/3a/240819_f08fU.jpg"
+    }
+  },
+  {
+    "id": 253656,
+    "name": "ロクでなし魔術講師と禁忌教典 (12)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/99/5e/253656_GDvpq.jpg"
+    }
+  },
+  {
+    "id": 265797,
+    "name": "ロクでなし魔術講師と禁忌教典 (13)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/e8/b0/265797_4rZn5.jpg"
+    }
+  },
+  {
+    "id": 278375,
+    "name": "ロクでなし魔術講師と禁忌教典 (14)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/16/82/278375_dyW9y.jpg"
+    }
+  },
+  {
+    "id": 287653,
+    "name": "ロクでなし魔術講師と禁忌教典 (15)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/5b/af/287653_6SBz6.jpg"
+    }
+  },
+  {
+    "id": 296885,
+    "name": "ロクでなし魔術講師と禁忌教典 (16)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/df/a2/296885_8p6Zx.jpg"
+    }
+  },
+  {
+    "id": 313275,
+    "name": "ロクでなし魔術講師と禁忌教典 (17)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/33/b0/313275_YM7o9.jpg"
+    }
+  },
+  {
+    "id": 324599,
+    "name": "ロクでなし魔術講師と禁忌教典 (18)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/39/23/324599_7mj7J.jpg"
+    }
+  },
+  {
+    "id": 338061,
+    "name": "ロクでなし魔術講師と禁忌教典 (19)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/65/84/338061_47iIo.jpg"
+    }
+  },
+  {
+    "id": 368746,
+    "name": "ロクでなし魔術講師と禁忌教典 (20)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/0f/ff/368746_a89Gu.jpg"
+    }
+  },
+  {
+    "id": 379880,
+    "name": "ロクでなし魔術講師と禁忌教典 (21)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/49/b8/379880_dd8oJ.jpg"
+    }
+  },
+  {
+    "id": 423177,
+    "name": "ロクでなし魔術講師と禁忌教典 (22)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/91/de/423177_g3S3C.jpg"
+    }
+  },
+  {
+    "id": 453265,
+    "name": "ロクでなし魔術講師と禁忌教典 (23)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/37/f2/453265_1zd4u.jpg"
+    }
+  },
+  {
+    "id": 453266,
+    "name": "ロクでなし魔術講師と禁忌教典 (24)",
+    "relation": "单行本",
+    "images": {
+      "large": "https://lain.bgm.tv/pic/cover/l/74/4f/453266_6e969.jpg"
+    }
+  }
+];
+const capturedEditions = [
+  {
+    "key": "/books/OL62062462M",
+    "title": "Spice & Wolf, Volume 17: Epilogue",
+    "covers": [
+      15224055
+    ],
+    "isbn_13": [
+      "9798855426090"
+    ]
+  },
+  {
+    "key": "/books/OL51080297M",
+    "title": "Spice and Wolf, Volume 17: Epilogue",
+    "covers": [
+      14841282
+    ],
+    "isbn_13": [
+      "9780316559188"
+    ]
+  },
+  {
+    "key": "/books/OL31964528M",
+    "title": "Spice and Wolf, Volume 17: Epilogue",
+    "covers": [
+      14841284
+    ],
+    "isbn_13": [
+      "9780316339643"
+    ]
+  }
+];
+
+test("publication catalog finds all 24 real related volume identities, excludes other relations, and reuses series cache", async () => {
+  const title = "ロクでなし魔術講師と禁忌教典";
+  const calls: string[] = [];
+  setRequestUrlMock(options => {
+    calls.push(options.url);
+    if (options.url.endsWith("/109635/subjects")) return { json: capturedRelations };
+    if (options.url.endsWith("/109635")) return { json: { id: 109635, name: title, platform: "小说" } };
+    throw new Error("Unexpected request: " + options.url);
+  });
+  try {
+    const catalog = new SerialVolumeCatalogService(() => ({ bangumi: true, anilist: false, openlibrary: false }), {
+      bangumi: new BangumiClient(), openlibrary: new OpenLibraryClient(),
+    });
+    const request = {
+      mediaType: "novel" as const, originalTitle: title, queryTitle: title, aliases: [],
+      sources: [{ provider: "bangumi", sourceId: "109635", sourceUrl: "" }], manual: false,
+    };
+    const expected = capturedRelations.filter(entry => entry.relation === "单行本");
+    assert.equal(expected.length, 24);
+    for (let index = 0; index < 24; index += 1) {
+      const result = await catalog.search({ ...request, label: String(index + 1) });
+      assert.deepEqual(result.verified.map(entry => entry.sourceId), [String(expected[index].id)]);
+      assert.equal(result.verified[0]?.coverUrl, expected[index].images.large);
+      assert.deepEqual(result.warnings, []);
+    }
+    assert.deepEqual((await catalog.search({ ...request, label: "25" })).verified, []);
+    assert.deepEqual((await catalog.search({ ...request, label: "26" })).verified, []);
+    assert.equal(calls.length, 2);
+  } finally { setRequestUrlMock(null); }
+});
+
+test("Open Library editions preserve different cover IDs without guessing book type", async () => {
+  const title = "Spice and Wolf";
+  setRequestUrlMock(options => {
+    if (options.url.includes("/search.json")) return { json: { numFound: 1, start: 0, docs: [{
+      key: "/works/OL24202662W", title: "Spice and Wolf, Volume 17: Epilogue",
+      editions: { docs: [{ key: capturedEditions[1].key, title: capturedEditions[1].title, cover_i: capturedEditions[1].covers[0], isbn: capturedEditions[1].isbn_13 }] },
+    }] } };
+    if (options.url.includes("/OL24202662W/editions.json")) return { json: { entries: capturedEditions } };
+    throw new Error("Unexpected request: " + options.url);
+  });
+  try {
+    const catalog = new SerialVolumeCatalogService(() => ({ bangumi: false, anilist: false, openlibrary: true }), {
+      bangumi: new BangumiClient(), openlibrary: new OpenLibraryClient(),
+    });
+    const result = await catalog.search({
+      mediaType: "novel", originalTitle: title, queryTitle: title, aliases: ["Spice & Wolf"],
+      label: "17", sources: [], manual: true,
+    });
+    assert.deepEqual(result.verified, []);
+    assert.deepEqual(new Set(result.alternatives.map(entry => entry.sourceId)), new Set(capturedEditions.map(entry => entry.key.replace("/books/", ""))));
+    assert.equal(new Set(result.alternatives.map(entry => entry.coverUrl)).size, 3);
+    assert.ok(result.alternatives.every(entry => !entry.mediaTypeHint));
+  } finally { setRequestUrlMock(null); }
+});
+
+test("volume recognition excludes numbers inside series titles, other volumes and multi-volume sets", () => {
+  assert.equal(matchesCatalogVolume("作品 (24)", ["作品"], "24"), true);
+  assert.equal(matchesCatalogVolume("作品２４", ["作品"], "24"), true);
+  assert.equal(matchesCatalogVolume("作品, Volume 24: Epilogue", ["作品"], "24"), true);
+  assert.equal(matchesCatalogVolume("作品 24-26", ["作品"], "24"), false);
+  assert.equal(matchesCatalogVolume("作品 124", ["作品"], "24"), false);
+  assert.equal(matchesCatalogVolume("作品 Part 5 Volume 12", ["作品 Part 5"], "5"), false);
+  assert.equal(matchesCatalogVolume("作品 Part 5 Volume 12", ["作品 Part 5"], "12"), true);
 });
