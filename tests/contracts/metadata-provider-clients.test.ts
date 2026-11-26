@@ -1066,3 +1066,21 @@ test("volume recognition excludes numbers inside series titles, other volumes an
   assert.equal(matchesCatalogVolume("作品 Part 5 Volume 12", ["作品 Part 5"], "5"), false);
   assert.equal(matchesCatalogVolume("作品 Part 5 Volume 12", ["作品 Part 5"], "12"), true);
 });
+
+
+test("Open Library stored work ID retrieves editions without searching the work index", async () => {
+  const calls: string[] = [];
+  setRequestUrlMock(options => {
+    calls.push(options.url);
+    if (options.url.includes("/OL24202662W/editions.json")) return { json: { entries: capturedEditions } };
+    throw new Error("Unexpected search: " + options.url);
+  });
+  try {
+    const catalog = new SerialVolumeCatalogService(() => ({ bangumi: false, anilist: false, openlibrary: true }), {
+      bangumi: new BangumiClient(), openlibrary: new OpenLibraryClient(),
+    });
+    const output = await catalog.search({ mediaType: "novel", originalTitle: "Spice and Wolf", queryTitle: "Spice and Wolf", aliases: ["Spice & Wolf"], label: "17", sources: [{ provider: "openlibrary", sourceId: "OL24202662W", sourceUrl: "" }], manual: true });
+    assert.equal(output.alternatives.length, 3);
+    assert.equal(calls.length, 1);
+  } finally { setRequestUrlMock(null); }
+});

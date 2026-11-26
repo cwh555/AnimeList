@@ -87,23 +87,32 @@ export class SerialVolumeCatalogService {
 
   private async openLibraryEditions(request: VolumeCatalogRequest, aliases: readonly string[]): Promise<SerialCoverCandidate[]> {
     const candidates: SerialCoverCandidate[] = [];
+    const errors: unknown[] = [];
     const volumeMatches = (edition: OpenLibraryVolumeEdition): boolean =>
       matchesCatalogVolume(edition.title, aliases, request.label) || matchesCatalogVolume(edition.workTitle, aliases, request.label);
     const collectWork = async (id: string, title: string): Promise<void> => {
-      const editions = await this.workEditionCache.get(id, () => this.clients.openlibrary.fetchWorkEditions(id, title));
-      candidates.push(...editions.filter(volumeMatches).map(editionCandidate));
+      try {
+        const editions = await this.workEditionCache.get(id, () => this.clients.openlibrary.fetchWorkEditions(id, title));
+        candidates.push(...editions.filter(volumeMatches).map(editionCandidate));
+      } catch (error: unknown) { errors.push(error); }
     };
     // A stored Work ID is a direct lookup, even if its cover or search index is incomplete.
     for (const id of [...new Set(request.sources.filter(source => source.provider.toLowerCase() === "openlibrary").map(source => source.sourceId))].slice(0, 2)) {
       await collectWork(id, request.originalTitle);
     }
+    if (candidates.length) return uniqueSerialCoverSources(candidates);
     const titles = [...new Set([request.queryTitle, ...aliases])].filter(Boolean).slice(0, 3);
     if (titles[0]) titles.push(`${titles[0]} ${request.label}`);
     for (const title of titles) {
-      const works = await this.editionCache.get(title, async () => {
-        const first = await this.clients.openlibrary.searchBookEditions(title);
-        return first.hasMore ? [...first.works, ...(await this.clients.openlibrary.searchBookEditions(title, 2)).works] : first.works;
-      });
+      let works: OpenLibraryVolumeWork[];
+      try {
+        works = await this.editionCache.get(title, async () => {
+          const first = await this.clients.openlibrary.searchBookEditions(title);
+          if (!first.hasMore) return first.works;
+          try { return [...first.works, ...(await this.clients.openlibrary.searchBookEditions(title, 2)).works]; }
+          catch (error: unknown) { errors.push(error); return first.works; }
+        });
+      } catch (error: unknown) { errors.push(error); break; }
       const matched = works.filter(work => matchesCatalogVolume(work.title, aliases, request.label)
         || work.editions.some(volumeMatches));
       candidates.push(...matched.flatMap(work => work.editions.filter(volumeMatches)).map(editionCandidate));
@@ -112,6 +121,7 @@ export class SerialVolumeCatalogService {
       for (const work of matched.slice(0, 2)) await collectWork(work.id, work.title);
       if (candidates.length) break;
     }
+    if (!candidates.length && errors.length) throw errors[0];
     return uniqueSerialCoverSources(candidates);
   }
 
