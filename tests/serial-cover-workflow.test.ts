@@ -8,7 +8,10 @@ import {
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
 } from "../src/data/serial-covers/provider";
-import { findSerialCoverCandidates } from "../src/app/serial-covers/serial-cover-service";
+import { TFile } from "obsidian";
+import type { AnimeListFeatureHost } from "../src/app/feature-types";
+import { SerialCoverIntent } from "../src/app/serial-covers/intent";
+import { findConfiguredSerialCoverCandidates, loadMissingSerialCovers, loadConfidentSerialCover, findSerialCoverCandidates } from "../src/app/serial-covers/serial-cover-service";
 import { resolveSerialEntryCoverPaths } from "../src/domain/serial-covers/timeline";
 import { normalizeManualSerialCoverQuery } from "../src/domain/serial-covers/ranking";
 import { setRequestUrlMock } from "./mocks/obsidian";
@@ -268,4 +271,128 @@ test("simultaneous provider IDs do not mark the wrong cover as applying", async 
   resolve();
   assert.equal(await operation, "applied");
   assert.equal(action.activeSourceKey, null);
+});
+
+
+test("pagination preserves earlier results after an exception and deduplicates across pages", async () => {
+  const pages: number[] = [];
+  const output = await searchMetadataCoverCandidates(async (_type, _query, page) => {
+    pages.push(page);
+    if (page === 3) throw new Error("429");
+    return { results: [metadataCover("bangumi", "1", "作品 1"), metadataCover("openlibrary", String(page), "作品 2")], warnings: [], hasMore: true };
+  }, "novel", "作品");
+  assert.deepEqual(pages, [1, 2, 3]);
+  assert.deepEqual(output.map(x => [x.provider, x.sourceId]), [["Bangumi","1"], ["Open Library","1"], ["Open Library","2"]]);
+  await assert.rejects(() => searchMetadataCoverCandidates(async () => { throw new Error("offline"); }, "novel", "作品"), /offline/);
+});
+
+test("automatic result loses authority after manual selection, clear or editor close", async () => {
+  const intent = new SerialCoverIntent();
+  const covers = new Map<string,string>();
+  let complete!: (value: string) => void;
+  const pending = new Promise<string>(resolve => { complete = resolve; });
+  const ticket = intent.capture("20");
+  const other = intent.capture("21");
+  const finished = pending.then(value => { if (intent.isCurrent(ticket)) covers.set("20", value); });
+  intent.invalidate("20");
+  covers.set("20", "manual.jpg");
+  complete("automatic.jpg");
+  await finished;
+  assert.equal(covers.get("20"), "manual.jpg");
+  assert.equal(intent.isCurrent(other), true);
+  const afterManual = intent.capture("20");
+  intent.invalidate("20");
+  covers.delete("20");
+  assert.equal(intent.isCurrent(afterManual), false);
+  assert.equal(covers.has("20"), false);
+  intent.close();
+  assert.equal(intent.isCurrent(other), false);
+});
+
+function recoveryHost(frontmatter: Record<string, unknown>, onDownload?: () => void, onWrite?: () => void) {
+  const file = new TFile();
+  file.path = "Example.md"; file.basename = "Example";
+  const events: string[] = [];
+  const host = {
+    app: {
+      vault: { getRoot: () => ({ children: [file] }) },
+      metadataCache: { getFileCache: () => ({ frontmatter }) },
+      fileManager: { async processFrontMatter(_file: TFile, update: (fm: Record<string, unknown>) => void) {
+        events.push("write"); onWrite?.(); update(frontmatter);
+      } },
+    },
+    getScanFolders: () => [""],
+    async searchSerialVolumeCatalog(request: { label: string }) {
+      events.push("lookup:" + request.label);
+      return { verified: [candidate(request.label)], alternatives: [], warnings: [] };
+    },
+    async searchExternalPage() { throw new Error("fallback not expected"); },
+    async downloadCover(result: ExternalMediaResult) { events.push("download:" + result.sourceId); onDownload?.(); return "covers/" + result.sourceId + ".jpg"; },
+    releaseDownloadedCover(path: string) { events.push("release:" + path); },
+  } as unknown as AnimeListFeatureHost;
+  return { host, events };
+}
+
+test("recovery writes fullwidth legacy labels without changing titles, existing covers or unrelated fields", async () => {
+  const fm = { media_type: "novel", title: "無職転生", extra: { keep: 42 }, volume_log: [
+    { volume: "２０", completed_at: "2026-01-01", custom: true },
+    { label: "21", cover: "manual.jpg", coverManual: true },
+    { label: "EX", note: "skip" },
+  ] };
+  const {host,events} = recoveryHost(fm);
+  const summary = await loadMissingSerialCovers(host);
+  assert.equal(summary.loaded, 1);
+  assert.equal(summary.failed, 0);
+  assert.deepEqual(fm, { media_type: "novel", title: "無職転生", extra: { keep: 42 }, volume_log: [
+    { volume: "２０", completed_at: "2026-01-01", custom: true, cover: "covers/20.jpg", cover_provider: "Bangumi", cover_source_id: "20" },
+    { label: "21", cover: "manual.jpg", coverManual: true },
+    { label: "EX", note: "skip" },
+  ] });
+  assert.deepEqual(events, ["lookup:20","download:20","write","release:covers/20.jpg"]);
+});
+
+test("cancelling recovery during an in-flight download never writes and releases the asset", async () => {
+  const controller = new AbortController();
+  const fm = { media_type: "novel", title: "無職転生", volume_log: [{ label: "20" }, { label: "21" }] };
+  const {host,events} = recoveryHost(fm, () => controller.abort());
+  const result = await loadMissingSerialCovers(host, undefined, controller.signal);
+  assert.equal(result.loaded, 0);
+  assert.equal(result.skipped, 2);
+  assert.deepEqual(fm.volume_log, [{ label: "20" }, { label: "21" }]);
+  assert.deepEqual(events, ["lookup:20","download:20","release:covers/20.jpg"]);
+});
+
+test("recovery preserves a concurrent manual cover and reports it as skipped", async () => {
+  const entry = { label: "20", cover: "" };
+  const fm = { media_type: "novel", title: "無職転生", volume_log: [entry] };
+  const {host,events} = recoveryHost(fm, () => { entry.cover = "user.jpg"; });
+  const result = await loadMissingSerialCovers(host);
+  assert.equal(result.loaded, 0);
+  assert.equal(result.skipped, 1);
+  assert.equal(fm.volume_log[0].cover, "user.jpg");
+  assert.equal(events.at(-1), "release:covers/20.jpg");
+});
+
+test("failed recovery writes release downloaded assets and report failure", async () => {
+  const fm = { media_type: "novel", title: "無職転生", volume_log: [{ label: "20" }] };
+  const {host,events} = recoveryHost(fm, undefined, () => { throw new Error("disk write failed"); });
+  const result = await loadMissingSerialCovers(host);
+  assert.equal(result.failed, 1);
+  assert.match(result.details[0].message, /disk write failed/);
+  assert.equal(events.at(-1), "release:covers/20.jpg");
+  assert.deepEqual(fm.volume_log, [{ label: "20" }]);
+});
+
+test("configured automatic lookup refuses ambiguous verified matches; manual keeps provider alternatives", async () => {
+  const context = { mediaType: "novel" as const, originalTitle: "無職転生" };
+  const host = {
+    async searchSerialVolumeCatalog() { return { verified: [candidate("20"), {...candidate("20"), sourceId:"another"}], alternatives: [{ ...candidate("20"), provider:"Open Library" }], warnings: [] }; },
+    async searchExternalPage() { throw new Error("offline"); },
+    async downloadCover() { throw new Error("ambiguous result must not download"); },
+  } as unknown as AnimeListFeatureHost;
+  clearSerialCoverProviderCache(); configureSerialCoverProvider({apiKey:""});
+  assert.equal(await loadConfidentSerialCover(host, context, "20"), null);
+  const manual = await findConfiguredSerialCoverCandidates(host, context, "20", "無職転生");
+  assert.equal(manual.length, 3);
+  assert.ok(manual.some(x => x.provider === "Open Library"));
 });

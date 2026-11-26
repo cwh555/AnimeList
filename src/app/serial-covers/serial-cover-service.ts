@@ -335,6 +335,7 @@ export async function loadMissingSerialCovers(
       try {
         const cover = await loadConfidentSerialCover(plugin, context, label);
         if (!cover) {
+          if (signal?.aborted) break;
           details.push({
             filePath: file.path,
             title: work.title,
@@ -346,34 +347,34 @@ export async function loadMissingSerialCovers(
           let written = false;
           try {
             if (signal?.aborted) break;
-          onProgress?.({
-            completed,
-            total,
-            phase: "saving",
-            message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
-          });
-          if (signal?.aborted) break;
-          await plugin.app.fileManager.processFrontMatter(file, (next) => {
-            if (signal?.aborted || !Array.isArray(next.volume_log) || next.media_type !== work.mediaType) return;
-            next.volume_log = next.volume_log.map((raw: unknown): unknown => {
-              const entry = record(raw);
-              if (!entry || text(entry.label ?? entry.volume).normalize("NFKC").trim() !== label || entry.cover) return raw;
-              written = true;
-              return {
-                ...entry,
-                cover: cover.cover,
-                cover_provider: cover.provider,
-                cover_source_id: cover.sourceId,
-              };
+            onProgress?.({
+              completed,
+              total,
+              phase: "saving",
+              message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
             });
-          });
-          details.push({
-            filePath: file.path,
-            title: work.title,
-            label,
-            status: written ? "loaded" : "skipped",
-            message: written ? cover.provider : serialCoverText("settings.metric.skipped"),
-          });
+            if (signal?.aborted) break;
+            await plugin.app.fileManager.processFrontMatter(file, (next) => {
+              if (signal?.aborted || !Array.isArray(next.volume_log) || next.media_type !== work.mediaType) return;
+              next.volume_log = next.volume_log.map((raw: unknown): unknown => {
+                const entry = record(raw);
+                if (!entry || text(entry.label ?? entry.volume).normalize("NFKC").trim() !== label || entry.cover) return raw;
+                written = true;
+                return {
+                  ...entry,
+                  cover: cover.cover,
+                  cover_provider: cover.provider,
+                  cover_source_id: cover.sourceId,
+                };
+              });
+            });
+            details.push({
+              filePath: file.path,
+              title: work.title,
+              label,
+              status: written ? "loaded" : "skipped",
+              message: written ? cover.provider : serialCoverText("settings.metric.skipped"),
+            });
           } finally {
             plugin.releaseDownloadedCover(cover.cover);
           }
