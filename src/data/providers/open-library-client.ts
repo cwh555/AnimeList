@@ -2,7 +2,7 @@ import { requestUrl } from "obsidian";
 import { withProviderRequestDeadline } from "./request-deadline";
 import { USER_AGENT } from "../../app-metadata";
 import type { MediaType } from "../../domain/media-types";
-import { asArray } from "../../domain/value-normalization";
+import { asArray, stringArray, stringValue } from "../../domain/value-normalization";
 import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
 import { normalizeOpenLibraryBook } from "../provider-normalizers";
 import { getActiveLocale } from "../../i18n/catalog";
@@ -30,11 +30,64 @@ function optionalNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export interface OpenLibraryVolumeEdition {
+  workId: string;
+  editionId: string;
+  workTitle: string;
+  title: string;
+  isbn: string[];
+  coverUrl: string;
+}
+
+function editionRecord(workId: string, workTitle: string, value: unknown): OpenLibraryVolumeEdition | null {
+  const edition = record(value);
+  const editionId = stringValue(edition.key).replace(/^\/books\//, "");
+  const coverId = optionalNumber(edition.cover_i) ?? optionalNumber(asArray(edition.covers)[0]);
+  if (!/^OL\d+M$/.test(editionId) || coverId === null || coverId <= 0) return null;
+  return {
+    workId, editionId, workTitle, title: stringValue(edition.title),
+    isbn: stringArray(edition.isbn ?? edition.isbn_13),
+    coverUrl: `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false`,
+  };
+}
+
 export class OpenLibraryClient implements MetadataProviderClient {
   readonly id = "openlibrary" as const;
   readonly label = "Open Library";
 
   supports(mediaType: MediaType): boolean { return mediaType === "novel"; }
+
+  /** Publication search: unlike Add Media, both comics and novels may have editions here. */
+  async searchBookEditions(query: string, page = 1): Promise<{ editions: OpenLibraryVolumeEdition[]; hasMore: boolean }> {
+    const fields = "key,title,cover_i,isbn,editions,editions.key,editions.title,editions.isbn,editions.cover_i";
+    const parameters = new URLSearchParams({ title: query, fields, limit: "50", page: String(page) });
+    const response = await withProviderRequestDeadline("Open Library", () => requestUrl({
+      url: `${OPEN_LIBRARY_SEARCH_ENDPOINT}?${parameters.toString()}`,
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    }));
+    const payload = record(response.json ?? JSON.parse(response.text || "{}"));
+    const docs = asArray(payload.docs).map(record);
+    const editions = docs.flatMap(doc => {
+      const workId = stringValue(doc.key).replace(/^\/works\//, "");
+      return asArray(record(doc.editions).docs)
+        .map(value => editionRecord(workId, stringValue(doc.title), value))
+        .filter((entry): entry is OpenLibraryVolumeEdition => entry !== null);
+    });
+    return { editions, hasMore: (optionalNumber(payload.start) ?? (page - 1) * 50) + docs.length < (optionalNumber(payload.numFound) ?? 0) };
+  }
+
+  async fetchWorkEditions(workId: string, workTitle: string): Promise<OpenLibraryVolumeEdition[]> {
+    if (!/^OL\d+W$/.test(workId)) return [];
+    const response = await withProviderRequestDeadline("Open Library", () => requestUrl({
+      url: `https://openlibrary.org/works/${encodeURIComponent(workId)}/editions.json?limit=50`,
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    }));
+    const payload = record(response.json ?? JSON.parse(response.text || "{}"));
+    return asArray(payload.entries).map(value => editionRecord(workId, workTitle, value))
+      .filter((entry): entry is OpenLibraryVolumeEdition => entry !== null);
+  }
 
   async searchPage(_mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
     const normalizedPage = Math.max(1, Math.floor(page));

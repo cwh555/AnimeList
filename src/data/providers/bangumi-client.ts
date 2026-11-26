@@ -1,7 +1,7 @@
 import { requestUrl } from "obsidian";
 import { withProviderRequestDeadline } from "./request-deadline";
 import { USER_AGENT } from "../../app-metadata";
-import type { MediaType } from "../../domain/media-types";
+import type { ExternalMediaResult, MediaType } from "../../domain/media-types";
 import { asArray, stringValue } from "../../domain/value-normalization";
 import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import type { MetadataProviderClient, MetadataProviderPage } from "../external-media-provider";
@@ -88,6 +88,21 @@ export class BangumiClient implements MetadataProviderClient {
       // remains an independent secondary source.
       return normalized;
     }
+  }
+
+  /** Related single volumes inherit the verified parent book type, not a guessed title category. */
+  async fetchBookVolumes(mediaType: "manga" | "novel", sourceId: string): Promise<ExternalMediaResult[]> {
+    if (!/^\d+$/.test(sourceId)) return [];
+    const response = await withProviderRequestDeadline("Bangumi", () => requestUrl({
+      url: `${BANGUMI_SUBJECT_ENDPOINT}/${encodeURIComponent(sourceId)}/subjects`,
+      method: "GET",
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+    }));
+    const data: unknown = response.json ?? JSON.parse(response.text || "[]");
+    if (!Array.isArray(data)) throw new Error("Bangumi returned an invalid relation response.");
+    return asArray<unknown>(data).map(record)
+      .filter(subject => subject.relation === "单行本" && (subject.type === 1 || subject.type === undefined))
+      .map(subject => normalizeBangumiSubject(subject, mediaType));
   }
 
   async searchPage(mediaType: MediaType, query: string, page: number): Promise<MetadataProviderPage> {
