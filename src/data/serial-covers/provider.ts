@@ -1,5 +1,4 @@
 import { requestUrl } from "obsidian";
-import { USER_AGENT } from "../../app-metadata";
 import { searchMetadataCoverCandidates, uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "./metadata-candidates";
 import {
   manualSerialCoverQueries,
