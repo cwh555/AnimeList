@@ -1,0 +1,29 @@
+name: Diagnose score touch geometry under repeated execution
+on:
+  push:
+    branches: [research/score-touch-root-cause]
+permissions:
+  contents: read
+jobs:
+  repeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1,2,3]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Repeat score interaction with geometry diagnostics
+        run: |
+          failures=0
+          for i in 1 2 3 4 5; do
+            echo "ROUND $i"
+            ANIMELIST_REQUIRE_CHROMIUM=1 node scripts/check-score-dashboard-mobile-interactions.mjs || failures=$((failures+1))
+          done
+          echo "FAILURES=$failures"
+          test "$failures" -eq 0

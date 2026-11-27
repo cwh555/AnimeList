@@ -214,10 +214,13 @@ const html = `<!doctype html>
       await delay(30);
       const longPressPoint = center(alphaAfterSwipe);
       const dropPoint = center(lane("9.0"));
+      const snapshot = () => ({scrollTop:dashboard.scrollTop, source:center(alphaAfterSwipe), target:center(lane("9.0")), hit:document.elementFromPoint(dropPoint.x,dropPoint.y)?.closest(".al-score-lane")?.dataset.score??null, viewport:[innerWidth,innerHeight]});
+      const geometryBefore = snapshot();
       finger(alphaAfterSwipe, "touchstart", longPressPoint.x, longPressPoint.y, 21);
       await delay(520);
       details.longPressArmsMove = !!document.querySelector(".al-score-drag-preview")
         && alphaAfterSwipe.classList.contains("is-dragging");
+      const geometryAfter = snapshot();
       finger(alphaAfterSwipe, "touchmove", dropPoint.x, dropPoint.y, 21);
       details.longPressHighlightsDropLane = lane("9.0").classList.contains("is-drop-target");
       finger(alphaAfterSwipe, "touchend", dropPoint.x, dropPoint.y, 21);
@@ -311,7 +314,7 @@ const html = `<!doctype html>
         && alphaCoverAfterChange?.getAttribute("src") === cover2
         && !alphaCoverBeforeFilters?.isConnected;
 
-      document.body.dataset.details = JSON.stringify({ ...details, touchErrors:window.__touchErrors });
+      document.body.dataset.details = JSON.stringify({ ...details, geometryBefore, geometryAfter, touchErrors:window.__touchErrors });
       document.body.dataset.result = Object.values(details).every(Boolean) ? "pass" : "fail";
     })().catch((error) => {
       document.body.dataset.details = String(error?.stack || error);
