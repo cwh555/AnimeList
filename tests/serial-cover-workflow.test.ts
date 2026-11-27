@@ -1,3 +1,4 @@
+import { installProviderWindow } from "./mocks/provider-window";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
@@ -18,6 +19,8 @@ import { normalizeManualSerialCoverQuery } from "../src/domain/serial-covers/ran
 import { setRequestUrlMock } from "./mocks/obsidian";
 import type { ExternalMediaResult, MediaType } from "../src/domain/media-types";
 import { searchMetadataCoverCandidates, uniqueSerialCoverSources } from "../src/data/serial-covers/metadata-candidates";
+
+installProviderWindow();
 
 function candidate(sourceId: string, score = 200) {
   return {

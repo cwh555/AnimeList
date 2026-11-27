@@ -1,3 +1,4 @@
+import { installProviderWindow } from "./mocks/provider-window";
 import assert from "node:assert/strict";
 import { BangumiClient } from "../src/data/providers/bangumi-client";
 import type { SerialCoverMetadataSearch } from "../src/data/serial-covers/metadata-candidates";
@@ -24,6 +25,8 @@ import {
   searchManualSerialCovers as searchManualConfigured,
   searchSerialCovers as searchConfigured,
 } from "../src/data/serial-covers/provider";
+
+installProviderWindow();
 
 const bangumi = new BangumiClient();
 const metadataSearch: SerialCoverMetadataSearch = async (type, query, page) => ({

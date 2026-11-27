@@ -1,5 +1,6 @@
+import { installProviderWindow } from "../mocks/provider-window";
 import assert from "node:assert/strict";
-import { after, before, describe, it, test } from "node:test";
+import { describe, it, test } from "node:test";
 import { setRequestUrlMock } from "../mocks/obsidian";
 import { AniListClient } from "../../src/data/providers/anilist-client";
 import { BangumiClient } from "../../src/data/providers/bangumi-client";
@@ -7,20 +8,7 @@ import { OpenLibraryClient } from "../../src/data/providers/open-library-client"
 import { SerialVolumeCatalogService } from "../../src/data/serial-covers/volume-catalog-service";
 import { matchesCatalogVolume } from "../../src/domain/serial-covers/catalog";
 
-const originalWindow = globalThis.window;
-before(() => {
-  Object.defineProperty(globalThis, "window", {
-    configurable: true,
-    value: {
-      setTimeout: (handler: TimerHandler, timeout?: number) => setTimeout(handler, timeout),
-      clearTimeout: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
-    } as unknown as Window & typeof globalThis,
-  });
-});
-after(() => {
-  if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-  else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
-});
+installProviderWindow();
 
 function aniListMedia(id: number, format = "TV"): unknown {
   return {
