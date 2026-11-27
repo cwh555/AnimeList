@@ -1192,3 +1192,29 @@ test("Open Library uses an indexed full-text volume query when title-only discov
     assert.ok(output.alternatives.every(x=>x.sourceId!=="OL999M"));
   }finally{setRequestUrlMock(null);}
 });
+
+
+test("Bangumi novel discovery uses explicit category before overlapping serialization metadata", async () => {
+  const title = "無職転生 ～異世界行ったら本気だす～";
+  const calls: string[] = [];
+  setRequestUrlMock(options=>{
+    calls.push(options.url);
+    if (options.url.includes("/search/subjects")) return {json:{total:2,data:[
+      {id:101114,name:title,platform:"小说",meta_tags:["日本","小说","已完结"],infobox:[{key:"连载杂志",value:"小説家になろう"},{key:"书系",value:"MFブックス"}]},
+      {id:143597,name:title,platform:"漫画",meta_tags:["漫画","小说改"],infobox:[{key:"连载杂志",value:"月刊コミックフラッパー"}]},
+    ]}};
+    if (options.url.endsWith("/101114/subjects")) return {json:[
+      {id:100704,type:1,name:"無職転生 ~異世界行ったら本気だす~ (1)",relation:"单行本",images:{large:"https://example.invalid/1.jpg"}},
+      {id:403823,type:1,name:"無職転生 ~異世界行ったら本気だす~ (26)",relation:"单行本",images:{large:"https://example.invalid/26.jpg"}},
+      {id:143597,type:1,name:title,relation:"书籍",images:{large:"https://example.invalid/manga.jpg"}},
+    ]};
+    throw new Error("Unexpected request: "+options.url);
+  });
+  try {
+    const service=new SerialVolumeCatalogService(()=>({bangumi:true,anilist:false,openlibrary:false}),{bangumi:new BangumiClient(),openlibrary:new OpenLibraryClient()});
+    const request={mediaType:"novel" as const,originalTitle:title,queryTitle:title,aliases:[],sources:[],manual:false};
+    assert.deepEqual((await service.search({...request,label:"1"})).verified.map(x=>x.sourceId),["100704"]);
+    assert.deepEqual((await service.search({...request,label:"26"})).verified.map(x=>x.sourceId),["403823"]);
+    assert.equal(calls.length,2);
+  }finally{setRequestUrlMock(null);}
+});

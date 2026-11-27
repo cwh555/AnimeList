@@ -13,6 +13,9 @@ describe("Bangumi Book media classification", () => {
     assert.equal(bangumiBookMediaType("Book"), null);
     assert.equal(bangumiBookMediaType("漫画 小説"), null);
     assert.equal(bangumiBookMediaType("", ["漫画改"]), null);
+    assert.equal(bangumiBookMediaType("小说", ["小说"], ["连载杂志", "书系"]), "novel");
+    assert.equal(bangumiBookMediaType("漫画", ["漫画"], ["书系"]), "manga");
+    assert.equal(bangumiBookMediaType("小说", ["漫画"], ["书系"]), null);
   });
 
   it("does not present confirmed manga as novels or novels as manga", async () => {

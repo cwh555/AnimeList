@@ -3,7 +3,8 @@ import type { MediaType } from "./media-types";
 /**
  * Bangumi groups manga and novels under Book (type=1).
  * Infer only from explicit source category fields, never from work titles.
- * Unknown or conflicting evidence must not be treated as confirmed.
+ * Explicit platform/category evidence takes priority over indirect infobox keys.
+ * Unknown or conflicting evidence at the same tier must not be treated as confirmed.
  */
 export function bangumiBookMediaType(
   platform: string,
@@ -20,6 +21,9 @@ export function bangumiBookMediaType(
     if (/^(?:漫画|漫畫|コミック|マンガ|manga|comic|webtoon)$/u.test(tag)) mangaEvidence = true;
     if (/^(?:小说|小說|小説|ライトノベル|轻小说|輕小說|novel)$/u.test(tag)) novelEvidence = true;
   }
+  // Serialized novels can have a magazine field, and manga may have a book-series field.
+  // Such infobox keys cannot contradict a known explicit category.
+  if (mangaEvidence || novelEvidence) return mangaEvidence === novelEvidence ? null : mangaEvidence ? "manga" : "novel";
   for (const raw of infoboxKeys) {
     const key = raw.normalize("NFKC").trim();
     if (/^(?:连载杂志|連載雜誌|掲載誌|連載誌)$/u.test(key)) mangaEvidence = true;
