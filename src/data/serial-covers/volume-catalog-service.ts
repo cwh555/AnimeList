@@ -87,7 +87,7 @@ export class SerialVolumeCatalogService {
   private async openLibraryEditions(request: VolumeCatalogRequest, aliases: readonly string[]): Promise<SerialCoverCandidate[]> {
     const candidates: SerialCoverCandidate[] = [];
     const errors: unknown[] = [];
-    const manualAliases = [...new Set([request.queryTitle, ...aliases])];
+    const manualAliases = [...new Set([request.queryTitle, ...aliases].flatMap(title => [title, title.replace(/\s+and\s+/gi, " & "), title.replace(/\s*&\s*/g, " and ")]))];
     const volumeMatches = (edition: OpenLibraryVolumeEdition): boolean =>
       matchesCatalogVolume(edition.title, manualAliases, request.label) || matchesCatalogVolume(edition.workTitle, manualAliases, request.label);
     const collectWork = async (id: string, title: string): Promise<void> => {
@@ -102,14 +102,15 @@ export class SerialVolumeCatalogService {
     }
     if (candidates.length) return uniqueSerialCoverSources(candidates);
     const titles = [...new Set([request.queryTitle, ...aliases])].filter(Boolean).slice(0, 3);
-    if (titles[0]) titles.push(`${titles[0]} ${request.label}`);
-    for (const title of titles) {
+    const queries: { title: string; mode: "title" | "q" }[] = titles.map(title => ({ title, mode: "title" }));
+    if (titles[0]) queries.push({ title: `${titles[0]} ${request.label}`, mode: "q" });
+    for (const { title, mode } of queries) {
       let works: OpenLibraryVolumeWork[];
       try {
-        works = await this.editionCache.get(title, async () => {
-          const first = await this.clients.openlibrary.searchBookEditions(title);
+        works = await this.editionCache.get(JSON.stringify([mode, title]), async () => {
+          const first = await this.clients.openlibrary.searchBookEditions(title, 1, mode);
           if (!first.hasMore) return first.works;
-          try { return [...first.works, ...(await this.clients.openlibrary.searchBookEditions(title, 2)).works]; }
+          try { return [...first.works, ...(await this.clients.openlibrary.searchBookEditions(title, 2, mode)).works]; }
           catch (error: unknown) { errors.push(error); return first.works; }
         });
       } catch (error: unknown) { errors.push(error); break; }

@@ -64,9 +64,9 @@ export class OpenLibraryClient implements MetadataProviderClient {
   supports(mediaType: MediaType): boolean { return mediaType === "novel"; }
 
   /** Publication search: unlike Add Media, both comics and novels may have editions here. */
-  async searchBookEditions(query: string, page = 1): Promise<{ works: OpenLibraryVolumeWork[]; hasMore: boolean }> {
+  async searchBookEditions(query: string, page = 1, mode: "title" | "q" = "title"): Promise<{ works: OpenLibraryVolumeWork[]; hasMore: boolean }> {
     const fields = "key,title,cover_i,isbn,editions,editions.key,editions.title,editions.isbn,editions.cover_i";
-    const parameters = new URLSearchParams({ title: query, fields, limit: "50", page: String(page) });
+    const parameters = new URLSearchParams({ [mode]: query, fields, limit: "50", page: String(page) });
     const response = await withProviderRequestDeadline("Open Library", () => requestUrl({
       url: `${OPEN_LIBRARY_SEARCH_ENDPOINT}?${parameters.toString()}`,
       method: "GET",

@@ -1164,3 +1164,31 @@ test("manual edited title discovers an Open Library edition even when the stored
     assert.equal(output.alternatives.length,3);
   }finally{setRequestUrlMock(null);}
 });
+
+
+test("Open Library uses an indexed full-text volume query when title-only discovery omits translated editions", async () => {
+  const calls: string[] = [];
+  setRequestUrlMock(options => {
+    const url = new URL(options.url);
+    if (url.pathname === "/search.json") {
+      const q = url.searchParams.get("q");
+      calls.push(q ? "q:" + q : "title:" + url.searchParams.get("title"));
+      if (q === "Spice and Wolf 17") return {json:{numFound:3,start:0,docs:[
+        {key:"/works/OL24202662W",title:"狼と香辛料XVII Epilogue (light novel)",editions:{docs:[{key:capturedEditions[0].key,title:capturedEditions[0].title,cover_i:capturedEditions[0].covers[0]}]}},
+        {key:"/works/OL20098163W",title:"狼と香辛料 (Novel) #1-17",editions:{docs:[{key:"/books/OL999M",title:"Spice and Wolf Anniversary",cover_i:999}]}},
+        {key:"/works/OL17597290W",title:"American Film",editions:{docs:[]}},
+      ]}};
+      return {json:{numFound:0,docs:[]}};
+    }
+    if (url.pathname === "/works/OL24202662W/editions.json") return {json:{entries:capturedEditions}};
+    throw new Error("Unexpected request: " + options.url);
+  });
+  try {
+    const service = new SerialVolumeCatalogService(()=>({bangumi:false,anilist:false,openlibrary:true}),{bangumi:new BangumiClient(),openlibrary:new OpenLibraryClient()});
+    const output=await service.search({mediaType:"novel",originalTitle:"狼と香辛料",queryTitle:"Spice and Wolf",aliases:[],label:"17",manual:true,sources:[]});
+    assert.deepEqual(output.verified,[]);
+    assert.equal(output.alternatives.length,3);
+    assert.equal(calls.at(-1),"q:Spice and Wolf 17");
+    assert.ok(output.alternatives.every(x=>x.sourceId!=="OL999M"));
+  }finally{setRequestUrlMock(null);}
+});
