@@ -1218,3 +1218,28 @@ test("Bangumi novel discovery uses explicit category before overlapping serializ
     assert.equal(calls.length,2);
   }finally{setRequestUrlMock(null);}
 });
+
+
+test("concurrent catalog lookups for one series reuse the same pending relation request", async () => {
+  const calls: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const title = "ロクでなし魔術講師と禁忌教典";
+  setRequestUrlMock(async options => {
+    calls.push(options.url);
+    if (options.url.endsWith("/109635/subjects")) { await gate; return { json: capturedRelations }; }
+    if (options.url.endsWith("/109635")) return { json: { id:109635, name:title, platform:"小说" } };
+    throw new Error("Unexpected request: " + options.url);
+  });
+  try {
+    const service = new SerialVolumeCatalogService(() => ({bangumi:true,anilist:false,openlibrary:false}), {bangumi:new BangumiClient(),openlibrary:new OpenLibraryClient()});
+    const request = {mediaType:"novel" as const,originalTitle:title,queryTitle:title,aliases:[],sources:[{provider:"bangumi",sourceId:"109635",sourceUrl:""}],manual:false};
+    const first=service.search({...request,label:"1"});
+    const second=service.search({...request,label:"24"});
+    release();
+    const [one,two]=await Promise.all([first,second]);
+    assert.equal(one.verified[0]?.sourceId,"109636");
+    assert.equal(two.verified[0]?.sourceId,"453266");
+    assert.equal(calls.length,2);
+  }finally{setRequestUrlMock(null);}
+});

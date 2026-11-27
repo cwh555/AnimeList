@@ -4,11 +4,12 @@ import { expandTimelineEntries } from "../src/ui/timeline-entry-expansion";
 import { SerialCoverLoadQueue } from "../src/app/serial-covers/load-queue";
 import { SerialCoverDirectApply } from "../src/app/serial-covers/direct-apply";
 import {
-  clearSerialCoverProviderCache,
+  resetSerialCoverProviderForTests,
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
 } from "../src/data/serial-covers/provider";
 import { TFile } from "obsidian";
+import { BangumiClient } from "../src/data/providers/bangumi-client";
 import type { AnimeListFeatureHost } from "../src/app/feature-types";
 import { SerialCoverIntent } from "../src/app/serial-covers/intent";
 import { findConfiguredSerialCoverCandidates, loadMissingSerialCovers, loadConfidentSerialCover, findSerialCoverCandidates } from "../src/app/serial-covers/serial-cover-service";
@@ -41,7 +42,7 @@ test("manual cover search accepts a title with or without the current volume suf
 });
 
 test("manual cover search ranks against the edited title instead of the stored long title", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   const keywords: string[] = [];
@@ -63,7 +64,7 @@ test("manual cover search ranks against the edited title instead of the stored l
   const results = await findSerialCoverCandidates({
     mediaType: "novel",
     originalTitle: "無職転生 ～異世界行ったら本気だす～",
-  }, "20", "無職転生");
+  }, "20", "無職転生", async (type, query, page) => ({ ...await new BangumiClient().searchPage(type, query, page), warnings: [] }));
 
   assert.equal(keywords[0], "無職転生 20");
   assert.equal(results[0]?.sourceId, "267778");
@@ -184,7 +185,7 @@ function metadataCover(provider: string, sourceId: string, title: string, mediaT
 }
 
 test("manual serial cover picker combines enabled metadata providers rather than returning only Bangumi", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   const queries: Array<[string, string, number]> = [];
   const metadataSearch = async (type: "manga" | "novel", query: string, page: number) => {
@@ -209,7 +210,7 @@ test("manual serial cover picker combines enabled metadata providers rather than
 });
 
 test("configured cover lookup respects provider selection and does not contact the old Bangumi-only endpoint", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   let rawRequests = 0;
   setRequestUrlMock(async () => {
@@ -226,7 +227,7 @@ test("configured cover lookup respects provider selection and does not contact t
 });
 
 test("automatic serial lookup rejects a series-level cover when the requested volume is absent", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   const metadataSearch = async () => ({
     results: [metadataCover("anilist", "1", "無職転生")],
@@ -390,7 +391,7 @@ test("configured automatic lookup refuses ambiguous verified matches; manual kee
     async searchExternalPage() { throw new Error("offline"); },
     async downloadCover() { throw new Error("ambiguous result must not download"); },
   } as unknown as AnimeListFeatureHost;
-  clearSerialCoverProviderCache(); configureSerialCoverProvider({apiKey:""});
+  resetSerialCoverProviderForTests(); configureSerialCoverProvider({apiKey:""});
   assert.equal(await loadConfidentSerialCover(host, context, "20"), null);
   const manual = await findConfiguredSerialCoverCandidates(host, context, "20", "無職転生");
   assert.equal(manual.length, 3);
@@ -407,7 +408,7 @@ test("automatic fallback accepts source-verified explicit book types and rejects
     async searchExternalPage(){throw new Error("work-level search not expected");},
     async downloadCover(item: ExternalMediaResult){return item.sourceId+".jpg";},
   } as unknown as AnimeListFeatureHost;
-  clearSerialCoverProviderCache();configureSerialCoverProvider({apiKey:""});
+  resetSerialCoverProviderForTests();configureSerialCoverProvider({apiKey:""});
   assert.equal((await loadConfidentSerialCover(host,context,"２０"))?.cover,"safe.jpg");
   const manual=await findConfiguredSerialCoverCandidates(host,context,"20","無職転生");
   assert.equal(manual.length,3);

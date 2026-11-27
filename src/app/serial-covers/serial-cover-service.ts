@@ -3,6 +3,7 @@ import type { AnimeListFeatureHost } from "../feature-types";
 import { getScopedMarkdownFiles } from "../../data/vault-scope";
 import {
   confidentSerialCover,
+  rankManualSerialCoverCandidates,
   normalizeManualSerialCoverQuery,
   selectOriginalTitle,
   serialCoverQuery,
@@ -17,7 +18,6 @@ import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-
 import { uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
 import { matchesCatalogVolume } from "../../domain/serial-covers/catalog";
 import { storedMediaExternalResult } from "../../data/stored-media-result";
-import { rankManualSerialCoverCandidates } from "../../domain/serial-covers/ranking";
 import { serialCoverText } from "../../features/serial-covers/text";
 import type { ExternalMediaResult, MediaType } from "../../types";
 
@@ -158,8 +158,8 @@ function asMediaResult(
 export async function findSerialCoverCandidates(
   context: SerialCoverLookupContext,
   label: string,
-  queryInput?: string,
-  metadataSearch?: SerialCoverMetadataSearch,
+  queryInput: string | undefined,
+  metadataSearch: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
   const normalized = queryInput === undefined
     ? (() => {

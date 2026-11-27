@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { USER_AGENT } from "../src/app-metadata";
+import { BangumiClient } from "../src/data/providers/bangumi-client";
+import type { SerialCoverMetadataSearch } from "../src/data/serial-covers/metadata-candidates";
 import test from "node:test";
 import {
   confidentSerialCover,
@@ -17,12 +18,21 @@ import {
 import { setRequestUrlMock } from "./mocks/obsidian";
 import { directlyApplySerialCover, SerialCoverDirectApply } from "../src/app/serial-covers/direct-apply";
 import {
-  clearSerialCoverProviderCache,
+  resetSerialCoverProviderForTests,
   configureSerialCoverProvider,
   configureSerialCoverProviderForTests,
-  searchManualSerialCovers,
-  searchSerialCovers,
+  searchManualSerialCovers as searchManualConfigured,
+  searchSerialCovers as searchConfigured,
 } from "../src/data/serial-covers/provider";
+
+const bangumi = new BangumiClient();
+const metadataSearch: SerialCoverMetadataSearch = async (type, query, page) => ({
+  ...await bangumi.searchPage(type, query, page), warnings: [],
+});
+const searchSerialCovers = (query: string, title: string, label: string, type: "novel" | "manga") =>
+  searchConfigured(query, title, label, type, metadataSearch);
+const searchManualSerialCovers = (query: string, title: string, original: string, label: string, type: "novel" | "manga") =>
+  searchManualConfigured(query, title, original, label, type, metadataSearch);
 
 function bangumiSubject(options: {
   id: number;
@@ -81,51 +91,26 @@ test("missing-cover migration groups entries by work and filters nonnumeric labe
   assert.equal(missingSerialCoverEntryCount(works), 3);
 });
 
-test("Bangumi lookup retries 429 and preserves one exact query", async () => {
-  clearSerialCoverProviderCache();
-  configureSerialCoverProvider({ apiKey: "" });
+test("Google Books retries 429 using the exact query and configured API key", async () => {
+  resetSerialCoverProviderForTests();
+  configureSerialCoverProvider({ apiKey: "test-key" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
-  const requests: Array<Record<string, unknown>> = [];
-  let attempts = 0;
-  setRequestUrlMock(async (options) => {
-    requests.push(options as Record<string, unknown>);
-    attempts += 1;
-    if (attempts === 1) {
-      const error = new Error("Request failed with status 429") as Error & { status: number };
-      error.status = 429;
-      throw error;
-    }
-    return { json: { data: [bangumiSubject({ id: 5, title: "寄宿学校のジュリエット (5)", platform: "小说" })] } };
+  const requests: URL[] = [];
+  setRequestUrlMock(options => {
+    requests.push(new URL(options.url));
+    if (requests.length === 1) throw Object.assign(new Error("429"), { status: 429 });
+    return { json: { items: [{ id: "google-5", volumeInfo: { title: "作品 5", imageLinks: { thumbnail: "https://cover/5.jpg" } } }] } };
   });
-  const result = await searchSerialCovers("寄宿学校のジュリエット 5", "寄宿学校のジュリエット", "5", "novel");
-  assert.equal(attempts, 2);
-  assert.equal(result[0]?.sourceId, "5");
-  for (const request of requests) {
-    assert.equal(request.url, "https://api.bgm.tv/v0/search/subjects?limit=50&offset=0");
-    assert.equal((request.headers as Record<string, string> | undefined)?.["User-Agent"], USER_AGENT);
-    const body = JSON.parse(String(request.body)) as { keyword: string };
-    assert.equal(body.keyword, "寄宿学校のジュリエット 5");
-  }
-});
-
-test("serial cover provider coalesces duplicate concurrent queries", async () => {
-  clearSerialCoverProviderCache();
-  configureSerialCoverProvider({ apiKey: "" });
-  configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
-  let calls = 0;
-  setRequestUrlMock(async () => {
-    calls += 1;
-    return { json: { data: [] } };
-  });
-  await Promise.all([
-    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
-    searchSerialCovers("無職転生 ～異世界行ったら本気だす～ 1", "無職転生 ～異世界行ったら本気だす～", "1", "novel"),
-  ]);
-  assert.equal(calls, 2);
+  try {
+    const result = await searchConfigured("作品 5", "作品", "5", "novel", async () => ({ results: [], warnings: [], hasMore: false }));
+    assert.equal(result[0]?.sourceId, "google-5");
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every(url => url.hostname === "www.googleapis.com" && url.searchParams.get("q") === "作品 5" && url.searchParams.get("key") === "test-key"));
+  } finally { configureSerialCoverProvider({ apiKey: "" }); setRequestUrlMock(null); }
 });
 
 test("Bangumi media type removes manga duplicates and spin-offs", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   setRequestUrlMock(async () => ({
@@ -143,7 +128,7 @@ test("Bangumi media type removes manga duplicates and spin-offs", async () => {
 });
 
 test("Bangumi ranking selects the main light novel instead of a same-number spin-off", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   setRequestUrlMock(async () => ({
@@ -161,7 +146,7 @@ test("Bangumi ranking selects the main light novel instead of a same-number spin
 });
 
 test("Google Books is an optional fallback and keeps the exact query", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "project-key" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   const requests: Array<Record<string, unknown>> = [];
@@ -181,7 +166,7 @@ test("Google Books is an optional fallback and keeps the exact query", async () 
 });
 
 test("without a Google key, an empty Bangumi result does not call Google Books", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   const urls: string[] = [];
@@ -191,11 +176,11 @@ test("without a Google key, an empty Bangumi result does not call Google Books",
   });
   const result = await searchSerialCovers("不存在的作品 1", "不存在的作品", "1", "novel");
   assert.deepEqual(result, []);
-  assert.deepEqual(urls, ["https://api.bgm.tv/v0/search/subjects?limit=50&offset=0"]);
+  assert.deepEqual(urls, ["https://api.bgm.tv/v0/search/subjects?limit=20&offset=0"]);
 });
 
-test("Bangumi unknown book platform falls back to requested novel type", async () => {
-  clearSerialCoverProviderCache();
+test("Bangumi unknown book platform preserves unknown evidence", async () => {
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   setRequestUrlMock(async () => ({
@@ -210,11 +195,11 @@ test("Bangumi unknown book platform falls back to requested novel type", async (
   }));
   const result = await searchSerialCovers("六畳間の侵略者！？ 1", "六畳間の侵略者！？", "1", "novel");
   assert.equal(result[0]?.sourceId, "116027");
-  assert.equal(result[0]?.mediaTypeHint, "novel");
+  assert.equal(result[0]?.mediaTypeHint, undefined);
 });
 
 test("Bangumi known media type is preferred before unknown duplicate", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   setRequestUrlMock(async () => ({
@@ -252,7 +237,7 @@ test("serial cover ranking prefers an explicitly numbered first volume", () => {
 
 
 test("Bangumi retries a shortened series query when the exact long title misses a high volume", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   const keywords: string[] = [];
@@ -337,7 +322,7 @@ test("manual ranking prioritizes the stored original title without filtering bro
 });
 
 test("manual provider keeps broad results instead of requiring automatic confidence", async () => {
-  clearSerialCoverProviderCache();
+  resetSerialCoverProviderForTests();
   configureSerialCoverProvider({ apiKey: "" });
   configureSerialCoverProviderForTests({ sleep: async () => undefined, random: () => 0 });
   setRequestUrlMock(async () => ({
