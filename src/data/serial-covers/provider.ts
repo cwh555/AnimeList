@@ -1,9 +1,6 @@
 import { requestUrl } from "obsidian";
-import { USER_AGENT } from "../../app-metadata";
 import { searchMetadataCoverCandidates, uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "./metadata-candidates";
-import { bangumiBookMediaType } from "../../domain/bangumi-book-type";
 import {
-  confidentSerialCover,
   manualSerialCoverQueries,
   rankManualSerialCoverCandidates,
   rankSerialCoverCandidates,
@@ -12,18 +9,13 @@ import {
   type SerialCoverCandidate,
 } from "../../domain/serial-covers/ranking";
 
-const SUCCESS_CACHE_TTL_MS = 30 * 60 * 1000;
-const EMPTY_CACHE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_INTERVAL_MS = 750;
 const MAX_ATTEMPTS = 5;
-const BANGUMI_SEARCH_URL = "https://api.bgm.tv/v0/search/subjects";
 const GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes";
 
 type SerialMediaType = "manga" | "novel";
 type RequestOptions = Parameters<typeof requestUrl>[0];
 
-const resultCache = new Map<string, { expiresAt: number; value: RankedSerialCoverCandidate[] }>();
-const inFlight = new Map<string, Promise<RankedSerialCoverCandidate[]>>();
 let queueTail: Promise<void> = Promise.resolve();
 let nextRequestAt = 0;
 let sleep = (milliseconds: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -42,53 +34,6 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function text(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
-function comparable(value: unknown): string {
-  return text(value).normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
-}
-
-function infoboxValues(value: unknown, keys: string[]): string[] {
-  const wanted = new Set(keys.map((key) => key.toLocaleLowerCase()));
-  const output: string[] = [];
-  for (const raw of asArray(value)) {
-    const row = record(raw);
-    if (!row || !wanted.has(text(row.key).toLocaleLowerCase())) continue;
-    const rawValue = row.value;
-    for (const entry of Array.isArray(rawValue) ? rawValue : [rawValue]) {
-      const nested = record(entry);
-      const candidate = nested ? text(nested.v ?? nested.k) : text(entry);
-      if (candidate && !output.includes(candidate)) output.push(candidate);
-    }
-  }
-  return output;
-}
-
-function bangumiCandidate(value: unknown): SerialCoverCandidate | null {
-  const item = record(value);
-  const images = record(item?.images);
-  const sourceId = text(item?.id);
-  const title = text(item?.name).trim();
-  const coverUrl = text(images?.large)
-    || text(images?.common)
-    || text(images?.medium)
-    || text(images?.small)
-    || text(images?.grid);
-  if (!item || !sourceId || !title || !coverUrl) return null;
-  const platform = text(item.platform);
-  const metaTags = asArray(item.meta_tags).map(text).filter(Boolean);
-  const infoboxKeys = asArray(item.infobox).map(row => text(record(row)?.key));
-  return {
-    provider: "Bangumi",
-    sourceId,
-    title,
-    coverUrl: coverUrl.replace(/^http:/, "https:"),
-    infoUrl: `https://bgm.tv/subject/${sourceId}`,
-    categories: [platform, ...metaTags].filter(Boolean),
-    authors: infoboxValues(item.infobox, ["作者", "原作", "作画", "插图", "插畫"]),
-    publisher: infoboxValues(item.infobox, ["出版社"])[0] ?? "",
-    mediaTypeHint: bangumiBookMediaType(platform, metaTags, infoboxKeys) ?? undefined,
-  };
 }
 
 function googleBookCandidate(value: unknown): SerialCoverCandidate | null {
@@ -168,46 +113,6 @@ async function requestWithBackoff(options: RequestOptions): Promise<unknown> {
   throw lastError;
 }
 
-function deduplicateCandidates(candidates: SerialCoverCandidate[]): SerialCoverCandidate[] {
-  const seen = new Set<string>();
-  const output: SerialCoverCandidate[] = [];
-  for (const candidate of candidates) {
-    const key = `${candidate.mediaTypeHint ?? "unknown"}:${comparable(candidate.title)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    output.push(candidate);
-  }
-  return output;
-}
-
-async function searchBangumi(
-  query: string,
-  mediaType: SerialMediaType,
-  strictMediaType = true,
-): Promise<SerialCoverCandidate[]> {
-  const payload = record(await requestWithBackoff({
-    url: `${BANGUMI_SEARCH_URL}?limit=50&offset=0`,
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "User-Agent": USER_AGENT,
-    },
-    body: JSON.stringify({ keyword: query, sort: "match", filter: { type: [1] } }),
-  }));
-  const opposite = mediaType === "novel" ? "manga" : "novel";
-  const candidates = asArray(payload?.data)
-    .map(bangumiCandidate)
-    .filter((candidate): candidate is SerialCoverCandidate => (
-      candidate !== null && (!strictMediaType || candidate.mediaTypeHint !== opposite)
-    ))
-    .sort((left, right) => Number(right.mediaTypeHint === mediaType) - Number(left.mediaTypeHint === mediaType))
-    .map((candidate) => candidate.mediaTypeHint
-      ? candidate
-      : { ...candidate, mediaTypeHint: mediaType });
-  return deduplicateCandidates(candidates);
-}
-
 async function searchGoogleBooks(query: string): Promise<SerialCoverCandidate[]> {
   if (!apiKey) return [];
   const parameters = new URLSearchParams({
@@ -224,7 +129,7 @@ async function searchGoogleBooks(query: string): Promise<SerialCoverCandidate[]>
     method: "GET",
     headers: { Accept: "application/json" },
   }));
-  return deduplicateCandidates(asArray(payload?.items)
+  return uniqueSerialCoverSources(asArray(payload?.items)
     .map(googleBookCandidate)
     .filter((candidate): candidate is SerialCoverCandidate => candidate !== null));
 }
@@ -263,133 +168,19 @@ async function searchConfiguredCoverSources(
   return candidates;
 }
 
-async function requestSerialCovers(
-  query: string,
-  originalTitle: string,
-  label: string,
-  mediaType: SerialMediaType,
-  metadataSearch?: SerialCoverMetadataSearch,
-): Promise<RankedSerialCoverCandidate[]> {
-  const queries: string[] = [];
-  const seenQueries = new Set<string>();
-  for (const candidateQuery of [query, ...serialCoverQueries(originalTitle, label)]) {
-    const key = candidateQuery.normalize("NFKC").trim();
-    if (!key || seenQueries.has(key)) continue;
-    seenQueries.add(key);
-    queries.push(candidateQuery);
-  }
-  if (metadataSearch) {
-    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, originalTitle, label);
-    return rankSerialCoverCandidates(candidates, originalTitle, label, mediaType);
-  }
-  let bangumiCandidates: SerialCoverCandidate[] = [];
-  let bangumiError: unknown;
-
-  for (const bangumiQuery of queries) {
-    try {
-      bangumiCandidates = deduplicateCandidates([
-        ...bangumiCandidates,
-        ...await searchBangumi(bangumiQuery, mediaType),
-      ]);
-    } catch (error) {
-      bangumiError ??= error;
-      continue;
-    }
-    const ranked = rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
-    if (confidentSerialCover(ranked)) return ranked;
-  }
-
-  const rankedBangumi = rankSerialCoverCandidates(bangumiCandidates, originalTitle, label, mediaType);
-  if (rankedBangumi.length > 0) return rankedBangumi;
-  if (apiKey) {
-    const googleCandidates = await searchGoogleBooks(query);
-    if (googleCandidates.length > 0) {
-      return rankSerialCoverCandidates(googleCandidates, originalTitle, label, mediaType);
-    }
-  }
-  if (bangumiError !== undefined) throw bangumiError;
-  return [];
-}
-
-async function requestManualSerialCovers(
-  query: string,
-  queryTitle: string,
-  referenceTitle: string,
-  label: string,
-  mediaType: SerialMediaType,
-  metadataSearch?: SerialCoverMetadataSearch,
-): Promise<RankedSerialCoverCandidate[]> {
-  const queries: string[] = [];
-  const seenQueries = new Set<string>();
-  for (const candidateQuery of [
-    query,
-    ...manualSerialCoverQueries(queryTitle, label),
-    ...manualSerialCoverQueries(referenceTitle, label),
-  ]) {
-    const key = candidateQuery.normalize("NFKC").trim();
-    if (!key || seenQueries.has(key)) continue;
-    seenQueries.add(key);
-    queries.push(candidateQuery);
-  }
-
-  if (metadataSearch) {
-    const candidates = await searchConfiguredCoverSources(metadataSearch, mediaType, queries, queryTitle, label);
-    return rankManualSerialCoverCandidates(candidates, queryTitle, label, mediaType, referenceTitle);
-  }
-
-  let bangumiCandidates: SerialCoverCandidate[] = [];
-  let bangumiError: unknown;
-  for (const bangumiQuery of queries) {
-    try {
-      bangumiCandidates = deduplicateCandidates([
-        ...bangumiCandidates,
-        ...await searchBangumi(bangumiQuery, mediaType, false),
-      ]);
-    } catch (error) {
-      bangumiError ??= error;
-    }
-  }
-
-  if (bangumiCandidates.length > 0) {
-    return rankManualSerialCoverCandidates(bangumiCandidates, queryTitle, label, mediaType, referenceTitle);
-  }
-  if (apiKey) {
-    const googleCandidates = await searchGoogleBooks(query);
-    if (googleCandidates.length > 0) {
-      return rankManualSerialCoverCandidates(googleCandidates, queryTitle, label, mediaType, referenceTitle);
-    }
-  }
-  if (bangumiError !== undefined) throw bangumiError;
-  return [];
-}
-
+/** The only text-search path; provider enablement is owned by the supplied host adapter. */
 export async function searchSerialCovers(
   query: string,
   originalTitle: string,
   label: string,
   mediaType: SerialMediaType,
-  metadataSearch?: SerialCoverMetadataSearch,
+  metadataSearch: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
-  // The host owns provider enablement and localization; do not reuse cached
-  // candidates after those settings change.
-  if (metadataSearch) return enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType, metadataSearch));
-  const key = `${mediaType}:${query.normalize("NFKC").trim()}`;
-  const cached = resultCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = inFlight.get(key);
-  if (pending !== undefined) return pending;
-
-  const request = enqueue(() => requestSerialCovers(query, originalTitle, label, mediaType))
-    .then((value) => {
-      resultCache.set(key, {
-        expiresAt: Date.now() + (value.length ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS),
-        value,
-      });
-      return value;
-    })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, request);
-  return request;
+  const queries = uniqueQueries([query, ...serialCoverQueries(originalTitle, label)]);
+  return enqueue(async () => rankSerialCoverCandidates(
+    await searchConfiguredCoverSources(metadataSearch, mediaType, queries, originalTitle, label),
+    originalTitle, label, mediaType,
+  ));
 }
 
 export async function searchManualSerialCovers(
@@ -398,33 +189,26 @@ export async function searchManualSerialCovers(
   referenceTitle: string,
   label: string,
   mediaType: SerialMediaType,
-  metadataSearch?: SerialCoverMetadataSearch,
+  metadataSearch: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
-  if (metadataSearch) {
-    return enqueue(() => requestManualSerialCovers(query, queryTitle, referenceTitle, label, mediaType, metadataSearch));
-  }
-  const key = `manual:${mediaType}:${query.normalize("NFKC").trim()}:${referenceTitle.normalize("NFKC").trim()}`;
-  const cached = resultCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = inFlight.get(key);
-  if (pending !== undefined) return pending;
-
-  const request = enqueue(() => requestManualSerialCovers(query, queryTitle, referenceTitle, label, mediaType))
-    .then((value) => {
-      resultCache.set(key, {
-        expiresAt: Date.now() + (value.length ? SUCCESS_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS),
-        value,
-      });
-      return value;
-    })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, request);
-  return request;
+  const queries = uniqueQueries([query, ...manualSerialCoverQueries(queryTitle, label), ...manualSerialCoverQueries(referenceTitle, label)]);
+  return enqueue(async () => rankManualSerialCoverCandidates(
+    await searchConfiguredCoverSources(metadataSearch, mediaType, queries, queryTitle, label),
+    queryTitle, label, mediaType, referenceTitle,
+  ));
 }
 
-export function clearSerialCoverProviderCache(): void {
-  resultCache.clear();
-  inFlight.clear();
+function uniqueQueries(queries: readonly string[]): string[] {
+  const seen = new Set<string>();
+  return queries.filter(query => {
+    const key = query.normalize("NFKC").trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function resetSerialCoverProviderForTests(): void {
   queueTail = Promise.resolve();
   nextRequestAt = 0;
 }
@@ -441,5 +225,4 @@ export function configureSerialCoverProvider(options: { apiKey?: string }): void
   const nextKey = options.apiKey?.trim() ?? "";
   if (nextKey === apiKey) return;
   apiKey = nextKey;
-  clearSerialCoverProviderCache();
 }

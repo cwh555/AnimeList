@@ -343,3 +343,15 @@ describe("external media search service", () => {
   });
 
 });
+
+
+it("publication fallback consumes untruncated provider pages without changing work search page limits", async () => {
+  const service = new ExternalMediaSearchService(() => ({ bangumi: true, anilist: false, openlibrary: false }), clients({
+    bangumi: client("bangumi", "Bangumi", () => true, async () => ({ results: Array.from({ length: 40 }, (_, i) => result("bangumi", String(i), "Title " + i, "novel")), hasMore: true })),
+  }));
+  const raw = await service.searchProviderPage("novel", "Title", 1);
+  assert.equal(raw.results.length, 40);
+  assert.equal(raw.results[39].sourceId, "39");
+  assert.equal(raw.hasMore, true);
+  assert.equal((await service.searchPage("novel", "Title", 1)).results.length, 24);
+});

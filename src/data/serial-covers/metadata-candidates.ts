@@ -25,10 +25,23 @@ export async function searchMetadataCoverCandidates(
   mediaType: SerialCoverMediaType,
   query: string,
 ): Promise<SerialCoverCandidate[]> {
-  const page = await search(mediaType, query, 1);
+  const results: ExternalMediaSearchPage["results"] = [];
+  const warnings: string[] = [];
+  for (let index = 1; index <= 3; index += 1) {
+    try {
+      const page = await search(mediaType, query, index);
+      results.push(...page.results);
+      warnings.push(...page.warnings);
+      if (!page.hasMore) break;
+    } catch (error: unknown) {
+      warnings.push(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown provider error");
+      break;
+    }
+  }
+  if (!results.length && warnings.length) throw new Error([...new Set(warnings)].join("; "));
   const seen = new Set<string>();
   const candidates: SerialCoverCandidate[] = [];
-  for (const result of page.results) {
+  for (const result of results) {
     if (result.mediaType !== mediaType || !result.coverUrl) continue;
     const provider = result.provider.trim();
     const id = result.sourceId.trim();
@@ -45,7 +58,7 @@ export async function searchMetadataCoverCandidates(
       infoUrl: result.sourceUrl,
       categories: [...result.platforms, ...result.genres],
       authors: result.people,
-      mediaTypeHint: mediaType,
+      mediaTypeHint: result.bookMediaTypeEvidence,
     });
   }
   return candidates;

@@ -90,8 +90,7 @@ export class UserTagManagerModal extends AnimeListModal {
     addInput.type = "text";
     addInput.placeholder = userTagText("manager.addPlaceholder");
     addInput.autocomplete = "off";
-    const addButton = makeEl("button", "mod-cta", userTagText("manager.add"));
-    addButton.type = "button";
+    const addButton = createUiAction(userTagText("manager.add"), "primary");
     const addTag = async (): Promise<void> => {
       const tag = normalizeUserTag(addInput.value);
       if (!tag) return;
@@ -120,8 +119,7 @@ export class UserTagManagerModal extends AnimeListModal {
     this.renderTagRows(searchInput);
 
     const actions = makeEl("div", "al-modal-actions");
-    const close = makeEl("button", "", userTagText("manager.close"));
-    close.type = "button";
+    const close = createUiAction(userTagText("manager.close"));
     close.addEventListener("click", () => this.close());
     actions.appendChild(close);
     this.contentEl.appendChild(actions);

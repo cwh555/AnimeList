@@ -1,3 +1,4 @@
+import { createUiAction } from "../ui-primitives";
 import { AnimeListModal } from "../animelist-modal";
 import { Notice, type Plugin } from "obsidian";
 import type {
@@ -100,16 +101,13 @@ export class SerialCoverMigrationModal extends AnimeListModal {
     report.hidden = true;
 
     const footer = this.contentEl.createDiv({ cls: "al-modal-actions al-serial-cover-migration-actions" });
-    const copyButton = footer.createEl("button", { text: serialCoverText("settings.copy") });
-    copyButton.type = "button";
+    const copyButton = createUiAction(serialCoverText("settings.copy"));
+    footer.appendChild(copyButton);
     copyButton.hidden = true;
-    const cancelButton = footer.createEl("button", { text: serialCoverText("settings.cancel") });
-    cancelButton.type = "button";
-    const closeButton = footer.createEl("button", {
-      cls: "mod-cta",
-      text: serialCoverText("settings.close"),
-    });
-    closeButton.type = "button";
+    const cancelButton = createUiAction(serialCoverText("settings.cancel"));
+    footer.appendChild(cancelButton);
+    const closeButton = createUiAction(serialCoverText("settings.close"), "primary");
+    footer.appendChild(closeButton);
     closeButton.disabled = true;
 
     let reportText = "";

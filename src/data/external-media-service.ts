@@ -158,16 +158,20 @@ export class ExternalMediaSearchService {
       return { results, warnings: [...new Set(warnings)], hasMore: session.hasMore };
     }
 
+    const raw = await this.searchProviderPage(mediaType, query, page);
+    return { ...raw, results: rankSearchResults(dedupeSearchResults(raw.results), query).slice(0, PAGE_RESULT_LIMIT) };
+  }
+
+  /** Publication matching consumes provider results before work-level ranking or truncation. */
+  async searchProviderPage(mediaType: MediaType, query: string, page: number): Promise<ExternalMediaSearchPage> {
+    const providers = this.enabledProviders(mediaType);
+    if (!providers.length) return { results: [], warnings: [searchFeatureText("provider.noneEnabled")], hasMore: false };
     const settled = await Promise.all(
       providers.map(client => providerTask(client.label, client.searchPage(mediaType, query, page))),
     );
-    const warnings = settled
-      .filter(entry => entry.error !== undefined)
-      .map(entry => `${entry.provider}: ${errorMessage(entry.error)}`);
-    const merged = dedupeSearchResults(settled.flatMap(entry => entry.page?.results ?? []));
     return {
-      results: rankSearchResults(merged, query).slice(0, PAGE_RESULT_LIMIT),
-      warnings,
+      results: settled.flatMap(entry => entry.page?.results ?? []),
+      warnings: settled.filter(entry => entry.error !== undefined).map(entry => `${entry.provider}: ${errorMessage(entry.error)}`),
       hasMore: settled.some(entry => entry.page?.hasMore === true),
     };
   }

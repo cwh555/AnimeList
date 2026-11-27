@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import { App, TFile } from "obsidian";
 import type { ExternalMediaResult, MediaNoteForm } from "../../src/domain/media-types";
 import { createDefaultSettings } from "../../src/app/settings-model";
+import { setRequestUrlMock } from "../mocks/obsidian";
+import { remoteCoverExtension } from "../../src/domain/remote-cover-format";
 import { MediaNoteService } from "../../src/data/media-note-service";
 import type { MediaRepository } from "../../src/data/media-repository";
 import type { LibraryStorage } from "../../src/data/library-storage";
@@ -245,4 +247,35 @@ describe("media note service", () => {
     assert.deepEqual(trashed, [cover.path]);
   });
 
+});
+
+
+it("remote cover storage recognizes image bytes and rejects error pages before writing", async () => {
+  const writes: string[] = [];
+  const app = { vault: { async createBinary(path: string) { writes.push(path); return new TFile(); } } } as unknown as App;
+  const storage = { async ensureFolder() {}, async uniqueFilePath(_folder: string, _name: string, ext: string) { return "cover." + ext; } } as unknown as LibraryStorage;
+  const service = new MediaNoteService(app, createDefaultSettings, {} as MediaRepository, storage,
+    { async optimizeFile() {} }, { async openMediaFile() {}, refreshViews() {} });
+  const result = { ...externalResult(), coverUrl: "https://example.invalid/cover.jpg" };
+  try {
+    setRequestUrlMock(() => ({ status: 200, headers: { "Content-Type": "image/jpeg" }, arrayBuffer: new TextEncoder().encode("<html>rate limited</html>").buffer }));
+    await assert.rejects(() => service.downloadCover(result), /supported raster image/);
+    assert.deepEqual(writes, []);
+    setRequestUrlMock(() => ({ status: 404, headers: {}, arrayBuffer: new Uint8Array([255, 216, 255]).buffer }));
+    await assert.rejects(() => service.downloadCover(result), /404/);
+    assert.deepEqual(writes, []);
+    setRequestUrlMock(() => ({ status: 200, headers: { "Content-Type": "application/octet-stream" }, arrayBuffer: new Uint8Array([137,80,78,71,13,10,26,10]).buffer }));
+    assert.equal(await service.downloadCover(result), "cover.png");
+    assert.deepEqual(writes, ["cover.png"]);
+  } finally { setRequestUrlMock(null); }
+});
+
+it("cover signature validation covers JPEG, PNG, WebP, GIF, AVIF, empty and oversized data", () => {
+  assert.equal(remoteCoverExtension(new Uint8Array([255,216,255]).buffer), "jpg");
+  assert.equal(remoteCoverExtension(new Uint8Array([137,80,78,71,13,10,26,10]).buffer), "png");
+  assert.equal(remoteCoverExtension(new TextEncoder().encode("RIFF0000WEBP").buffer), "webp");
+  assert.equal(remoteCoverExtension(new TextEncoder().encode("GIF89a").buffer), "gif");
+  assert.equal(remoteCoverExtension(new TextEncoder().encode("0000ftypavif").buffer), "avif");
+  assert.throws(() => remoteCoverExtension(new ArrayBuffer(0)), /nonempty/);
+  assert.throws(() => remoteCoverExtension(new ArrayBuffer(20*1024*1024+1)), /20 MB/);
 });

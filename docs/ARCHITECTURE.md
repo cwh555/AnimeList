@@ -58,6 +58,7 @@ Application wiring may compose services, but it must not implement provider norm
 - `providers/ndl-release-client.ts`: NDL/JPRO publication discovery for novels.
 - `external-media-provider.ts`: shared provider/page contracts and enabled-provider selection.
 - `metadata-provider-clients.ts`: constructs the concrete Bangumi, AniList, and Open Library clients.
+- `domain/serial-covers/catalog.ts` and `data/serial-covers/volume-catalog-service.ts`: volume identity matching and cached series/edition discovery using the shared metadata clients. The application service wires this into manual, automatic and recovery cover flows; the work-search service exposes raw provider pages for publication fallback without changing work-search pagination.
 - `data/serial-covers/metadata-candidates.ts` adapts configured metadata search results into cover candidates; `data/serial-covers/provider.ts` combines them with optional Google Books and retains strict automatic entry matching. Manual selection can include lower-confidence artwork.
 - `provider-normalizers.ts`: pure provider payload normalization, plus a thin call to typed, identity-safe result deduplication; no fuzzy source-ID inference.
 - `media-classification-service.ts`: optional exact-AniList-ID classification enrichment after a work is selected. Title/year matching alone is not evidence of cross-provider identity; failure never blocks note creation.

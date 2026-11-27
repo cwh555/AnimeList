@@ -3,6 +3,7 @@ import type { AnimeListFeatureHost } from "../feature-types";
 import { getScopedMarkdownFiles } from "../../data/vault-scope";
 import {
   confidentSerialCover,
+  rankManualSerialCoverCandidates,
   normalizeManualSerialCoverQuery,
   selectOriginalTitle,
   serialCoverQuery,
@@ -14,7 +15,9 @@ import {
   type MissingSerialCoverRecord,
 } from "../../domain/serial-covers/migration";
 import { searchManualSerialCovers, searchSerialCovers } from "../../data/serial-covers/provider";
-import type { SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
+import { uniqueSerialCoverSources, type SerialCoverMetadataSearch } from "../../data/serial-covers/metadata-candidates";
+import { matchesCatalogVolume } from "../../domain/serial-covers/catalog";
+import { storedMediaExternalResult } from "../../data/stored-media-result";
 import { serialCoverText } from "../../features/serial-covers/text";
 import type { ExternalMediaResult, MediaType } from "../../types";
 
@@ -28,6 +31,7 @@ export interface StoredSerialCover {
 export interface SerialCoverLookupContext {
   mediaType: "manga" | "novel";
   originalTitle: string;
+  work?: ExternalMediaResult;
 }
 
 export interface SerialCoverMigrationDetail {
@@ -154,8 +158,8 @@ function asMediaResult(
 export async function findSerialCoverCandidates(
   context: SerialCoverLookupContext,
   label: string,
-  queryInput?: string,
-  metadataSearch?: SerialCoverMetadataSearch,
+  queryInput: string | undefined,
+  metadataSearch: SerialCoverMetadataSearch,
 ): Promise<RankedSerialCoverCandidate[]> {
   const normalized = queryInput === undefined
     ? (() => {
@@ -176,6 +180,49 @@ export async function findSerialCoverCandidates(
     );
 }
 
+/** Both editor and maintenance share the same catalog-first lookup. */
+export async function findConfiguredSerialCoverCandidates(
+  plugin: AnimeListFeatureHost,
+  context: SerialCoverLookupContext,
+  label: string,
+  queryInput?: string,
+): Promise<RankedSerialCoverCandidate[]> {
+  const lookupLabel = label.normalize("NFKC").trim();
+  const metadataSearch: SerialCoverMetadataSearch = (mediaType, query, page) => plugin.searchSerialVolumePage?.(mediaType, query, page) ?? plugin.searchExternalPage(mediaType, query, page);
+  const fallback = () => findSerialCoverCandidates(context, lookupLabel, queryInput ?? context.originalTitle, metadataSearch);
+  if (!plugin.searchSerialVolumeCatalog) return findSerialCoverCandidates(context, lookupLabel, queryInput, metadataSearch);
+  const normalized = queryInput === undefined
+    ? (serialCoverQuery(context.originalTitle, lookupLabel) ? { title: context.originalTitle } : null)
+    : normalizeManualSerialCoverQuery(queryInput, lookupLabel);
+  if (!normalized) return [];
+  const work = context.work;
+  const aliases = [...new Set([work?.title ?? "", work?.originalTitle ?? "", work?.romajiTitle ?? "", ...(work?.searchTitles ?? [])].filter(Boolean))];
+  const catalog = await plugin.searchSerialVolumeCatalog({
+    mediaType: context.mediaType, originalTitle: context.originalTitle, aliases,
+    sources: [...(work?.sources ?? []), ...(work?.sourceId ? [{ provider: work.provider, sourceId: work.sourceId, sourceUrl: work.sourceUrl }] : [])],
+    queryTitle: normalized.title, label: lookupLabel, manual: queryInput !== undefined,
+  }).catch((error: unknown) => ({ verified: [], alternatives: [], warnings: [error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown catalog error"] }));
+  const rank = (items: Parameters<typeof rankManualSerialCoverCandidates>[0]) =>
+    rankManualSerialCoverCandidates(items, normalized.title, lookupLabel, context.mediaType, context.originalTitle);
+  const verified = rank(catalog.verified).map(candidate => ({ ...candidate, score: candidate.score + 100 }));
+  if (queryInput === undefined && verified.length) return verified;
+  let other: RankedSerialCoverCandidate[] = [];
+  try { other = await fallback(); }
+  catch (error) {
+    if (queryInput === undefined || (!verified.length && !catalog.alternatives.length)) throw error;
+  }
+  if (queryInput === undefined) {
+    const exact = other.filter(candidate => matchesCatalogVolume(candidate.title, [context.originalTitle, ...aliases], lookupLabel)
+      && candidate.mediaTypeHint === context.mediaType);
+    if (!exact.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
+    return exact;
+  }
+  const results = uniqueSerialCoverSources([...verified, ...rank(catalog.alternatives), ...other])
+    .sort((left, right) => right.score - left.score);
+  if (!results.length && catalog.warnings.length) throw new Error(catalog.warnings.join("; "));
+  return results;
+}
+
 export async function downloadSelectedSerialCover(
   plugin: AnimeListFeatureHost,
   context: SerialCoverLookupContext,
@@ -183,6 +230,7 @@ export async function downloadSelectedSerialCover(
   manual: boolean,
 ): Promise<StoredSerialCover> {
   const cover = await plugin.downloadCover(asMediaResult(candidate, context.mediaType));
+  if (!cover.trim()) throw new Error("No cover was downloaded.");
   return {
     cover,
     provider: candidate.provider,
@@ -196,26 +244,14 @@ export async function loadConfidentSerialCover(
   context: SerialCoverLookupContext,
   label: string,
 ): Promise<StoredSerialCover | null> {
-  const candidates = await findSerialCoverCandidates(
-    context, label, undefined, (mediaType, query, page) => plugin.searchExternalPage(mediaType, query, page),
-  );
+  const candidates = await findConfiguredSerialCoverCandidates(plugin, context, label);
   const candidate = confidentSerialCover(candidates);
   return candidate ? downloadSelectedSerialCover(plugin, context, candidate, false) : null;
 }
 
-async function resolveOriginalTitle(
-  plugin: AnimeListFeatureHost,
-  mediaType: "manga" | "novel",
-  frontmatter: Record<string, unknown>,
-): Promise<string | null> {
-  const stored = selectOriginalTitle(frontmatter.title_original, frontmatter.title_aliases);
-  if (stored) return stored;
-  const title = text(frontmatter.title).trim();
-  if (!title) return null;
-  const results = await plugin.searchAniList(mediaType, title);
-  return results
-    .map((result) => selectOriginalTitle(result.originalTitle, result.searchTitles))
-    .find((value): value is string => Boolean(value)) ?? null;
+function resolveCoverSearchTitle(frontmatter: Record<string, unknown>): string | null {
+  return selectOriginalTitle(frontmatter.title_original, frontmatter.title_aliases)
+    ?? (text(frontmatter.title).trim() || null);
 }
 
 function summary(total: number, details: SerialCoverMigrationDetail[]): SerialCoverMigrationSummary {
@@ -271,22 +307,7 @@ export async function loadMissingSerialCovers(
       message: `${serialCoverText("migration.resolving")} · ${work.title}`,
     });
 
-    let original: string | null;
-    try {
-      original = await resolveOriginalTitle(plugin, work.mediaType, frontmatter);
-      if (original && !text(frontmatter.title_original)) {
-        await plugin.app.fileManager.processFrontMatter(file, (next) => {
-          next.title_original = original;
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      for (const label of work.labels) {
-        details.push({ filePath: file.path, title: work.title, label, status: "failed", message });
-        completed += 1;
-      }
-      continue;
-    }
+    const original = resolveCoverSearchTitle(frontmatter);
 
     if (!original) {
       for (const label of work.labels) {
@@ -302,7 +323,7 @@ export async function loadMissingSerialCovers(
       continue;
     }
 
-    const context = { mediaType: work.mediaType, originalTitle: original };
+    const context = { mediaType: work.mediaType, originalTitle: original, work: storedMediaExternalResult(frontmatter, work.mediaType) };
     for (const label of work.labels) {
       if (signal?.aborted) break;
       onProgress?.({
@@ -314,6 +335,7 @@ export async function loadMissingSerialCovers(
       try {
         const cover = await loadConfidentSerialCover(plugin, context, label);
         if (!cover) {
+          if (signal?.aborted) break;
           details.push({
             filePath: file.path,
             title: work.title,
@@ -322,32 +344,40 @@ export async function loadMissingSerialCovers(
             message: serialCoverText("notFound"),
           });
         } else {
-          onProgress?.({
-            completed,
-            total,
-            phase: "saving",
-            message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
-          });
-          await plugin.app.fileManager.processFrontMatter(file, (next) => {
-            if (!Array.isArray(next.volume_log)) return;
-            next.volume_log = next.volume_log.map((raw: unknown): unknown => {
-              const entry = record(raw);
-              if (!entry || text(entry.label ?? entry.volume).trim() !== label || entry.cover) return raw;
-              return {
-                ...entry,
-                cover: cover.cover,
-                cover_provider: cover.provider,
-                cover_source_id: cover.sourceId,
-              };
+          let written = false;
+          try {
+            if (signal?.aborted) break;
+            onProgress?.({
+              completed,
+              total,
+              phase: "saving",
+              message: `${serialCoverText("migration.saving")} · ${work.title} · ${label}`,
             });
-          });
-          details.push({
-            filePath: file.path,
-            title: work.title,
-            label,
-            status: "loaded",
-            message: cover.provider,
-          });
+            if (signal?.aborted) break;
+            await plugin.app.fileManager.processFrontMatter(file, (next) => {
+              if (signal?.aborted || !Array.isArray(next.volume_log) || next.media_type !== work.mediaType) return;
+              next.volume_log = next.volume_log.map((raw: unknown): unknown => {
+                const entry = record(raw);
+                if (!entry || text(entry.label ?? entry.volume).normalize("NFKC").trim() !== label || entry.cover) return raw;
+                written = true;
+                return {
+                  ...entry,
+                  cover: cover.cover,
+                  cover_provider: cover.provider,
+                  cover_source_id: cover.sourceId,
+                };
+              });
+            });
+            details.push({
+              filePath: file.path,
+              title: work.title,
+              label,
+              status: written ? "loaded" : "skipped",
+              message: written ? cover.provider : serialCoverText("settings.metric.skipped"),
+            });
+          } finally {
+            plugin.releaseDownloadedCover(cover.cover);
+          }
         }
       } catch (error) {
         details.push({

@@ -111,6 +111,8 @@ export interface ExternalMediaResult {
   originalTitle: string;
   romajiTitle: string;
   mediaType: MediaType;
+  /** Provider-verified book subtype; absent when only the requested type is known. */
+  bookMediaTypeEvidence?: Extract<MediaType, "manga" | "novel">;
   format: string;
   total: number;
   unit: string;

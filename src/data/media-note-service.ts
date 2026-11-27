@@ -1,9 +1,10 @@
 import { App, Notice, TFile, requestUrl, normalizePath } from "obsidian";
 import { USER_AGENT } from "../app-metadata";
+import { remoteCoverExtension } from "../domain/remote-cover-format";
 import type { AnimeListSettings } from "../domain/settings-types";
 import type { ExternalMediaResult, MediaNoteForm } from "../domain/media-types";
 import type { MediaCoverAssetInput } from "../domain/manual-media";
-import { slugify, stringValue } from "../domain/value-normalization";
+import { slugify } from "../domain/value-normalization";
 import { normalizeMediaStatus } from "../domain/media-status";
 import { defaultProgressUnit, isReadingProgressUnit, normalizeSerialLog } from "../domain/progress-units";
 import { uiText } from "../ui-text";
@@ -42,15 +43,8 @@ export class MediaNoteService {
         "User-Agent": USER_AGENT,
       },
     });
-    const contentType = Object.entries(response.headers ?? {})
-      .find(([key]) => key.toLocaleLowerCase() === "content-type")?.[1] ?? "";
-    const extension = /webp/i.test(stringValue(contentType))
-      ? "webp"
-      : /png/i.test(stringValue(contentType))
-        ? "png"
-        : /avif/i.test(stringValue(contentType))
-          ? "avif"
-          : "jpg";
+    if (response.status < 200 || response.status >= 300) throw new Error(`Cover request failed (${response.status})`);
+    const extension = remoteCoverExtension(response.arrayBuffer);
     const folder = normalizePath(`${this.settings().coverFolder}/${result.mediaType}`);
     await this.storage.ensureFolder(folder);
     const filename = `${slugify(result.title)}-${result.provider}-${result.sourceId || Date.now()}`;

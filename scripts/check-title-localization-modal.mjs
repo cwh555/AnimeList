@@ -41,6 +41,7 @@ try {
     readFile(path.join(root, "styles.css"), "utf8"),
   ]);
   const setup = [
+    'window.createEl=function(tag){return document.createElement(tag)}',
     'HTMLElement.prototype.empty=function(){this.replaceChildren()}',
     'HTMLElement.prototype.addClass=function(...names){this.classList.add(...names)}',
     'HTMLElement.prototype.setText=function(text){this.textContent=text}',
@@ -68,7 +69,8 @@ try {
     '  checks.noWritesBeforeConfirm=notes[0].title==="日本語原題"&&notes[1].title==="Custom novel";',
     '  checks.sourceLink=!!root.querySelector("a[href=\\"https://bgm.tv/subject/88\\"]");',
     '  const confirm=[...root.querySelectorAll("button")].find(x=>x.textContent==="Update selected titles");',
-    '  checks.explicitApply=!!confirm&&!confirm.disabled;confirm?.click();',
+    '  checks.explicitApply=!!confirm&&!confirm.disabled;',
+    '  checks.sharedAction=confirm?.classList.contains("al-ui-button-primary")&&confirm.type==="button";confirm?.click();',
     '  for(let i=0;i<30&&!root.textContent.includes("Updated 1");i++)await new Promise(resolve=>setTimeout(resolve,20));',
     '  checks.applied=notes[0].title==="简体标题"&&notes[0].title_original==="日本語原題"&&notes[0].other_field==="keep"&&notes[1].title==="Custom novel"&&refreshed===1;',
     '  checks.history=notes[0].title_aliases?.includes("日本語原題")&&notes[0].tags[0]==="mine";',
